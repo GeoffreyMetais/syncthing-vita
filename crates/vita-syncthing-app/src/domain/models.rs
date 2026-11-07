@@ -1,0 +1,100 @@
+//! Pure domain models and value objects for PS Vita Syncthing.
+
+use syncthing_core::DeviceId;
+
+/// Number of visible rows in the `ux0:` directory browser.
+pub const BROWSER_ROWS: usize = 8;
+
+/// Colour theme modes supported by the UI.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ThemeMode {
+    Dark = 0,
+    Oled = 1,
+}
+
+/// Main navigation tabs in the left sidebar.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ActiveTab {
+    Dashboard = 0,
+    Shares = 1,
+    FolderPicker = 2,
+    Settings = 3,
+}
+
+/// Mode for the `Files` (`FolderPicker`) tab.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PickerMode {
+    /// Change target directory for `selected_share_idx`.
+    ChangeShareTarget,
+    /// Create a brand-new Syncthing share from the chosen directory.
+    CreateNewShare,
+}
+
+/// VitaSend-style modal dialogs drawn over dimmed background.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ModalDialog {
+    None,
+    /// Create a new share from a template or by browsing `ux0:`.
+    CreateShare { selected_idx: usize },
+    /// Add or remove remote Syncthing devices for a share.
+    ManageDevices {
+        share_idx: usize,
+        selected_dev_idx: usize,
+    },
+    /// Display the PS Vita's full Syncthing Device ID and scannable QR code.
+    ShowDeviceId,
+    /// Confirmation dialog before quitting the application (`START` button).
+    ConfirmQuit,
+}
+
+/// Known or discovered remote Syncthing device.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct KnownDevice {
+    pub device_id: DeviceId,
+    pub name: String,
+    pub address: String,
+}
+
+/// Syncthing shared folder configuration on PS Vita.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ShareConfigEntry {
+    pub folder_id: String,
+    pub label: String,
+    pub target_path: String,
+    pub enabled: bool,
+    /// Hex strings (`DeviceId::to_hex()`) of remote devices this folder is shared with.
+    pub shared_devices: Vec<String>,
+}
+
+/// Item in the target folder picker (`ux0:`).
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PickerItem {
+    pub label: String,
+    pub path: String,
+    pub is_preset: bool,
+}
+
+/// Templates offered in the `Create New Share` modal dialog.
+pub const NEW_SHARE_TEMPLATES: &[(&str, &str, &str)] = &[
+    ("vita-savedata", "Vita Save Data", "ux0:user/00/savedata"),
+    ("vita-pictures", "Vita Screenshots & Pictures", "ux0:picture"),
+    ("vita-music", "Vita Music Library", "ux0:music"),
+    (
+        "retroarch-saves",
+        "RetroArch Savefiles",
+        "ux0:data/retroarch/savefiles",
+    ),
+    ("vita-shared", "Vita Shared Folder", "ux0:data/syncthing/shared"),
+    ("__browse__", "Browse ux0: to pick any custom folder...", "ux0:"),
+];
+
+/// Format byte sizes cleanly ("1.5 KB", "3.2 MB").
+pub fn fmt_size(b: usize) -> String {
+    if b < 1024 {
+        format!("{} B", b)
+    } else if b < 1024 * 1024 {
+        format!("{:.1} KB", (b as f64) / 1024.0)
+    } else {
+        format!("{:.1} MB", (b as f64) / (1024.0 * 1024.0))
+    }
+}

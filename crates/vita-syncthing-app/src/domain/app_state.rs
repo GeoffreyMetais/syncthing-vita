@@ -1,0 +1,189 @@
+//! Application state (`AppState`) holding all domain, navigation, and view-model state
+//! independently of the 2D renderer or hardware framebuffer.
+
+use crate::domain::models::{
+    ActiveTab, KnownDevice, ModalDialog, PickerItem, PickerMode, ShareConfigEntry, ThemeMode,
+    BROWSER_ROWS,
+};
+
+/// Pure application state for PS Vita Syncthing.
+/// All UI screens and modals read `&AppState` without performing I/O or mutating business rules.
+pub struct AppState {
+    pub theme_mode: ThemeMode,
+    pub active_tab: ActiveTab,
+    pub picker_mode: PickerMode,
+    pub modal: ModalDialog,
+    pub oled_saver_active: bool,
+    pub saver_x: f32,
+    pub saver_y: f32,
+    pub saver_vx: f32,
+    pub saver_vy: f32,
+    pub sync_in_progress: bool,
+    pub vita_device_id: String,
+    pub peer_label: String,
+    pub folder_label: String,
+    pub status_line: String,
+    pub current_file: String,
+    pub progress_pct: u32,
+    pub files_up_to_date: usize,
+    pub files_downloaded: usize,
+    pub blocks_uploaded: usize,
+    pub bytes_transferred: usize,
+    pub shares: Vec<ShareConfigEntry>,
+    pub devices: Vec<KnownDevice>,
+    pub selected_share_idx: usize,
+    pub picker_current_dir: String,
+    pub picker_items: Vec<PickerItem>,
+    pub selected_picker_idx: usize,
+    pub picker_top_idx: usize,
+    pub logs: Vec<String>,
+    pub toast_msg: Option<(String, u32)>,
+}
+
+impl AppState {
+    pub fn new(
+        shares: Vec<ShareConfigEntry>,
+        devices: Vec<KnownDevice>,
+        default_browse_root: &str,
+    ) -> Self {
+        Self {
+            theme_mode: ThemeMode::Dark,
+            active_tab: ActiveTab::Dashboard,
+            picker_mode: PickerMode::ChangeShareTarget,
+            modal: ModalDialog::None,
+            oled_saver_active: false,
+            saver_x: 180.0,
+            saver_y: 160.0,
+            saver_vx: 0.65,
+            saver_vy: 0.45,
+            sync_in_progress: false,
+            vita_device_id: "Initializing...".to_owned(),
+            peer_label: "Scanning UDP 21027...".to_owned(),
+            folder_label: "No folders synced yet".to_owned(),
+            status_line: "Ready · Press Cross to synchronize".to_owned(),
+            current_file: "-".to_owned(),
+            progress_pct: 0,
+            files_up_to_date: 0,
+            files_downloaded: 0,
+            blocks_uploaded: 0,
+            bytes_transferred: 0,
+            shares,
+            devices,
+            selected_share_idx: 0,
+            picker_current_dir: default_browse_root.to_owned(),
+            picker_items: Vec::new(),
+            selected_picker_idx: 0,
+            picker_top_idx: 0,
+            logs: Vec::with_capacity(32),
+            toast_msg: None,
+        }
+    }
+
+    /// Toggles between Dark (VitaSend slate) and OLED (pure `#000000`) theme modes.
+    pub fn toggle_theme(&mut self) {
+        self.theme_mode = match self.theme_mode {
+            ThemeMode::Dark => ThemeMode::Oled,
+            ThemeMode::Oled => ThemeMode::Dark,
+        };
+        let label = match self.theme_mode {
+            ThemeMode::Dark => "Theme: Dark (Blue-Grey)",
+            ThemeMode::Oled => "Theme: OLED (Pure Black #000000)",
+        };
+        self.show_toast(label);
+    }
+
+    /// Displays a transient toast notification for ~1.8 seconds (110 frames at 60 FPS).
+    pub fn show_toast(&mut self, msg: &str) {
+        self.toast_msg = Some((msg.to_owned(), 110));
+    }
+
+    /// Decrements the toast timer by one frame.
+    pub fn tick_toast(&mut self) {
+        if let Some((_, ref mut ticks)) = self.toast_msg {
+            if *ticks <= 1 {
+                self.toast_msg = None;
+            } else {
+                *ticks -= 1;
+            }
+        }
+    }
+
+    /// Advances the bouncing DVD-style OLED screensaver position within the given screen bounds.
+    pub fn step_screensaver(&mut self, screen_w: f32, screen_h: f32, box_w: f32, box_h: f32) {
+        self.saver_x += self.saver_vx;
+        self.saver_y += self.saver_vy;
+        let max_x = screen_w - box_w - 12.0;
+        let max_y = screen_h - box_h - 12.0;
+        if self.saver_x < 12.0 {
+            self.saver_x = 12.0;
+            self.saver_vx = -self.saver_vx;
+        } else if self.saver_x > max_x {
+            self.saver_x = max_x;
+            self.saver_vx = -self.saver_vx;
+        }
+        if self.saver_y < 12.0 {
+            self.saver_y = 12.0;
+            self.saver_vy = -self.saver_vy;
+        } else if self.saver_y > max_y {
+            self.saver_y = max_y;
+            self.saver_vy = -self.saver_vy;
+        }
+    }
+
+    /// Ensures the directory picker scroll window (`picker_top_idx`) keeps `selected_picker_idx` visible.
+    pub fn clamp_picker_scroll(&mut self) {
+        if self.picker_items.is_empty() {
+            self.selected_picker_idx = 0;
+            self.picker_top_idx = 0;
+            return;
+        }
+        if self.selected_picker_idx >= self.picker_items.len() {
+            self.selected_picker_idx = self.picker_items.len() - 1;
+        }
+        if self.selected_picker_idx < self.picker_top_idx {
+            self.picker_top_idx = self.selected_picker_idx;
+        } else if self.selected_picker_idx >= self.picker_top_idx + BROWSER_ROWS {
+            self.picker_top_idx = self.selected_picker_idx + 1 - BROWSER_ROWS;
+        }
+    }
+
+    /// Appends a sanitized line to the in-memory protocol log ring buffer (retaining last 14 entries).
+    pub fn push_log(&mut self, line: &str) {
+        let clean: String = line
+            .chars()
+            .filter(|&c| c >= ' ' && c != '\u{7f}')
+            .collect();
+        self.logs.push(clean.trim().to_owned());
+        if self.logs.len() > 14 {
+            self.logs.remove(0);
+        }
+    }
+
+    /// Resets transfer counters at the beginning of a manual synchronization cycle.
+    pub fn prepare_manual_sync(&mut self) {
+        self.sync_in_progress = true;
+        self.files_up_to_date = 0;
+        self.files_downloaded = 0;
+        self.blocks_uploaded = 0;
+        self.bytes_transferred = 0;
+        self.progress_pct = 5;
+        self.status_line = "Starting synchronization...".to_owned();
+        self.show_toast("Synchronizing with LAN peers...");
+    }
+
+    /// Human-readable summary of devices linked to a share.
+    pub fn share_devices_summary(&self, share: &ShareConfigEntry) -> String {
+        if share.shared_devices.is_empty() {
+            return "No devices linked (Press Cross to add a device)".to_owned();
+        }
+        let mut names = Vec::new();
+        for hex in &share.shared_devices {
+            if let Some(dev) = self.devices.iter().find(|d| &d.device_id.to_hex() == hex) {
+                names.push(format!("{} ({})", dev.name, dev.device_id.short()));
+            } else if hex.len() >= 7 {
+                names.push(hex[..7].to_uppercase());
+            }
+        }
+        format!("Shared with: {}", names.join(", "))
+    }
+}

@@ -87,9 +87,9 @@ pub enum PadButton {
     DpadUd,
 }
 
-static FONT_POPPINS_REG: &[u8] = include_bytes!("../assets/fonts/font_poppins_regular.ttf");
-static FONT_POPPINS_MED: &[u8] = include_bytes!("../assets/fonts/font_poppins_medium.ttf");
-static FONT_POPPINS_BOLD: &[u8] = include_bytes!("../assets/fonts/font_poppins_bold.ttf");
+static FONT_POPPINS_REG: &[u8] = include_bytes!("../../assets/fonts/font_poppins_regular.ttf");
+static FONT_POPPINS_MED: &[u8] = include_bytes!("../../assets/fonts/font_poppins_medium.ttf");
+static FONT_POPPINS_BOLD: &[u8] = include_bytes!("../../assets/fonts/font_poppins_bold.ttf");
 
 #[derive(Clone)]
 struct CachedGlyph {

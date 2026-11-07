@@ -1,4 +1,4 @@
-//! Unified PS Vita input management:
+//! Unified PS Vita input hardware driver:
 //! - Gamepad & analog sticks (`SceCtrl`: D-Pad, Cross, Circle, Square, Triangle, L, R, Select, Start)
 //! - Front touchscreen (`SceTouch`: coordinate scaling `1920x1088` -> `960x544` and tap/press detection)
 

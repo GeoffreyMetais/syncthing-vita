@@ -15,7 +15,7 @@ This document provides essential architectural context, build workflows, and **r
 ## 2. Workspace Architecture
 
 ```text
-/mnt/projects/vita-dev
+syncthing-vita
 ├── Cargo.toml                        # Workspace manifest (Edition 2021, LTO + opt-level = "z")
 ├── Justfile                          # Task runner (test-host, check-vita, build-vita, vpk)
 ├── scripts/build_vpk.sh              # Full VPK build pipeline (vita-elf-create, vita-make-fself, vita-mksfoex, vita-pack-vpk)
@@ -28,13 +28,41 @@ This document provides essential architectural context, build workflows, and **r
     │       ├── cert.rs               # Deterministic/random ECDSA P-256 X.509 certificate & DER generator
     │       ├── tls.rs                # TLS 1.3 mutual-auth handshake (ALPN "bep/1.0") + bidirectional delta sync
     │       └── storage.rs            # SyncStorage trait & FsSyncStorage (128 KiB streaming I/O, local folder registry)
-    └── vita-syncthing-app/           # Native PlayStation Vita GUI application (Title ID: SYNCTHING)
+    └── vita-syncthing-app/           # Native PlayStation Vita GUI application (Title ID: SYNCTHING, Clean Architecture)
         ├── assets/fonts/             # Embedded Poppins TrueType fonts (Regular, Medium, Bold — SIL OFL 1.1)
         └── src/
-            ├── main.rs               # PS Vita entry point, SceNet/SceSysmodule init, worker thread, input routing
-            ├── gfx.rs                # 960x544 RGBA8888 2D anti-aliased vector & TrueType software renderer
-            ├── display.rs            # VitaSend-style GUI (Sidebar, Overview, Shares, Files, Settings, Modals, OLED Saver)
-            └── input.rs              # SceCtrl gamepad/analog + SceTouch front touchscreen (1920x1088 -> 960x544)
+            ├── main.rs               # Composition root, 60 FPS event loop, and PS Vita kernel symbols
+            ├── domain/               # Layer 1: Pure Domain Entities, Value Objects & Application State
+            │   ├── mod.rs
+            │   ├── models.rs         # KnownDevice, ShareConfigEntry, PickerItem, ActiveTab, PickerMode, ModalDialog, ThemeMode
+            │   └── app_state.rs      # AppState (pure state & view-model queries, zero I/O or rendering dependencies)
+            ├── application/          # Layer 2: Use Cases, Input Controller & Sync Event Coordinator
+            │   ├── mod.rs
+            │   ├── share_service.rs  # ShareService (create_share, upsert_device, toggle_device_for_share, refresh_picker_items)
+            │   ├── sync_coordinator.rs # SyncCoordinator (maps WorkerMsg & SyncEvent into AppState & ShareService)
+            │   └── input_controller.rs # InputController (routes InputFrame -> AppState + ShareService -> UserCommand)
+            ├── infrastructure/       # Layer 3: Persistence, OS Filesystem, PS Vita Hardware & BEP Worker Thread
+            │   ├── mod.rs
+            │   ├── config_repo.rs    # ConfigRepository (devices.cfg, shares.cfg, syncthing.log, ux0: directory listing)
+            │   ├── identity_store.rs # IdentityStore (sceKernelGetRandomNumber, device_seed.bin, cert.der)
+            │   ├── vita_system.rs    # init_vita_network (SceSysmodule + SceSysmem + SceNet + SceNetCtl)
+            │   ├── sync_worker.rs    # spawn_sync_worker (background thread for fast-path BEP + UDP discovery + TLS 1.3)
+            │   ├── framebuffer.rs    # VitaFramebuffer (SceDisplay + SceSysmem 960x544 RGBA8888 hardware driver)
+            │   └── input.rs          # VitaInput & InputFrame (SceCtrl + SceTouch hardware driver)
+            └── ui/                   # Layer 4: Pure Presentation & Rendering Layer (reads &AppState, zero business logic)
+                ├── mod.rs
+                ├── gfx.rs            # 960x544 RGBA8888 2D anti-aliased vector & TrueType software renderer
+                ├── theme.rs          # UiTheme (Dark & OLED palettes) and layout constants
+                ├── widgets.rs        # Reusable VitaSend UI components (cards, chips, actions, checkboxes, chrome, toast)
+                ├── screens/          # Feature-split screen views (Overview, Shares, Files, Settings, OLED Screensaver)
+                │   ├── mod.rs
+                │   ├── dashboard.rs
+                │   ├── shares.rs
+                │   ├── folder_picker.rs
+                │   ├── settings.rs
+                │   └── screensaver.rs
+                ├── modals.rs         # Modal dialog views (CreateShare, ManageDevices, ShowDeviceId + QR, ConfirmQuit)
+                └── renderer.rs       # VitaUiRenderer (coordinates Gfx + VitaFramebuffer presentation)
 ```
 
 ---
