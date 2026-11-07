@@ -1,0 +1,22 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/syncthing-core",
+    "crates/vita-syncthing-app",
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2021"
+license = "MPL-2.0"
+
+[workspace.dependencies]
+syncthing-core = { path = "crates/syncthing-core" }
+libc = "0.2"
+
+[profile.release]
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"
+strip = false # Important: preserve relocations (-Wl,-q) for vita-elf-create

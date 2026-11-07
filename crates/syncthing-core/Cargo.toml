@@ -1,0 +1,11 @@
+[package]
+name = "syncthing-core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+rustls = { version = "0.23", default-features = false, features = ["std", "tls12"] }
+rustls-rustcrypto = "0.0.2-alpha"
+sha2 = "0.10"
+p256 = { version = "0.13", features = ["ecdsa", "pkcs8"] }

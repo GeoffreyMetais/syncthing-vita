@@ -1,0 +1,23 @@
+[package]
+name = "vita-syncthing-app"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[dependencies]
+syncthing-core = { workspace = true }
+libc = { workspace = true }
+ab_glyph = "0.2"
+qrcodegen = "1.8"
+
+# PS Vita target specific dependencies
+[target.'cfg(target_os = "vita")'.dependencies]
+# vitasdk-sys = "0.2"
+
+# Metadata used by `cargo-vita` (`cargo +nightly vita build vpk`)
+[package.metadata.vita]
+title_id = "SYNC00001"
+title_name = "VitaSyncthing"
+assets = []
+vita_make_fself_flags = ["-c"]
+vita_mksfoex_flags = ["-d", "ATTRIBUTE2=12"]

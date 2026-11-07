@@ -1,0 +1,18 @@
+[build]
+# Uncomment to build for PS Vita by default:
+# target = "armv7-sony-vita-newlibeabihf"
+
+[target.armv7-sony-vita-newlibeabihf]
+linker = "arm-vita-eabi-gcc"
+ar = "arm-vita-eabi-ar"
+rustflags = [
+    "-C", "link-arg=-Wl,-q",
+    "-C", "link-arg=-mcpu=cortex-a9",
+    "-C", "link-arg=-mfpu=neon-fp16",
+    "-C", "link-arg=-mfloat-abi=hard",
+    "-C", "opt-level=2",
+]
+
+# Note: For Tier-3 target `armv7-sony-vita-newlibeabihf`, `build-std` is passed via
+# `cargo +nightly build -Z build-std=std,panic_abort` in `scripts/build_vpk.sh`
+# so native x86_64 host builds/tests are not affected.
