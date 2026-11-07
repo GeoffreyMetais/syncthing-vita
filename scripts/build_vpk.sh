@@ -2,8 +2,8 @@
 set -euo pipefail
 
 APP_NAME="vita-syncthing-app"
-TITLE_ID="SYNC00001"
-TITLE_NAME="VitaSyncthing"
+TITLE_ID="SYNCTHING"
+TITLE_NAME="Syncthing"
 TARGET="armv7-sony-vita-newlibeabihf"
 PROFILE="${PROFILE:-release}"
 

@@ -1,6 +1,6 @@
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
-title_id := "SYNC00001"
+title_id := "SYNCTHING"
 target := "armv7-sony-vita-newlibeabihf"
 vpk_path := "target/" + target + "/release/" + title_id + ".vpk"
 vita3k_bin := env_var_or_default("VITA3K_BIN", env_var("HOME") + "/.local/bin/Vita3K")
@@ -30,7 +30,7 @@ setup-firmware:
     {{vita3k_bin}} --console 1 --firmware /tmp/vita-fw/PSP2UPDAT.PUP
     {{vita3k_bin}} --console 1 --firmware /tmp/vita-fw/FONT_PSP2UPDAT.PUP
 
-# Build .vpk, deploy to ux0:app/SYNC00001 and run inside Vita3K with log streaming
+# Build .vpk, deploy to ux0:app/SYNCTHING and run inside Vita3K with log streaming
 run-vita3k: vpk
     @echo "Deploying {{vpk_path}} to {{vita3k_ux0}}/app/{{title_id}}..."
     mkdir -p "{{vita3k_ux0}}/app/{{title_id}}"

@@ -16,8 +16,8 @@ qrcodegen = "1.8"
 
 # Metadata used by `cargo-vita` (`cargo +nightly vita build vpk`)
 [package.metadata.vita]
-title_id = "SYNC00001"
-title_name = "VitaSyncthing"
+title_id = "SYNCTHING"
+title_name = "Syncthing"
 assets = []
 vita_make_fself_flags = ["-c"]
 vita_mksfoex_flags = ["-d", "ATTRIBUTE2=12"]

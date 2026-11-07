@@ -1,4 +1,4 @@
-# AGENTS.md — Contributor & AI Agent Guide for VitaSyncthing (`SYNC00001`)
+# AGENTS.md — Contributor & AI Agent Guide for VitaSyncthing (`SYNCTHING`)
 
 This document provides essential architectural context, build workflows, and **real PlayStation Vita hardware constraints** for future coding sessions. Read this file before modifying any crate or build script.
 
@@ -28,7 +28,7 @@ This document provides essential architectural context, build workflows, and **r
     │       ├── cert.rs               # Deterministic/random ECDSA P-256 X.509 certificate & DER generator
     │       ├── tls.rs                # TLS 1.3 mutual-auth handshake (ALPN "bep/1.0") + bidirectional delta sync
     │       └── storage.rs            # SyncStorage trait & FsSyncStorage (128 KiB streaming I/O, local folder registry)
-    └── vita-syncthing-app/           # Native PlayStation Vita GUI application (Title ID: SYNC00001)
+    └── vita-syncthing-app/           # Native PlayStation Vita GUI application (Title ID: SYNCTHING)
         ├── assets/fonts/             # Embedded Poppins TrueType fonts (Regular, Medium, Bold — SIL OFL 1.1)
         └── src/
             ├── main.rs               # PS Vita entry point, SceNet/SceSysmodule init, worker thread, input routing
@@ -115,7 +115,7 @@ just vpk
 ```
 Output package:
 ```text
-target/armv7-sony-vita-newlibeabihf/release/SYNC00001.vpk
+target/armv7-sony-vita-newlibeabihf/release/SYNCTHING.vpk
 ```
 
 ### Verify Symbol Exports in the Vita ELF
@@ -126,8 +126,8 @@ After running `just vpk`, you can verify that the required Newlib heap and threa
 
 ### Install & Smoke-Test in Vita3K (Local Emulator)
 ```bash
-unzip -o target/armv7-sony-vita-newlibeabihf/release/SYNC00001.vpk -d ~/.local/share/Vita3K/Vita3K/ux0/app/SYNC00001
-timeout 6s ~/.local/bin/Vita3K --console 1 --frontend sdl -l 2 -r SYNC00001 || true
+unzip -o target/armv7-sony-vita-newlibeabihf/release/SYNCTHING.vpk -d ~/.local/share/Vita3K/Vita3K/ux0/app/SYNCTHING
+timeout 6s ~/.local/bin/Vita3K --console 1 --frontend sdl -l 2 -r SYNCTHING || true
 ```
 
 ---
