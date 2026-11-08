@@ -53,6 +53,9 @@ fn main() {
     let devices = repo.load_devices();
     let shares = repo.load_shares();
     let mut state = AppState::new(shares, devices, ConfigRepository::default_browse_root());
+    if let Ok(ref id) = identity_res {
+        state.vita_device_id = id.device_id.to_syncthing_string();
+    }
     ShareService::refresh_picker_items(&mut state, &repo);
 
     let mut renderer = Box::new(VitaUiRenderer::new());
@@ -165,7 +168,9 @@ fn main() {
             repo.write_log("Automatic OLED screensaver activation (#000000).");
         }
 
+        // On PS Vita, `render` blocks on VBlank (double-buffered flip), which paces the loop at 60 FPS.
         renderer.render(&mut state);
+        #[cfg(not(target_os = "vita"))]
         std::thread::sleep(Duration::from_millis(16));
     }
 }

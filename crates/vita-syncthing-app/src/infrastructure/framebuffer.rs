@@ -10,8 +10,12 @@ const FB_ALIGNED_SIZE: usize = 2 * 1024 * 1024;
 mod display_ffi {
     use libc::{c_char, c_int, c_uint, c_void};
 
-    pub const SCE_KERNEL_MEMBLOCK_TYPE_USER_CDRAM_RW: c_uint = 0x0C20D060;
-    pub const SCE_KERNEL_MEMBLOCK_TYPE_USER_MAIN_PHYCONT_NC_RW: c_uint = 0x0C20D050;
+    /// Real VitaSDK CDRAM uncached RW memory block type (`psp2common/kernel/sysmem.h`).
+    pub const SCE_KERNEL_MEMBLOCK_TYPE_USER_CDRAM_RW: c_uint = 0x09408060;
+    /// Real VitaSDK physically contiguous uncached main memory block type (`psp2common/kernel/sysmem.h`).
+    pub const SCE_KERNEL_MEMBLOCK_TYPE_USER_MAIN_PHYCONT_NC_RW: c_uint = 0x0D808060;
+    /// Fallback uncached main memory block type (`psp2common/kernel/sysmem.h`).
+    pub const SCE_KERNEL_MEMBLOCK_TYPE_USER_RW_UNCACHE: c_uint = 0x0C208060;
     pub const SCE_DISPLAY_SETBUF_NEXTFRAME: c_int = 1;
 
     #[repr(C)]
@@ -45,20 +49,30 @@ mod display_ffi {
     }
 }
 
-/// Manages the physical CDRAM/PHYCONT framebuffer on PS Vita and VBlank presentation.
+/// Initial fill colour for the hardware buffers (matches the dark UI background, `rgb(15, 19, 23)`).
+#[cfg(target_os = "vita")]
+const FB_CLEAR_COLOR: u32 = 0xFF17_130F;
+
+/// Manages two physical CDRAM/PHYCONT framebuffers on PS Vita (double buffering) and VBlank presentation.
+///
+/// The frame is always written into the *back* buffer (not visible), then flipped to the display
+/// on the next VBlank via `sceDisplaySetFrameBuf(.., SCE_DISPLAY_SETBUF_NEXTFRAME)`. This prevents
+/// tearing/flicker caused by copying into the buffer currently being scanned out.
 pub struct VitaFramebuffer {
     #[cfg(target_os = "vita")]
-    mem_uid: i32,
+    mem_uids: [i32; 2],
     #[cfg(target_os = "vita")]
-    fb_ptr: *mut u32,
+    fb_ptrs: [*mut u32; 2],
+    /// Index of the buffer that will receive the next frame (not currently displayed).
+    #[cfg(target_os = "vita")]
+    back_idx: usize,
 }
 
 impl VitaFramebuffer {
     pub fn new() -> Self {
         #[cfg(target_os = "vita")]
         {
-            let (mem_uid, fb_ptr) = Self::init_vita_fb();
-            Self { mem_uid, fb_ptr }
+            Self::init_vita_fb()
         }
         #[cfg(not(target_os = "vita"))]
         {
@@ -68,7 +82,7 @@ impl VitaFramebuffer {
     }
 
     #[cfg(target_os = "vita")]
-    fn init_vita_fb() -> (i32, *mut u32) {
+    fn alloc_buffer() -> (i32, *mut u32) {
         use display_ffi::*;
         use std::ptr;
 
@@ -88,6 +102,14 @@ impl VitaFramebuffer {
                 );
             }
             if uid < 0 {
+                uid = sceKernelAllocMemBlock(
+                    b"vita_syncthing_fb\0".as_ptr() as *const libc::c_char,
+                    SCE_KERNEL_MEMBLOCK_TYPE_USER_RW_UNCACHE,
+                    FB_ALIGNED_SIZE as i32,
+                    ptr::null(),
+                );
+            }
+            if uid < 0 {
                 return (-1, ptr::null_mut());
             }
 
@@ -96,32 +118,62 @@ impl VitaFramebuffer {
                 return (uid, ptr::null_mut());
             }
 
-            let fb_param = SceDisplayFrameBuf {
-                size: std::mem::size_of::<SceDisplayFrameBuf>() as u32,
-                base,
-                pitch: SCREEN_W as u32,
-                pixelformat: 0,
-                width: SCREEN_W as u32,
-                height: SCREEN_H as u32,
-            };
-            let _ = sceDisplaySetFrameBuf(&fb_param, SCE_DISPLAY_SETBUF_NEXTFRAME);
-            let _ = sceDisplayWaitVblankStart();
+            // Clear uninitialized memory so no garbage is ever shown on screen.
+            std::slice::from_raw_parts_mut(base as *mut u32, SCREEN_W * SCREEN_H)
+                .fill(FB_CLEAR_COLOR);
 
             (uid, base as *mut u32)
         }
     }
 
-    /// Copies the 960x544 RGBA8888 backbuffer to CDRAM and waits for VBlank.
-    pub fn present(&self, pixels: &[u32]) {
-        #[cfg(target_os = "vita")]
+    #[cfg(target_os = "vita")]
+    fn set_display_buffer(ptr: *mut u32) {
+        use display_ffi::*;
+
+        let fb_param = SceDisplayFrameBuf {
+            size: std::mem::size_of::<SceDisplayFrameBuf>() as u32,
+            base: ptr as *mut libc::c_void,
+            pitch: SCREEN_W as u32,
+            pixelformat: 0,
+            width: SCREEN_W as u32,
+            height: SCREEN_H as u32,
+        };
         unsafe {
-            if !self.fb_ptr.is_null() && pixels.len() >= SCREEN_W * SCREEN_H {
-                std::ptr::copy_nonoverlapping(
-                    pixels.as_ptr(),
-                    self.fb_ptr,
-                    SCREEN_W * SCREEN_H,
-                );
-                let _ = display_ffi::sceDisplayWaitVblankStart();
+            let _ = sceDisplaySetFrameBuf(&fb_param, SCE_DISPLAY_SETBUF_NEXTFRAME);
+        }
+    }
+
+    #[cfg(target_os = "vita")]
+    fn init_vita_fb() -> Self {
+        let (uid0, ptr0) = Self::alloc_buffer();
+        let (uid1, mut ptr1) = Self::alloc_buffer();
+        // Fall back to single buffering if the second allocation failed.
+        if ptr1.is_null() {
+            ptr1 = ptr0;
+        }
+
+        Self {
+            mem_uids: [uid0, uid1],
+            fb_ptrs: [ptr0, ptr1],
+            back_idx: 0,
+        }
+    }
+
+    /// Copies the 960x544 RGBA8888 backbuffer into the hidden hardware buffer,
+    /// flips it to the display on the next VBlank, and waits for that VBlank.
+    pub fn present(&mut self, pixels: &[u32]) {
+        #[cfg(target_os = "vita")]
+        {
+            let dst = self.fb_ptrs[self.back_idx];
+            if !dst.is_null() && pixels.len() >= SCREEN_W * SCREEN_H {
+                unsafe {
+                    std::ptr::copy_nonoverlapping(pixels.as_ptr(), dst, SCREEN_W * SCREEN_H);
+                }
+                Self::set_display_buffer(dst);
+                unsafe {
+                    let _ = display_ffi::sceDisplayWaitVblankStart();
+                }
+                self.back_idx ^= 1;
             }
         }
         #[cfg(not(target_os = "vita"))]
@@ -132,6 +184,6 @@ impl VitaFramebuffer {
 impl Drop for VitaFramebuffer {
     fn drop(&mut self) {
         #[cfg(target_os = "vita")]
-        let _ = self.mem_uid;
+        let _ = self.mem_uids;
     }
 }
