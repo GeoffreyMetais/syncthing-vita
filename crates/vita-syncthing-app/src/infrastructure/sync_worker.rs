@@ -84,10 +84,13 @@ pub fn spawn_sync_worker(
         // Fast-path: if we already have known devices linked to one of our shares, connect directly first
         // so the BEP/1.0 connection stays persistent without a 2-second discovery gap between cycles.
         for kd in &known_devices {
-            let kd_hex = kd.device_id.to_hex();
-            let is_linked = shares_snapshot
-                .iter()
-                .any(|s| s.enabled && s.shared_devices.contains(&kd_hex));
+            let is_linked = shares_snapshot.iter().any(|s| {
+                s.enabled
+                    && s.shared_devices
+                        .iter()
+                        .filter_map(|h| DeviceId::from_hex(h))
+                        .any(|id| id.matches_peer(&kd.device_id))
+            });
             if !is_linked {
                 continue;
             }
@@ -137,7 +140,11 @@ pub fn spawn_sync_worker(
             Ok(mut res) => {
                 // Include any previously saved devices from `devices.cfg` if not in discovered_peers
                 for kd in &known_devices {
-                    if !res.discovered_peers.iter().any(|(_, a)| a.id == kd.device_id) {
+                    if !res
+                        .discovered_peers
+                        .iter()
+                        .any(|(_, a)| a.id.matches_peer(&kd.device_id))
+                    {
                         if let Ok(sock_addr) = kd.address.parse::<std::net::SocketAddr>() {
                             res.discovered_peers.push((
                                 sock_addr,
@@ -162,12 +169,14 @@ pub fn spawn_sync_worker(
                     return;
                 }
 
-                // Prioritize peers that are explicitly linked to one of our shares
+                // Prioritize peers that are explicitly linked to one of our shares (full or short ID)
                 res.discovered_peers.sort_by_key(|(_, peer)| {
-                    let p_hex = peer.id.to_hex();
-                    let is_linked = shares_snapshot
-                        .iter()
-                        .any(|s| s.shared_devices.contains(&p_hex));
+                    let is_linked = shares_snapshot.iter().any(|s| {
+                        s.shared_devices
+                            .iter()
+                            .filter_map(|h| DeviceId::from_hex(h))
+                            .any(|id| id.matches_peer(&peer.id))
+                    });
                     !is_linked
                 });
 

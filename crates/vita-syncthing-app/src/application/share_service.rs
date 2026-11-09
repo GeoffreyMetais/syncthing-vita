@@ -21,6 +21,7 @@ impl ShareService {
     }
 
     /// Registers or updates a discovered/connected Syncthing device and links any unassigned shares.
+    /// Automatically upgrades any user-added Short ID placeholder matching `device_id` to the full 32-byte ID.
     pub fn upsert_device(
         state: &mut AppState,
         repo: &ConfigRepository,
@@ -29,11 +30,24 @@ impl ShareService {
         address: &str,
     ) {
         let dev_hex = device_id.to_hex();
-        if let Some(existing) = state.devices.iter_mut().find(|d| d.device_id == device_id) {
+        let mut upgraded_from_hex: Option<String> = None;
+
+        if let Some(existing) = state
+            .devices
+            .iter_mut()
+            .find(|d| d.device_id.matches_peer(&device_id))
+        {
+            if existing.device_id != device_id && existing.device_id.is_short_placeholder() {
+                upgraded_from_hex = Some(existing.device_id.to_hex());
+                existing.device_id = device_id;
+                if existing.name.contains("(Short ID)") {
+                    existing.name = format!("Device {}", device_id.short());
+                }
+            }
             if !name.is_empty() && name != "LAN Peer" {
                 existing.name = name.to_owned();
             }
-            if !address.is_empty() {
+            if !address.is_empty() && address != "dynamic" {
                 existing.address = address.to_owned();
             }
         } else {
@@ -48,6 +62,19 @@ impl ShareService {
                 address: address.to_owned(),
             });
         }
+
+        // If a shortened ID placeholder was upgraded to a full 32-byte DeviceId, update all shares
+        if let Some(old_hex) = upgraded_from_hex {
+            for s in &mut state.shares {
+                for h in &mut s.shared_devices {
+                    if *h == old_hex {
+                        *h = dev_hex.clone();
+                    }
+                }
+                s.shared_devices.dedup();
+            }
+        }
+
         // Automatically link any share that had empty devices to this device
         for s in &mut state.shares {
             if s.shared_devices.is_empty() {
@@ -56,6 +83,102 @@ impl ShareService {
         }
         repo.save_devices(&state.devices);
         repo.save_shares(&state.shares);
+    }
+
+    /// Parses and adds a Syncthing device from user input (7+ char Short ID, full 56-char ID, or `ID@ip[:port]`).
+    /// Links the device to `share_idx` (if `Some`) and to any shares without devices.
+    /// Returns `Ok((resolved_device_id, device_name, is_short_placeholder))`.
+    pub fn add_device_by_input(
+        state: &mut AppState,
+        repo: &ConfigRepository,
+        raw_input: &str,
+        share_idx: Option<usize>,
+    ) -> Result<(DeviceId, String, bool), String> {
+        let trimmed = raw_input.trim();
+        let (id_part, addr_part) = if let Some((left, right)) = trimmed.split_once('@') {
+            let clean_addr = right.trim();
+            let formatted_addr = if clean_addr.is_empty() {
+                None
+            } else if clean_addr.contains(':') {
+                Some(clean_addr.to_owned())
+            } else {
+                Some(format!("{}:22000", clean_addr))
+            };
+            (left.trim(), formatted_addr)
+        } else {
+            (trimmed, None)
+        };
+
+        let parsed_id = DeviceId::parse_user_id(id_part)?;
+
+        if let Ok(own_id) = DeviceId::parse_user_id(&state.vita_device_id) {
+            if own_id.matches_peer(&parsed_id) {
+                return Err("Cannot add this PS Vita's own Device ID".to_owned());
+            }
+        }
+
+        let mut upgraded_from_hex: Option<String> = None;
+        let (resolved_id, dev_name) = if let Some(existing) = state
+            .devices
+            .iter_mut()
+            .find(|d| d.device_id.matches_peer(&parsed_id))
+        {
+            if existing.device_id.is_short_placeholder() && !parsed_id.is_short_placeholder() {
+                upgraded_from_hex = Some(existing.device_id.to_hex());
+                existing.device_id = parsed_id;
+                if existing.name.contains("(Short ID)") {
+                    existing.name = format!("Device {}", parsed_id.short());
+                }
+            }
+            if let Some(addr) = addr_part {
+                existing.address = addr;
+            }
+            (existing.device_id, existing.name.clone())
+        } else {
+            let label = if parsed_id.is_short_placeholder() {
+                format!("Peer {} (Short ID)", parsed_id.short())
+            } else {
+                format!("Device {}", parsed_id.short())
+            };
+            let address = addr_part.unwrap_or_else(|| "dynamic".to_owned());
+            state.devices.push(KnownDevice {
+                device_id: parsed_id,
+                name: label.clone(),
+                address,
+            });
+            (parsed_id, label)
+        };
+
+        let dev_hex = resolved_id.to_hex();
+        if let Some(old_hex) = upgraded_from_hex {
+            for s in &mut state.shares {
+                for h in &mut s.shared_devices {
+                    if *h == old_hex {
+                        *h = dev_hex.clone();
+                    }
+                }
+                s.shared_devices.dedup();
+            }
+        }
+
+        if let Some(idx) = share_idx {
+            if let Some(share) = state.shares.get_mut(idx) {
+                if !share.shared_devices.contains(&dev_hex) {
+                    share.shared_devices.push(dev_hex.clone());
+                }
+            }
+        }
+
+        for s in &mut state.shares {
+            if s.shared_devices.is_empty() {
+                s.shared_devices.push(dev_hex.clone());
+            }
+        }
+
+        repo.save_devices(&state.devices);
+        repo.save_shares(&state.shares);
+
+        Ok((resolved_id, dev_name, resolved_id.is_short_placeholder()))
     }
 
     /// Creates a new share on PS Vita (or updates if `folder_id` already exists) and links all known devices by default.

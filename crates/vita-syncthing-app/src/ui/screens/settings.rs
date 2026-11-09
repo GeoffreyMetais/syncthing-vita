@@ -51,8 +51,18 @@ pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
 
     let w_theme = action_width(gfx, PadButton::Cross, "Switch Theme");
     let w_qr = action_width(gfx, PadButton::Circle, "QR / ID");
+    let w_add = action_width(gfx, PadButton::Triangle, "+ Add Device");
     let bx_theme = CONTENT_R - 20 - w_theme;
-    let bx_qr = bx_theme - 10 - w_qr;
+    let bx_qr = bx_theme - 8 - w_qr;
+    let bx_add = bx_qr - 8 - w_add;
+    draw_action(
+        gfx,
+        th,
+        bx_add,
+        CONTENT_Y + 62,
+        PadButton::Triangle,
+        "+ Add Device",
+    );
     draw_action(gfx, th, bx_qr, CONTENT_Y + 62, PadButton::Circle, "QR / ID");
     draw_action(
         gfx,
@@ -116,10 +126,10 @@ pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         gfx,
         th,
         &[
-            (PadButton::Cross, None, "Switch Theme (Dark/OLED)"),
+            (PadButton::Cross, None, "Switch Theme"),
             (PadButton::Circle, None, "Device ID / QR"),
-            (PadButton::Select, None, "OLED Screensaver"),
-            (PadButton::L, Some(PadButton::R), "Tabs"),
+            (PadButton::Triangle, None, "+ Add Device ID"),
+            (PadButton::Select, None, "Screensaver"),
             (PadButton::Start, None, "Quit"),
         ],
     );

@@ -38,6 +38,10 @@ pub struct AppState {
     pub picker_top_idx: usize,
     pub logs: Vec<String>,
     pub toast_msg: Option<(String, u32)>,
+    /// Current text buffer in the `AddDeviceById` modal (updated by PS Vita `SceIme` or keypad).
+    pub device_id_input: String,
+    /// True while the native PS Vita System Keyboard (`SceIme`) overlay is active.
+    pub ime_active: bool,
 }
 
 impl AppState {
@@ -76,6 +80,8 @@ impl AppState {
             picker_top_idx: 0,
             logs: Vec::with_capacity(32),
             toast_msg: None,
+            device_id_input: String::new(),
+            ime_active: false,
         }
     }
 
@@ -180,6 +186,8 @@ impl AppState {
         for hex in &share.shared_devices {
             if let Some(dev) = self.devices.iter().find(|d| &d.device_id.to_hex() == hex) {
                 names.push(format!("{} ({})", dev.name, dev.device_id.short()));
+            } else if let Some(id) = syncthing_core::DeviceId::from_hex(hex) {
+                names.push(id.short());
             } else if hex.len() >= 7 {
                 names.push(hex[..7].to_uppercase());
             }

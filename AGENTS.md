@@ -61,7 +61,14 @@ syncthing-vita
                 │   ├── folder_picker.rs
                 │   ├── settings.rs
                 │   └── screensaver.rs
-                ├── modals.rs         # Modal dialog views (CreateShare, ManageDevices, ShowDeviceId + QR, ConfirmQuit)
+                ├── modals/           # Modal dialog views & fallback keypad
+                │   ├── mod.rs
+                │   ├── create_share.rs
+                │   ├── manage_devices.rs
+                │   ├── add_device.rs
+                │   ├── fallback_keyboard.rs
+                │   ├── device_id.rs
+                │   └── confirm_quit.rs
                 └── renderer.rs       # VitaUiRenderer (coordinates Gfx + VitaFramebuffer presentation)
 ```
 

@@ -160,7 +160,7 @@ impl ServerCertVerifier for SyncthingServerVerifier {
         let actual_id = DeviceId(raw_id);
 
         if let Some(expected) = self.expected_device_id {
-            if actual_id != expected {
+            if !expected.matches_peer(&actual_id) {
                 return Err(TlsError::General(format!(
                     "Peer TLS DeviceId ({actual_id}) != expected DeviceId ({expected})"
                 )));
@@ -419,7 +419,8 @@ where
 
                 // Merge locally created shares that are shared with this peer_device_id
                 for lf in storage.local_folders() {
-                    if (lf.device_ids.is_empty() || lf.device_ids.contains(&peer_device_id))
+                    if (lf.device_ids.is_empty()
+                        || lf.device_ids.iter().any(|id| id.matches_peer(&peer_device_id)))
                         && !shared_folders.iter().any(|f| f.id == lf.id)
                     {
                         shared_folders.push(lf.clone());

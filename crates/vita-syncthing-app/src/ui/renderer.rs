@@ -5,8 +5,8 @@ use crate::domain::{ActiveTab, AppState, ModalDialog};
 use crate::infrastructure::VitaFramebuffer;
 use crate::ui::gfx::{Gfx, GFX_H, GFX_W};
 use crate::ui::modals::{
-    render_confirm_quit_modal, render_create_share_modal, render_device_id_modal,
-    render_manage_devices_modal,
+    render_add_device_modal, render_confirm_quit_modal, render_create_share_modal,
+    render_device_id_modal, render_manage_devices_modal,
 };
 use crate::ui::screens::{
     render_dashboard_tab, render_folder_picker_tab, render_oled_screensaver, render_settings_tab,
@@ -69,6 +69,9 @@ impl VitaUiRenderer {
                     share_idx,
                     selected_dev_idx,
                 );
+            }
+            ModalDialog::AddDeviceById { keypad_idx, .. } => {
+                render_add_device_modal(&mut self.gfx, &th, state, keypad_idx);
             }
             ModalDialog::ShowDeviceId => {
                 render_device_id_modal(&mut self.gfx, &th, state);

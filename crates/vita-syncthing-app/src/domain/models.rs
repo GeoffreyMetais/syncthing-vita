@@ -41,6 +41,12 @@ pub enum ModalDialog {
         share_idx: usize,
         selected_dev_idx: usize,
     },
+    /// Enter a remote Syncthing Device ID (7+ char Short ID or full 56-char ID) via PS Vita
+    /// System Keyboard (`SceIme`) or the built-in Base32 keypad.
+    AddDeviceById {
+        return_share_idx: Option<usize>,
+        keypad_idx: usize,
+    },
     /// Display the PS Vita's full Syncthing Device ID and scannable QR code.
     ShowDeviceId,
     /// Confirmation dialog before quitting the application (`START` button).
@@ -86,6 +92,14 @@ pub const NEW_SHARE_TEMPLATES: &[(&str, &str, &str)] = &[
     ),
     ("vita-shared", "Vita Shared Folder", "ux0:data/syncthing/shared"),
     ("__browse__", "Browse ux0: to pick any custom folder...", "ux0:"),
+];
+
+/// 36-key (9x4) Base32 quick-keypad for `ModalDialog::AddDeviceById`.
+pub const ADD_DEVICE_KEYPAD: &[&str; 36] = &[
+    "A", "B", "C", "D", "E", "F", "G", "H", "I",
+    "J", "K", "L", "M", "N", "O", "P", "Q", "R",
+    "S", "T", "U", "V", "W", "X", "Y", "Z", "-",
+    "2", "3", "4", "5", "6", "7", "Bksp", "Clear", "Add",
 ];
 
 /// Format byte sizes cleanly ("1.5 KB", "3.2 MB").
