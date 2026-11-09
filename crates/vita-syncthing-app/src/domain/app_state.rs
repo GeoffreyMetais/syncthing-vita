@@ -1,6 +1,8 @@
 //! Application state (`AppState`) holding all domain, navigation, and view-model state
 //! independently of the 2D renderer or hardware framebuffer.
 
+use syncthing_core::DeviceId;
+
 use crate::domain::models::{
     ActiveTab, KnownDevice, ModalDialog, PickerItem, PickerMode, ShareConfigEntry, ThemeMode,
     BROWSER_ROWS,
@@ -31,6 +33,17 @@ pub struct AppState {
     pub bytes_transferred: usize,
     pub shares: Vec<ShareConfigEntry>,
     pub devices: Vec<KnownDevice>,
+    /// Peers discovered passively on the LAN (UDP 21027) that have NOT been manually linked/paired by the user.
+    pub unpaired_lan_peers: Vec<DeviceId>,
+    /// True while a persistent `1+2` BEP/1.0 connection is active in the background.
+    pub session_connected: bool,
+    /// True when automatic background reconnection is permitted (disabled when a peer is awaiting manual pairing).
+    pub auto_reconnect_enabled: bool,
+    /// True when share/device configuration was modified and the background session should reload once modals close.
+    pub config_dirty: bool,
+    /// Folder IDs explicitly created, enabled, or linked to a device by the user during this session
+    /// that should be advertised as new folder offers in the next BEP `ClusterConfig`.
+    pub pending_folder_offers: Vec<String>,
     pub selected_share_idx: usize,
     pub picker_current_dir: String,
     pub picker_items: Vec<PickerItem>,
@@ -62,7 +75,7 @@ impl AppState {
             saver_vy: 0.45,
             sync_in_progress: false,
             vita_device_id: "Initializing...".to_owned(),
-            peer_label: "Scanning UDP 21027...".to_owned(),
+            peer_label: "Ready (Manual LAN pairing)".to_owned(),
             folder_label: "No folders synced yet".to_owned(),
             status_line: "Ready · Press Cross to synchronize".to_owned(),
             current_file: "-".to_owned(),
@@ -73,6 +86,11 @@ impl AppState {
             bytes_transferred: 0,
             shares,
             devices,
+            unpaired_lan_peers: Vec::new(),
+            session_connected: false,
+            auto_reconnect_enabled: true,
+            config_dirty: false,
+            pending_folder_offers: Vec::new(),
             selected_share_idx: 0,
             picker_current_dir: default_browse_root.to_owned(),
             picker_items: Vec::new(),
@@ -83,6 +101,66 @@ impl AppState {
             device_id_input: String::new(),
             ime_active: false,
         }
+    }
+
+    /// Returns `true` if `device_id` was only passively discovered on LAN and not yet approved by the user.
+    pub fn is_unpaired_lan_peer(&self, device_id: &DeviceId) -> bool {
+        self.unpaired_lan_peers
+            .iter()
+            .any(|id| id.matches_peer(device_id))
+    }
+
+    /// Returns the list of user-approved/linked `KnownDevice`s eligible for BEP/1.0 connection.
+    pub fn approved_devices(&self) -> Vec<KnownDevice> {
+        self.devices
+            .iter()
+            .filter(|d| {
+                let is_linked_to_share = self.shares.iter().any(|s| {
+                    s.shared_devices
+                        .iter()
+                        .filter_map(|h| DeviceId::from_hex(h))
+                        .any(|id| id.matches_peer(&d.device_id))
+                });
+                is_linked_to_share || !self.is_unpaired_lan_peer(&d.device_id)
+            })
+            .cloned()
+            .collect()
+    }
+
+    /// Returns `true` if at least one peer has been manually added or linked to a share.
+    pub fn has_configured_peers(&self) -> bool {
+        !self.approved_devices().is_empty()
+    }
+
+    /// Marks `folder_id` as explicitly offered by the user so the next BEP `ClusterConfig`
+    /// advertises it to linked devices.
+    pub fn queue_folder_offer(&mut self, folder_id: &str) {
+        if !self.pending_folder_offers.iter().any(|f| f == folder_id) {
+            self.pending_folder_offers.push(folder_id.to_owned());
+        }
+    }
+
+    /// Cleans up legacy auto-discovered unpaired LAN peers (`"LAN Peer"`, `"Syncthing Peer"`, `"Syncthing ("`)
+    /// that may have been persisted by older versions when an unpaired LAN instance rejected `Hello`.
+    pub fn sanitize_legacy_unpaired_peers(&mut self) -> bool {
+        let mut unlinked_hexes = Vec::new();
+        for dev in &self.devices {
+            let is_legacy_unpaired_name = dev.name == "LAN Peer"
+                || dev.name == "Syncthing Peer"
+                || dev.name.starts_with("Syncthing (")
+                || dev.name.starts_with("LAN Peer (");
+            if is_legacy_unpaired_name && !self.is_unpaired_lan_peer(&dev.device_id) {
+                self.unpaired_lan_peers.push(dev.device_id);
+                unlinked_hexes.push(dev.device_id.to_hex());
+            }
+        }
+        if unlinked_hexes.is_empty() {
+            return false;
+        }
+        for s in &mut self.shares {
+            s.shared_devices.retain(|h| !unlinked_hexes.contains(h));
+        }
+        true
     }
 
     /// Toggles between Dark (VitaSend slate) and OLED (pure `#000000`) theme modes.

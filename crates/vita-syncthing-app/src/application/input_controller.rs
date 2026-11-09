@@ -409,6 +409,13 @@ impl InputController {
                     return Self::open_add_device_modal(state, Some(share_idx));
                 }
                 if (input.pressed & BTN_TRIANGLE) != 0 {
+                    if let Some(share) = state.shares.get(share_idx) {
+                        if share.enabled && !share.shared_devices.is_empty() {
+                            let fid = share.folder_id.clone();
+                            state.queue_folder_offer(&fid);
+                            state.config_dirty = true;
+                        }
+                    }
                     if !state.devices.is_empty() {
                         state.modal = ModalDialog::None;
                     }
@@ -433,6 +440,13 @@ impl InputController {
                             if tx >= dx + w - 140 {
                                 state.modal = ModalDialog::None;
                             } else if tx >= dx + w - 330 {
+                                if let Some(share) = state.shares.get(share_idx) {
+                                    if share.enabled && !share.shared_devices.is_empty() {
+                                        let fid = share.folder_id.clone();
+                                        state.queue_folder_offer(&fid);
+                                        state.config_dirty = true;
+                                    }
+                                }
                                 if !state.devices.is_empty() {
                                     state.modal = ModalDialog::None;
                                 }

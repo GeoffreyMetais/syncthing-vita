@@ -20,7 +20,67 @@ impl ShareService {
         state.push_log(msg);
     }
 
-    /// Registers or updates a discovered/connected Syncthing device and links any unassigned shares.
+    /// Passively records a LAN peer discovered via UDP 21027 without automatically linking or connecting to it.
+    /// If the peer matches an existing user-added Short ID placeholder, upgrades it to the full 32-byte ID.
+    pub fn register_discovered_peer(
+        state: &mut AppState,
+        repo: &ConfigRepository,
+        device_id: DeviceId,
+        name: &str,
+        address: &str,
+    ) {
+        let dev_hex = device_id.to_hex();
+        let mut upgraded_from_hex: Option<String> = None;
+
+        if let Some(existing) = state
+            .devices
+            .iter_mut()
+            .find(|d| d.device_id.matches_peer(&device_id))
+        {
+            if existing.device_id != device_id && existing.device_id.is_short_placeholder() {
+                upgraded_from_hex = Some(existing.device_id.to_hex());
+                existing.device_id = device_id;
+                if existing.name.contains("(Short ID)") {
+                    existing.name = format!("Device {}", device_id.short());
+                }
+            }
+            if !name.is_empty() && name != "LAN Peer" {
+                existing.name = name.to_owned();
+            }
+            if !address.is_empty() && address != "dynamic" {
+                existing.address = address.to_owned();
+            }
+        } else {
+            let label = if name.is_empty() || name == "LAN Peer" {
+                format!("LAN Peer ({})", device_id.short())
+            } else {
+                name.to_owned()
+            };
+            state.devices.push(KnownDevice {
+                device_id,
+                name: label,
+                address: address.to_owned(),
+            });
+            if !state.is_unpaired_lan_peer(&device_id) {
+                state.unpaired_lan_peers.push(device_id);
+            }
+        }
+
+        if let Some(old_hex) = upgraded_from_hex {
+            for s in &mut state.shares {
+                for h in &mut s.shared_devices {
+                    if *h == old_hex {
+                        *h = dev_hex.clone();
+                    }
+                }
+                s.shared_devices.dedup();
+            }
+            repo.save_devices(&state.approved_devices());
+            repo.save_shares(&state.shares);
+        }
+    }
+
+    /// Registers or updates an approved/paired Syncthing device and links any unassigned shares.
     /// Automatically upgrades any user-added Short ID placeholder matching `device_id` to the full 32-byte ID.
     pub fn upsert_device(
         state: &mut AppState,
@@ -29,6 +89,9 @@ impl ShareService {
         name: &str,
         address: &str,
     ) {
+        state
+            .unpaired_lan_peers
+            .retain(|id| !id.matches_peer(&device_id));
         let dev_hex = device_id.to_hex();
         let mut upgraded_from_hex: Option<String> = None;
 
@@ -75,18 +138,12 @@ impl ShareService {
             }
         }
 
-        // Automatically link any share that had empty devices to this device
-        for s in &mut state.shares {
-            if s.shared_devices.is_empty() {
-                s.shared_devices.push(dev_hex.clone());
-            }
-        }
-        repo.save_devices(&state.devices);
+        repo.save_devices(&state.approved_devices());
         repo.save_shares(&state.shares);
     }
 
     /// Parses and adds a Syncthing device from user input (7+ char Short ID, full 56-char ID, or `ID@ip[:port]`).
-    /// Links the device to `share_idx` (if `Some`) and to any shares without devices.
+    /// Links the device to `share_idx` if `Some`.
     /// Returns `Ok((resolved_device_id, device_name, is_short_placeholder))`.
     pub fn add_device_by_input(
         state: &mut AppState,
@@ -116,6 +173,10 @@ impl ShareService {
                 return Err("Cannot add this PS Vita's own Device ID".to_owned());
             }
         }
+
+        state
+            .unpaired_lan_peers
+            .retain(|id| !id.matches_peer(&parsed_id));
 
         let mut upgraded_from_hex: Option<String> = None;
         let (resolved_id, dev_name) = if let Some(existing) = state
@@ -161,27 +222,31 @@ impl ShareService {
             }
         }
 
+        let mut offered_fid: Option<String> = None;
         if let Some(idx) = share_idx {
             if let Some(share) = state.shares.get_mut(idx) {
                 if !share.shared_devices.contains(&dev_hex) {
                     share.shared_devices.push(dev_hex.clone());
                 }
+                if share.enabled {
+                    offered_fid = Some(share.folder_id.clone());
+                }
             }
         }
-
-        for s in &mut state.shares {
-            if s.shared_devices.is_empty() {
-                s.shared_devices.push(dev_hex.clone());
-            }
+        if let Some(fid) = offered_fid {
+            state.queue_folder_offer(&fid);
         }
 
-        repo.save_devices(&state.devices);
+        state.config_dirty = true;
+        state.auto_reconnect_enabled = true;
+        repo.save_devices(&state.approved_devices());
         repo.save_shares(&state.shares);
 
         Ok((resolved_id, dev_name, resolved_id.is_short_placeholder()))
     }
 
-    /// Creates a new share on PS Vita (or updates if `folder_id` already exists) and links all known devices by default.
+    /// Creates a new share on PS Vita (or updates if `folder_id` already exists).
+    /// Devices are linked explicitly in the `ManageDevices` modal that opens immediately after creation.
     pub fn create_share(
         state: &mut AppState,
         repo: &ConfigRepository,
@@ -189,21 +254,14 @@ impl ShareService {
         label: &str,
         target_path: &str,
     ) -> usize {
-        let default_devs: Vec<String> = state
-            .devices
-            .iter()
-            .map(|d| d.device_id.to_hex())
-            .collect();
-
         repo.ensure_dir(target_path);
 
+        let mut has_linked_devices = false;
         let idx = if let Some(idx) = state.shares.iter().position(|s| s.folder_id == folder_id) {
             state.shares[idx].label = label.to_owned();
             state.shares[idx].target_path = target_path.to_owned();
             state.shares[idx].enabled = true;
-            if state.shares[idx].shared_devices.is_empty() {
-                state.shares[idx].shared_devices = default_devs;
-            }
+            has_linked_devices = !state.shares[idx].shared_devices.is_empty();
             idx
         } else {
             state.shares.push(ShareConfigEntry {
@@ -211,12 +269,18 @@ impl ShareService {
                 label: label.to_owned(),
                 target_path: target_path.to_owned(),
                 enabled: true,
-                shared_devices: default_devs,
+                shared_devices: Vec::new(),
             });
             state.shares.len() - 1
         };
 
+        if has_linked_devices {
+            state.queue_folder_offer(folder_id);
+        }
+
         state.selected_share_idx = idx;
+        state.config_dirty = true;
+        state.auto_reconnect_enabled = true;
         repo.save_shares(&state.shares);
         idx
     }
@@ -276,6 +340,7 @@ impl ShareService {
             updated_fid = Some(share.folder_id.clone());
         }
         if let Some(fid) = updated_fid {
+            state.config_dirty = true;
             repo.save_shares(&state.shares);
             repo.ensure_dir(&chosen_path);
             let msg = format!("Saved in {}", chosen_path);
@@ -291,10 +356,21 @@ impl ShareService {
 
     /// Toggles `enabled` (Active / Paused) on the currently selected share.
     pub fn toggle_selected_share(state: &mut AppState, repo: &ConfigRepository) {
+        let mut toggle_info = None;
         if let Some(share) = state.shares.get_mut(state.selected_share_idx) {
             share.enabled = !share.enabled;
             let fid = share.folder_id.clone();
-            let st = if share.enabled { "Active" } else { "Paused" };
+            let is_enabled = share.enabled;
+            let has_devs = !share.shared_devices.is_empty();
+            toggle_info = Some((fid, is_enabled, has_devs));
+        }
+        if let Some((fid, is_enabled, has_devs)) = toggle_info {
+            if is_enabled && has_devs {
+                state.queue_folder_offer(&fid);
+            }
+            let st = if is_enabled { "Active" } else { "Paused" };
+            state.config_dirty = true;
+            state.auto_reconnect_enabled = true;
             repo.save_shares(&state.shares);
             let msg = format!("Share {} is now {}", fid, st);
             state.show_toast(&msg);
@@ -318,7 +394,9 @@ impl ShareService {
             .unwrap_or_else(|| device_id.short());
 
         if let Some(share) = state.shares.get_mut(share_idx) {
+            let folder_id = share.folder_id.clone();
             let folder_label = share.label.clone();
+            let is_enabled = share.enabled;
             let added = if let Some(pos) = share.shared_devices.iter().position(|x| x == &dev_hex) {
                 share.shared_devices.remove(pos);
                 false
@@ -326,6 +404,27 @@ impl ShareService {
                 share.shared_devices.push(dev_hex);
                 true
             };
+            if added {
+                state
+                    .unpaired_lan_peers
+                    .retain(|id| !id.matches_peer(&device_id));
+                if is_enabled {
+                    state.queue_folder_offer(&folder_id);
+                }
+            } else {
+                let still_linked_anywhere = state.shares.iter().any(|s| {
+                    s.shared_devices
+                        .iter()
+                        .filter_map(|h| DeviceId::from_hex(h))
+                        .any(|id| id.matches_peer(&device_id))
+                });
+                if !still_linked_anywhere && !state.is_unpaired_lan_peer(&device_id) {
+                    state.unpaired_lan_peers.push(device_id);
+                }
+            }
+            state.config_dirty = true;
+            state.auto_reconnect_enabled = true;
+            repo.save_devices(&state.approved_devices());
             repo.save_shares(&state.shares);
             Some((folder_label, dev_name, added))
         } else {
@@ -333,19 +432,16 @@ impl ShareService {
         }
     }
 
-    /// Merges folders received in `ClusterConfig` with local shared folder configuration.
+    /// Merges folders received in `ClusterConfig` from `peer_device_id` with local shared folder configuration.
     /// Newly discovered remote folders start paused (`enabled: false`) so nothing syncs without user opt-in.
     pub fn upsert_discovered_folder(
         state: &mut AppState,
         repo: &ConfigRepository,
+        peer_device_id: DeviceId,
         folder_id: &str,
         label: &str,
     ) {
-        let default_devs: Vec<String> = state
-            .devices
-            .iter()
-            .map(|d| d.device_id.to_hex())
-            .collect();
+        let peer_hex = peer_device_id.to_hex();
 
         let template_path = NEW_SHARE_TEMPLATES
             .iter()
@@ -358,8 +454,8 @@ impl ShareService {
             if !label.is_empty() {
                 existing.label = label.to_owned();
             }
-            if existing.shared_devices.is_empty() {
-                existing.shared_devices = default_devs;
+            if !existing.shared_devices.contains(&peer_hex) {
+                existing.shared_devices.push(peer_hex);
             }
             if existing.target_path == fallback_sync {
                 if let Some(tpl) = template_path {
@@ -377,7 +473,7 @@ impl ShareService {
                 },
                 target_path: default_target,
                 enabled: false,
-                shared_devices: default_devs,
+                shared_devices: vec![peer_hex],
             });
         }
         repo.save_shares(&state.shares);

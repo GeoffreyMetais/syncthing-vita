@@ -125,12 +125,29 @@ impl BepHeader {
     }
 }
 
+/// Default number of parallel BEP connections advertised to Syncthing v2.0+ peers
+/// (`1` primary metadata connection + `2` secondary data connections = `1+2`).
+pub const BEP_DEFAULT_NUM_CONNECTIONS: i32 = 3;
+
+static HELLO_TS_COUNTER: std::sync::atomic::AtomicI64 = std::sync::atomic::AtomicI64::new(1);
+
+fn next_hello_timestamp_ns() -> i64 {
+    let now_ns = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map(|d| d.as_nanos() as i64)
+        .unwrap_or(1_700_000_000_000_000_000);
+    let seq = HELLO_TS_COUNTER.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    now_ns.saturating_add(seq)
+}
+
 /// `Hello` message exchanged at the start of a BEP connection.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BepHello {
     pub device_name: String,
     pub client_name: String,
     pub client_version: String,
+    pub num_connections: i32,
+    pub timestamp: i64,
 }
 
 impl BepHello {
@@ -139,11 +156,13 @@ impl BepHello {
             device_name: "PS-Vita".to_owned(),
             client_name: "vita-syncthing".to_owned(),
             client_version: env!("CARGO_PKG_VERSION").to_owned(),
+            num_connections: BEP_DEFAULT_NUM_CONNECTIONS,
+            timestamp: 0,
         }
     }
 
     pub fn encode_frame(&self) -> Vec<u8> {
-        let mut payload = Vec::with_capacity(64);
+        let mut payload = Vec::with_capacity(80);
         if !self.device_name.is_empty() {
             encode_bytes_field(&mut payload, 1, self.device_name.as_bytes());
         }
@@ -152,6 +171,12 @@ impl BepHello {
         }
         if !self.client_version.is_empty() {
             encode_bytes_field(&mut payload, 3, self.client_version.as_bytes());
+        }
+        if self.num_connections > 0 {
+            encode_varint_field(&mut payload, 4, self.num_connections as u64);
+        }
+        if self.timestamp > 0 {
+            encode_varint_field(&mut payload, 5, self.timestamp as u64);
         }
 
         let len = payload.len() as u16;
@@ -166,19 +191,32 @@ impl BepHello {
         let mut device_name = String::new();
         let mut client_name = String::new();
         let mut client_version = String::new();
+        let mut num_connections = 0i32;
+        let mut timestamp = 0i64;
 
         for field_res in WireIter::new(payload) {
             let (field_num, wire_type, data) = field_res?;
-            if wire_type == 2 {
-                let s = std::str::from_utf8(data).map_err(|e| {
-                    io::Error::new(io::ErrorKind::InvalidData, format!("Invalid UTF-8: {e}"))
-                })?;
-                match field_num {
-                    1 => device_name = s.to_owned(),
-                    2 => client_name = s.to_owned(),
-                    3 => client_version = s.to_owned(),
-                    _ => {}
+            match (field_num, wire_type) {
+                (1, 2) | (2, 2) | (3, 2) => {
+                    let s = std::str::from_utf8(data).map_err(|e| {
+                        io::Error::new(io::ErrorKind::InvalidData, format!("Invalid UTF-8: {e}"))
+                    })?;
+                    match field_num {
+                        1 => device_name = s.to_owned(),
+                        2 => client_name = s.to_owned(),
+                        3 => client_version = s.to_owned(),
+                        _ => {}
+                    }
                 }
+                (4, 0) => {
+                    let (v, _) = decode_varint(data)?;
+                    num_connections = v as i32;
+                }
+                (5, 0) => {
+                    let (v, _) = decode_varint(data)?;
+                    timestamp = v as i64;
+                }
+                _ => {}
             }
         }
 
@@ -186,6 +224,8 @@ impl BepHello {
             device_name,
             client_name,
             client_version,
+            num_connections,
+            timestamp,
         })
     }
 
@@ -214,7 +254,11 @@ impl BepHello {
     }
 
     pub fn exchange<S: Read + Write>(&self, stream: &mut S) -> io::Result<Self> {
-        let out_frame = self.encode_frame();
+        let mut outgoing = self.clone();
+        if outgoing.timestamp == 0 {
+            outgoing.timestamp = next_hello_timestamp_ns();
+        }
+        let out_frame = outgoing.encode_frame();
         stream.write_all(&out_frame)?;
         stream.flush()?;
 
@@ -243,28 +287,43 @@ pub struct BepFolder {
 }
 
 /// Folder index state metadata for `ClusterConfig`.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, Default)]
 pub struct FolderIndexState {
     pub index_id: u64,
     pub max_sequence: i64,
+    pub paused: bool,
 }
 
 /// `ClusterConfig` message (type 0).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BepClusterConfig {
     pub folders: Vec<BepFolder>,
+    pub secondary: bool,
 }
 
 impl BepClusterConfig {
     pub fn decode(payload: &[u8]) -> io::Result<Self> {
         let mut folders = Vec::new();
+        let mut secondary = false;
         for item in WireIter::new(payload) {
             let (field_num, wire_type, data) = item?;
-            if field_num == 1 && wire_type == 2 {
-                folders.push(Self::decode_folder(data)?);
+            match (field_num, wire_type) {
+                (1, 2) => folders.push(Self::decode_folder(data)?),
+                (2, 0) => {
+                    let (v, _) = decode_varint(data)?;
+                    secondary = v != 0;
+                }
+                _ => {}
             }
         }
-        Ok(Self { folders })
+        Ok(Self { folders, secondary })
+    }
+
+    /// Encodes a `ClusterConfig` for a secondary BEP data connection (`secondary = true`).
+    pub fn encode_secondary() -> Vec<u8> {
+        let mut out = Vec::with_capacity(4);
+        encode_varint_field(&mut out, 2, 1);
+        out
     }
 
     fn decode_folder(bytes: &[u8]) -> io::Result<BepFolder> {
@@ -313,6 +372,9 @@ impl BepClusterConfig {
             encode_bytes_field(&mut folder_buf, 1, folder.id.as_bytes());
             if !folder.label.is_empty() {
                 encode_bytes_field(&mut folder_buf, 2, folder.label.as_bytes());
+            }
+            if state.paused {
+                encode_varint_field(&mut folder_buf, 7, 1);
             }
 
             // Device entry for PS Vita (with index_id and max_sequence from local index)
@@ -706,6 +768,14 @@ pub struct BepClose {
 }
 
 impl BepClose {
+    pub fn encode(&self) -> Vec<u8> {
+        let mut buf = Vec::with_capacity(2 + self.reason.len());
+        if !self.reason.is_empty() {
+            encode_bytes_field(&mut buf, 1, self.reason.as_bytes());
+        }
+        buf
+    }
+
     pub fn decode(payload: &[u8]) -> io::Result<Self> {
         let mut reason = String::new();
         for item in WireIter::new(payload) {
@@ -718,7 +788,7 @@ impl BepClose {
     }
 }
 
-/// Writes an uncompressed post-`Hello` BEP message to a stream.
+/// Writes an uncompressed post-`Hello` BEP message to a stream as a single contiguous frame.
 pub fn write_bep_message<W: Write>(
     stream: &mut W,
     msg_type: BepMessageType,
@@ -732,18 +802,31 @@ pub fn write_bep_message<W: Write>(
     let hdr_len = hdr_bytes.len() as u16;
     let msg_len = payload.len() as u32;
 
-    stream.write_all(&hdr_len.to_be_bytes())?;
-    stream.write_all(&hdr_bytes)?;
-    stream.write_all(&msg_len.to_be_bytes())?;
-    stream.write_all(payload)?;
+    let mut frame = Vec::with_capacity(2 + hdr_bytes.len() + 4 + payload.len());
+    frame.extend_from_slice(&hdr_len.to_be_bytes());
+    frame.extend_from_slice(&hdr_bytes);
+    frame.extend_from_slice(&msg_len.to_be_bytes());
+    frame.extend_from_slice(payload);
+
+    stream.write_all(&frame)?;
     stream.flush()
 }
 
 /// Reads and decompresses (if LZ4) the next post-`Hello` BEP message from a stream.
 pub fn read_bep_message<R: Read>(stream: &mut R) -> io::Result<(BepMessageType, Vec<u8>)> {
-    let mut hdr_len_buf = [0u8; 2];
-    stream.read_exact(&mut hdr_len_buf)?;
-    let hdr_len = u16::from_be_bytes(hdr_len_buf) as usize;
+    let mut first = [0u8; 1];
+    stream.read_exact(&mut first)?;
+    read_bep_message_after_first_byte(stream, first[0])
+}
+
+/// Completes reading and decompressing a post-`Hello` BEP message after its first header-length byte (`first_byte`) has been read.
+pub fn read_bep_message_after_first_byte<R: Read>(
+    stream: &mut R,
+    first_byte: u8,
+) -> io::Result<(BepMessageType, Vec<u8>)> {
+    let mut second = [0u8; 1];
+    stream.read_exact(&mut second)?;
+    let hdr_len = u16::from_be_bytes([first_byte, second[0]]) as usize;
 
     let mut hdr_buf = vec![0u8; hdr_len];
     stream.read_exact(&mut hdr_buf)?;

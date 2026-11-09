@@ -5,15 +5,12 @@ use std::collections::{HashMap, HashSet};
 use std::fs::{self, File, OpenOptions};
 use std::io::{self, Read, Seek, SeekFrom, Write};
 use std::path::{Path, PathBuf};
-use std::time::UNIX_EPOCH;
 
 use sha2::{Digest, Sha256};
 
 use crate::bep::{
-    BepBlockInfo, BepFileInfo, BepFolder, BepIndex, BepVersionCounter, FolderIndexState,
-    BEP_BLOCK_SIZE,
+    BepBlockInfo, BepFileInfo, BepFolder, BEP_BLOCK_SIZE,
 };
-use crate::disco::DeviceId;
 
 /// Local filesystem storage manager (`ux0:data/syncthing/sync` or custom paths).
 #[derive(Debug, Clone)]
@@ -56,7 +53,7 @@ impl FsSyncStorage {
     /// Sets a custom target directory for a given Syncthing `folder_id`.
     pub fn set_folder_path<P: Into<PathBuf>>(&mut self, folder_id: &str, target_path: P) {
         self.custom_folder_paths
-            .insert(folder_id.to_owned(), target_path.into());
+            .insert(folder_id.to_owned(), accessible_root(target_path.into()));
     }
 
     /// Returns the effective root directory for a given `folder_id`.
@@ -150,8 +147,73 @@ impl FsSyncStorage {
         Ok(outdated)
     }
 
+    /// Path of the local database of `folder_id`. It is keyed by the folder's current root so that
+    /// pointing a share at another directory starts from a fresh database instead of advertising
+    /// every previously known file as deleted.
+    pub fn db_path(&self, folder_id: &str) -> PathBuf {
+        let root = self.folder_root(folder_id);
+        let digest = Sha256::digest(root.to_string_lossy().as_bytes());
+        let clean_folder: String = folder_id
+            .chars()
+            .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
+            .collect();
+        self.default_root_dir.join(format!(
+            ".syncthing_db_{}_{:02x}{:02x}{:02x}{:02x}.txt",
+            clean_folder, digest[0], digest[1], digest[2], digest[3]
+        ))
+    }
+
+    /// Hidden temporary file a download is assembled into before being moved into place, so a
+    /// half-written file is never indexed or served as a local change.
+    pub fn download_temp_path(&self, folder_id: &str, rel_path: &str) -> PathBuf {
+        let full = self.resolve_safe_path(folder_id, rel_path);
+        let file_name = full
+            .file_name()
+            .map(|n| n.to_string_lossy().into_owned())
+            .unwrap_or_default();
+        full.with_file_name(format!(".syncthing.{}.tmp", file_name))
+    }
+
+    /// Starts a download: seeds the temp file with the current local content (delta sync only
+    /// rewrites outdated blocks).
+    pub fn prepare_download(&self, folder_id: &str, rel_path: &str) -> io::Result<()> {
+        let full = self.resolve_safe_path(folder_id, rel_path);
+        if let Some(parent) = full.parent() {
+            ensure_dir_exists(parent)?;
+        }
+        let tmp = self.download_temp_path(folder_id, rel_path);
+        let _ = fs::remove_file(&tmp);
+        if full.is_file() {
+            fs::copy(&full, &tmp)
+                .map_err(|e| io::Error::new(e.kind(), format!("copy {}: {e}", full.display())))?;
+        } else {
+            File::create(&tmp)
+                .map_err(|e| io::Error::new(e.kind(), format!("create {}: {e}", tmp.display())))?;
+        }
+        Ok(())
+    }
+
+    /// Finishes a download: truncates the temp file to `final_size` and moves it into place.
+    pub fn commit_download(&self, folder_id: &str, rel_path: &str, final_size: u64) -> io::Result<()> {
+        let full = self.resolve_safe_path(folder_id, rel_path);
+        let tmp = self.download_temp_path(folder_id, rel_path);
+        OpenOptions::new().write(true).open(&tmp)?.set_len(final_size)?;
+        if full.exists() {
+            fs::remove_file(&full)
+                .map_err(|e| io::Error::new(e.kind(), format!("replace {}: {e}", full.display())))?;
+        }
+        fs::rename(&tmp, &full)
+            .map_err(|e| io::Error::new(e.kind(), format!("rename {}: {e}", full.display())))
+    }
+
+    /// Discards an unfinished download.
+    pub fn abort_download(&self, folder_id: &str, rel_path: &str) {
+        let _ = fs::remove_file(self.download_temp_path(folder_id, rel_path));
+    }
+
     /// **Step 1 (Streaming Disk Write)**:
-    /// Writes a block directly to its `offset` on disk without buffering the whole file in RAM.
+    /// Writes a downloaded block at its `offset` into the download temp file (see
+    /// [`Self::prepare_download`]) without buffering the whole file in RAM.
     pub fn write_block_streaming(
         &self,
         folder_id: &str,
@@ -160,16 +222,17 @@ impl FsSyncStorage {
         data: &[u8],
         final_file_size: u64,
     ) -> io::Result<PathBuf> {
-        let full_path = self.resolve_safe_path(folder_id, rel_path);
+        let full_path = self.download_temp_path(folder_id, rel_path);
         if let Some(parent) = full_path.parent() {
-            fs::create_dir_all(parent)?;
+            ensure_dir_exists(parent)?;
         }
 
         let mut file = OpenOptions::new()
             .create(true)
             .read(true)
             .write(true)
-            .open(&full_path)?;
+            .open(&full_path)
+            .map_err(|e| io::Error::new(e.kind(), format!("open {}: {e}", full_path.display())))?;
 
         file.seek(SeekFrom::Start(offset))?;
         file.write_all(data)?;
@@ -198,160 +261,51 @@ impl FsSyncStorage {
         file.read_exact(&mut buf)?;
         Ok(buf)
     }
+}
 
-    /// **Step 2 (Bidirectional Local Indexing)**:
-    /// Scans the local target directory for `folder_id`, chunks files into 128 KiB blocks,
-    /// calculates SHA-256 checksums, and constructs the PS Vita local `BepIndex`.
-    pub fn build_local_index(
-        &self,
-        folder_id: &str,
-        own_id: DeviceId,
-        remote_files: &[BepFileInfo],
-    ) -> io::Result<(BepIndex, FolderIndexState)> {
-        let folder_dir = self.folder_root(folder_id);
-        fs::create_dir_all(&folder_dir)?;
+/// `ux0:music` -> `ux0:/music` (the form `sceIo*` always accepts), or `None` if the path is not
+/// of the `device:relative` form.
+fn with_device_root_slash(path: &Path) -> Option<PathBuf> {
+    let s = path.to_str()?;
+    let (device, rest) = s.split_once(':')?;
+    let valid_device = !device.is_empty()
+        && !device.contains('/')
+        && device.chars().all(|c| c.is_ascii_alphanumeric());
+    if !valid_device || rest.is_empty() || rest.starts_with('/') {
+        return None;
+    }
+    Some(PathBuf::from(format!("{}:/{}", device, rest)))
+}
 
-        let short_id = u64::from_be_bytes([
-            own_id.0[0],
-            own_id.0[1],
-            own_id.0[2],
-            own_id.0[3],
-            own_id.0[4],
-            own_id.0[5],
-            own_id.0[6],
-            own_id.0[7],
-        ]);
-
-        let mut rel_entries = Vec::new();
-        collect_files_recursive(&folder_dir, "", &mut rel_entries)?;
-        rel_entries.sort_by(|a, b| a.0.cmp(&b.0));
-
-        let mut files = Vec::with_capacity(rel_entries.len());
-        let mut seq: i64 = 0;
-        let mut index_hasher = Sha256::new();
-        index_hasher.update(b"vita-bep-v2:");
-        index_hasher.update(folder_id.as_bytes());
-        index_hasher.update(&own_id.0);
-
-        for (rel_name, is_dir) in rel_entries {
-            let full_path = folder_dir.join(&rel_name);
-            let meta = fs::metadata(&full_path)?;
-            let modified_s = meta
-                .modified()
-                .ok()
-                .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
-                .map(|d| d.as_secs() as i64)
-                .unwrap_or(1_700_000_000);
-
-            if is_dir {
-                seq += 1;
-                index_hasher.update(b"D:");
-                index_hasher.update(rel_name.as_bytes());
-                files.push(BepFileInfo {
-                    name: rel_name,
-                    is_dir: true,
-                    size: 0,
-                    modified_s,
-                    deleted: false,
-                    invalid: false,
-                    sequence: seq,
-                    versions: vec![BepVersionCounter {
-                        short_device_id: short_id,
-                        value: (modified_s.max(1) as u64),
-                    }],
-                    blocks: Vec::new(),
-                });
-                continue;
-            }
-
-            if !meta.is_file() {
-                continue;
-            }
-
-            let file_size = meta.len() as i64;
-            let blocks = hash_file_blocks(&full_path)?;
-
-            let remote_match = remote_files.iter().find(|rf| rf.name == rel_name);
-            let versions = match remote_match {
-                Some(rf) if blocks_equal(&rf.blocks, &blocks) && rf.size == file_size => {
-                    if rf.versions.is_empty() {
-                        vec![BepVersionCounter {
-                            short_device_id: short_id,
-                            value: 1,
-                        }]
-                    } else {
-                        rf.versions.clone()
-                    }
-                }
-                Some(rf) => {
-                    let mut v = rf.versions.clone();
-                    if let Some(existing) = v.iter_mut().find(|c| c.short_device_id == short_id) {
-                        existing.value += 1;
-                    } else {
-                        v.push(BepVersionCounter {
-                            short_device_id: short_id,
-                            value: (modified_s.max(1) as u64),
-                        });
-                    }
-                    v
-                }
-                None => {
-                    vec![BepVersionCounter {
-                        short_device_id: short_id,
-                        value: (modified_s.max(1) as u64),
-                    }]
-                }
-            };
-
-            seq += 1;
-            index_hasher.update(b"F:");
-            index_hasher.update(rel_name.as_bytes());
-            index_hasher.update(&file_size.to_be_bytes());
-            for b in &blocks {
-                index_hasher.update(&b.hash);
-            }
-
-            files.push(BepFileInfo {
-                name: rel_name,
-                is_dir: false,
-                size: file_size,
-                modified_s,
-                deleted: false,
-                invalid: false,
-                sequence: seq,
-                versions,
-                blocks,
-            });
-        }
-
-        let digest = index_hasher.finalize();
-        let index_id = u64::from_be_bytes([
-            digest[0], digest[1], digest[2], digest[3], digest[4], digest[5], digest[6], digest[7],
-        ]) | 1;
-
-        Ok((
-            BepIndex {
-                folder: folder_id.to_owned(),
-                files,
-            },
-            FolderIndexState {
-                index_id,
-                max_sequence: seq,
-            },
-        ))
+/// On PS Vita, `stat()` / `opendir()` on a top-level `device:dir` path (e.g. `ux0:music`) can fail
+/// although the directory exists. Prefer whichever spelling can actually be listed.
+fn accessible_root(path: PathBuf) -> PathBuf {
+    if fs::read_dir(&path).is_ok() {
+        return path;
+    }
+    match with_device_root_slash(&path) {
+        Some(alt) if fs::read_dir(&alt).is_ok() => alt,
+        _ => path,
     }
 }
 
-fn blocks_equal(a: &[BepBlockInfo], b: &[BepBlockInfo]) -> bool {
-    if a.len() != b.len() {
-        return false;
+/// Creates `dir` (and its parents) if needed.
+///
+/// On PS Vita, `sceIoMkdir` reports `EEXIST` for existing directories and `std::fs::create_dir_all`
+/// then relies on `stat()` to confirm it is a directory, which can fail for some paths (e.g. names
+/// normalized by exFAT). Treat the directory as present whenever it can actually be listed.
+pub(crate) fn ensure_dir_exists(dir: &Path) -> io::Result<()> {
+    match fs::create_dir_all(dir) {
+        Ok(()) => Ok(()),
+        Err(_) if fs::read_dir(dir).is_ok() => Ok(()),
+        Err(e) => Err(io::Error::new(
+            e.kind(),
+            format!("mkdir {}: {e}", dir.display()),
+        )),
     }
-    a.iter()
-        .zip(b.iter())
-        .all(|(x, y)| x.size == y.size && x.hash == y.hash)
 }
 
-fn hash_file_blocks(path: &Path) -> io::Result<Vec<BepBlockInfo>> {
+pub(crate) fn hash_file_blocks(path: &Path) -> io::Result<Vec<BepBlockInfo>> {
     let mut file = File::open(path)?;
     let mut blocks = Vec::new();
     let mut buf = vec![0u8; BEP_BLOCK_SIZE];
@@ -392,7 +346,7 @@ fn hash_file_blocks(path: &Path) -> io::Result<Vec<BepBlockInfo>> {
     Ok(blocks)
 }
 
-fn collect_files_recursive(
+pub(crate) fn collect_files_recursive(
     base: &Path,
     prefix: &str,
     out: &mut Vec<(String, bool)>,
@@ -400,7 +354,8 @@ fn collect_files_recursive(
     for entry_res in fs::read_dir(base)? {
         let entry = entry_res?;
         let name = entry.file_name().to_string_lossy().into_owned();
-        if name.starts_with('.') {
+        // Internal files only: download temp files, local databases and Syncthing markers.
+        if name.starts_with(".syncthing") || name.starts_with(".st") {
             continue;
         }
         let rel = if prefix.is_empty() {
@@ -417,4 +372,24 @@ fn collect_files_recursive(
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn device_root_slash_variant() {
+        assert_eq!(
+            with_device_root_slash(Path::new("ux0:music")),
+            Some(PathBuf::from("ux0:/music"))
+        );
+        assert_eq!(
+            with_device_root_slash(Path::new("ux0:data/syncthing")),
+            Some(PathBuf::from("ux0:/data/syncthing"))
+        );
+        assert_eq!(with_device_root_slash(Path::new("ux0:/music")), None);
+        assert_eq!(with_device_root_slash(Path::new("/tmp/a:b")), None);
+        assert_eq!(with_device_root_slash(Path::new("relative/dir")), None);
+    }
 }

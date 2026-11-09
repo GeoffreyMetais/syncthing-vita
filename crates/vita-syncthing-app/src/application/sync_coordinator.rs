@@ -33,11 +33,18 @@ impl SyncCoordinator {
                         name,
                         address,
                     } => {
-                        ShareService::upsert_device(state, repo, device_id, &name, &address);
+                        ShareService::register_discovered_peer(
+                            state, repo, device_id, &name, &address,
+                        );
                     }
                     WorkerMsg::SyncEvent(event) => Self::handle_sync_event(state, repo, event),
-                    WorkerMsg::Finished(summary) => {
+                    WorkerMsg::Finished {
+                        summary,
+                        allow_auto_reconnect,
+                    } => {
                         state.sync_in_progress = false;
+                        state.session_connected = false;
+                        state.auto_reconnect_enabled = allow_auto_reconnect;
                         state.progress_pct = 100;
                         state.current_file = "Finished".to_owned();
                         state.status_line = summary.clone();
@@ -61,7 +68,7 @@ impl SyncCoordinator {
                 client_version,
             } => {
                 let name = if peer_name.is_empty() {
-                    "Syncthing Peer".to_owned()
+                    format!("Device {}", peer_device_id.short())
                 } else {
                     peer_name
                 };
@@ -81,14 +88,27 @@ impl SyncCoordinator {
                     &format!("Connected via TLS 1.3 to {} ({})", name, peer_addr),
                 );
             }
-            SyncEvent::ClusterConfigReceived { folders } => {
+            SyncEvent::ClusterConfigReceived {
+                peer_device_id,
+                folders,
+            } => {
                 let mut labels = Vec::new();
                 for f in &folders {
-                    ShareService::upsert_discovered_folder(state, repo, &f.id, &f.label);
+                    ShareService::upsert_discovered_folder(
+                        state,
+                        repo,
+                        peer_device_id,
+                        &f.id,
+                        &f.label,
+                    );
                     labels.push(format!("{} ({})", f.id, f.label));
                 }
                 ShareService::refresh_picker_items(state, repo);
-                let joined = labels.join(", ");
+                let joined = if labels.is_empty() {
+                    "No remote folders shared".to_owned()
+                } else {
+                    labels.join(", ")
+                };
                 state.folder_label = joined.clone();
                 state.progress_pct = 55;
                 ShareService::log_event(
@@ -114,6 +134,7 @@ impl SyncCoordinator {
                 total_size,
                 ..
             } => {
+                state.sync_in_progress = true;
                 state.bytes_transferred += size;
                 state.current_file = name.clone();
                 let pct = if total_size > 0 {
@@ -163,6 +184,74 @@ impl SyncCoordinator {
                     &format!(
                         "Block uploaded (Vita -> PC/Mac): {} (offset={}, {} B)",
                         name, offset, size
+                    ),
+                );
+            }
+            SyncEvent::SyncCycleCompleted {
+                active_connections,
+                files_up_to_date,
+                files_downloaded,
+                bytes_downloaded,
+                blocks_uploaded,
+                bytes_uploaded,
+            } => {
+                state.sync_in_progress = false;
+                state.session_connected = true;
+                state.auto_reconnect_enabled = true;
+                state.progress_pct = 100;
+                let conn_badge = if active_connections > 1 {
+                    format!("1+{} connections", active_connections - 1)
+                } else {
+                    "1 connection".to_owned()
+                };
+                state.current_file = format!("Connected ({})", conn_badge);
+                let summary = format!(
+                    "Connected ({}) · {} up-to-date | {} DL ({} KB) | {} UL ({} B)",
+                    conn_badge,
+                    files_up_to_date,
+                    files_downloaded,
+                    bytes_downloaded / 1024,
+                    blocks_uploaded,
+                    bytes_uploaded
+                );
+                state.status_line = summary.clone();
+                ShareService::log_event(state, repo, &summary);
+            }
+            SyncEvent::FolderUnavailable { folder, error } => {
+                ShareService::log_event(
+                    state,
+                    repo,
+                    &format!("Folder {} skipped (local directory unavailable): {}", folder, error),
+                );
+            }
+            SyncEvent::LocalChangeApplied {
+                folder,
+                description,
+            } => {
+                ShareService::log_event(state, repo, &format!("[{}] {}", folder, description));
+            }
+            SyncEvent::FileError {
+                folder,
+                name,
+                error,
+            } => {
+                ShareService::log_event(
+                    state,
+                    repo,
+                    &format!("Skipped file {}/{}: {}", folder, name, error),
+                );
+            }
+            SyncEvent::SessionEnded {
+                peer_device_id,
+                reason,
+            } => {
+                ShareService::log_event(
+                    state,
+                    repo,
+                    &format!(
+                        "Session with {} ended ({}). Reconnecting...",
+                        peer_device_id.short(),
+                        reason
                     ),
                 );
             }

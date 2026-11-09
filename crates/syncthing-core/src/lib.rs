@@ -2,7 +2,10 @@
 //! Tested natively on `x86_64-unknown-linux-gnu` via `cargo test -p syncthing-core`.
 
 pub mod bep;
+pub mod cert;
 pub mod disco;
+pub mod folder_sync;
+pub mod local_db;
 pub mod proto;
 pub mod storage;
 pub mod tls;
@@ -16,15 +19,16 @@ pub use bep::{
     decompress_bep_lz4, read_bep_message, write_bep_message, BepBlockInfo, BepClose,
     BepClusterConfig, BepCompression, BepFileInfo, BepFolder, BepHeader, BepHello, BepIndex,
     BepMessageType, BepRequest, BepResponse, BepVersionCounter, FolderIndexState, BEP_BLOCK_SIZE,
-    BEP_DEFAULT_PORT, BEP_MAGIC,
+    BEP_DEFAULT_NUM_CONNECTIONS, BEP_DEFAULT_PORT, BEP_MAGIC,
 };
+pub use cert::VitaIdentity;
 pub use disco::{
     Announce, DeviceId, DISCOVERY_BROADCAST_ADDR, DISCOVERY_MAGIC, DISCOVERY_PORT,
 };
 pub use storage::FsSyncStorage;
 pub use tls::{
-    connect_and_sync, probe_bep_peer_device_id, PeerHandshakeResult, SyncEvent, SyncSessionStatus,
-    VitaIdentity, BEP_ALPN,
+    connect_and_sync, connect_and_sync_with_control, probe_bep_peer_device_id,
+    PeerHandshakeResult, SyncControl, SyncEvent, SyncSessionStatus, BEP_ALPN,
 };
 
 /// Result of a Syncthing Local Discovery v4 broadcast and listen cycle.
@@ -220,12 +224,6 @@ pub fn run_discovery_cycle(
         }
     }
 
-    // If UDP broadcast on port 21027 found no peers (e.g. Docker container / firewall / AP isolation),
-    // automatically scan the local /24 subnet on TCP port 22000 (BEP/1.0 TLS 1.3)
-    if discovered_peers.is_empty() && target.port() == DISCOVERY_PORT {
-        discovered_peers = scan_lan_bep_peers(own_announce.id);
-    }
-
     Ok(DiscoveryCycleResult {
         local_port,
         bytes_sent,
@@ -304,12 +302,25 @@ mod tests {
 
     #[test]
     fn test_bep_hello_roundtrip() {
-        let hello = BepHello::new_vita_default();
+        let mut hello = BepHello::new_vita_default();
+        assert_eq!(hello.num_connections, BEP_DEFAULT_NUM_CONNECTIONS);
+        hello.timestamp = 1_700_000_000_123_456_789;
         let frame = hello.encode_frame();
         assert_eq!(&frame[0..4], &[0x2E, 0xA7, 0xD9, 0x0B]);
 
         let decoded = BepHello::decode_frame(&frame).expect("BEP Hello decoding failed");
         assert_eq!(decoded, hello);
+        assert_eq!(decoded.num_connections, 3);
+        assert_eq!(decoded.timestamp, 1_700_000_000_123_456_789);
+    }
+
+    #[test]
+    fn test_bep_secondary_cluster_config_roundtrip() {
+        let sec_bytes = BepClusterConfig::encode_secondary();
+        let decoded =
+            BepClusterConfig::decode(&sec_bytes).expect("Secondary ClusterConfig decode failed");
+        assert!(decoded.secondary);
+        assert!(decoded.folders.is_empty());
     }
 
     #[test]
@@ -342,9 +353,13 @@ mod tests {
 
         // Streaming block write
         let sample_data = b"Hello from PS Vita streaming block storage!";
+        storage.prepare_download("test-folder", "save01.bin").expect("Prepare failed");
         storage
             .write_block_streaming("test-folder", "save01.bin", 0, sample_data, sample_data.len() as u64)
             .expect("Streaming write failed");
+        storage
+            .commit_download("test-folder", "save01.bin", sample_data.len() as u64)
+            .expect("Commit failed");
 
         // Local indexing
         let (local_idx, state) = storage
@@ -364,6 +379,100 @@ mod tests {
             .find_outdated_blocks("test-folder", &decoded_idx.files[0])
             .expect("Delta check failed");
         assert!(outdated.is_empty(), "No blocks should be re-downloaded");
+
+        // Rescanning an unchanged folder keeps the same sequence (nothing new to advertise)
+        let (_, state2) = storage.build_local_index("test-folder", dev_id, &[]).unwrap();
+        assert_eq!(state2.max_sequence, state.max_sequence);
+        assert_eq!(state2.index_id, state.index_id);
+
+        let _ = std::fs::remove_dir_all(&tmp_dir);
+    }
+
+    fn remote_file(name: &str, versions: Vec<BepVersionCounter>) -> BepFileInfo {
+        BepFileInfo {
+            name: name.to_owned(),
+            is_dir: false,
+            size: 0,
+            modified_s: 1,
+            deleted: false,
+            invalid: false,
+            sequence: 1,
+            versions,
+            blocks: Vec::new(),
+        }
+    }
+
+    #[test]
+    fn test_versions_converge_across_peers() {
+        let tmp_dir = std::env::temp_dir().join("vita_syncthing_versions_test");
+        let _ = std::fs::remove_dir_all(&tmp_dir);
+        let storage = FsSyncStorage::new(&tmp_dir);
+        let dev_id = DeviceId([0x22; 32]);
+        let root = storage.folder_root("f");
+        std::fs::create_dir_all(root.join("PCSE00277")).unwrap();
+        std::fs::write(root.join("PCSE00277/save.txt"), b"abc").unwrap();
+        std::fs::create_dir_all(root.join("OLD")).unwrap();
+        std::fs::write(root.join("gone.txt"), b"x").unwrap();
+        let (local, _) = storage.build_local_index("f", dev_id, &[]).unwrap();
+        let file = local.files.iter().find(|f| f.name == "PCSE00277/save.txt").unwrap();
+        let gone = local.files.iter().find(|f| f.name == "gone.txt").unwrap().clone();
+
+        let linux = BepVersionCounter { short_device_id: 0x9A7C, value: 5 };
+        let mac = BepVersionCounter { short_device_id: 0x4E26, value: 7 };
+
+        // Peer A (Linux) has the same content with its own version, a directory the Vita lacks,
+        // and a newer deletion of `gone.txt`.
+        let mut same = file.clone();
+        same.versions = vec![linux];
+        let mut dir = remote_file("SYNC00001", vec![linux]);
+        dir.is_dir = true;
+        let mut del = remote_file("gone.txt", local_db::version_merge(&gone.versions, &[linux]));
+        del.deleted = true;
+        let plan = storage
+            .plan_pull("f", dev_id, &[same.clone(), dir, del])
+            .unwrap();
+        assert!(plan.downloads.is_empty());
+        assert!(root.join("SYNC00001").is_dir());
+        assert!(!root.join("gone.txt").exists());
+
+        // Peer B (Mac) has yet another version of the same content.
+        let mut same_b = file.clone();
+        same_b.versions = vec![mac];
+        storage.plan_pull("f", dev_id, &[same_b.clone()]).unwrap();
+
+        // One single version, newer than or equal to both peers', is advertised to everyone.
+        let (idx_a, _) = storage.build_local_index("f", dev_id, &[same]).unwrap();
+        let (idx_b, _) = storage.build_local_index("f", dev_id, &[same_b]).unwrap();
+        assert_eq!(idx_a.files, idx_b.files);
+        let v = &idx_a.files.iter().find(|f| f.name == "PCSE00277/save.txt").unwrap().versions;
+        assert!(local_db::version_ge(v, &[linux]) && local_db::version_ge(v, &[mac]));
+        let t = idx_a.files.iter().find(|f| f.name == "gone.txt").unwrap();
+        assert!(t.deleted);
+        assert!(idx_a.files.iter().any(|f| f.name == "SYNC00001" && f.is_dir));
+
+        let _ = std::fs::remove_dir_all(&tmp_dir);
+    }
+
+    #[test]
+    fn test_local_deletion_becomes_tombstone() {
+        let tmp_dir = std::env::temp_dir().join("vita_syncthing_tombstone_test");
+        let _ = std::fs::remove_dir_all(&tmp_dir);
+        let storage = FsSyncStorage::new(&tmp_dir);
+        let dev_id = DeviceId([0x33; 32]);
+        let root = storage.folder_root("f");
+        std::fs::create_dir_all(&root).unwrap();
+        std::fs::write(root.join("a.txt"), b"a").unwrap();
+        std::fs::write(root.join("b.txt"), b"b").unwrap();
+        let (_, s1) = storage.build_local_index("f", dev_id, &[]).unwrap();
+        std::fs::remove_file(root.join("a.txt")).unwrap();
+        let (idx, s2) = storage.build_local_index("f", dev_id, &[]).unwrap();
+        assert!(s2.max_sequence > s1.max_sequence);
+        assert!(idx.files.iter().any(|f| f.name == "a.txt" && f.deleted));
+
+        // An emptied root (e.g. unavailable folder) must not turn everything into deletions.
+        std::fs::remove_file(root.join("b.txt")).unwrap();
+        let (idx, _) = storage.build_local_index("f", dev_id, &[]).unwrap();
+        assert!(idx.files.iter().any(|f| f.name == "b.txt" && !f.deleted));
 
         let _ = std::fs::remove_dir_all(&tmp_dir);
     }

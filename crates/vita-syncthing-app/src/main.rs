@@ -13,13 +13,16 @@ mod infrastructure;
 mod ui;
 
 use std::sync::mpsc::Receiver;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use application::{InputController, ShareService, SyncCoordinator, UserCommand};
-use domain::AppState;
+use domain::{AppState, ModalDialog};
 use infrastructure::{
-    init_vita_network, spawn_sync_worker, ConfigRepository, IdentityStore, VitaInput, WorkerMsg,
+    init_vita_network, keep_system_awake, spawn_sync_worker, ConfigRepository, IdentityStore,
+    VitaInput, WorkerMsg,
 };
+use syncthing_core::SyncControl;
 use ui::VitaUiRenderer;
 
 /// Explicit 64 MB Newlib heap size on PS Vita hardware.
@@ -53,6 +56,10 @@ fn main() {
     let devices = repo.load_devices();
     let shares = repo.load_shares();
     let mut state = AppState::new(shares, devices, ConfigRepository::default_browse_root());
+    if state.sanitize_legacy_unpaired_peers() {
+        repo.save_devices(&state.approved_devices());
+        repo.save_shares(&state.shares);
+    }
     if let Ok(ref id) = identity_res {
         state.vita_device_id = id.device_id.to_syncthing_string();
     }
@@ -95,17 +102,30 @@ fn main() {
         &format!("PS Vita Device ID: {}", identity.device_id),
     );
 
-    // Automatically trigger initial synchronization on startup
-    state.sync_in_progress = true;
-    let mut worker_rx: Option<Receiver<WorkerMsg>> = Some(spawn_sync_worker(
-        repo.base_data_dir(),
-        identity.clone(),
-        state.shares.clone(),
-        state.devices.clone(),
-    ));
+    let mut worker_rx: Option<Receiver<WorkerMsg>> = None;
+    let mut worker_ctl: Option<Arc<SyncControl>> = None;
+
+    // Only auto-connect on startup if the user has already configured/paired at least one device
+    if state.has_configured_peers() {
+        state.sync_in_progress = true;
+        let offered = std::mem::take(&mut state.pending_folder_offers);
+        let (rx, ctl) = spawn_sync_worker(
+            repo.base_data_dir(),
+            identity.clone(),
+            state.shares.clone(),
+            state.approved_devices(),
+            offered,
+        );
+        worker_rx = Some(rx);
+        worker_ctl = Some(ctl);
+    } else {
+        state.peer_label = "No peer linked (Manual pairing)".to_owned();
+        state.status_line = "Select or add a device in Shares -> Devices to connect".to_owned();
+    }
 
     let mut last_activity = Instant::now();
     let mut last_sync_finished = Instant::now();
+    let mut last_power_tick = Instant::now() - Duration::from_secs(60);
 
     // Main interactive 60 FPS loop (Gamepad SceCtrl + Touch SceTouch + OLED Saver)
     loop {
@@ -122,44 +142,108 @@ fn main() {
             UserCommand::StartSync => {
                 input_ctl.close_ime();
                 state.ime_active = false;
-                if !state.sync_in_progress {
+                state.auto_reconnect_enabled = true;
+                if worker_rx.is_some() && state.session_connected && !state.config_dirty {
+                    state.prepare_manual_sync();
+                    ShareService::log_event(
+                        &mut state,
+                        &repo,
+                        "Triggering live local rescan over persistent 1+2 connection...",
+                    );
+                    if let Some(ref ctl) = worker_ctl {
+                        ctl.request_rescan();
+                    }
+                } else {
+                    if let Some(ref ctl) = worker_ctl {
+                        ctl.request_stop();
+                    }
+                    state.config_dirty = false;
+                    state.session_connected = false;
                     state.prepare_manual_sync();
                     ShareService::log_event(
                         &mut state,
                         &repo,
                         "Starting BEP/1.0 synchronization...",
                     );
-                    worker_rx = Some(spawn_sync_worker(
+                    let offered = std::mem::take(&mut state.pending_folder_offers);
+                    let (rx, ctl) = spawn_sync_worker(
                         repo.base_data_dir(),
                         identity.clone(),
                         state.shares.clone(),
-                        state.devices.clone(),
-                    ));
+                        state.approved_devices(),
+                        offered,
+                    );
+                    worker_rx = Some(rx);
+                    worker_ctl = Some(ctl);
                 }
             }
             UserCommand::QuitApp => {
                 input_ctl.close_ime();
+                if let Some(ref ctl) = worker_ctl {
+                    ctl.request_stop();
+                }
                 ShareService::log_event(&mut state, &repo, "Exit requested by user [START].");
                 break;
             }
         }
         state.ime_active = input_ctl.is_ime_open();
 
+        // Reload persistent worker if share/device configuration was changed and modals are closed
+        if state.config_dirty && state.modal == ModalDialog::None {
+            state.config_dirty = false;
+            if let Some(ref ctl) = worker_ctl {
+                ctl.request_stop();
+            }
+            worker_rx = None;
+            worker_ctl = None;
+            state.session_connected = false;
+            if state.has_configured_peers() {
+                state.sync_in_progress = true;
+                let offered = std::mem::take(&mut state.pending_folder_offers);
+                let (rx, ctl) = spawn_sync_worker(
+                    repo.base_data_dir(),
+                    identity.clone(),
+                    state.shares.clone(),
+                    state.approved_devices(),
+                    offered,
+                );
+                worker_rx = Some(rx);
+                worker_ctl = Some(ctl);
+            }
+        }
+
         let was_running = worker_rx.is_some();
         SyncCoordinator::process_worker_messages(&mut state, &repo, &mut worker_rx);
         if was_running && worker_rx.is_none() {
+            worker_ctl = None;
             last_sync_finished = Instant::now();
         }
 
-        // Automatically maintain BEP/1.0 connection in the background every 1s when idle
-        if worker_rx.is_none() && last_sync_finished.elapsed() >= Duration::from_secs(1) {
+        // Automatically reconnect to user-approved peers if the persistent session dropped
+        if worker_rx.is_none()
+            && state.auto_reconnect_enabled
+            && state.has_configured_peers()
+            && last_sync_finished.elapsed() >= Duration::from_secs(2)
+        {
             state.sync_in_progress = true;
-            worker_rx = Some(spawn_sync_worker(
+            let offered = std::mem::take(&mut state.pending_folder_offers);
+            let (rx, ctl) = spawn_sync_worker(
                 repo.base_data_dir(),
                 identity.clone(),
                 state.shares.clone(),
-                state.devices.clone(),
-            ));
+                state.approved_devices(),
+                offered,
+            );
+            worker_rx = Some(rx);
+            worker_ctl = Some(ctl);
+        }
+
+        // Keep the console out of automatic standby while connected / reconnecting to peers.
+        if (worker_rx.is_some() || state.auto_reconnect_enabled)
+            && last_power_tick.elapsed() >= Duration::from_secs(10)
+        {
+            last_power_tick = Instant::now();
+            keep_system_awake();
         }
 
         // Automatic activation of OLED screensaver (pure black #000000 background):
@@ -170,9 +254,7 @@ fn main() {
         } else {
             Duration::from_secs(45)
         };
-        if !state.oled_saver_active
-            && !state.ime_active
-            && last_activity.elapsed() >= oled_timeout
+        if !state.oled_saver_active && !state.ime_active && last_activity.elapsed() >= oled_timeout
         {
             state.oled_saver_active = true;
             repo.write_log("Automatic OLED screensaver activation (#000000).");
@@ -223,12 +305,23 @@ mod tests {
         assert_eq!(idx, 0);
         assert_eq!(state.shares.len(), 1);
         assert!(state.shares[0].enabled);
-        assert_eq!(state.shares[0].shared_devices, vec![dev_id.to_hex()]);
+        assert!(state.shares[0].shared_devices.is_empty());
+        assert!(state.pending_folder_offers.is_empty());
 
-        // Toggle device off and back on
+        // Link device explicitly to share
         let (_, _, added) =
             ShareService::toggle_device_for_share(&mut state, &repo, 0, dev_id).unwrap();
-        assert!(!added);
+        assert!(added);
+        assert_eq!(state.shares[0].shared_devices, vec![dev_id.to_hex()]);
+        assert_eq!(
+            state.pending_folder_offers,
+            vec!["vita-savedata".to_owned()]
+        );
+
+        // Toggle device off and back on
+        let (_, _, added_off) =
+            ShareService::toggle_device_for_share(&mut state, &repo, 0, dev_id).unwrap();
+        assert!(!added_off);
         assert!(state.shares[0].shared_devices.is_empty());
 
         let (_, _, added_again) =
@@ -237,7 +330,13 @@ mod tests {
         assert_eq!(state.shares[0].shared_devices, vec![dev_id.to_hex()]);
 
         // Discovered remote folder starts paused (enabled = false)
-        ShareService::upsert_discovered_folder(&mut state, &repo, "remote-docs", "Remote Docs");
+        ShareService::upsert_discovered_folder(
+            &mut state,
+            &repo,
+            dev_id,
+            "remote-docs",
+            "Remote Docs",
+        );
         assert_eq!(state.shares.len(), 2);
         assert!(!state.shares[1].enabled);
 
@@ -380,6 +479,48 @@ mod tests {
             state.shares[share_idx].shared_devices,
             vec![full_peer_id.to_hex()]
         );
+
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn test_passive_lan_discovery_does_not_auto_link_or_connect() {
+        let dir = temp_test_dir("manual-lan-pairing");
+        let repo = ConfigRepository::new(&dir);
+        let mut state = AppState::new(Vec::new(), Vec::new(), &dir);
+
+        let random_lan_peer = DeviceId([0x77; 32]);
+        ShareService::register_discovered_peer(
+            &mut state,
+            &repo,
+            random_lan_peer,
+            "LAN Peer",
+            "192.168.1.99:22000",
+        );
+
+        // Discovered LAN peer is visible in UI list (`state.devices`) but NOT approved for automatic connection
+        assert_eq!(state.devices.len(), 1);
+        assert!(!state.has_configured_peers());
+        assert!(state.approved_devices().is_empty());
+
+        // Creating a share must NOT auto-link unapproved LAN peers
+        let share_idx = ShareService::create_share(
+            &mut state,
+            &repo,
+            "vita-savedata",
+            "Vita Save Data",
+            "ux0:user/00/savedata",
+        );
+        assert!(state.shares[share_idx].shared_devices.is_empty());
+        assert!(!state.has_configured_peers());
+
+        // Only when the user manually ticks the peer in ManageDevices does it become approved
+        let (_, _, added) =
+            ShareService::toggle_device_for_share(&mut state, &repo, share_idx, random_lan_peer)
+                .unwrap();
+        assert!(added);
+        assert!(state.has_configured_peers());
+        assert_eq!(state.approved_devices().len(), 1);
 
         let _ = std::fs::remove_dir_all(&dir);
     }

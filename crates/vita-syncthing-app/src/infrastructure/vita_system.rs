@@ -10,6 +10,8 @@ pub mod vita_ffi {
 
     pub const SCE_SYSMODULE_NET: c_ushort = 0x0001;
     pub const SCE_KERNEL_MEMBLOCK_TYPE_USER_RW: u32 = 0x0C20_D060;
+    /// Prevents automatic standby only; the screen may still dim and switch off.
+    pub const SCE_KERNEL_POWER_TICK_DISABLE_AUTO_SUSPEND: c_int = 1;
 
     #[repr(C)]
     pub struct SceNetInitParam {
@@ -26,6 +28,7 @@ pub mod vita_ffi {
     #[link(name = "SceLibKernel_stub")]
     extern "C" {
         pub fn sceKernelGetRandomNumber(output: *mut c_void, size: u32) -> c_int;
+        pub fn sceKernelPowerTick(tick_type: c_int) -> c_int;
     }
 
     #[link(name = "SceSysmem_stub")]
@@ -110,3 +113,16 @@ pub fn init_vita_network() -> Result<Vec<u8>, String> {
 pub fn init_vita_network() -> Result<Vec<u8>, String> {
     Ok(Vec::new())
 }
+
+/// Keeps the PS Vita out of automatic standby while a sync session is active. Standby suspends
+/// Wi-Fi and drops every BEP connection, which peers see as the Vita going "Disconnected".
+/// The screen can still dim / switch off. Must be called periodically (the timer is ~1 minute).
+#[cfg(target_os = "vita")]
+pub fn keep_system_awake() {
+    unsafe {
+        vita_ffi::sceKernelPowerTick(vita_ffi::SCE_KERNEL_POWER_TICK_DISABLE_AUTO_SUSPEND);
+    }
+}
+
+#[cfg(not(target_os = "vita"))]
+pub fn keep_system_awake() {}
