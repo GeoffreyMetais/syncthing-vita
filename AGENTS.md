@@ -74,7 +74,94 @@ syncthing-vita
 
 ---
 
-## 3. Critical PlayStation Vita Hardware Constraints (`C2-12828-1` Prevention)
+## 3. Clean Architecture & Modularity Guidelines (Preventing Monolithic Files)
+
+VitaSyncthing enforces a strict **Clean Architecture** to maintain high maintainability, testability on host platforms, and prevent monolithic "god files".
+
+### 3.1 The Four Clean Architecture Layers & Dependency Rules
+
+Dependencies strictly point **inward**. Inner layers never import or depend on outer layers.
+
+```text
+       ┌────────────────────────────────────────────────────────┐
+       │   UI / Presentation Layer (crates/.../ui)              │
+       │   Screens, Modals, Widgets, Gfx Engine                 │
+       │   (Reads &AppState, ZERO business logic or I/O)        │
+       └───────────────────────────┬────────────────────────────┘
+                                   │
+                                   ▼
+       ┌────────────────────────────────────────────────────────┐
+       │   Application Layer (crates/.../application)           │
+       │   Services, Coordinators, Input Controller             │
+       │   (Orchestrates use cases, routes commands)            │
+       └──────────────┬─────────────────────────┬───────────────┘
+                      │                         │
+                      ▼                         ▼
+┌───────────────────────────────┐     ┌─────────────────────────┐
+│ Infrastructure Layer          │     │ Domain Layer            │
+│ (crates/.../infrastructure)   │────▶│ (crates/.../domain)     │
+│ Persistence, Vita Hardware,   │     │ Entities, Models,       │
+│ Syscalls, Network Worker      │     │ AppState, Invariants    │
+└───────────────────────────────┘     └─────────────────────────┘
+```
+
+1. **Layer 1: Pure Domain Layer (`crates/vita-syncthing-app/src/domain/`)**
+   - **Responsibility**: Pure domain models (`models.rs`), application state container (`app_state.rs`), invariants, and query functions.
+   - **Strict Isolation**: **Zero external dependencies**. Absolutely no I/O, no filesystem, no sockets, no rendering, and no VitaSDK syscalls.
+   - **Host Testability**: Must be 100% testable on standard x86_64 host machines without any mocks or emulators.
+
+2. **Layer 2: Application Layer (`crates/vita-syncthing-app/src/application/`)**
+   - **Responsibility**: Use cases, business workflow orchestration, command routing, and event coordination.
+   - **Key Modules**:
+     - `share_service.rs`: Share creation, device linkage, path validation.
+     - `sync_coordinator.rs`: Maps background `WorkerMsg` protocol events into `AppState` updates.
+     - `input_controller.rs`: Translates user button/touch inputs into actions, modal triggers, and commands.
+   - **Strict Rule**: No UI rendering code or direct hardware drivers.
+
+3. **Layer 3: Infrastructure Layer (`crates/vita-syncthing-app/src/infrastructure/`)**
+   - **Responsibility**: Hardware drivers, OS filesystem persistence, background threads, and Vita system modules.
+   - **Key Modules**:
+     - `config_repo.rs`: Disk persistence (`devices.cfg`, `shares.cfg`, `syncthing.log`) and `ux0:` browsing.
+     - `identity_store.rs`: Device seed PRNG (`sceKernelGetRandomNumber`) and X.509 certificate persistence.
+     - `framebuffer.rs`: PS Vita hardware framebuffer management (`SceDisplay`, `SceSysmem`).
+     - `input.rs`: Controller & touchscreen hardware drivers (`SceCtrl`, `SceTouch`).
+     - `sync_worker.rs`: Background sync thread (UDP discovery, BEP protocol, TLS 1.3).
+     - `vita_system.rs`: Network stack and sysmodule initialization.
+   - **Strict Rule**: All platform-specific `#[cfg(target_os = "vita")]` hardware syscalls (`sce*`) must be encapsulated here. Never leak them into UI or Domain.
+
+4. **Layer 4: UI / Presentation Layer (`crates/vita-syncthing-app/src/ui/`)**
+   - **Responsibility**: Visual presentation and 2D vector/font rendering.
+   - **Key Modules**:
+     - `screens/`: Independent full-screen views (`dashboard.rs`, `shares.rs`, `folder_picker.rs`, `settings.rs`, `screensaver.rs`).
+     - `modals/`: Isolated modal dialogs (`create_share.rs`, `manage_devices.rs`, `add_device.rs`, `device_id.rs`, `confirm_quit.rs`, `fallback_keyboard.rs`).
+     - `widgets.rs`: Reusable UI elements (cards, chips, checkboxes, buttons, chrome, toast).
+     - `gfx.rs`: Software 2D rendering primitives, anti-aliased geometry, and TrueType rasterization.
+     - `renderer.rs`: Main UI coordinator invoking active screen and modal renderers.
+   - **Strict Rule**: Pure read-only view. Receives `&AppState` and visual context. **Never mutate domain state directly, and never perform disk I/O or network calls.**
+
+5. **Composition Root (`crates/vita-syncthing-app/src/main.rs`)**
+   - **Responsibility**: Initializes subsystems, wires dependencies, executes the 60 FPS event loop, and exports required VitaSDK entrypoint symbols (`_newlib_heap_size_user`, `sceUserMainThreadStackSize`).
+   - Must remain concise and free of monolithic rendering or business logic.
+
+---
+
+### 3.2 Modularity & File Size Guidelines (Preventing Monoliths)
+
+To prevent code degradation into large, unmaintainable files:
+
+- **Target File Size**: Aim for **200 to 400 lines of code** per file. A file approaching **500+ lines** is a strong code smell indicating multiple responsibilities and must be decomposed.
+- **Single Responsibility Principle (SRP)**:
+  - Each module must have one, and only one, reason to change.
+  - Separate rendering from logic: UI files only draw; application services only coordinate; repositories only persist.
+- **Decomposition Standards**:
+  - **New Screens**: Always create a separate file under `ui/screens/<feature>.rs` and expose it via `ui/screens/mod.rs`.
+  - **New Modal Dialogs**: Always create a separate file under `ui/modals/<modal_name>.rs` and expose it via `ui/modals/mod.rs`.
+  - **New Services**: Split distinct domain workflows into dedicated services in `application/` rather than adding methods to an existing unrelated service.
+  - **Avoid "Omnibus" Files**: Never create catch-all files like `display.rs` or `utils.rs`. Group code by specific domain responsibility.
+
+---
+
+## 4. Critical PlayStation Vita Hardware Constraints (`C2-12828-1` Prevention)
 
 Emulators like Vita3K are permissive HLE environments that run with host PC RAM and pre-bound HLE syscalls. **Real PS Vita hardware will crash with `(C2-12828-1)` if any of the following rules are violated**:
 
@@ -110,7 +197,7 @@ Emulators like Vita3K are permissive HLE environments that run with host PC RAM 
 
 ---
 
-## 4. Runtime Configuration Files on PS Vita (`ux0:data/syncthing/`)
+## 5. Runtime Configuration Files on PS Vita (`ux0:data/syncthing/`)
 
 All persistent application state lives in `ux0:data/syncthing/` (or `/tmp/syncthing-vita` on host builds):
 
@@ -125,7 +212,7 @@ All persistent application state lives in `ux0:data/syncthing/` (or `/tmp/syncth
 
 ---
 
-## 5. Build, Test & Verification Commands
+## 6. Build, Test & Verification Commands
 
 ### Run Host Unit Tests
 ```bash
@@ -167,16 +254,16 @@ timeout 6s ~/.local/bin/Vita3K --console 1 --frontend sdl -l 2 -r SYNCTHING || t
 
 ---
 
-## 6. UI Layout & Controls Reference (`VitaSend` Design System)
+## 7. UI Layout & Controls Reference (`VitaSend` Design System)
 
-The UI (`gfx.rs` + `display.rs`) renders at native `960x544` @ 60 FPS with a `212px` left sidebar (`SIDEBAR_W = 212`), main content area (`x = 236..936`, `y = 86..488`), and bottom button hint bar (`y = 500..544`):
+The UI (`gfx.rs` + `ui/screens/*` + `ui/modals/*` + `ui/renderer.rs`) renders at native `960x544` @ 60 FPS with a `212px` left sidebar (`SIDEBAR_W = 212`), main content area (`x = 236..936`, `y = 86..488`), and bottom button hint bar (`y = 500..544`):
 
 - **Left Sidebar Tabs** (`L` / `R` shoulder buttons or touch tap):
   1. `Overview` (`ActiveTab::Dashboard`): Device status card, `QR / ID` modal button (`Circle`), `Sync Now` button (`Cross`), transfer statistics, and recent activity feed.
   2. `Shares` (`ActiveTab::Shares`): List of shared folders, `+ New Share` modal (`Circle`), `Devices` assignment modal (`Cross`), `Pause/Enable` toggle (`Square`), and `Folder` path picker (`Triangle`).
   3. `Files` (`ActiveTab::FolderPicker`): Interactive `ux0:` directory browser with presets and subfolder navigation (`Cross` select, `Triangle` open subfolder, `Circle` up/back).
   4. `Settings` (`ActiveTab::Settings`): Dark / Pure-Black OLED theme switcher (`Cross`), `QR / ID` modal (`Circle`), and BEP/1.0 protocol log viewer.
-- **Modal Dialogs** (`ModalDialog` in `display.rs`):
+- **Modal Dialogs** (`ModalDialog` in `domain/models.rs`, rendered by `ui/modals/*`):
   - `CreateShare`: Create a share from PS Vita folder presets (`ux0:user/00/savedata`, `ux0:picture`, `ux0:music`, RetroArch saves) or browse `ux0:`.
   - `ManageDevices`: Link/unlink discovered Syncthing peers to a share with circular checkboxes (`draw_row_tick`) and trigger immediate `ClusterConfig` advertising (`Triangle · Apply & Sync`).
   - `ShowDeviceId`: Displays a scannable QR code (`qrcodegen`) alongside the 8-group Syncthing Device ID.

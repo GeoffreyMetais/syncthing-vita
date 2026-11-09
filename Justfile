@@ -18,6 +18,10 @@ test-host:
 run-host:
     cargo run -p vita-syncthing-app
 
+# Cross-check compilation for PS Vita target without packaging
+check-vita:
+    cargo +nightly check -Z build-std=std,panic_abort --package vita-syncthing-app --target {{target}}
+
 # Cross-compile for PS Vita target and generate .vpk package
 vpk:
     VITASDK="${VITASDK:-/usr/local/vitasdk}" PATH="${VITASDK:-/usr/local/vitasdk}/bin:$PATH" ./scripts/build_vpk.sh
