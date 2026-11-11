@@ -55,14 +55,26 @@ pub fn render_manage_devices_modal(
         Align::Left,
         &format!("Devices for {}", share_title),
     );
+    let incomplete = state.is_share_creation_incomplete(share_idx);
+    let (subtitle, subtitle_col) = if incomplete {
+        (
+            "Link at least one device to finish creating this share",
+            C_WARN,
+        )
+    } else {
+        (
+            "Tick the remote Syncthing devices that should synchronize this folder",
+            th.dim,
+        )
+    };
     gfx.text(
         lx + 52,
         dy + 54,
         14,
         FontWeight::Regular,
-        th.dim,
+        subtitle_col,
         Align::Left,
-        "Tick the remote Syncthing devices that should synchronize this folder",
+        subtitle,
     );
     gfx.line(
         (dx + 24) as f32,
@@ -177,7 +189,8 @@ pub fn render_manage_devices_modal(
     draw_action(gfx, th, lx, dy + h - 32, PadButton::Select, pause_lbl);
     let w_add = action_width(gfx, PadButton::Square, "+ Add by ID");
     let w_sync = action_width(gfx, PadButton::Triangle, "Apply & Sync");
-    let w_close = action_width(gfx, PadButton::Circle, "Done");
+    let close_lbl = if incomplete { "Cancel" } else { "Done" };
+    let w_close = action_width(gfx, PadButton::Circle, close_lbl);
     let bx_close = dx + w - 28 - w_close;
     let bx_sync = bx_close - 10 - w_sync;
     let bx_add = bx_sync - 10 - w_add;
@@ -197,7 +210,7 @@ pub fn render_manage_devices_modal(
         PadButton::Triangle,
         "Apply & Sync",
     );
-    draw_action(gfx, th, bx_close, dy + h - 32, PadButton::Circle, "Done");
+    draw_action(gfx, th, bx_close, dy + h - 32, PadButton::Circle, close_lbl);
 
     draw_hints(
         gfx,
@@ -208,7 +221,7 @@ pub fn render_manage_devices_modal(
             (PadButton::Select, None, "Pause/Enable"),
             (PadButton::Square, None, "+ Add by ID"),
             (PadButton::Triangle, None, "Apply & Sync"),
-            (PadButton::Circle, None, "Done"),
+            (PadButton::Circle, None, close_lbl),
         ],
     );
 }

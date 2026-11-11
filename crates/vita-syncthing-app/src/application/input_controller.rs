@@ -1,7 +1,7 @@
 //! Input Controller translating Gamepad (`SceCtrl`) and Touchscreen (`SceTouch`) events
 //! into `AppState` transitions, `ShareService` use-case calls, and high-level `UserCommand`s.
 
-use crate::application::ShareService;
+use crate::application::{ShareCreation, ShareService};
 use crate::domain::{
     ActiveTab, AppState, ModalDialog, PickerMode, ADD_DEVICE_KEYPAD, BROWSER_ROWS,
     NEW_SHARE_TEMPLATES,
@@ -374,17 +374,7 @@ impl InputController {
                         ShareService::refresh_picker_items(state, repo);
                         state.active_tab = ActiveTab::FolderPicker;
                     } else {
-                        let share_idx = ShareService::create_share(state, repo, fid, label, path);
-                        ShareService::log_event(
-                            state,
-                            repo,
-                            &format!("Created share '{}' ({}) -> {}", label, fid, path),
-                        );
-                        state.show_toast(&format!("Created share '{}'", label));
-                        state.modal = ModalDialog::ManageDevices {
-                            share_idx,
-                            selected_dev_idx: 0,
-                        };
+                        ShareCreation::begin(state, repo, fid, label, path);
                     }
                 }
                 UserCommand::None
@@ -409,7 +399,7 @@ impl InputController {
                     };
                 }
                 if (input.pressed & BTN_CIRCLE) != 0 {
-                    state.modal = ModalDialog::None;
+                    Self::close_manage_devices(state, repo);
                     return UserCommand::None;
                 }
                 if (input.pressed & BTN_SQUARE) != 0 {
@@ -421,20 +411,7 @@ impl InputController {
                     return UserCommand::None;
                 }
                 if (input.pressed & BTN_TRIANGLE) != 0 {
-                    if let Some(share) = state.shares.get(share_idx) {
-                        if share.enabled && !share.shared_devices.is_empty() {
-                            let fid = share.folder_id.clone();
-                            state.queue_folder_offer(&fid);
-                            state.config_dirty = true;
-                        }
-                    }
-                    if !state.devices.is_empty() {
-                        state.modal = ModalDialog::None;
-                    }
-                    if !state.sync_in_progress {
-                        return UserCommand::StartSync;
-                    }
-                    return UserCommand::None;
+                    return Self::apply_and_sync(state, repo, share_idx);
                 }
 
                 let mut toggle_dev = (input.pressed & BTN_CROSS) != 0;
@@ -450,21 +427,9 @@ impl InputController {
                         // Bottom buttons inside modal (+ Add by ID / Apply & Sync / Done)
                         if ty >= dy + h - 56 {
                             if tx >= dx + w - 140 {
-                                state.modal = ModalDialog::None;
+                                Self::close_manage_devices(state, repo);
                             } else if tx >= dx + w - 330 {
-                                if let Some(share) = state.shares.get(share_idx) {
-                                    if share.enabled && !share.shared_devices.is_empty() {
-                                        let fid = share.folder_id.clone();
-                                        state.queue_folder_offer(&fid);
-                                        state.config_dirty = true;
-                                    }
-                                }
-                                if !state.devices.is_empty() {
-                                    state.modal = ModalDialog::None;
-                                }
-                                if !state.sync_in_progress {
-                                    return UserCommand::StartSync;
-                                }
+                                return Self::apply_and_sync(state, repo, share_idx);
                             } else if tx >= dx + w - 500 {
                                 return Self::open_add_device_modal(state, Some(share_idx));
                             } else {
@@ -486,7 +451,7 @@ impl InputController {
                             }
                         }
                     } else {
-                        state.modal = ModalDialog::None;
+                        Self::close_manage_devices(state, repo);
                         return UserCommand::None;
                     }
                 }
@@ -730,6 +695,39 @@ impl InputController {
                 UserCommand::None
             }
         }
+    }
+
+    /// Closes `ManageDevices`, discarding a share being created that still has no linked device.
+    fn close_manage_devices(state: &mut AppState, repo: &ConfigRepository) {
+        state.modal = ModalDialog::None;
+        ShareCreation::finish(state, repo);
+    }
+
+    /// `Apply & Sync` in `ManageDevices`: offers the share to its devices and (re)starts the sync.
+    /// With no known device yet, keeps the modal open while the LAN is scanned.
+    fn apply_and_sync(
+        state: &mut AppState,
+        repo: &ConfigRepository,
+        share_idx: usize,
+    ) -> UserCommand {
+        if state.is_share_creation_incomplete(share_idx) && !state.devices.is_empty() {
+            state.show_toast("Link at least one device to create this share");
+            return UserCommand::None;
+        }
+        if let Some(share) = state.shares.get(share_idx) {
+            if share.enabled && !share.shared_devices.is_empty() {
+                let fid = share.folder_id.clone();
+                state.queue_folder_offer(&fid);
+                state.config_dirty = true;
+            }
+        }
+        if !state.devices.is_empty() {
+            Self::close_manage_devices(state, repo);
+        }
+        if !state.sync_in_progress {
+            return UserCommand::StartSync;
+        }
+        UserCommand::None
     }
 
     fn open_add_device_modal(state: &mut AppState, return_share_idx: Option<usize>) -> UserCommand {

@@ -47,6 +47,9 @@ pub struct AppState {
     /// Folder IDs explicitly created, enabled, or linked to a device by the user during this session
     /// that should be advertised as new folder offers in the next BEP `ClusterConfig`.
     pub pending_folder_offers: Vec<String>,
+    /// Folder ID of a share being created: it is discarded unless a device gets linked before
+    /// the `ManageDevices` modal closes.
+    pub pending_share_creation: Option<String>,
     pub selected_share_idx: usize,
     pub picker_current_dir: String,
     pub picker_items: Vec<PickerItem>,
@@ -95,6 +98,7 @@ impl AppState {
             transfer_activity: 0,
             config_dirty: false,
             pending_folder_offers: Vec::new(),
+            pending_share_creation: None,
             selected_share_idx: 0,
             picker_current_dir: default_browse_root.to_owned(),
             picker_items: Vec::new(),
@@ -142,6 +146,14 @@ impl AppState {
         if !self.pending_folder_offers.iter().any(|f| f == folder_id) {
             self.pending_folder_offers.push(folder_id.to_owned());
         }
+    }
+
+    /// True while `shares[share_idx]` is being created and has no linked device yet.
+    pub fn is_share_creation_incomplete(&self, share_idx: usize) -> bool {
+        self.shares.get(share_idx).is_some_and(|s| {
+            s.shared_devices.is_empty()
+                && self.pending_share_creation.as_deref() == Some(s.folder_id.as_str())
+        })
     }
 
     /// Cleans up legacy auto-discovered unpaired LAN peers (`"LAN Peer"`, `"Syncthing Peer"`, `"Syncthing ("`)

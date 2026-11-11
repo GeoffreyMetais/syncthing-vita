@@ -5,9 +5,9 @@ use std::path::Path;
 
 use syncthing_core::DeviceId;
 
+use crate::application::ShareCreation;
 use crate::domain::{
-    ActiveTab, AppState, KnownDevice, ModalDialog, PickerItem, PickerMode, ShareConfigEntry,
-    NEW_SHARE_TEMPLATES,
+    ActiveTab, AppState, KnownDevice, PickerItem, PickerMode, ShareConfigEntry, NEW_SHARE_TEMPLATES,
 };
 use crate::infrastructure::ConfigRepository;
 
@@ -285,48 +285,6 @@ impl ShareService {
         idx
     }
 
-    /// Creates a custom share from a browsed `ux0:` folder path, derives a clean `folder_id` and `label`,
-    /// and transitions to the `ManageDevices` modal.
-    pub fn create_custom_share_from_path(
-        state: &mut AppState,
-        repo: &ConfigRepository,
-        raw_path: &str,
-    ) {
-        let chosen_path = raw_path.trim_end_matches('/').to_owned();
-        let raw_name = chosen_path
-            .rsplit(['/', ':'])
-            .next()
-            .filter(|s| !s.is_empty() && *s != "ux0")
-            .unwrap_or("vita-shared");
-        let folder_id: String = raw_name
-            .chars()
-            .map(|c| {
-                if c.is_ascii_alphanumeric() || c == '-' || c == '_' {
-                    c.to_ascii_lowercase()
-                } else {
-                    '-'
-                }
-            })
-            .collect();
-        let label = format!("Vita {}", raw_name);
-        let share_idx = Self::create_share(state, repo, &folder_id, &label, &chosen_path);
-        Self::log_event(
-            state,
-            repo,
-            &format!(
-                "Created custom share '{}' ({}) -> {}",
-                label, folder_id, chosen_path
-            ),
-        );
-        state.show_toast(&format!("Created share '{}'", label));
-        state.picker_mode = PickerMode::ChangeShareTarget;
-        state.active_tab = ActiveTab::Shares;
-        state.modal = ModalDialog::ManageDevices {
-            share_idx,
-            selected_dev_idx: 0,
-        };
-    }
-
     /// Updates the target path of the currently selected share and returns to the `Shares` tab.
     pub fn update_selected_share_target(
         state: &mut AppState,
@@ -361,6 +319,24 @@ impl ShareService {
         repo: &ConfigRepository,
         share_idx: usize,
     ) -> Option<String> {
+        let removed = Self::remove_share(state, repo, share_idx)?;
+        Self::log_event(
+            state,
+            repo,
+            &format!(
+                "Deleted share '{}' ({}) -> {}",
+                removed.label, removed.folder_id, removed.target_path
+            ),
+        );
+        Some(removed.label)
+    }
+
+    /// Removes `shares[share_idx]` from state and `shares.cfg` without logging.
+    pub(crate) fn remove_share(
+        state: &mut AppState,
+        repo: &ConfigRepository,
+        share_idx: usize,
+    ) -> Option<ShareConfigEntry> {
         if share_idx >= state.shares.len() {
             return None;
         }
@@ -373,15 +349,7 @@ impl ShareService {
         }
         state.config_dirty = true;
         repo.save_shares(&state.shares);
-        Self::log_event(
-            state,
-            repo,
-            &format!(
-                "Deleted share '{}' ({}) -> {}",
-                removed.label, removed.folder_id, removed.target_path
-            ),
-        );
-        Some(removed.label)
+        Some(removed)
     }
 
     /// Toggles `enabled` (Active / Paused) on the currently selected share.
@@ -648,7 +616,7 @@ impl ShareService {
         }
 
         if state.picker_mode == PickerMode::CreateNewShare {
-            Self::create_custom_share_from_path(state, repo, &item.path);
+            ShareCreation::begin_from_path(state, repo, &item.path);
         } else {
             Self::update_selected_share_target(state, repo, &item.path);
         }

@@ -48,6 +48,7 @@ syncthing-vita
             ├── application/          # Layer 2: Use Cases, Input Controller & Sync Event Coordinator
             │   ├── mod.rs
             │   ├── share_service.rs  # ShareService (create_share, upsert_device, toggle_device_for_share, refresh_picker_items)
+            │   ├── share_creation.rs # ShareCreation (new share kept only once a device is linked)
             │   ├── sync_coordinator.rs # SyncCoordinator (maps WorkerMsg & SyncEvent into AppState & ShareService)
             │   └── input_controller.rs # InputController (routes InputFrame -> AppState + ShareService -> UserCommand)
             ├── infrastructure/       # Layer 3: Persistence, OS Filesystem, PS Vita Hardware & BEP Worker Thread
@@ -124,6 +125,7 @@ Dependencies strictly point **inward**. Inner layers never import or depend on o
    - **Responsibility**: Use cases, business workflow orchestration, command routing, and event coordination.
    - **Key Modules**:
      - `share_service.rs`: Share creation, device linkage, path validation.
+     - `share_creation.rs`: Share creation workflow — a new share is discarded if `ManageDevices` closes with no linked device.
      - `sync_coordinator.rs`: Maps background `WorkerMsg` protocol events into `AppState` updates.
      - `input_controller.rs`: Translates user button/touch inputs into actions, modal triggers, and commands.
    - **Strict Rule**: No UI rendering code or direct hardware drivers.
@@ -297,7 +299,8 @@ cargo test --workspace
 - `version_vector.rs`: version vector ordering / merge / bump
 
 `vita-syncthing-app` tests live in `crates/vita-syncthing-app/tests/` (`cargo test -p vita-syncthing-app`):
-- `share_service.rs`: share creation, device linking, paused discovered folders, `ConfigRepository` roundtrip, manual LAN pairing
+- `share_creation.rs`: a new share without a linked device is discarded, a linked one is kept
+- `share_service.rs`: share deletion, share creation, device linking, paused discovered folders, `ConfigRepository` roundtrip, manual LAN pairing
 - `input_controller.rs`: `START` quit dialog, theme toggle, add-device-by-short-ID via system keyboard
 - `power_policy.rs`: standby blocking while syncing (charging / battery / transfer grace period)
 
@@ -339,7 +342,7 @@ The UI (`gfx.rs` + `ui/screens/*` + `ui/modals/*` + `ui/renderer.rs`) renders at
   3. `Files` (`ActiveTab::FolderPicker`): Interactive `ux0:` directory browser with presets and subfolder navigation (`Cross` select, `Triangle` open subfolder, `Circle` up/back).
   4. `Settings` (`ActiveTab::Settings`): Dark / Pure-Black OLED theme switcher (`Cross`), `QR / ID` modal (`Circle`), and BEP/1.0 protocol log viewer.
 - **Modal Dialogs** (`ModalDialog` in `domain/models.rs`, rendered by `ui/modals/*`):
-  - `CreateShare`: Create a share from PS Vita folder presets (`ux0:user/00/savedata`, `ux0:picture`, `ux0:music`, RetroArch saves) or browse `ux0:`.
+  - `CreateShare`: Create a share from PS Vita folder presets (`ux0:user/00/savedata`, `ux0:picture`, `ux0:music`, RetroArch saves) or browse `ux0:`. The share is only kept once a device is linked in the `ManageDevices` modal that follows.
   - `ManageDevices`: Link/unlink discovered Syncthing peers to a share with circular checkboxes (`draw_row_tick`) and trigger immediate `ClusterConfig` advertising (`Triangle · Apply & Sync`); `SELECT` pauses / enables the share.
   - `ShowDeviceId`: Displays a scannable QR code (`qrcodegen`) alongside the 8-group Syncthing Device ID.
   - `ConfirmDeleteShare`: Triggered by `Square` on the `Shares` tab; removes the share from `shares.cfg` (files on `ux0:` are kept).
