@@ -4,8 +4,8 @@
 //! - Embedded Poppins (Regular, Medium, Bold) TrueType fonts rasterized and cached in memory
 //! - Vector icons and authentic colored PlayStation button symbols (`Cross`, `Circle`, `Square`, `Triangle`, `L`, `R`, `START`, `SELECT`, `D-Pad`)
 
-use std::collections::HashMap;
 use ab_glyph::{Font, FontRef, PxScale, ScaleFont};
+use std::collections::HashMap;
 
 pub const GFX_W: i32 = 960;
 pub const GFX_H: i32 = 544;
@@ -257,8 +257,16 @@ impl Gfx {
         for q in 0..4 {
             let qx = if (q & 1) != 0 { x + w - r } else { x };
             let qy = if (q & 2) != 0 { y + h - r } else { y };
-            let ccx = if (q & 1) != 0 { (x + w - r) as f32 } else { (x + r) as f32 };
-            let ccy = if (q & 2) != 0 { (y + h - r) as f32 } else { (y + r) as f32 };
+            let ccx = if (q & 1) != 0 {
+                (x + w - r) as f32
+            } else {
+                (x + r) as f32
+            };
+            let ccy = if (q & 2) != 0 {
+                (y + h - r) as f32
+            } else {
+                (y + r) as f32
+            };
             for yy in qy..(qy + r) {
                 for xx in qx..(qx + r) {
                     let cov = Self::cov255(Self::circ_cov(xx, yy, ccx, ccy, rf));
@@ -289,8 +297,16 @@ impl Gfx {
         for q in 0..4 {
             let qx = if (q & 1) != 0 { x + w - r } else { x };
             let qy = if (q & 2) != 0 { y + h - r } else { y };
-            let ccx = if (q & 1) != 0 { (x + w - r) as f32 } else { (x + r) as f32 };
-            let ccy = if (q & 2) != 0 { (y + h - r) as f32 } else { (y + r) as f32 };
+            let ccx = if (q & 1) != 0 {
+                (x + w - r) as f32
+            } else {
+                (x + r) as f32
+            };
+            let ccy = if (q & 2) != 0 {
+                (y + h - r) as f32
+            } else {
+                (y + r) as f32
+            };
             for yy in qy..(qy + r) {
                 for xx in qx..(qx + r) {
                     let outer = Self::circ_cov(xx, yy, ccx, ccy, rf);
@@ -511,7 +527,8 @@ impl Gfx {
         }
 
         let adv = scaled.h_advance(glyph_id);
-        let glyph = glyph_id.with_scale_and_position(PxScale::from(px_scale), ab_glyph::point(0.0, 0.0));
+        let glyph =
+            glyph_id.with_scale_and_position(PxScale::from(px_scale), ab_glyph::point(0.0, 0.0));
 
         let cached = if clean_ch == ' ' {
             CachedGlyph {
@@ -853,7 +870,14 @@ impl Gfx {
                 let lx = cx - 0.355 * s;
                 let rx = cx + 0.355 * s;
                 self.line(lx, cy - 0.17 * s, lx, cy - 0.03 * s, tt * 1.7, c);
-                self.line(lx - 0.07 * s, cy - 0.10 * s, lx + 0.07 * s, cy - 0.10 * s, tt * 1.7, c);
+                self.line(
+                    lx - 0.07 * s,
+                    cy - 0.10 * s,
+                    lx + 0.07 * s,
+                    cy - 0.10 * s,
+                    tt * 1.7,
+                    c,
+                );
                 self.ring(lx, cy + 0.11 * s, 0.05 * s, tt, c);
                 let by = cy - 0.10 * s;
                 let d = 0.055 * s;
@@ -988,7 +1012,11 @@ impl Gfx {
                     FontWeight::Medium,
                     col,
                     Align::Center,
-                    if b == PadButton::Start { "START" } else { "SELECT" },
+                    if b == PadButton::Start {
+                        "START"
+                    } else {
+                        "SELECT"
+                    },
                 );
             }
             PadButton::Dpad | PadButton::DpadLr | PadButton::DpadUd => {

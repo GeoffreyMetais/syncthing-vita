@@ -14,11 +14,7 @@ pub const KEYPAD_STEP_X: i32 = KEYPAD_CELL_W + KEYPAD_GAP; // 72
 pub const KEYPAD_STEP_Y: i32 = KEYPAD_CELL_H + KEYPAD_GAP; // 42
 
 /// Returns the color palette `(bg, fg, outline)` for a keypad button.
-pub fn keypad_button_colors(
-    th: &UiTheme,
-    label: &str,
-    is_sel: bool,
-) -> (Color, Color, Color) {
+pub fn keypad_button_colors(th: &UiTheme, label: &str, is_sel: bool) -> (Color, Color, Color) {
     let is_add = label == "Add";
     let is_action = label == "Bksp" || label == "Clear";
 

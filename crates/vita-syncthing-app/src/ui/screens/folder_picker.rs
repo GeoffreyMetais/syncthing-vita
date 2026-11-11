@@ -96,7 +96,11 @@ pub fn render_folder_picker_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         let ic_col = if item.is_preset { C_GOOD } else { th.accent_hi };
         gfx.icon(ic, (tx + 12) as f32, cy as f32, 22.0, ic_col);
 
-        let badge = if item.is_preset { "Select" } else { "Directory" };
+        let badge = if item.is_preset {
+            "Select"
+        } else {
+            "Directory"
+        };
         let bw = draw_chip(gfx, CONTENT_R - 26, cy, badge, ic_col);
 
         gfx.text_fit(

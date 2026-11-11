@@ -49,7 +49,15 @@ pub fn render_oled_screensaver(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         Align::Left,
         &status_line,
     );
-    draw_progress(gfx, bx + 2, by + 104, (SAVER_W as i32) - 8, 8, pct, th.accent);
+    draw_progress(
+        gfx,
+        bx + 2,
+        by + 104,
+        (SAVER_W as i32) - 8,
+        8,
+        pct,
+        th.accent,
+    );
     gfx.text(
         bx + 2,
         by + 124,

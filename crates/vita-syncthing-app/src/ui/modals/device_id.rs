@@ -67,7 +67,15 @@ pub fn render_device_id_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         14,
         rgb(255, 255, 255),
     );
-    gfx.rrect_outline(qr_box_x, qr_box_y, qr_box_size, qr_box_size, 14, 1, th.border);
+    gfx.rrect_outline(
+        qr_box_x,
+        qr_box_y,
+        qr_box_size,
+        qr_box_size,
+        14,
+        1,
+        th.border,
+    );
 
     let dev_id = &state.vita_device_id;
     if let Ok(qr) = QrCode::encode_text(dev_id, QrCodeEcc::Medium) {
@@ -183,7 +191,13 @@ pub fn render_device_id_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
     gfx.rrect_outline(rx, meta_y, rw, 96, 10, 1, th.border);
 
     let short_id = groups.first().copied().unwrap_or("VITA");
-    draw_chip(gfx, rx + rw - 14, meta_y + 22, "TLS 1.3 · ECDSA P-256", C_GOOD);
+    draw_chip(
+        gfx,
+        rx + rw - 14,
+        meta_y + 22,
+        "TLS 1.3 · ECDSA P-256",
+        C_GOOD,
+    );
     gfx.text(
         rx + 14,
         meta_y + 22,

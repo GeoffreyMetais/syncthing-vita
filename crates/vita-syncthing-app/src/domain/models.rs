@@ -35,7 +35,9 @@ pub enum PickerMode {
 pub enum ModalDialog {
     None,
     /// Create a new share from a template or by browsing `ux0:`.
-    CreateShare { selected_idx: usize },
+    CreateShare {
+        selected_idx: usize,
+    },
     /// Add or remove remote Syncthing devices for a share.
     ManageDevices {
         share_idx: usize,
@@ -83,23 +85,33 @@ pub struct PickerItem {
 /// Templates offered in the `Create New Share` modal dialog.
 pub const NEW_SHARE_TEMPLATES: &[(&str, &str, &str)] = &[
     ("vita-savedata", "Vita Save Data", "ux0:user/00/savedata"),
-    ("vita-pictures", "Vita Screenshots & Pictures", "ux0:picture"),
+    (
+        "vita-pictures",
+        "Vita Screenshots & Pictures",
+        "ux0:picture",
+    ),
     ("vita-music", "Vita Music Library", "ux0:music"),
     (
         "retroarch-saves",
         "RetroArch Savefiles",
         "ux0:data/retroarch/savefiles",
     ),
-    ("vita-shared", "Vita Shared Folder", "ux0:data/syncthing/shared"),
-    ("__browse__", "Browse ux0: to pick any custom folder...", "ux0:"),
+    (
+        "vita-shared",
+        "Vita Shared Folder",
+        "ux0:data/syncthing/shared",
+    ),
+    (
+        "__browse__",
+        "Browse ux0: to pick any custom folder...",
+        "ux0:",
+    ),
 ];
 
 /// 36-key (9x4) Base32 quick-keypad for `ModalDialog::AddDeviceById`.
 pub const ADD_DEVICE_KEYPAD: &[&str; 36] = &[
-    "A", "B", "C", "D", "E", "F", "G", "H", "I",
-    "J", "K", "L", "M", "N", "O", "P", "Q", "R",
-    "S", "T", "U", "V", "W", "X", "Y", "Z", "-",
-    "2", "3", "4", "5", "6", "7", "Bksp", "Clear", "Add",
+    "A", "B", "C", "D", "E", "F", "G", "H", "I", "J", "K", "L", "M", "N", "O", "P", "Q", "R", "S",
+    "T", "U", "V", "W", "X", "Y", "Z", "-", "2", "3", "4", "5", "6", "7", "Bksp", "Clear", "Add",
 ];
 
 /// Format byte sizes cleanly ("1.5 KB", "3.2 MB").

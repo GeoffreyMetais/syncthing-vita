@@ -191,14 +191,7 @@ pub fn render_manage_devices_modal(
         PadButton::Triangle,
         "Apply & Sync",
     );
-    draw_action(
-        gfx,
-        th,
-        bx_close,
-        dy + h - 32,
-        PadButton::Circle,
-        "Done",
-    );
+    draw_action(gfx, th, bx_close, dy + h - 32, PadButton::Circle, "Done");
 
     draw_hints(
         gfx,

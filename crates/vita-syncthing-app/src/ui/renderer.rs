@@ -62,13 +62,7 @@ impl VitaUiRenderer {
                 share_idx,
                 selected_dev_idx,
             } => {
-                render_manage_devices_modal(
-                    &mut self.gfx,
-                    &th,
-                    state,
-                    share_idx,
-                    selected_dev_idx,
-                );
+                render_manage_devices_modal(&mut self.gfx, &th, state, share_idx, selected_dev_idx);
             }
             ModalDialog::AddDeviceById { keypad_idx, .. } => {
                 render_add_device_modal(&mut self.gfx, &th, state, keypad_idx);

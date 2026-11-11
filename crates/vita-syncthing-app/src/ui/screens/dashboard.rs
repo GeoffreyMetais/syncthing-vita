@@ -63,7 +63,10 @@ pub fn render_dashboard_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         "PlayStation Vita",
     );
 
-    let peer_str = format!("Peer: {} · Folders: {}", state.peer_label, state.folder_label);
+    let peer_str = format!(
+        "Peer: {} · Folders: {}",
+        state.peer_label, state.folder_label
+    );
     gfx.text_fit(
         tx,
         CONTENT_Y + 80,
@@ -111,7 +114,14 @@ pub fn render_dashboard_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         &state.vita_device_id,
     );
 
-    draw_action(gfx, th, bx_qr, CONTENT_Y + 128, PadButton::Circle, "QR / ID");
+    draw_action(
+        gfx,
+        th,
+        bx_qr,
+        CONTENT_Y + 128,
+        PadButton::Circle,
+        "QR / ID",
+    );
     draw_action(
         gfx,
         th,

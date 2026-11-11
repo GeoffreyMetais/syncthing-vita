@@ -224,7 +224,10 @@ impl SyncCoordinator {
                 ShareService::log_event(
                     state,
                     repo,
-                    &format!("Folder {} skipped (local directory unavailable): {}", folder, error),
+                    &format!(
+                        "Folder {} skipped (local directory unavailable): {}",
+                        folder, error
+                    ),
                 );
             }
             SyncEvent::LocalChangeApplied {

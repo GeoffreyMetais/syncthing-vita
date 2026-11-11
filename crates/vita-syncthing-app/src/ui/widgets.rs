@@ -2,7 +2,9 @@
 //! `draw_progress`, `draw_scrollbar`, `draw_page_title`, `draw_chrome`, `draw_hints`, `draw_toast`).
 
 use crate::domain::{ActiveTab, AppState};
-use crate::ui::gfx::{rgb, with_alpha, Align, Color, FontWeight, Gfx, Icon, PadButton, GFX_H, GFX_W};
+use crate::ui::gfx::{
+    rgb, with_alpha, Align, Color, FontWeight, Gfx, Icon, PadButton, GFX_H, GFX_W,
+};
 use crate::ui::theme::{
     UiTheme, CONTENT_R, CONTENT_W, CONTENT_X, C_GOOD, C_WARN, HINT_Y, SIDEBAR_W,
 };

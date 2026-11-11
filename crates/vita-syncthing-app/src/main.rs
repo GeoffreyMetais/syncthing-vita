@@ -7,14 +7,16 @@ use std::sync::mpsc::Receiver;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use syncthing_core::SyncControl;
 use vita_syncthing_app::application::power_policy::should_block_standby;
-use vita_syncthing_app::application::{InputController, ShareService, SyncCoordinator, UserCommand};
+use vita_syncthing_app::application::{
+    InputController, ShareService, SyncCoordinator, UserCommand,
+};
 use vita_syncthing_app::domain::{AppState, ModalDialog};
 use vita_syncthing_app::infrastructure::{
-    init_vita_network, is_on_external_power, keep_system_awake, spawn_sync_worker, ConfigRepository, IdentityStore,
-    VitaInput, WorkerMsg,
+    init_vita_network, is_on_external_power, keep_system_awake, spawn_sync_worker,
+    ConfigRepository, IdentityStore, VitaInput, WorkerMsg,
 };
-use syncthing_core::SyncControl;
 use vita_syncthing_app::ui::VitaUiRenderer;
 
 /// Explicit 64 MB Newlib heap size on PS Vita hardware.

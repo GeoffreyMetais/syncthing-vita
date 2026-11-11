@@ -2,11 +2,11 @@
 
 use syncthing_core::DeviceId;
 
+use super::fallback_keyboard::draw_fallback_keypad;
 use crate::domain::AppState;
 use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton, GFX_W};
 use crate::ui::theme::{UiTheme, C_GOOD, C_WARN, HINT_Y};
 use crate::ui::widgets::{action_width, draw_action, draw_hints};
-use super::fallback_keyboard::draw_fallback_keypad;
 
 /// Modal Dialog 2b: Add a remote Syncthing device by entering its Short ID (7+ chars) or Full ID (56 chars).
 pub fn render_add_device_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, keypad_idx: usize) {
@@ -60,12 +60,7 @@ pub fn render_add_device_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, ke
     // Live Text Input Box (y = dy + 80..128)
     let box_y = dy + 80;
     let box_h = 48;
-    let id_part = state
-        .device_id_input
-        .split('@')
-        .next()
-        .unwrap_or("")
-        .trim();
+    let id_part = state.device_id_input.split('@').next().unwrap_or("").trim();
     let parse_res = DeviceId::parse_user_id(id_part);
     let border_col = if state.device_id_input.trim().is_empty() {
         th.accent
@@ -117,17 +112,16 @@ pub fn render_add_device_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, ke
     // Live Validation & LAN Peer Resolution Status Line
     let (status_txt, status_col) = if state.device_id_input.trim().is_empty() {
         (
-            "Tip: You only need the first 7 characters (Short ID shown in Syncthing Web UI).".to_owned(),
+            "Tip: You only need the first 7 characters (Short ID shown in Syncthing Web UI)."
+                .to_owned(),
             th.dim,
         )
     } else {
         match parse_res {
             Ok(parsed_id) => {
-                if let Some(peer) = state
-                    .devices
-                    .iter()
-                    .find(|d| d.device_id.matches_peer(&parsed_id) && !d.device_id.is_short_placeholder())
-                {
+                if let Some(peer) = state.devices.iter().find(|d| {
+                    d.device_id.matches_peer(&parsed_id) && !d.device_id.is_short_placeholder()
+                }) {
                     (
                         format!(
                             "Matches discovered LAN peer: {} ({} @ {}) · Ready to link!",
@@ -198,14 +192,7 @@ pub fn render_add_device_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, ke
         PadButton::Square,
         "Backspace",
     );
-    draw_action(
-        gfx,
-        th,
-        bx_cancel,
-        dy + h - 28,
-        PadButton::Circle,
-        "Cancel",
-    );
+    draw_action(gfx, th, bx_cancel, dy + h - 28, PadButton::Circle, "Cancel");
 
     draw_hints(
         gfx,
