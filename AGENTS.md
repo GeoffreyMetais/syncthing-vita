@@ -52,7 +52,8 @@ syncthing-vita
             │   ├── share_creation.rs # ShareCreation (new share kept only once a device is linked)
             │   ├── dpad_navigation.rs # DpadNavigation (sidebar <-> page focus, Cross on focused element)
             │   ├── sync_coordinator.rs # SyncCoordinator (maps WorkerMsg & SyncEvent into AppState & ShareService)
-            │   └── input_controller.rs # InputController (routes InputFrame -> AppState + ShareService -> UserCommand)
+            │   ├── input_controller.rs # InputController (main-screen InputFrame -> AppState + ShareService -> UserCommand)
+            │   └── modal_input/      # ModalInput: one input handler per modal (create_share, manage_devices, add_device, dialogs)
             ├── infrastructure/       # Layer 3: Persistence, OS Filesystem, PS Vita Hardware & BEP Worker Thread
             │   ├── mod.rs
             │   ├── config_repo.rs    # ConfigRepository (devices.cfg, shares.cfg, syncthing.log, ux0: directory listing)
@@ -130,7 +131,9 @@ Dependencies strictly point **inward**. Inner layers never import or depend on o
      - `share_service.rs`: Share creation, device linkage, path validation.
      - `share_creation.rs`: Share creation workflow — a new share is discarded if `ManageDevices` closes with no linked device.
      - `sync_coordinator.rs`: Maps background `WorkerMsg` protocol events into `AppState` updates.
-     - `input_controller.rs`: Translates user button/touch inputs into actions, modal triggers, and commands.
+     - `input_controller.rs`: Translates main-screen button/touch inputs into actions, modal triggers, and commands.
+     - `modal_input/`: Input handling for open modals, one file per modal (mirrors `ui/modals/`).
+     - `dpad_navigation.rs`: D-pad focus between the sidebar and the page elements.
    - **Strict Rule**: No UI rendering code or direct hardware drivers.
 
 3. **Layer 3: Infrastructure Layer (`crates/vita-syncthing-app/src/infrastructure/`)**
