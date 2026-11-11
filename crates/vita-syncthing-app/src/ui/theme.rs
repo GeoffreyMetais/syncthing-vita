@@ -13,6 +13,8 @@ pub const HINT_Y: i32 = 500;
 
 pub const BROWSER_TOP: i32 = 134;
 pub const BROWSER_STEP: i32 = 42;
+/// Touch width of the "Open" chip at the right of a directory row in the `Files` browser.
+pub const OPEN_CHIP_W: i32 = 120;
 
 pub const C_GOOD: Color = rgb(102, 187, 106);
 pub const C_WARN: Color = rgb(255, 193, 77);

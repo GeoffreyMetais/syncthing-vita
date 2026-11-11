@@ -1,8 +1,6 @@
 //! Share & Device management use cases (`ShareService`).
 //! Extracted from the display layer so business rules and persistence can be tested independently of the UI.
 
-use std::path::Path;
-
 use syncthing_core::DeviceId;
 
 use crate::application::ShareCreation;
@@ -508,10 +506,7 @@ impl ShareService {
 
         let mut items = if state.picker_mode == PickerMode::CreateNewShare {
             vec![PickerItem {
-                label: format!(
-                    "Create share from current folder: {}",
-                    state.picker_current_dir
-                ),
+                label: format!("Share this folder ({})", state.picker_current_dir),
                 path: state.picker_current_dir.clone(),
                 is_preset: true,
             }]
@@ -585,15 +580,14 @@ impl ShareService {
 
     /// Navigates one directory level up in the `ux0:` picker, or returns to the `Shares` tab if at root.
     pub fn navigate_picker_up(state: &mut AppState, repo: &ConfigRepository) {
-        if let Some(parent) = Path::new(&state.picker_current_dir).parent() {
-            let p_str = parent.to_string_lossy().into_owned();
-            if !p_str.is_empty() {
-                state.picker_current_dir = p_str;
+        match parent_dir(&state.picker_current_dir) {
+            Some(parent) => {
+                state.picker_current_dir = parent;
+                state.selected_picker_idx = 0;
                 Self::refresh_picker_items(state, repo);
-                return;
             }
+            None => state.active_tab = ActiveTab::Shares,
         }
-        state.active_tab = ActiveTab::Shares;
     }
 
     /// Applies selection in the `ux0:` directory browser:
@@ -611,6 +605,7 @@ impl ShareService {
 
         if enter_subdir && !item.is_preset {
             state.picker_current_dir = item.path;
+            state.selected_picker_idx = 0;
             Self::refresh_picker_items(state, repo);
             return;
         }
@@ -620,5 +615,20 @@ impl ShareService {
         } else {
             Self::update_selected_share_target(state, repo, &item.path);
         }
+    }
+}
+
+/// Parent of a browsed directory, handling `sceIo` device roots (`ux0:data` -> `ux0:`).
+/// Returns `None` at a root (`ux0:` or `/`).
+fn parent_dir(dir: &str) -> Option<String> {
+    let trimmed = dir.trim_end_matches('/');
+    match trimmed.rfind('/') {
+        Some(0) if trimmed.len() > 1 => Some("/".to_owned()),
+        Some(0) => None,
+        Some(i) => Some(trimmed[..i].to_owned()),
+        None => match trimmed.find(':') {
+            Some(i) if i + 1 < trimmed.len() => Some(trimmed[..=i].to_owned()),
+            _ => None,
+        },
     }
 }

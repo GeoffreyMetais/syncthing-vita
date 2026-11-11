@@ -84,3 +84,36 @@ fn test_reopening_existing_share_never_discards_it() {
 
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn test_selecting_a_folder_in_files_tab_starts_share_creation() {
+    use vita_syncthing_app::domain::{ActiveTab, PickerMode};
+    use vita_syncthing_app::infrastructure::{BTN_DOWN, BTN_R};
+
+    let dir = temp_test_dir("files-tab-create");
+    std::fs::create_dir_all(format!("{}/saves", dir)).unwrap();
+    let repo = ConfigRepository::new(&dir);
+    let mut state = AppState::new(Vec::new(), Vec::new(), &dir);
+
+    // Dashboard -> Shares -> Files
+    press(&mut state, &repo, BTN_R);
+    press(&mut state, &repo, BTN_R);
+    assert_eq!(state.active_tab, ActiveTab::FolderPicker);
+    assert_eq!(state.picker_mode, PickerMode::CreateNewShare);
+    assert_eq!(state.picker_items[1].path, format!("{}/saves", dir));
+
+    // Cross on the "saves/" folder opens device linking for a new pending share
+    press(&mut state, &repo, BTN_DOWN);
+    press(&mut state, &repo, BTN_CROSS);
+    assert_eq!(state.active_tab, ActiveTab::Shares);
+    assert_eq!(state.shares.len(), 1);
+    assert_eq!(state.shares[0].folder_id, "saves");
+    assert_eq!(state.shares[0].target_path, format!("{}/saves", dir));
+    assert!(state.is_share_creation_incomplete(0));
+    assert!(matches!(
+        state.modal,
+        ModalDialog::ManageDevices { share_idx: 0, .. }
+    ));
+
+    let _ = std::fs::remove_dir_all(&dir);
+}

@@ -13,8 +13,8 @@ use crate::ui::widgets::{
 pub fn render_folder_picker_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
     let (page_title, share_name) = if state.picker_mode == PickerMode::CreateNewShare {
         (
-            "Create Share from Folder",
-            "Pick any ux0: folder".to_owned(),
+            "Share a Folder",
+            "Select a folder to share it, open it to browse its subfolders".to_owned(),
         )
     } else {
         let s = state
@@ -96,11 +96,7 @@ pub fn render_folder_picker_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         let ic_col = if item.is_preset { C_GOOD } else { th.accent_hi };
         gfx.icon(ic, (tx + 12) as f32, cy as f32, 22.0, ic_col);
 
-        let badge = if item.is_preset {
-            "Select"
-        } else {
-            "Directory"
-        };
+        let badge = if item.is_preset { "Select" } else { "Open" };
         let bw = draw_chip(gfx, CONTENT_R - 26, cy, badge, ic_col);
 
         gfx.text_fit(
@@ -139,7 +135,7 @@ pub fn render_folder_picker_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
                 PadButton::Cross,
                 None,
                 if state.picker_mode == PickerMode::CreateNewShare {
-                    "Create Share Here"
+                    "Share Folder"
                 } else {
                     "Select Target"
                 },

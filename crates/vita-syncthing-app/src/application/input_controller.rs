@@ -10,7 +10,7 @@ use crate::infrastructure::{
     ConfigRepository, InputFrame, BTN_CIRCLE, BTN_CROSS, BTN_DOWN, BTN_L, BTN_LEFT, BTN_R,
     BTN_RIGHT, BTN_SELECT, BTN_SQUARE, BTN_START, BTN_TRIANGLE, BTN_UP,
 };
-use crate::ui::theme::{BROWSER_STEP, BROWSER_TOP};
+use crate::ui::theme::{BROWSER_STEP, BROWSER_TOP, CONTENT_R, OPEN_CHIP_W};
 
 /// High-level command returned by `InputController` to the main application loop.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -58,7 +58,7 @@ impl InputController {
                 } else if (138..=184).contains(&ty) {
                     state.active_tab = ActiveTab::Shares;
                 } else if (188..=234).contains(&ty) {
-                    state.picker_mode = PickerMode::ChangeShareTarget;
+                    state.picker_mode = PickerMode::CreateNewShare;
                     ShareService::refresh_picker_items(state, repo);
                     state.active_tab = ActiveTab::FolderPicker;
                 } else if (238..=284).contains(&ty) {
@@ -165,7 +165,10 @@ impl InputController {
                                 let ry = (BROWSER_TOP as usize) + vis_i * (BROWSER_STEP as usize);
                                 if ty >= ry && ty <= ry + 38 {
                                     state.selected_picker_idx = idx;
-                                    ShareService::apply_picker_selection(state, repo, false);
+                                    // The "Open" chip on the right enters the subfolder; the rest
+                                    // of the row selects the folder.
+                                    let on_open_chip = tx >= (CONTENT_R - OPEN_CHIP_W) as usize;
+                                    ShareService::apply_picker_selection(state, repo, on_open_chip);
                                     break;
                                 }
                             }
@@ -203,7 +206,7 @@ impl InputController {
                 ActiveTab::Settings => ActiveTab::FolderPicker,
             };
             if state.active_tab == ActiveTab::FolderPicker {
-                state.picker_mode = PickerMode::ChangeShareTarget;
+                state.picker_mode = PickerMode::CreateNewShare;
                 ShareService::refresh_picker_items(state, repo);
             }
         }
@@ -215,7 +218,7 @@ impl InputController {
                 ActiveTab::Settings => ActiveTab::Dashboard,
             };
             if state.active_tab == ActiveTab::FolderPicker {
-                state.picker_mode = PickerMode::ChangeShareTarget;
+                state.picker_mode = PickerMode::CreateNewShare;
                 ShareService::refresh_picker_items(state, repo);
             }
         }
