@@ -4,6 +4,7 @@
 mod add_device;
 mod create_share;
 mod dialogs;
+mod folder_offer;
 mod manage_devices;
 mod scan_qr;
 
@@ -39,6 +40,9 @@ impl ModalInput {
                 dialogs::confirm_delete_share(state, repo, input, share_idx)
             }
             ModalDialog::ConfirmQuit => dialogs::confirm_quit(state, input),
+            ModalDialog::FolderOffer { offer_idx } => {
+                folder_offer::handle(state, repo, input, offer_idx)
+            }
         }
     }
 }

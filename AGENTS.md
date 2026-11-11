@@ -50,6 +50,7 @@ syncthing-vita
             │   ├── mod.rs
             │   ├── share_service.rs  # ShareService (create_share, upsert_device, toggle_device_for_share, refresh_picker_items)
             │   ├── share_creation.rs # ShareCreation (new share kept only once a device is linked)
+            │   ├── folder_offers.rs  # FolderOfferService (folders offered by peers need consent: accept / decline / later)
             │   ├── dpad_navigation.rs # DpadNavigation (sidebar <-> page focus, Cross on focused element)
             │   ├── qr_scan.rs        # QrScanFlow (scanner events -> AddDeviceById confirmation), extract_device_id
             │   ├── sync_coordinator.rs # SyncCoordinator (maps WorkerMsg & SyncEvent into AppState & ShareService)
@@ -88,7 +89,8 @@ syncthing-vita
                 │   ├── fallback_keyboard.rs
                 │   ├── device_id.rs
                 │   ├── confirm_quit.rs
-                │   └── confirm_delete_share.rs
+                │   ├── confirm_delete_share.rs
+                │   └── folder_offer.rs
                 └── renderer.rs       # VitaUiRenderer (coordinates Gfx + VitaFramebuffer presentation)
 ```
 
@@ -135,6 +137,7 @@ Dependencies strictly point **inward**. Inner layers never import or depend on o
    - **Key Modules**:
      - `share_service.rs`: Share creation, device linkage, path validation.
      - `share_creation.rs`: Share creation workflow — a new share is discarded if `ManageDevices` closes with no linked device.
+     - `folder_offers.rs`: Consent for folders offered by peers (`FolderOffer` modal); declined offers persisted.
      - `sync_coordinator.rs`: Maps background `WorkerMsg` protocol events into `AppState` updates.
      - `input_controller.rs`: Translates main-screen button/touch inputs into actions, modal triggers, and commands.
      - `modal_input/`: Input handling for open modals, one file per modal (mirrors `ui/modals/`).
@@ -274,7 +277,7 @@ Emulators like Vita3K are permissive HLE environments that run with host PC RAM 
 5. **Unique Per-Installation Cryptographic Identity (`main.rs`)**:
    - Never hardcode the contents of `ux0:data/syncthing/device_seed.bin`.
    - On a clean installation (when `device_seed.bin` does not exist), generate 32 random bytes via `sceKernelGetRandomNumber` (`SceLibKernel_stub`) so every PS Vita gets a unique Syncthing `DeviceId`.
-   - Remote folders discovered via `ClusterConfig` (`upsert_discovered_folder`) must default to `enabled: false` (**Paused**) until the user selects a target folder and enables them in the **Shares** tab.
+   - Remote folders received via `ClusterConfig` never become shares on their own: `FolderOfferService::receive` queues them as `FolderOffer`s and the `FolderOffer` modal asks for consent. An accepted folder defaults to `enabled: false` (**Paused**) until the user selects a target folder and enables it in the **Shares** tab; a declined one is saved in `ignored_folders.cfg`.
 
 ---
 
@@ -288,6 +291,7 @@ All persistent application state lives in `ux0:data/syncthing/` (or `/tmp/syncth
 | `cert.der` | Self-signed X.509 DER certificate whose SHA-256 is the Syncthing `DeviceId` | ASN.1 DER |
 | `devices.cfg` | Known/discovered remote Syncthing peers | `<device_id_hex>\|<name>\|<ip:port>\n` |
 | `shares.cfg` | Configured shared folders and linked devices | `<folder_id>\|<label>\|<target_path>\|<0\|1>\|<dev_hex1,dev_hex2>\n` |
+| `ignored_folders.cfg` | Folder offers declined by the user or deleted shares (not prompted again until `Settings` · `Clear Declined`) | `<folder_id>\|<device_id_hex>\n` |
 | `syncthing.log` | Persistent protocol & UI event log | Plain text lines |
 | `sync/.syncthing_db_<folder>_<root hash>.txt` | Persistent folder database (`local_db/`): version vectors, sequences, blocks and tombstones per entry | `#vita-db-v1` tab-separated text |
 
@@ -311,7 +315,8 @@ cargo test --workspace
 
 `vita-syncthing-app` tests live in `crates/vita-syncthing-app/tests/` (`cargo test -p vita-syncthing-app`):
 - `share_creation.rs`: a new share without a linked device is discarded, a linked one is kept, `Files` tab folder selection, already-shared folders are not selectable
-- `share_service.rs`: share deletion, share creation, device linking, paused discovered folders, `ConfigRepository` roundtrip, manual LAN pairing
+- `folder_offers.rs`: offered folders need consent, accept / decline / later, declined offers persisted, deleted shares are declined and do not come back, `Settings` · `Clear Declined` (D-pad and touch)
+- `share_service.rs`: share deletion, share creation, device linking, paused accepted folders, `ConfigRepository` roundtrip, manual LAN pairing
 - `input_controller.rs`: `START` quit dialog, theme toggle, add-device-by-short-ID via system keyboard, share deletion confirmation, `Files` up navigation, virtual keyboard toggle
 - `dpad_navigation.rs`: sidebar <-> page focus, Shares rows / buttons / header, Files rows / Up button
 - `qr_scan.rs`: Device ID extraction from QR payloads, `quircs` decoding of a rendered QR code, scanner modal navigation, adding the scanned device
@@ -362,13 +367,14 @@ The UI (`gfx.rs` + `ui/screens/*` + `ui/modals/*` + `ui/renderer.rs`) renders at
   1. `Overview` (`ActiveTab::Dashboard`): Device status card, `QR / ID` modal button (`Circle`), `Sync Now` button (`Cross`), transfer statistics, and recent activity feed.
   2. `Shares` (`ActiveTab::Shares`): List of shared folders, `+ New Share` modal (`Circle`), `Devices` assignment modal (`Cross`), `Delete` with confirmation (`Square`), and `Folder` path picker (`Triangle`).
   3. `Files` (`ActiveTab::FolderPicker`): Interactive `ux0:` directory browser. Selecting a folder (`Cross` or tap) starts creating a share of it (folders already shared are greyed out and cannot be selected or opened); `Triangle` (or tapping the `Open` chip) enters a subfolder, `Circle` goes up/back. The `Shares` tab `Folder` action reuses this browser to change a share's target path.
-  4. `Settings` (`ActiveTab::Settings`): Dark / Pure-Black OLED theme switcher (`Cross`), `QR / ID` modal (`Circle`), and BEP/1.0 protocol log viewer.
+  4. `Settings` (`ActiveTab::Settings`): Dark / Pure-Black OLED theme switcher (`Cross`), `QR / ID` modal (`Circle`), `Declined folders` card (D-pad `Down` + `Cross` or tap `Clear Declined` to forget declined folder offers so peers can offer them again), and BEP/1.0 protocol log viewer.
 - **Modal Dialogs** (`ModalDialog` in `domain/models.rs`, rendered by `ui/modals/*`):
   - `CreateShare`: Create a share from PS Vita folder presets (`ux0:user/00/savedata`, `ux0:picture`, `ux0:music`, RetroArch saves) or browse `ux0:`. The share is only kept once a device is linked in the `ManageDevices` modal that follows.
   - `ManageDevices`: Link/unlink discovered Syncthing peers to a share with circular checkboxes (`draw_row_tick`), add one by ID (`Square`) or by QR code (`R · Scan QR`) and trigger immediate `ClusterConfig` advertising (`Triangle · Apply & Sync`); `SELECT` pauses / enables the share.
   - `AddDeviceById`: Enter a remote Short / Full Device ID with the PS Vita system keyboard (opened on entry or by tapping the text box). The fallback Base32 keypad is hidden by default; `Triangle · Virtual Keyboard` shows / hides it.
   - `ScanDeviceQr`: Rear-camera (`SceCamera`) viewfinder opened with `R · Scan QR` from `AddDeviceById` or from `ManageDevices` (next to `+ Add by ID`). The camera runs only while the modal is open; a decoded full Device ID is added like a typed one, `Circle` goes back to the ID form. Vita3K's emulated camera only delivers blank frames, so decoding must be tested on hardware.
   - `ShowDeviceId`: Displays a scannable QR code (`qrcodegen`) alongside the 8-group Syncthing Device ID.
-  - `ConfirmDeleteShare`: Triggered by `Square` on the `Shares` tab; removes the share from `shares.cfg` (files on `ux0:` are kept).
+  - `ConfirmDeleteShare`: Triggered by `Square` on the `Shares` tab; removes the share from `shares.cfg` (files on `ux0:` are kept) and registers the folder as declined for its linked devices (`ignored_folders.cfg`), so peers do not offer it back until `Settings` · `Clear Declined`.
+  - `FolderOffer`: Opens when a peer's `ClusterConfig` lists a folder that is not shared with it yet (including a deleted share). `Cross · Accept` creates a paused share and opens `Files` to choose its target, `Square · Decline` ignores it (`ignored_folders.cfg`, cleared from `Settings` · `Clear Declined`), `Circle · Later` postpones it until the app restarts.
   - `ConfirmQuit`: Triggered by `START` (or tapping `Quit`), warns if a sync is in progress before exiting to LiveArea.
 - **OLED Screensaver**: Activates automatically after 12s of inactivity during active sync (or 45s when idle, or immediately via `SELECT`), rendering a pure `#000000` black background with a bouncing progress widget to protect PS Vita 1000 OLED screens.

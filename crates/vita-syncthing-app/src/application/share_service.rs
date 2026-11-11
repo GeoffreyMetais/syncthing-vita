@@ -3,10 +3,8 @@
 
 use syncthing_core::DeviceId;
 
-use crate::application::ShareCreation;
-use crate::domain::{
-    ActiveTab, AppState, KnownDevice, PickerItem, PickerMode, ShareConfigEntry, NEW_SHARE_TEMPLATES,
-};
+use crate::application::{FolderOfferService, ShareCreation};
+use crate::domain::{ActiveTab, AppState, KnownDevice, PickerItem, PickerMode, ShareConfigEntry};
 use crate::infrastructure::ConfigRepository;
 
 pub struct ShareService;
@@ -310,14 +308,21 @@ impl ShareService {
         }
     }
 
-    /// Removes `shares[share_idx]` from the configuration (files on disk are kept).
-    /// Returns the label of the removed share.
+    /// Removes `shares[share_idx]` from the configuration (files on disk are kept) and registers
+    /// the folder as declined for its linked devices, so their next `ClusterConfig` does not offer
+    /// it again (undone with `Settings` · `Clear Declined`). Returns the label of the removed share.
     pub fn delete_share(
         state: &mut AppState,
         repo: &ConfigRepository,
         share_idx: usize,
     ) -> Option<String> {
         let removed = Self::remove_share(state, repo, share_idx)?;
+        let linked: Vec<DeviceId> = removed
+            .shared_devices
+            .iter()
+            .filter_map(|h| DeviceId::from_hex(h))
+            .collect();
+        FolderOfferService::ignore(state, repo, &removed.folder_id, &linked);
         Self::log_event(
             state,
             repo,
@@ -426,53 +431,6 @@ impl ShareService {
         } else {
             None
         }
-    }
-
-    /// Merges folders received in `ClusterConfig` from `peer_device_id` with local shared folder configuration.
-    /// Newly discovered remote folders start paused (`enabled: false`) so nothing syncs without user opt-in.
-    pub fn upsert_discovered_folder(
-        state: &mut AppState,
-        repo: &ConfigRepository,
-        peer_device_id: DeviceId,
-        folder_id: &str,
-        label: &str,
-    ) {
-        let peer_hex = peer_device_id.to_hex();
-
-        let template_path = NEW_SHARE_TEMPLATES
-            .iter()
-            .find(|&&(id, _, _)| id == folder_id && id != "__browse__")
-            .map(|&(_, _, p)| p.to_owned());
-
-        let fallback_sync = format!("{}/sync/{}", repo.base_data_dir(), folder_id);
-
-        if let Some(existing) = state.shares.iter_mut().find(|s| s.folder_id == folder_id) {
-            if !label.is_empty() {
-                existing.label = label.to_owned();
-            }
-            if !existing.shared_devices.contains(&peer_hex) {
-                existing.shared_devices.push(peer_hex);
-            }
-            if existing.target_path == fallback_sync {
-                if let Some(tpl) = template_path {
-                    existing.target_path = tpl;
-                }
-            }
-        } else {
-            let default_target = template_path.unwrap_or(fallback_sync);
-            state.shares.push(ShareConfigEntry {
-                folder_id: folder_id.to_owned(),
-                label: if label.is_empty() {
-                    folder_id.to_owned()
-                } else {
-                    label.to_owned()
-                },
-                target_path: default_target,
-                enabled: false,
-                shared_devices: vec![peer_hex],
-            });
-        }
-        repo.save_shares(&state.shares);
     }
 
     /// Refreshes presets and `ux0:` subdirectories for the currently selected share or new share creation.

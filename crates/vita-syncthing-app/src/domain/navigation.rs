@@ -19,6 +19,8 @@ pub struct NavState {
     pub col: usize,
     /// True when the page's top button is focused instead of a row.
     pub header: bool,
+    /// Focused card on pages with fixed rows (Settings: `0` = display, `1` = declined folders).
+    pub row: usize,
 }
 
 impl NavState {
@@ -27,6 +29,7 @@ impl NavState {
             focus: NavFocus::Content,
             col: default_col(tab),
             header: false,
+            row: 0,
         }
     }
 }
@@ -50,6 +53,9 @@ pub const fn action_count(tab: ActiveTab) -> usize {
         ActiveTab::Settings => 3,
     }
 }
+
+/// Number of focusable cards on the Settings page: display buttons, then `Clear Declined`.
+pub const SETTINGS_ROWS: usize = 2;
 
 /// Button focused when entering a tab: the one `Cross` triggered before D-pad navigation.
 pub const fn default_col(tab: ActiveTab) -> usize {

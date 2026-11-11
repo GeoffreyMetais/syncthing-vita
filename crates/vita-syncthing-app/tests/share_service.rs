@@ -5,7 +5,7 @@ mod common;
 
 use common::temp_test_dir;
 use syncthing_core::DeviceId;
-use vita_syncthing_app::application::ShareService;
+use vita_syncthing_app::application::{FolderOfferService, ShareService};
 use vita_syncthing_app::domain::AppState;
 use vita_syncthing_app::infrastructure::ConfigRepository;
 
@@ -53,8 +53,10 @@ fn test_share_service_and_config_repository_roundtrip() {
     assert!(added_again);
     assert_eq!(state.shares[0].shared_devices, vec![dev_id.to_hex()]);
 
-    // Discovered remote folder starts paused (enabled = false)
-    ShareService::upsert_discovered_folder(&mut state, &repo, dev_id, "remote-docs", "Remote Docs");
+    // An accepted remote folder offer starts paused (enabled = false)
+    FolderOfferService::receive(&mut state, &repo, dev_id, "remote-docs", "Remote Docs");
+    assert_eq!(state.shares.len(), 1);
+    FolderOfferService::accept(&mut state, &repo, 0);
     assert_eq!(state.shares.len(), 2);
     assert!(!state.shares[1].enabled);
 

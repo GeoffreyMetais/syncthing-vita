@@ -7,7 +7,8 @@ pub mod navigation;
 
 pub use app_state::AppState;
 pub use models::{
-    fmt_size, ActiveTab, CameraPreview, KnownDevice, ModalDialog, PickerItem, PickerMode,
-    ShareConfigEntry, ThemeMode, ADD_DEVICE_KEYPAD, BROWSER_ROWS, NEW_SHARE_TEMPLATES,
+    fmt_size, ActiveTab, CameraPreview, FolderOffer, IgnoredFolder, KnownDevice, ModalDialog,
+    PickerItem, PickerMode, ShareConfigEntry, ThemeMode, ADD_DEVICE_KEYPAD, BROWSER_ROWS,
+    NEW_SHARE_TEMPLATES,
 };
-pub use navigation::{action_count, default_col, NavFocus, NavState, TAB_ORDER};
+pub use navigation::{action_count, default_col, NavFocus, NavState, SETTINGS_ROWS, TAB_ORDER};

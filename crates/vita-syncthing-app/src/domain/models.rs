@@ -62,6 +62,10 @@ pub enum ModalDialog {
     ConfirmDeleteShare {
         share_idx: usize,
     },
+    /// A remote device offers to share a folder: the user accepts, declines or postpones it.
+    FolderOffer {
+        offer_idx: usize,
+    },
 }
 
 /// Known or discovered remote Syncthing device.
@@ -81,6 +85,24 @@ pub struct ShareConfigEntry {
     pub enabled: bool,
     /// Hex strings (`DeviceId::to_hex()`) of remote devices this folder is shared with.
     pub shared_devices: Vec<String>,
+}
+
+/// Folder a remote device shares with this PS Vita (received in its `ClusterConfig`),
+/// waiting for the user's consent before it becomes a share.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct FolderOffer {
+    pub folder_id: String,
+    pub label: String,
+    pub device_id: DeviceId,
+    /// Postponed with `Later`: kept in the list but not prompted again until the app restarts.
+    pub snoozed: bool,
+}
+
+/// Folder offer declined by the user: never prompted again for this device.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct IgnoredFolder {
+    pub folder_id: String,
+    pub device_id: DeviceId,
 }
 
 /// Latest greyscale camera frame shown in the `ScanDeviceQr` viewfinder.

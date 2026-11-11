@@ -18,6 +18,12 @@ pub const OPEN_CHIP_W: i32 = 120;
 /// Touch width of the `Virtual Keyboard` button inside the `AddDeviceById` text box.
 pub const VIRTUAL_KEYBOARD_BTN_W: usize = 200;
 
+/// Top / bottom of the `Declined folders` card on the Settings page.
+pub const SETTINGS_DECLINED_Y: i32 = CONTENT_Y + 132;
+pub const SETTINGS_DECLINED_B: i32 = SETTINGS_DECLINED_Y + 70;
+/// Touch area of the `Clear Declined` button: from this `x` to the card's right edge.
+pub const SETTINGS_CLEAR_BTN_X: i32 = CONTENT_R - 220;
+
 /// Size of the `ManageDevices` modal (wide enough for its five bottom actions).
 pub const MANAGE_DEVICES_W: i32 = 780;
 pub const MANAGE_DEVICES_H: i32 = 390;
@@ -34,6 +40,23 @@ pub const fn scan_qr_modal_rect() -> (usize, usize, usize, usize) {
     let w = SCAN_QR_VIEW_W as usize + 56;
     let h = SCAN_QR_VIEW_H as usize + 140;
     ((960 - w) / 2, (HINT_Y as usize - h) / 2, w, h)
+}
+
+/// `(x, y, w, h)` of the `FolderOffer` modal, centred above the hint bar.
+pub const fn folder_offer_modal_rect() -> (usize, usize, usize, usize) {
+    let w = 620;
+    let h = 260;
+    ((960 - w) / 2, (HINT_Y as usize - h) / 2, w, h)
+}
+
+/// Touch width of each bottom action slot (`Decline`, `Later`, `Accept`) of the `FolderOffer` modal.
+pub const FOLDER_OFFER_SLOT_W: usize = 160;
+
+/// Left `x` of bottom action slot `slot` (0 = `Decline`, 1 = `Later`, 2 = `Accept`) of the
+/// `FolderOffer` modal; the vertical centre of the action row is `y + h - 34`.
+pub const fn folder_offer_slot_x(slot: usize) -> usize {
+    let (dx, _, w, _) = folder_offer_modal_rect();
+    dx + w - 28 - (3 - slot) * FOLDER_OFFER_SLOT_W - (2 - slot) * 12
 }
 
 /// Height of the `AddDeviceById` modal, which grows when the fallback keypad is shown.

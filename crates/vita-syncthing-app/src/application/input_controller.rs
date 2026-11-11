@@ -4,13 +4,16 @@
 
 use crate::application::dpad_navigation::{DpadNavigation, PageAction};
 use crate::application::modal_input::{open_add_device_modal, ModalInput};
-use crate::application::ShareService;
+use crate::application::{FolderOfferService, ShareService};
 use crate::domain::{ActiveTab, AppState, ModalDialog, PickerMode, BROWSER_ROWS, TAB_ORDER};
 use crate::infrastructure::{
     ConfigRepository, InputFrame, BTN_CIRCLE, BTN_L, BTN_R, BTN_SELECT, BTN_SQUARE, BTN_START,
     BTN_TRIANGLE,
 };
-use crate::ui::theme::{BROWSER_STEP, BROWSER_TOP, CONTENT_R, OPEN_CHIP_W};
+use crate::ui::theme::{
+    BROWSER_STEP, BROWSER_TOP, CONTENT_R, OPEN_CHIP_W, SETTINGS_CLEAR_BTN_X, SETTINGS_DECLINED_B,
+    SETTINGS_DECLINED_Y,
+};
 
 /// High-level command returned by `InputController` to the main application loop.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -194,6 +197,11 @@ impl InputController {
                             } else {
                                 state.toggle_theme();
                             }
+                        } else if (SETTINGS_DECLINED_Y as usize..=SETTINGS_DECLINED_B as usize)
+                            .contains(&ty)
+                            && tx >= SETTINGS_CLEAR_BTN_X as usize
+                        {
+                            FolderOfferService::clear_declined(state, repo);
                         }
                     }
                 }
@@ -244,6 +252,9 @@ impl InputController {
             PageAction::PickerSelect => ShareService::apply_picker_selection(state, repo, false),
             PageAction::PickerOpen => ShareService::apply_picker_selection(state, repo, true),
             PageAction::PickerUp => ShareService::navigate_picker_up(state, repo),
+            PageAction::ClearDeclinedFolders => {
+                FolderOfferService::clear_declined(state, repo);
+            }
         }
 
         // 5. Tab-specific face-button shortcuts

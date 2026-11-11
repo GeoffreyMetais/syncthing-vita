@@ -1,7 +1,9 @@
 //! D-pad navigation on the main screen (`DpadNavigation`): moves the focus between the sidebar
 //! tabs and the current page's elements, and turns `Cross` into the focused element's action.
 
-use crate::domain::{action_count, ActiveTab, AppState, NavFocus, TAB_ORDER};
+use crate::domain::{
+    action_count, default_col, ActiveTab, AppState, NavFocus, SETTINGS_ROWS, TAB_ORDER,
+};
 use crate::infrastructure::{BTN_CROSS, BTN_DOWN, BTN_LEFT, BTN_RIGHT, BTN_UP};
 
 /// Action requested by D-pad navigation, executed by `InputController`.
@@ -20,6 +22,7 @@ pub enum PageAction {
     PickerSelect,
     PickerOpen,
     PickerUp,
+    ClearDeclinedFolders,
 }
 
 /// Buttons handled here; they are removed from the frame so page shortcuts do not see them.
@@ -40,6 +43,7 @@ impl DpadNavigation {
             NavFocus::Content => match state.active_tab {
                 ActiveTab::Shares => Self::shares(state, buttons),
                 ActiveTab::FolderPicker => Self::files(state, buttons),
+                ActiveTab::Settings => Self::settings(state, buttons),
                 tab => Self::action_row(state, tab, buttons),
             },
         }
@@ -89,6 +93,30 @@ impl DpadNavigation {
             (_, 0) => PageAction::AddDevice,
             (_, 1) => PageAction::ShowDeviceId,
             _ => PageAction::ToggleTheme,
+        }
+    }
+
+    /// Settings: the display card's `[+ Add Device, QR / ID, Switch Theme]` row, then the
+    /// declined folders card's `Clear Declined` button.
+    fn settings(state: &mut AppState, buttons: u32) -> PageAction {
+        if buttons & BTN_UP != 0 && state.nav.row > 0 {
+            state.nav.row -= 1;
+            state.nav.col = default_col(ActiveTab::Settings);
+        }
+        if buttons & BTN_DOWN != 0 && state.nav.row + 1 < SETTINGS_ROWS {
+            state.nav.row += 1;
+            state.nav.col = 0;
+        }
+        if state.nav.row == 0 {
+            return Self::action_row(state, ActiveTab::Settings, buttons);
+        }
+        if buttons & BTN_LEFT != 0 {
+            state.nav.focus = NavFocus::Sidebar;
+        }
+        if buttons & BTN_CROSS != 0 {
+            PageAction::ClearDeclinedFolders
+        } else {
+            PageAction::None
         }
     }
 

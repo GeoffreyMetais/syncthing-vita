@@ -10,7 +10,7 @@ use std::time::{Duration, Instant};
 use syncthing_core::SyncControl;
 use vita_syncthing_app::application::power_policy::should_block_standby;
 use vita_syncthing_app::application::{
-    InputController, QrScanFlow, ShareService, SyncCoordinator, UserCommand,
+    FolderOfferService, InputController, QrScanFlow, ShareService, SyncCoordinator, UserCommand,
 };
 use vita_syncthing_app::domain::{AppState, ModalDialog};
 use vita_syncthing_app::infrastructure::{
@@ -50,6 +50,7 @@ fn main() {
     let devices = repo.load_devices();
     let shares = repo.load_shares();
     let mut state = AppState::new(shares, devices, ConfigRepository::default_browse_root());
+    state.ignored_folders = repo.load_ignored_folders();
     if state.sanitize_legacy_unpaired_peers() {
         repo.save_devices(&state.approved_devices());
         repo.save_shares(&state.shares);
@@ -225,6 +226,7 @@ fn main() {
 
         let was_running = worker_rx.is_some();
         SyncCoordinator::process_worker_messages(&mut state, &repo, &mut worker_rx);
+        FolderOfferService::prompt_next(&mut state);
         if was_running && worker_rx.is_none() {
             worker_ctl = None;
             last_sync_finished = Instant::now();

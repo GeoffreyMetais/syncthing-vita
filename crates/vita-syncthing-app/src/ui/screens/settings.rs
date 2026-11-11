@@ -1,10 +1,12 @@
 //! Tab 4 (`Settings & Log` / `Settings`): Dark / Pure-Black OLED theme switcher,
-//! `QR / ID` modal shortcut, and BEP/1.0 & TLS 1.3 protocol event log.
+//! `QR / ID` modal shortcut, declined folder offers (`Clear Declined`), and BEP/1.0 & TLS 1.3
+//! protocol event log.
 
 use crate::domain::{ActiveTab, AppState, ThemeMode};
 use crate::ui::gfx::{Align, FontWeight, Gfx, PadButton};
 use crate::ui::theme::{
     UiTheme, CONTENT_B, CONTENT_R, CONTENT_W, CONTENT_X, CONTENT_Y, C_BAD, C_GOOD,
+    SETTINGS_DECLINED_B, SETTINGS_DECLINED_Y,
 };
 use crate::ui::widgets::{
     action_width, draw_action, draw_card, draw_focus_ring, draw_hints, draw_page_title,
@@ -74,7 +76,10 @@ pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         PadButton::Cross,
         "Switch Theme",
     );
-    match state.focused_action(ActiveTab::Settings) {
+    let display_focus = state
+        .focused_action(ActiveTab::Settings)
+        .filter(|_| state.is_settings_row_focused(0));
+    match display_focus {
         Some(0) => draw_focus_ring(gfx, th, bx_add, CONTENT_Y + 62, w_add),
         Some(1) => draw_focus_ring(gfx, th, bx_qr, CONTENT_Y + 62, w_qr),
         Some(_) => draw_focus_ring(gfx, th, bx_theme, CONTENT_Y + 62, w_theme),
@@ -91,8 +96,11 @@ pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         "OLED Screensaver activates automatically after 12s during sync (or press SELECT anytime).",
     );
 
-    // 2. Full Protocol Event Log Card
-    let ly = CONTENT_Y + 132;
+    // 2. Declined Folder Offers Card
+    render_declined_folders(gfx, th, state);
+
+    // 3. Full Protocol Event Log Card
+    let ly = SETTINGS_DECLINED_B + 14;
     let lh = CONTENT_B - ly;
     draw_card(gfx, th, CONTENT_X, ly, CONTENT_W, lh, false);
     gfx.text(
@@ -105,7 +113,8 @@ pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         "BEP/1.0 & TLS 1.3 PROTOCOL LOG",
     );
 
-    for (i, line) in state.logs.iter().rev().take(10).enumerate() {
+    let max_lines = ((lh - 56) / 22).max(0) as usize;
+    for (i, line) in state.logs.iter().rev().take(max_lines).enumerate() {
         let y = ly + 48 + (i as i32) * 22;
         let col = if line.contains("Error") || line.contains("Failed") {
             C_BAD
@@ -141,4 +150,54 @@ pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
             (PadButton::Start, None, "Quit"),
         ],
     );
+}
+
+/// Card listing folder offers declined in the `FolderOffer` modal, with a `Clear Declined` button.
+fn render_declined_folders(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
+    let y = SETTINGS_DECLINED_Y;
+    let h = SETTINGS_DECLINED_B - SETTINGS_DECLINED_Y;
+    draw_card(gfx, th, CONTENT_X, y, CONTENT_W, h, false);
+    let lx = CONTENT_X + 24;
+    gfx.text(
+        lx,
+        y + 22,
+        12,
+        FontWeight::Bold,
+        th.accent_hi,
+        Align::Left,
+        "DECLINED FOLDERS",
+    );
+    let summary = if state.ignored_folders.is_empty() {
+        "None · folders offered by peers are always asked first".to_owned()
+    } else {
+        let ids: Vec<&str> = state
+            .ignored_folders
+            .iter()
+            .map(|f| f.folder_id.as_str())
+            .collect();
+        format!("{} declined: {}", ids.len(), ids.join(", "))
+    };
+    let label = "Clear Declined";
+    let w_clear = action_width(gfx, PadButton::Cross, label);
+    let bx = CONTENT_R - 20 - w_clear;
+    let cy = y + h / 2;
+    let col = if state.ignored_folders.is_empty() {
+        th.faint
+    } else {
+        th.dim
+    };
+    gfx.text_fit(
+        lx,
+        y + 48,
+        bx - lx - 16,
+        14,
+        FontWeight::Regular,
+        col,
+        Align::Left,
+        &summary,
+    );
+    draw_action(gfx, th, bx, cy, PadButton::Cross, label);
+    if state.is_settings_row_focused(1) {
+        draw_focus_ring(gfx, th, bx, cy, w_clear);
+    }
 }

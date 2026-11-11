@@ -4,7 +4,7 @@ use std::sync::mpsc::Receiver;
 
 use syncthing_core::SyncEvent;
 
-use crate::application::ShareService;
+use crate::application::{FolderOfferService, ShareService};
 use crate::domain::AppState;
 use crate::infrastructure::{ConfigRepository, WorkerMsg};
 
@@ -94,13 +94,7 @@ impl SyncCoordinator {
             } => {
                 let mut labels = Vec::new();
                 for f in &folders {
-                    ShareService::upsert_discovered_folder(
-                        state,
-                        repo,
-                        peer_device_id,
-                        &f.id,
-                        &f.label,
-                    );
+                    FolderOfferService::receive(state, repo, peer_device_id, &f.id, &f.label);
                     labels.push(format!("{} ({})", f.id, f.label));
                 }
                 ShareService::refresh_picker_items(state, repo);

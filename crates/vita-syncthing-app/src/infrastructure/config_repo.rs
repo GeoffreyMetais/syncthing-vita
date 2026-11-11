@@ -1,11 +1,12 @@
-//! Persistence and filesystem repository (`devices.cfg`, `shares.cfg`, `syncthing.log`, and `ux0:` directory browsing).
+//! Persistence and filesystem repository (`devices.cfg`, `shares.cfg`, `ignored_folders.cfg`,
+//! `syncthing.log`, and `ux0:` directory browsing).
 
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 
 use syncthing_core::DeviceId;
 
-use crate::domain::{KnownDevice, ShareConfigEntry, NEW_SHARE_TEMPLATES};
+use crate::domain::{IgnoredFolder, KnownDevice, ShareConfigEntry, NEW_SHARE_TEMPLATES};
 
 /// Repository managing configuration persistence and local filesystem queries on `ux0:`.
 #[derive(Debug, Clone)]
@@ -148,6 +149,35 @@ impl ConfigRepository {
                 devs
             ));
         }
+        write_replacing(&cfg_path, &out);
+    }
+
+    /// Loads declined folder offers from `<base_data_dir>/ignored_folders.cfg`.
+    pub fn load_ignored_folders(&self) -> Vec<IgnoredFolder> {
+        let cfg_path = format!("{}/ignored_folders.cfg", self.base_data_dir);
+        let Ok(content) = fs::read_to_string(&cfg_path) else {
+            return Vec::new();
+        };
+        content
+            .lines()
+            .filter_map(|line| {
+                let (folder_id, dev_hex) = line.split_once('|')?;
+                Some(IgnoredFolder {
+                    folder_id: folder_id.to_owned(),
+                    device_id: DeviceId::from_hex(dev_hex.trim())?,
+                })
+            })
+            .collect()
+    }
+
+    /// Saves declined folder offers to `<base_data_dir>/ignored_folders.cfg`.
+    pub fn save_ignored_folders(&self, ignored: &[IgnoredFolder]) {
+        let _ = fs::create_dir_all(&self.base_data_dir);
+        let cfg_path = format!("{}/ignored_folders.cfg", self.base_data_dir);
+        let out: String = ignored
+            .iter()
+            .map(|f| format!("{}|{}\n", f.folder_id, f.device_id.to_hex()))
+            .collect();
         write_replacing(&cfg_path, &out);
     }
 

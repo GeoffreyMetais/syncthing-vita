@@ -78,6 +78,16 @@ pub fn render_confirm_delete_share_modal(
             Align::Left,
             &format!("Files in {} are kept on the PS Vita.", share.target_path),
         );
+        gfx.text_fit(
+            lx,
+            dy + 158,
+            w - 56,
+            13,
+            FontWeight::Regular,
+            th.faint,
+            Align::Left,
+            "Peers' offers of it are declined (undo in Settings · Clear Declined).",
+        );
     }
 
     let w_delete = action_width(gfx, PadButton::Cross, "Delete");

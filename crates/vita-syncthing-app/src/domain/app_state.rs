@@ -4,8 +4,8 @@
 use syncthing_core::DeviceId;
 
 use crate::domain::models::{
-    ActiveTab, CameraPreview, KnownDevice, ModalDialog, PickerItem, PickerMode, ShareConfigEntry,
-    ThemeMode, BROWSER_ROWS,
+    ActiveTab, CameraPreview, FolderOffer, IgnoredFolder, KnownDevice, ModalDialog, PickerItem,
+    PickerMode, ShareConfigEntry, ThemeMode, BROWSER_ROWS,
 };
 use crate::domain::navigation::{default_col, NavFocus, NavState};
 
@@ -53,6 +53,10 @@ pub struct AppState {
     /// Folder ID of a share being created: it is discarded unless a device gets linked before
     /// the `ManageDevices` modal closes.
     pub pending_share_creation: Option<String>,
+    /// Folders remote devices offered in their `ClusterConfig`, waiting for the user's consent.
+    pub folder_offers: Vec<FolderOffer>,
+    /// Folder offers the user declined (persisted in `ignored_folders.cfg`).
+    pub ignored_folders: Vec<IgnoredFolder>,
     pub selected_share_idx: usize,
     pub picker_current_dir: String,
     pub picker_items: Vec<PickerItem>,
@@ -109,6 +113,8 @@ impl AppState {
             config_dirty: false,
             pending_folder_offers: Vec::new(),
             pending_share_creation: None,
+            folder_offers: Vec::new(),
+            ignored_folders: Vec::new(),
             selected_share_idx: 0,
             picker_current_dir: default_browse_root.to_owned(),
             picker_items: Vec::new(),
@@ -161,6 +167,18 @@ impl AppState {
         }
     }
 
+    /// True if the user declined `folder_id` when `device_id` offered it.
+    pub fn is_folder_ignored(&self, folder_id: &str, device_id: &DeviceId) -> bool {
+        self.ignored_folders
+            .iter()
+            .any(|f| f.folder_id == folder_id && f.device_id.matches_peer(device_id))
+    }
+
+    /// Index of the first folder offer that should be prompted (not postponed with `Later`).
+    pub fn next_folder_offer_to_prompt(&self) -> Option<usize> {
+        self.folder_offers.iter().position(|o| !o.snoozed)
+    }
+
     /// True while `shares[share_idx]` is being created and has no linked device yet.
     pub fn is_share_creation_incomplete(&self, share_idx: usize) -> bool {
         self.shares.get(share_idx).is_some_and(|s| {
@@ -173,12 +191,20 @@ impl AppState {
     pub fn reset_nav_for_tab(&mut self) {
         self.nav.col = default_col(self.active_tab);
         self.nav.header = false;
+        self.nav.row = 0;
     }
 
     /// Focused action button of `tab`'s current row, if the page (not the sidebar) has focus.
     pub fn focused_action(&self, tab: ActiveTab) -> Option<usize> {
         (self.active_tab == tab && self.nav.focus == NavFocus::Content && !self.nav.header)
             .then_some(self.nav.col)
+    }
+
+    /// True when the Settings card `row` has D-pad focus.
+    pub fn is_settings_row_focused(&self, row: usize) -> bool {
+        self.active_tab == ActiveTab::Settings
+            && self.nav.focus == NavFocus::Content
+            && self.nav.row == row
     }
 
     /// True when `tab`'s top button (`+ New Share`, `Up`) has D-pad focus.
