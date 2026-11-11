@@ -1,12 +1,14 @@
 //! Persistence and filesystem repository (`devices.cfg`, `shares.cfg`, `ignored_folders.cfg`,
-//! `syncthing.log`, and `ux0:` directory browsing).
+//! `theme.cfg`, `syncthing.log`, and `ux0:` directory browsing).
 
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 
 use syncthing_core::DeviceId;
 
-use crate::domain::{IgnoredFolder, KnownDevice, ShareConfigEntry, NEW_SHARE_TEMPLATES};
+use crate::domain::{
+    IgnoredFolder, KnownDevice, ShareConfigEntry, ThemeMode, NEW_SHARE_TEMPLATES,
+};
 
 /// Repository managing configuration persistence and local filesystem queries on `ux0:`.
 #[derive(Debug, Clone)]
@@ -178,6 +180,24 @@ impl ConfigRepository {
             .iter()
             .map(|f| format!("{}|{}\n", f.folder_id, f.device_id.to_hex()))
             .collect();
+        write_replacing(&cfg_path, &out);
+    }
+
+    /// Loads the chosen colour theme mode from `<base_data_dir>/theme.cfg`.
+    /// Defaults to `ThemeMode::Oled` if the file does not exist or contains invalid data.
+    pub fn load_theme(&self) -> ThemeMode {
+        let cfg_path = format!("{}/theme.cfg", self.base_data_dir);
+        let Ok(content) = fs::read_to_string(&cfg_path) else {
+            return ThemeMode::Oled;
+        };
+        ThemeMode::parse(&content).unwrap_or(ThemeMode::Oled)
+    }
+
+    /// Saves the chosen colour theme mode to `<base_data_dir>/theme.cfg`.
+    pub fn save_theme(&self, theme: ThemeMode) {
+        let _ = fs::create_dir_all(&self.base_data_dir);
+        let cfg_path = format!("{}/theme.cfg", self.base_data_dir);
+        let out = format!("{}\n", theme.as_str());
         write_replacing(&cfg_path, &out);
     }
 

@@ -58,7 +58,7 @@ syncthing-vita
             │   └── modal_input/      # ModalInput: one input handler per modal (create_share, manage_devices, add_device, scan_qr, dialogs)
             ├── infrastructure/       # Layer 3: Persistence, OS Filesystem, PS Vita Hardware & BEP Worker Thread
             │   ├── mod.rs
-            │   ├── config_repo.rs    # ConfigRepository (devices.cfg, shares.cfg, syncthing.log, ux0: directory listing)
+            │   ├── config_repo.rs    # ConfigRepository (devices.cfg, shares.cfg, ignored_folders.cfg, theme.cfg, syncthing.log, ux0: directory listing)
             │   ├── identity_store.rs # IdentityStore (sceKernelGetRandomNumber, device_seed.bin, cert.der)
             │   ├── vita_system.rs    # init_vita_network (SceSysmodule + SceSysmem + SceNet + SceNetCtl) & detect_system_language (SceAppUtil)
             │   ├── ui_script.rs      # Opt-in `ui-script` feature: scripted input replay + frame dumps for Vita3K
@@ -155,7 +155,7 @@ Dependencies strictly point **inward**. Inner layers never import or depend on o
 3. **Layer 3: Infrastructure Layer (`crates/vita-syncthing-app/src/infrastructure/`)**
    - **Responsibility**: Hardware drivers, OS filesystem persistence, background threads, and Vita system modules.
    - **Key Modules**:
-     - `config_repo.rs`: Disk persistence (`devices.cfg`, `shares.cfg`, `syncthing.log`) and `ux0:` browsing.
+     - `config_repo.rs`: Disk persistence (`devices.cfg`, `shares.cfg`, `ignored_folders.cfg`, `theme.cfg`, `syncthing.log`) and `ux0:` browsing.
      - `identity_store.rs`: Device seed PRNG (`sceKernelGetRandomNumber`) and X.509 certificate persistence.
      - `framebuffer.rs`: PS Vita hardware framebuffer management (`SceDisplay`, `SceSysmem`).
      - `input.rs`: Controller & touchscreen hardware drivers (`SceCtrl`, `SceTouch`).
@@ -303,6 +303,7 @@ All persistent application state lives in `ux0:data/syncthing/` (or `/tmp/syncth
 | `devices.cfg` | Known/discovered remote Syncthing peers | `<device_id_hex>\|<name>\|<ip:port>\n` |
 | `shares.cfg` | Configured shared folders and linked devices | `<folder_id>\|<label>\|<target_path>\|<0\|1>\|<dev_hex1,dev_hex2>\n` |
 | `ignored_folders.cfg` | Folder offers declined by the user or deleted shares (not prompted again until `Settings` · `Clear Declined`) | `<folder_id>\|<device_id_hex>\n` |
+| `theme.cfg` | Persistent colour theme mode (`dark` or `oled`) | `<dark\|oled>\n` |
 | `syncthing.log` | Persistent protocol & UI event log | Plain text lines |
 | `sync/.syncthing_db_<folder>_<root hash>.txt` | Persistent folder database (`local_db/`): version vectors, sequences, blocks and tombstones per entry | `#vita-db-v1` tab-separated text |
 

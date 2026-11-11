@@ -47,10 +47,31 @@ impl Language {
 }
 
 /// Colour theme modes supported by the UI.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ThemeMode {
     Dark = 0,
+    #[default]
     Oled = 1,
+}
+
+impl ThemeMode {
+    /// Returns the lowercase ASCII identifier for configuration files.
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            Self::Dark => "dark",
+            Self::Oled => "oled",
+        }
+    }
+
+    /// Parses a theme mode identifier (case-insensitive, trimmed).
+    /// Accepts `"dark"`, `"0"`, `"oled"`, `"1"`.
+    pub fn parse(s: &str) -> Option<Self> {
+        match s.trim().to_ascii_lowercase().as_str() {
+            "dark" | "0" => Some(Self::Dark),
+            "oled" | "1" => Some(Self::Oled),
+            _ => None,
+        }
+    }
 }
 
 /// Main navigation tabs in the left sidebar.

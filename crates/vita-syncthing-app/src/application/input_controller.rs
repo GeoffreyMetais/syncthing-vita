@@ -100,7 +100,7 @@ impl InputController {
                     }
                 } else if state.active_tab == ActiveTab::Settings {
                     if tx < 230 {
-                        state.toggle_theme();
+                        Self::toggle_theme(state, repo);
                     } else if tx < 420 {
                         state.modal = ModalDialog::ShowDeviceId;
                     } else if tx < 620 {
@@ -195,7 +195,7 @@ impl InputController {
                             } else if (626..=760).contains(&tx) {
                                 state.modal = ModalDialog::ShowDeviceId;
                             } else {
-                                state.toggle_theme();
+                                Self::toggle_theme(state, repo);
                             }
                         } else if (SETTINGS_DECLINED_Y as usize..=SETTINGS_DECLINED_B as usize)
                             .contains(&ty)
@@ -236,7 +236,7 @@ impl InputController {
             PageAction::SwitchTab(tab) => Self::switch_tab(state, repo, tab),
             PageAction::StartSync => trigger_sync = true,
             PageAction::ShowDeviceId => state.modal = ModalDialog::ShowDeviceId,
-            PageAction::ToggleTheme => state.toggle_theme(),
+            PageAction::ToggleTheme => Self::toggle_theme(state, repo),
             PageAction::AddDevice => return open_add_device_modal(state, None),
             PageAction::NewShare => state.modal = ModalDialog::CreateShare { selected_idx: 0 },
             PageAction::ManageDevices => {
@@ -291,7 +291,7 @@ impl InputController {
             }
             ActiveTab::Settings => {
                 if (pressed & BTN_SQUARE) != 0 {
-                    state.toggle_theme();
+                    Self::toggle_theme(state, repo);
                 }
                 if (pressed & BTN_CIRCLE) != 0 {
                     state.modal = ModalDialog::ShowDeviceId;
@@ -323,6 +323,12 @@ impl InputController {
         }
 
         UserCommand::None
+    }
+
+    /// Toggles the colour theme mode and persists the choice to disk.
+    fn toggle_theme(state: &mut AppState, repo: &ConfigRepository) {
+        state.toggle_theme();
+        repo.save_theme(state.theme_mode);
     }
 
     /// Activates `tab`; the `Files` tab opens on the share-creation folder browser.

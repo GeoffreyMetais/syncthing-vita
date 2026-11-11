@@ -50,6 +50,7 @@ fn main() {
     let devices = repo.load_devices();
     let shares = repo.load_shares();
     let mut state = AppState::new(shares, devices, ConfigRepository::default_browse_root());
+    state.theme_mode = repo.load_theme();
     state.language = detect_system_language();
     state.ignored_folders = repo.load_ignored_folders();
     if state.sanitize_legacy_unpaired_peers() {
