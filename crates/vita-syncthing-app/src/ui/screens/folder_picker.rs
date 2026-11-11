@@ -93,10 +93,23 @@ pub fn render_folder_picker_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         } else {
             Icon::Folder
         };
-        let ic_col = if item.is_preset { C_GOOD } else { th.accent_hi };
+        // Folders already shared are greyed out and cannot be selected.
+        let ic_col = if item.is_shared {
+            th.faint
+        } else if item.is_preset {
+            C_GOOD
+        } else {
+            th.accent_hi
+        };
         gfx.icon(ic, (tx + 12) as f32, cy as f32, 22.0, ic_col);
 
-        let badge = if item.is_preset { "Select" } else { "Open" };
+        let badge = if item.is_shared {
+            "Shared"
+        } else if item.is_preset {
+            "Select"
+        } else {
+            "Open"
+        };
         let bw = draw_chip(gfx, CONTENT_R - 26, cy, badge, ic_col);
 
         gfx.text_fit(
@@ -109,7 +122,7 @@ pub fn render_folder_picker_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
             } else {
                 FontWeight::Regular
             },
-            th.text,
+            if item.is_shared { th.faint } else { th.text },
             Align::Left,
             &item.label,
         );

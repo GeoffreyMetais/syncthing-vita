@@ -117,3 +117,33 @@ fn test_selecting_a_folder_in_files_tab_starts_share_creation() {
 
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn test_already_shared_folders_are_not_selectable_in_files_tab() {
+    use vita_syncthing_app::domain::{ActiveTab, PickerMode};
+    use vita_syncthing_app::infrastructure::BTN_DOWN;
+
+    let dir = temp_test_dir("files-tab-shared");
+    let repo = ConfigRepository::new(&dir);
+    let mut state = AppState::new(Vec::new(), Vec::new(), &dir);
+    let saves = format!("{}/saves", dir);
+    ShareService::create_share(&mut state, &repo, "saves", "Saves", &format!("{}/", saves));
+
+    state.active_tab = ActiveTab::FolderPicker;
+    state.picker_mode = PickerMode::CreateNewShare;
+    ShareService::refresh_picker_items(&mut state, &repo);
+    assert_eq!(state.picker_items[1].path, saves);
+    assert!(state.picker_items[1].is_shared);
+    assert!(!state.picker_items[0].is_shared);
+
+    // Neither selecting nor opening the shared folder does anything
+    press(&mut state, &repo, BTN_DOWN);
+    press(&mut state, &repo, BTN_CROSS);
+    press(&mut state, &repo, BTN_TRIANGLE);
+    assert_eq!(state.modal, ModalDialog::None);
+    assert_eq!(state.active_tab, ActiveTab::FolderPicker);
+    assert_eq!(state.picker_current_dir, dir);
+    assert_eq!(state.shares.len(), 1);
+
+    let _ = std::fs::remove_dir_all(&dir);
+}

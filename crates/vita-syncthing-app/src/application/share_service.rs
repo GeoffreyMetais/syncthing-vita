@@ -509,6 +509,7 @@ impl ShareService {
                 label: format!("Share this folder ({})", state.picker_current_dir),
                 path: state.picker_current_dir.clone(),
                 is_preset: true,
+                is_shared: false,
             }]
         } else {
             vec![
@@ -516,26 +517,31 @@ impl ShareService {
                     label: format!("Keep current folder ({})", current_target),
                     path: current_target,
                     is_preset: true,
+                    is_shared: false,
                 },
                 PickerItem {
                     label: "Save Data (ux0:user/00/savedata)".to_owned(),
                     path: "ux0:user/00/savedata".to_owned(),
                     is_preset: true,
+                    is_shared: false,
                 },
                 PickerItem {
                     label: "PS Vita Pictures (ux0:picture)".to_owned(),
                     path: "ux0:picture".to_owned(),
                     is_preset: true,
+                    is_shared: false,
                 },
                 PickerItem {
                     label: "PS Vita Music (ux0:music)".to_owned(),
                     path: "ux0:music".to_owned(),
                     is_preset: true,
+                    is_shared: false,
                 },
                 PickerItem {
                     label: "RetroArch Savefiles (ux0:data/retroarch/savefiles)".to_owned(),
                     path: "ux0:data/retroarch/savefiles".to_owned(),
                     is_preset: true,
+                    is_shared: false,
                 },
                 PickerItem {
                     label: format!(
@@ -544,6 +550,7 @@ impl ShareService {
                     ),
                     path: format!("{}/sync/{}", base_data_dir, folder_id),
                     is_preset: true,
+                    is_shared: false,
                 },
                 PickerItem {
                     label: format!(
@@ -552,6 +559,7 @@ impl ShareService {
                     ),
                     path: state.picker_current_dir.trim_end_matches('/').to_owned(),
                     is_preset: true,
+                    is_shared: false,
                 },
             ]
         };
@@ -568,7 +576,19 @@ impl ShareService {
                 label: format!("{}/", sub),
                 path: full,
                 is_preset: false,
+                is_shared: false,
             });
+        }
+
+        // In `ChangeShareTarget` mode the selected share may keep its own folder.
+        let own_share = (state.picker_mode == PickerMode::ChangeShareTarget)
+            .then_some(state.selected_share_idx);
+        for item in &mut items {
+            let path = item.path.trim_end_matches('/');
+            item.is_shared =
+                state.shares.iter().enumerate().any(|(i, s)| {
+                    Some(i) != own_share && s.target_path.trim_end_matches('/') == path
+                });
         }
 
         state.picker_items = items;
@@ -590,7 +610,7 @@ impl ShareService {
         }
     }
 
-    /// Applies selection in the `ux0:` directory browser:
+    /// Applies selection in the `ux0:` directory browser (folders already shared are ignored):
     /// - If `enter_subdir == true` and item is a directory, descends into it.
     /// - If `state.picker_mode == PickerMode::CreateNewShare`, creates a new share and opens device assignment.
     /// - Otherwise, assigns the chosen target path to the selected share.
@@ -602,6 +622,9 @@ impl ShareService {
         let Some(item) = state.picker_items.get(state.selected_picker_idx).cloned() else {
             return;
         };
+        if item.is_shared {
+            return;
+        }
 
         if enter_subdir && !item.is_preset {
             state.picker_current_dir = item.path;

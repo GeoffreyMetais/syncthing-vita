@@ -84,6 +84,8 @@ pub struct PickerItem {
     pub label: String,
     pub path: String,
     pub is_preset: bool,
+    /// True if another share already targets this folder: shown greyed out and not selectable.
+    pub is_shared: bool,
 }
 
 /// Templates offered in the `Create New Share` modal dialog.

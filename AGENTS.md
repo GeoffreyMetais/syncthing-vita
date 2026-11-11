@@ -299,7 +299,7 @@ cargo test --workspace
 - `version_vector.rs`: version vector ordering / merge / bump
 
 `vita-syncthing-app` tests live in `crates/vita-syncthing-app/tests/` (`cargo test -p vita-syncthing-app`):
-- `share_creation.rs`: a new share without a linked device is discarded, a linked one is kept
+- `share_creation.rs`: a new share without a linked device is discarded, a linked one is kept, `Files` tab folder selection, already-shared folders are not selectable
 - `share_service.rs`: share deletion, share creation, device linking, paused discovered folders, `ConfigRepository` roundtrip, manual LAN pairing
 - `input_controller.rs`: `START` quit dialog, theme toggle, add-device-by-short-ID via system keyboard, share deletion confirmation, `Files` up navigation
 - `power_policy.rs`: standby blocking while syncing (charging / battery / transfer grace period)
@@ -339,7 +339,7 @@ The UI (`gfx.rs` + `ui/screens/*` + `ui/modals/*` + `ui/renderer.rs`) renders at
 - **Left Sidebar Tabs** (`L` / `R` shoulder buttons or touch tap):
   1. `Overview` (`ActiveTab::Dashboard`): Device status card, `QR / ID` modal button (`Circle`), `Sync Now` button (`Cross`), transfer statistics, and recent activity feed.
   2. `Shares` (`ActiveTab::Shares`): List of shared folders, `+ New Share` modal (`Circle`), `Devices` assignment modal (`Cross`), `Delete` with confirmation (`Square`), and `Folder` path picker (`Triangle`).
-  3. `Files` (`ActiveTab::FolderPicker`): Interactive `ux0:` directory browser. Selecting a folder (`Cross` or tap) starts creating a share of it; `Triangle` (or tapping the `Open` chip) enters a subfolder, `Circle` goes up/back. The `Shares` tab `Folder` action reuses this browser to change a share's target path.
+  3. `Files` (`ActiveTab::FolderPicker`): Interactive `ux0:` directory browser. Selecting a folder (`Cross` or tap) starts creating a share of it (folders already shared are greyed out and cannot be selected or opened); `Triangle` (or tapping the `Open` chip) enters a subfolder, `Circle` goes up/back. The `Shares` tab `Folder` action reuses this browser to change a share's target path.
   4. `Settings` (`ActiveTab::Settings`): Dark / Pure-Black OLED theme switcher (`Cross`), `QR / ID` modal (`Circle`), and BEP/1.0 protocol log viewer.
 - **Modal Dialogs** (`ModalDialog` in `domain/models.rs`, rendered by `ui/modals/*`):
   - `CreateShare`: Create a share from PS Vita folder presets (`ux0:user/00/savedata`, `ux0:picture`, `ux0:music`, RetroArch saves) or browse `ux0:`. The share is only kept once a device is linked in the `ManageDevices` modal that follows.
