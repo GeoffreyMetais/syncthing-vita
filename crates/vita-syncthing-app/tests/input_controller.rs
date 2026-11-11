@@ -57,6 +57,7 @@ fn test_input_controller_quit_dialog_and_theme_toggle() {
     // Switching to Settings and pressing CROSS toggles Dark -> OLED theme
     state.modal = ModalDialog::None;
     state.active_tab = ActiveTab::Settings;
+    state.reset_nav_for_tab();
     assert_eq!(state.theme_mode, ThemeMode::Dark);
     let _ = InputController::handle_input(
         &mut state,

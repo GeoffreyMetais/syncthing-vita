@@ -1,12 +1,13 @@
 //! Tab 3 (`Files` / `FolderPicker`): Interactive `ux0:` directory browser and folder presets.
 
-use crate::domain::{AppState, PickerMode, BROWSER_ROWS};
+use crate::domain::{ActiveTab, AppState, PickerMode, BROWSER_ROWS};
 use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton};
 use crate::ui::theme::{
     UiTheme, BROWSER_STEP, BROWSER_TOP, CONTENT_R, CONTENT_W, CONTENT_X, C_GOOD,
 };
 use crate::ui::widgets::{
-    action_width, draw_action, draw_card, draw_chip, draw_hints, draw_page_title, draw_scrollbar,
+    action_width, draw_action, draw_card, draw_chip, draw_focus_ring, draw_hints, draw_page_title,
+    draw_scrollbar,
 };
 
 /// Renders Tab 3: **Files** (`FolderPicker`).
@@ -39,6 +40,9 @@ pub fn render_folder_picker_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
 
     let uw = action_width(gfx, PadButton::Circle, "Up");
     draw_action(gfx, th, CONTENT_R - 10 - uw, 101, PadButton::Circle, "Up");
+    if state.is_header_focused(ActiveTab::FolderPicker) {
+        draw_focus_ring(gfx, th, CONTENT_R - 10 - uw, 101, uw);
+    }
     let mut right = CONTENT_R - 18 - uw;
 
     if !state.picker_items.is_empty() {
@@ -143,7 +147,7 @@ pub fn render_folder_picker_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         gfx,
         th,
         &[
-            (PadButton::DpadUd, None, "Move"),
+            (PadButton::Dpad, None, "Move"),
             (
                 PadButton::Cross,
                 None,

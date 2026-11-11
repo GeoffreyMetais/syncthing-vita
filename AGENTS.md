@@ -43,12 +43,14 @@ syncthing-vita
             ├── main.rs               # Composition root (binary), 60 FPS event loop, and PS Vita kernel symbols
             ├── domain/               # Layer 1: Pure Domain Entities, Value Objects & Application State
             │   ├── mod.rs
+            │   ├── navigation.rs     # NavFocus / NavState (D-pad focus), tab order, buttons per row
             │   ├── models.rs         # KnownDevice, ShareConfigEntry, PickerItem, ActiveTab, PickerMode, ModalDialog, ThemeMode
             │   └── app_state.rs      # AppState (pure state & view-model queries, zero I/O or rendering dependencies)
             ├── application/          # Layer 2: Use Cases, Input Controller & Sync Event Coordinator
             │   ├── mod.rs
             │   ├── share_service.rs  # ShareService (create_share, upsert_device, toggle_device_for_share, refresh_picker_items)
             │   ├── share_creation.rs # ShareCreation (new share kept only once a device is linked)
+            │   ├── dpad_navigation.rs # DpadNavigation (sidebar <-> page focus, Cross on focused element)
             │   ├── sync_coordinator.rs # SyncCoordinator (maps WorkerMsg & SyncEvent into AppState & ShareService)
             │   └── input_controller.rs # InputController (routes InputFrame -> AppState + ShareService -> UserCommand)
             ├── infrastructure/       # Layer 3: Persistence, OS Filesystem, PS Vita Hardware & BEP Worker Thread
@@ -303,6 +305,7 @@ cargo test --workspace
 - `share_creation.rs`: a new share without a linked device is discarded, a linked one is kept, `Files` tab folder selection, already-shared folders are not selectable
 - `share_service.rs`: share deletion, share creation, device linking, paused discovered folders, `ConfigRepository` roundtrip, manual LAN pairing
 - `input_controller.rs`: `START` quit dialog, theme toggle, add-device-by-short-ID via system keyboard, share deletion confirmation, `Files` up navigation, virtual keyboard toggle
+- `dpad_navigation.rs`: sidebar <-> page focus, Shares rows / buttons / header, Files rows / Up button
 - `power_policy.rs`: standby blocking while syncing (charging / battery / transfer grace period)
 
 ### Cross-Check for PS Vita (`armv7-sony-vita-newlibeabihf`)
@@ -345,7 +348,8 @@ PNGs land in `target/ui-shots/`; the Vita3K app data directory is backed up and 
 
 The UI (`gfx.rs` + `ui/screens/*` + `ui/modals/*` + `ui/renderer.rs`) renders at native `960x544` @ 60 FPS with a `212px` left sidebar (`SIDEBAR_W = 212`), main content area (`x = 236..936`, `y = 86..488`), and bottom button hint bar (`y = 500..544`):
 
-- **Left Sidebar Tabs** (`L` / `R` shoulder buttons or touch tap):
+- **D-pad focus** (`domain/navigation.rs` + `application/dpad_navigation.rs`): focus is on the sidebar or on the page. Sidebar: `Up`/`Down` switch tabs, `Right`/`Cross` enter the page. Page: `Up`/`Down` move between rows (including the top `+ New Share` / `Up` button), `Left`/`Right` between a row's buttons, `Left` on the first one returns to the sidebar, `Cross` activates the focused element (drawn with `draw_focus_ring`). On `Files`, `Right` opens the folder. Face buttons remain direct shortcuts.
+- **Left Sidebar Tabs** (`L` / `R` shoulder buttons, D-pad from the sidebar, or touch tap):
   1. `Overview` (`ActiveTab::Dashboard`): Device status card, `QR / ID` modal button (`Circle`), `Sync Now` button (`Cross`), transfer statistics, and recent activity feed.
   2. `Shares` (`ActiveTab::Shares`): List of shared folders, `+ New Share` modal (`Circle`), `Devices` assignment modal (`Cross`), `Delete` with confirmation (`Square`), and `Folder` path picker (`Triangle`).
   3. `Files` (`ActiveTab::FolderPicker`): Interactive `ux0:` directory browser. Selecting a folder (`Cross` or tap) starts creating a share of it (folders already shared are greyed out and cannot be selected or opened); `Triangle` (or tapping the `Open` chip) enters a subfolder, `Circle` goes up/back. The `Shares` tab `Folder` action reuses this browser to change a share's target path.

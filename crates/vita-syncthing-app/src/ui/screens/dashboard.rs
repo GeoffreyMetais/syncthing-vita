@@ -1,13 +1,13 @@
 //! Tab 1 (`Overview` / `Dashboard`): Device status hero card, `QR / ID` & `Sync Now` actions,
 //! transfer statistics, and recent synchronization activity feed.
 
-use crate::domain::{fmt_size, AppState};
+use crate::domain::{fmt_size, ActiveTab, AppState};
 use crate::ui::gfx::{rgba, Align, FontWeight, Gfx, Icon, PadButton};
 use crate::ui::theme::{
     UiTheme, CONTENT_B, CONTENT_R, CONTENT_W, CONTENT_X, CONTENT_Y, C_BAD, C_GOOD, C_WARN,
 };
 use crate::ui::widgets::{
-    action_width, draw_action, draw_card, draw_chip, draw_hints, draw_page_title,
+    action_width, draw_action, draw_card, draw_chip, draw_focus_ring, draw_hints, draw_page_title,
 };
 
 /// Renders Tab 1: **Overview** (`Dashboard`).
@@ -130,6 +130,11 @@ pub fn render_dashboard_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         PadButton::Cross,
         "Sync Now",
     );
+    match state.focused_action(ActiveTab::Dashboard) {
+        Some(0) => draw_focus_ring(gfx, th, bx_qr, CONTENT_Y + 128, act_qr_w),
+        Some(_) => draw_focus_ring(gfx, th, bx_sync, CONTENT_Y + 128, act_sync_w),
+        None => {}
+    }
 
     // 2. "Recent activity & Statistics" card
     let ry = CONTENT_Y + 166;
@@ -202,10 +207,10 @@ pub fn render_dashboard_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         gfx,
         th,
         &[
-            (PadButton::Cross, None, "Sync Now"),
-            (PadButton::Circle, None, "Device ID / QR"),
-            (PadButton::Square, None, "Pause/Resume"),
-            (PadButton::Triangle, None, "Pick Folder"),
+            (PadButton::Dpad, Some(PadButton::Cross), "Navigate"),
+            (PadButton::Circle, None, "QR / ID"),
+            (PadButton::Square, None, "Pause"),
+            (PadButton::Triangle, None, "Folder"),
             (PadButton::L, Some(PadButton::R), "Tabs"),
             (PadButton::Select, None, "Screensaver"),
         ],

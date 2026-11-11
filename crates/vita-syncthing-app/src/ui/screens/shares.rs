@@ -1,11 +1,11 @@
 //! Tab 2 (`Shared Folders` / `Shares`): List of configured Syncthing shares, `+ New Share` button,
 //! and per-share actions (`Devices`, `Delete`, `Folder`).
 
-use crate::domain::AppState;
+use crate::domain::{ActiveTab, AppState};
 use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton};
 use crate::ui::theme::{UiTheme, CONTENT_R, CONTENT_W, CONTENT_X, CONTENT_Y, C_GOOD, C_WARN};
 use crate::ui::widgets::{
-    action_width, draw_action, draw_card, draw_chip, draw_hints, draw_page_title,
+    action_width, draw_action, draw_card, draw_chip, draw_focus_ring, draw_hints, draw_page_title,
 };
 
 /// Renders Tab 2: **Shared Folders** (`Shares`).
@@ -22,6 +22,9 @@ pub fn render_shares_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         PadButton::Circle,
         "+ New Share",
     );
+    if state.is_header_focused(ActiveTab::Shares) {
+        draw_focus_ring(gfx, th, CONTENT_R - w_new, 46, w_new);
+    }
 
     if state.shares.is_empty() {
         draw_card(gfx, th, CONTENT_X, CONTENT_Y, CONTENT_W, 150, false);
@@ -82,6 +85,14 @@ pub fn render_shares_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
             draw_action(gfx, th, bx_devs, ry + 56, PadButton::Cross, "Devices");
             draw_action(gfx, th, bx_toggle, ry + 56, PadButton::Square, "Delete");
             draw_action(gfx, th, bx_folder, ry + 56, PadButton::Triangle, "Folder");
+            if is_sel {
+                match state.focused_action(ActiveTab::Shares) {
+                    Some(0) => draw_focus_ring(gfx, th, bx_devs, ry + 56, w_devs),
+                    Some(1) => draw_focus_ring(gfx, th, bx_toggle, ry + 56, w_toggle),
+                    Some(_) => draw_focus_ring(gfx, th, bx_folder, ry + 56, w_folder),
+                    None => {}
+                }
+            }
 
             let status_col = if share.enabled { C_GOOD } else { C_WARN };
             let status_txt = if share.enabled { "Active" } else { "Paused" };
@@ -134,8 +145,8 @@ pub fn render_shares_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         gfx,
         th,
         &[
+            (PadButton::Dpad, Some(PadButton::Cross), "Navigate"),
             (PadButton::Circle, None, "+ New Share"),
-            (PadButton::Cross, None, "Add/Edit Devices"),
             (PadButton::Square, None, "Delete"),
             (PadButton::Triangle, None, "Folder Path"),
             (PadButton::L, Some(PadButton::R), "Tabs"),

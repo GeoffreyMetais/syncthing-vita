@@ -1,12 +1,14 @@
 //! Tab 4 (`Settings & Log` / `Settings`): Dark / Pure-Black OLED theme switcher,
 //! `QR / ID` modal shortcut, and BEP/1.0 & TLS 1.3 protocol event log.
 
-use crate::domain::{AppState, ThemeMode};
+use crate::domain::{ActiveTab, AppState, ThemeMode};
 use crate::ui::gfx::{Align, FontWeight, Gfx, PadButton};
 use crate::ui::theme::{
     UiTheme, CONTENT_B, CONTENT_R, CONTENT_W, CONTENT_X, CONTENT_Y, C_BAD, C_GOOD,
 };
-use crate::ui::widgets::{action_width, draw_action, draw_card, draw_hints, draw_page_title};
+use crate::ui::widgets::{
+    action_width, draw_action, draw_card, draw_focus_ring, draw_hints, draw_page_title,
+};
 
 /// Renders Tab 4: **Settings & Log** (`Settings`).
 pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
@@ -72,6 +74,12 @@ pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         PadButton::Cross,
         "Switch Theme",
     );
+    match state.focused_action(ActiveTab::Settings) {
+        Some(0) => draw_focus_ring(gfx, th, bx_add, CONTENT_Y + 62, w_add),
+        Some(1) => draw_focus_ring(gfx, th, bx_qr, CONTENT_Y + 62, w_qr),
+        Some(_) => draw_focus_ring(gfx, th, bx_theme, CONTENT_Y + 62, w_theme),
+        None => {}
+    }
 
     gfx.text(
         lx,
@@ -126,7 +134,7 @@ pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         gfx,
         th,
         &[
-            (PadButton::Cross, None, "Switch Theme"),
+            (PadButton::Dpad, Some(PadButton::Cross), "Navigate"),
             (PadButton::Circle, None, "Device ID / QR"),
             (PadButton::Triangle, None, "+ Add Device ID"),
             (PadButton::Select, None, "Screensaver"),

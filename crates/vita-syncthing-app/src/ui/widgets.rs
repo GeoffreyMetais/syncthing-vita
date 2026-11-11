@@ -1,7 +1,7 @@
 //! Reusable VitaSend-style UI widgets (`draw_card`, `draw_chip`, `draw_action`, `draw_row_tick`,
 //! `draw_progress`, `draw_scrollbar`, `draw_page_title`, `draw_chrome`, `draw_hints`, `draw_toast`).
 
-use crate::domain::{ActiveTab, AppState};
+use crate::domain::{ActiveTab, AppState, NavFocus};
 use crate::ui::gfx::{
     rgb, with_alpha, Align, Color, FontWeight, Gfx, Icon, PadButton, GFX_H, GFX_W,
 };
@@ -62,6 +62,11 @@ pub fn draw_action(
         label,
     );
     w
+}
+
+/// D-pad focus ring around an action pill drawn by `draw_action` at (`x`, `cy`) with width `w`.
+pub fn draw_focus_ring(gfx: &mut Gfx, th: &UiTheme, x: i32, cy: i32, w: i32) {
+    gfx.rrect_outline(x - 4, cy - 21, w + 8, 42, 21, 2, th.accent_hi);
 }
 
 /// Circular checkbox modeled after VitaSend `row_tick`.
@@ -165,7 +170,13 @@ pub fn draw_chrome(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         let on = state.active_tab == tab;
         if on {
             gfx.rrect(12, y, SIDEBAR_W - 24, 44, 12, th.accent_bg);
-            gfx.rrect_outline(12, y, SIDEBAR_W - 24, 44, 12, 1, th.accent);
+            // A thicker, brighter outline shows the sidebar has D-pad focus
+            let (width, col) = if state.nav.focus == NavFocus::Sidebar {
+                (2, th.accent_hi)
+            } else {
+                (1, th.accent)
+            };
+            gfx.rrect_outline(12, y, SIDEBAR_W - 24, 44, 12, width, col);
         }
         let fg = if on { th.accent_hi } else { th.dim };
         gfx.icon(icon, 38.0, (y + 22) as f32, 24.0, fg);

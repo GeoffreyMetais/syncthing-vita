@@ -1,10 +1,11 @@
 //! Input Controller translating Gamepad (`SceCtrl`) and Touchscreen (`SceTouch`) events
 //! into `AppState` transitions, `ShareService` use-case calls, and high-level `UserCommand`s.
 
+use crate::application::dpad_navigation::{DpadNavigation, PageAction};
 use crate::application::{ShareCreation, ShareService};
 use crate::domain::{
     ActiveTab, AppState, ModalDialog, PickerMode, ADD_DEVICE_KEYPAD, BROWSER_ROWS,
-    NEW_SHARE_TEMPLATES,
+    NEW_SHARE_TEMPLATES, TAB_ORDER,
 };
 use crate::infrastructure::{
     ConfigRepository, InputFrame, BTN_CIRCLE, BTN_CROSS, BTN_DOWN, BTN_L, BTN_LEFT, BTN_R,
@@ -29,6 +30,19 @@ pub struct InputController;
 impl InputController {
     /// Processes a single frame of user input (`SceCtrl` + `SceTouch`).
     pub fn handle_input(
+        state: &mut AppState,
+        repo: &ConfigRepository,
+        input: InputFrame,
+    ) -> UserCommand {
+        let prev_tab = state.active_tab;
+        let cmd = Self::handle_frame(state, repo, input);
+        if state.active_tab != prev_tab {
+            state.reset_nav_for_tab();
+        }
+        cmd
+    }
+
+    fn handle_frame(
         state: &mut AppState,
         repo: &ConfigRepository,
         input: InputFrame,
@@ -61,9 +75,7 @@ impl InputController {
                 } else if (138..=184).contains(&ty) {
                     state.active_tab = ActiveTab::Shares;
                 } else if (188..=234).contains(&ty) {
-                    state.picker_mode = PickerMode::CreateNewShare;
-                    ShareService::refresh_picker_items(state, repo);
-                    state.active_tab = ActiveTab::FolderPicker;
+                    Self::switch_tab(state, repo, ActiveTab::FolderPicker);
                 } else if (238..=284).contains(&ty) {
                     state.active_tab = ActiveTab::Settings;
                 } else if (345..=440).contains(&ty) {
@@ -201,105 +213,83 @@ impl InputController {
             state.oled_saver_active = !state.oled_saver_active;
             return UserCommand::None;
         }
+        let tab_pos = TAB_ORDER
+            .iter()
+            .position(|&t| t == state.active_tab)
+            .unwrap_or(0);
         if (input.pressed & BTN_L) != 0 {
-            state.active_tab = match state.active_tab {
-                ActiveTab::Dashboard => ActiveTab::Settings,
-                ActiveTab::Shares => ActiveTab::Dashboard,
-                ActiveTab::FolderPicker => ActiveTab::Shares,
-                ActiveTab::Settings => ActiveTab::FolderPicker,
-            };
-            if state.active_tab == ActiveTab::FolderPicker {
-                state.picker_mode = PickerMode::CreateNewShare;
-                ShareService::refresh_picker_items(state, repo);
-            }
+            let tab = TAB_ORDER[(tab_pos + TAB_ORDER.len() - 1) % TAB_ORDER.len()];
+            Self::switch_tab(state, repo, tab);
         }
         if (input.pressed & BTN_R) != 0 {
-            state.active_tab = match state.active_tab {
-                ActiveTab::Dashboard => ActiveTab::Shares,
-                ActiveTab::Shares => ActiveTab::FolderPicker,
-                ActiveTab::FolderPicker => ActiveTab::Settings,
-                ActiveTab::Settings => ActiveTab::Dashboard,
-            };
-            if state.active_tab == ActiveTab::FolderPicker {
-                state.picker_mode = PickerMode::CreateNewShare;
-                ShareService::refresh_picker_items(state, repo);
-            }
+            Self::switch_tab(state, repo, TAB_ORDER[(tab_pos + 1) % TAB_ORDER.len()]);
         }
 
-        // 4. Tab-specific actions
+        // 4. D-pad focus navigation (sidebar <-> page) and `Cross` on the focused element
+        let mut pressed = input.pressed;
+        match DpadNavigation::handle(state, &mut pressed) {
+            PageAction::None => {}
+            PageAction::SwitchTab(tab) => Self::switch_tab(state, repo, tab),
+            PageAction::StartSync => trigger_sync = true,
+            PageAction::ShowDeviceId => state.modal = ModalDialog::ShowDeviceId,
+            PageAction::ToggleTheme => state.toggle_theme(),
+            PageAction::AddDevice => return Self::open_add_device_modal(state, None),
+            PageAction::NewShare => state.modal = ModalDialog::CreateShare { selected_idx: 0 },
+            PageAction::ManageDevices => {
+                if state.selected_share_idx < state.shares.len() {
+                    state.modal = ModalDialog::ManageDevices {
+                        share_idx: state.selected_share_idx,
+                        selected_dev_idx: 0,
+                    };
+                }
+            }
+            PageAction::DeleteShare => delete_share = true,
+            PageAction::ChangeFolder => open_picker = true,
+            PageAction::PickerSelect => ShareService::apply_picker_selection(state, repo, false),
+            PageAction::PickerOpen => ShareService::apply_picker_selection(state, repo, true),
+            PageAction::PickerUp => ShareService::navigate_picker_up(state, repo),
+        }
+
+        // 5. Tab-specific face-button shortcuts
         match state.active_tab {
             ActiveTab::Dashboard => {
-                if (input.pressed & BTN_CROSS) != 0 {
-                    trigger_sync = true;
-                }
-                if (input.pressed & BTN_CIRCLE) != 0 {
+                if (pressed & BTN_CIRCLE) != 0 {
                     state.modal = ModalDialog::ShowDeviceId;
                 }
-                if (input.pressed & BTN_SQUARE) != 0 {
+                if (pressed & BTN_SQUARE) != 0 {
                     toggle_share = true;
                 }
-                if (input.pressed & BTN_TRIANGLE) != 0 {
+                if (pressed & BTN_TRIANGLE) != 0 {
                     open_picker = true;
                 }
             }
             ActiveTab::Shares => {
-                if (input.pressed & BTN_UP) != 0 && state.selected_share_idx > 0 {
-                    state.selected_share_idx -= 1;
-                }
-                if (input.pressed & BTN_DOWN) != 0
-                    && state.selected_share_idx + 1 < state.shares.len()
-                {
-                    state.selected_share_idx += 1;
-                }
-                if (input.pressed & BTN_CIRCLE) != 0 {
+                if (pressed & BTN_CIRCLE) != 0 {
                     state.modal = ModalDialog::CreateShare { selected_idx: 0 };
                 }
-                if (input.pressed & BTN_CROSS) != 0 {
-                    if state.shares.is_empty() {
-                        state.modal = ModalDialog::CreateShare { selected_idx: 0 };
-                    } else {
-                        state.modal = ModalDialog::ManageDevices {
-                            share_idx: state.selected_share_idx,
-                            selected_dev_idx: 0,
-                        };
-                    }
-                }
-                if (input.pressed & BTN_SQUARE) != 0 {
+                if (pressed & BTN_SQUARE) != 0 {
                     delete_share = true;
                 }
-                if (input.pressed & BTN_TRIANGLE) != 0 {
+                if (pressed & BTN_TRIANGLE) != 0 {
                     open_picker = true;
                 }
             }
             ActiveTab::FolderPicker => {
-                if (input.pressed & BTN_UP) != 0 && state.selected_picker_idx > 0 {
-                    state.selected_picker_idx -= 1;
-                    state.clamp_picker_scroll();
-                }
-                if (input.pressed & BTN_DOWN) != 0
-                    && state.selected_picker_idx + 1 < state.picker_items.len()
-                {
-                    state.selected_picker_idx += 1;
-                    state.clamp_picker_scroll();
-                }
-                if (input.pressed & BTN_CROSS) != 0 {
-                    ShareService::apply_picker_selection(state, repo, false);
-                }
-                if (input.pressed & BTN_TRIANGLE) != 0 {
+                if (pressed & BTN_TRIANGLE) != 0 {
                     ShareService::apply_picker_selection(state, repo, true);
                 }
-                if (input.pressed & BTN_CIRCLE) != 0 {
+                if (pressed & BTN_CIRCLE) != 0 {
                     ShareService::navigate_picker_up(state, repo);
                 }
             }
             ActiveTab::Settings => {
-                if (input.pressed & BTN_CROSS) != 0 || (input.pressed & BTN_SQUARE) != 0 {
+                if (pressed & BTN_SQUARE) != 0 {
                     state.toggle_theme();
                 }
-                if (input.pressed & BTN_CIRCLE) != 0 {
+                if (pressed & BTN_CIRCLE) != 0 {
                     state.modal = ModalDialog::ShowDeviceId;
                 }
-                if (input.pressed & BTN_TRIANGLE) != 0 {
+                if (pressed & BTN_TRIANGLE) != 0 {
                     return Self::open_add_device_modal(state, None);
                 }
             }
@@ -709,6 +699,15 @@ impl InputController {
                 }
                 UserCommand::None
             }
+        }
+    }
+
+    /// Activates `tab`; the `Files` tab opens on the share-creation folder browser.
+    fn switch_tab(state: &mut AppState, repo: &ConfigRepository, tab: ActiveTab) {
+        state.active_tab = tab;
+        if tab == ActiveTab::FolderPicker {
+            state.picker_mode = PickerMode::CreateNewShare;
+            ShareService::refresh_picker_items(state, repo);
         }
     }
 

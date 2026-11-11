@@ -7,12 +7,15 @@ use crate::domain::models::{
     ActiveTab, KnownDevice, ModalDialog, PickerItem, PickerMode, ShareConfigEntry, ThemeMode,
     BROWSER_ROWS,
 };
+use crate::domain::navigation::{default_col, NavFocus, NavState};
 
 /// Pure application state for PS Vita Syncthing.
 /// All UI screens and modals read `&AppState` without performing I/O or mutating business rules.
 pub struct AppState {
     pub theme_mode: ThemeMode,
     pub active_tab: ActiveTab,
+    /// D-pad focus (sidebar or page element).
+    pub nav: NavState,
     pub picker_mode: PickerMode,
     pub modal: ModalDialog,
     pub oled_saver_active: bool,
@@ -74,6 +77,7 @@ impl AppState {
         Self {
             theme_mode: ThemeMode::Dark,
             active_tab: ActiveTab::Dashboard,
+            nav: NavState::new(ActiveTab::Dashboard),
             picker_mode: PickerMode::ChangeShareTarget,
             modal: ModalDialog::None,
             oled_saver_active: false,
@@ -157,6 +161,23 @@ impl AppState {
             s.shared_devices.is_empty()
                 && self.pending_share_creation.as_deref() == Some(s.folder_id.as_str())
         })
+    }
+
+    /// Resets the focused page element after the active tab changed (focus side is kept).
+    pub fn reset_nav_for_tab(&mut self) {
+        self.nav.col = default_col(self.active_tab);
+        self.nav.header = false;
+    }
+
+    /// Focused action button of `tab`'s current row, if the page (not the sidebar) has focus.
+    pub fn focused_action(&self, tab: ActiveTab) -> Option<usize> {
+        (self.active_tab == tab && self.nav.focus == NavFocus::Content && !self.nav.header)
+            .then_some(self.nav.col)
+    }
+
+    /// True when `tab`'s top button (`+ New Share`, `Up`) has D-pad focus.
+    pub fn is_header_focused(&self, tab: ActiveTab) -> bool {
+        self.active_tab == tab && self.nav.focus == NavFocus::Content && self.nav.header
     }
 
     /// Cleans up legacy auto-discovered unpaired LAN peers (`"LAN Peer"`, `"Syncthing Peer"`, `"Syncthing ("`)
