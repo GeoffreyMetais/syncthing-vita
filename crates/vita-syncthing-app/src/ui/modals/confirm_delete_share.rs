@@ -2,6 +2,7 @@
 
 use crate::domain::AppState;
 use crate::ui::gfx::{rgba, Align, FontWeight, Gfx, Icon, PadButton, GFX_W};
+use crate::ui::strings;
 use crate::ui::theme::{UiTheme, C_BAD, HINT_Y};
 use crate::ui::widgets::{action_width, draw_action, draw_hints};
 
@@ -37,7 +38,7 @@ pub fn render_confirm_delete_share_modal(
         FontWeight::Bold,
         th.text,
         Align::Left,
-        "Delete this share?",
+        strings::MODAL_DELETE_SHARE_TITLE,
     );
     gfx.text(
         lx + 52,
@@ -46,7 +47,7 @@ pub fn render_confirm_delete_share_modal(
         FontWeight::Regular,
         th.dim,
         Align::Left,
-        "The folder stops synchronizing with all linked devices",
+        strings::MODAL_DELETE_SHARE_SUBTITLE,
     );
     gfx.line(
         (dx + 24) as f32,
@@ -58,6 +59,8 @@ pub fn render_confirm_delete_share_modal(
     );
 
     if let Some(share) = state.shares.get(share_idx) {
+        let title = strings::fmt_share_title(&share.label, &share.folder_id);
+        let files_msg = strings::fmt_files_kept_on_vita(&share.target_path);
         gfx.text_fit(
             lx,
             dy + 110,
@@ -66,7 +69,7 @@ pub fn render_confirm_delete_share_modal(
             FontWeight::Medium,
             th.text,
             Align::Left,
-            &format!("{}  ·  {}", share.label, share.folder_id),
+            &title,
         );
         gfx.text_fit(
             lx,
@@ -76,7 +79,7 @@ pub fn render_confirm_delete_share_modal(
             FontWeight::Regular,
             th.dim,
             Align::Left,
-            &format!("Files in {} are kept on the PS Vita.", share.target_path),
+            &files_msg,
         );
         gfx.text_fit(
             lx,
@@ -86,19 +89,19 @@ pub fn render_confirm_delete_share_modal(
             FontWeight::Regular,
             th.faint,
             Align::Left,
-            "Peers' offers of it are declined (undo in Settings · Clear Declined).",
+            strings::MODAL_DELETE_SHARE_DECLINE_HINT,
         );
     }
 
-    let w_delete = action_width(gfx, PadButton::Cross, "Delete");
-    let w_cancel = action_width(gfx, PadButton::Circle, "Cancel");
+    let w_delete = action_width(gfx, PadButton::Cross, strings::ACTION_DELETE);
+    let w_cancel = action_width(gfx, PadButton::Circle, strings::ACTION_CANCEL);
     draw_action(
         gfx,
         th,
         dx + w - 28 - w_delete - 12 - w_cancel,
         dy + h - 34,
         PadButton::Circle,
-        "Cancel",
+        strings::ACTION_CANCEL,
     );
     draw_action(
         gfx,
@@ -106,15 +109,15 @@ pub fn render_confirm_delete_share_modal(
         dx + w - 28 - w_delete,
         dy + h - 34,
         PadButton::Cross,
-        "Delete",
+        strings::ACTION_DELETE,
     );
 
     draw_hints(
         gfx,
         th,
         &[
-            (PadButton::Cross, None, "Confirm Delete"),
-            (PadButton::Circle, None, "Cancel"),
+            (PadButton::Cross, None, strings::HINT_CONFIRM_DELETE),
+            (PadButton::Circle, None, strings::ACTION_CANCEL),
         ],
     );
 }

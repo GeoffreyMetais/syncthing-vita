@@ -2,6 +2,7 @@
 
 use crate::domain::AppState;
 use crate::ui::gfx::{rgba, Align, FontWeight, Gfx, Icon, PadButton, GFX_W};
+use crate::ui::strings;
 use crate::ui::theme::{UiTheme, C_BAD, C_WARN, HINT_Y};
 use crate::ui::widgets::{action_width, draw_action, draw_hints};
 
@@ -32,7 +33,7 @@ pub fn render_confirm_quit_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState) 
         FontWeight::Bold,
         th.text,
         Align::Left,
-        "Quit VitaSync?",
+        strings::MODAL_QUIT_TITLE,
     );
     gfx.text(
         lx + 52,
@@ -41,7 +42,7 @@ pub fn render_confirm_quit_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState) 
         FontWeight::Regular,
         th.dim,
         Align::Left,
-        "Confirm whether to close the application and return to LiveArea",
+        strings::MODAL_QUIT_SUBTITLE,
     );
     gfx.line(
         (dx + 24) as f32,
@@ -60,7 +61,7 @@ pub fn render_confirm_quit_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState) 
             FontWeight::Medium,
             C_WARN,
             Align::Left,
-            "A BEP/1.0 synchronization is currently in progress.",
+            strings::MODAL_QUIT_SYNCING_WARN,
         );
         gfx.text(
             lx,
@@ -69,7 +70,7 @@ pub fn render_confirm_quit_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState) 
             FontWeight::Regular,
             th.dim,
             Align::Left,
-            "Quitting now will interrupt active file transfers.",
+            strings::MODAL_QUIT_SYNCING_HINT,
         );
     } else {
         gfx.text(
@@ -79,7 +80,7 @@ pub fn render_confirm_quit_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState) 
             FontWeight::Medium,
             th.text,
             Align::Left,
-            "Are you sure you want to exit VitaSync?",
+            strings::MODAL_QUIT_IDLE_READY,
         );
         gfx.text(
             lx,
@@ -88,19 +89,19 @@ pub fn render_confirm_quit_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState) 
             FontWeight::Regular,
             th.dim,
             Align::Left,
-            "All share configurations and device settings are saved on ux0:.",
+            strings::MODAL_QUIT_IDLE_HINT,
         );
     }
 
-    let w_quit = action_width(gfx, PadButton::Cross, "Quit App");
-    let w_cancel = action_width(gfx, PadButton::Circle, "Cancel");
+    let w_quit = action_width(gfx, PadButton::Cross, strings::ACTION_QUIT_APP);
+    let w_cancel = action_width(gfx, PadButton::Circle, strings::ACTION_CANCEL);
     draw_action(
         gfx,
         th,
         dx + w - 28 - w_quit - 12 - w_cancel,
         dy + h - 34,
         PadButton::Circle,
-        "Cancel",
+        strings::ACTION_CANCEL,
     );
     draw_action(
         gfx,
@@ -108,15 +109,15 @@ pub fn render_confirm_quit_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState) 
         dx + w - 28 - w_quit,
         dy + h - 34,
         PadButton::Cross,
-        "Quit App",
+        strings::ACTION_QUIT_APP,
     );
 
     draw_hints(
         gfx,
         th,
         &[
-            (PadButton::Cross, None, "Confirm Quit"),
-            (PadButton::Circle, None, "Cancel"),
+            (PadButton::Cross, None, strings::HINT_CONFIRM_QUIT),
+            (PadButton::Circle, None, strings::ACTION_CANCEL),
         ],
     );
 }

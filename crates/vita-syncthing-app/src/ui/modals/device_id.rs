@@ -4,6 +4,7 @@ use qrcodegen::{QrCode, QrCodeEcc};
 
 use crate::domain::AppState;
 use crate::ui::gfx::{rgb, Align, FontWeight, Gfx, Icon, PadButton, GFX_W};
+use crate::ui::strings;
 use crate::ui::theme::{UiTheme, C_GOOD, HINT_Y};
 use crate::ui::widgets::{action_width, draw_action, draw_chip, draw_hints};
 
@@ -35,7 +36,7 @@ pub fn render_device_id_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         FontWeight::Bold,
         th.text,
         Align::Left,
-        "PS Vita Syncthing Device ID",
+        strings::MODAL_DEVICE_ID_TITLE,
     );
     gfx.text(
         lx + 52,
@@ -44,7 +45,7 @@ pub fn render_device_id_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         FontWeight::Regular,
         th.dim,
         Align::Left,
-        "Scan this QR code in Syncthing (Add Remote Device) or enter the 56-character ID",
+        strings::MODAL_DEVICE_ID_SUBTITLE,
     );
     gfx.line(
         (dx + 24) as f32,
@@ -102,7 +103,7 @@ pub fn render_device_id_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         FontWeight::Medium,
         th.accent_hi,
         Align::Center,
-        "Scan QR in Syncthing Web / Mobile UI",
+        strings::MODAL_DEVICE_ID_SCAN_WEB,
     );
 
     // Right Column: Formatted 8-group Syncthing Device ID + Certificate details
@@ -198,6 +199,7 @@ pub fn render_device_id_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         "TLS 1.3 · ECDSA P-256",
         C_GOOD,
     );
+    let short_id_label = strings::fmt_short_id_label(short_id);
     gfx.text(
         rx + 14,
         meta_y + 22,
@@ -205,7 +207,7 @@ pub fn render_device_id_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         FontWeight::Bold,
         th.text,
         Align::Left,
-        &format!("Short ID: {}", short_id),
+        &short_id_label,
     );
     gfx.text(
         rx + 14,
@@ -214,7 +216,7 @@ pub fn render_device_id_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         FontWeight::Regular,
         th.dim,
         Align::Left,
-        "Device Name: PlayStation Vita (vita-syncthing)",
+        strings::MODAL_DEVICE_ID_DEV_NAME,
     );
     gfx.text(
         rx + 14,
@@ -223,19 +225,19 @@ pub fn render_device_id_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         FontWeight::Regular,
         th.faint,
         Align::Left,
-        "Identity Cert: ux0:data/syncthing/cert.der",
+        strings::MODAL_DEVICE_ID_CERT_PATH,
     );
 
     // Bottom buttons at bottom-right of modal
-    let w_add = action_width(gfx, PadButton::Square, "+ Add Remote Device");
-    let w_close = action_width(gfx, PadButton::Circle, "Close");
+    let w_add = action_width(gfx, PadButton::Square, strings::ACTION_ADD_REMOTE_DEVICE);
+    let w_close = action_width(gfx, PadButton::Circle, strings::ACTION_CLOSE);
     draw_action(
         gfx,
         th,
         dx + w - 28 - w_close - 10 - w_add,
         dy + h - 32,
         PadButton::Square,
-        "+ Add Remote Device",
+        strings::ACTION_ADD_REMOTE_DEVICE,
     );
     draw_action(
         gfx,
@@ -243,18 +245,18 @@ pub fn render_device_id_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         dx + w - 28 - w_close,
         dy + h - 32,
         PadButton::Circle,
-        "Close",
+        strings::ACTION_CLOSE,
     );
 
     draw_hints(
         gfx,
         th,
         &[
-            (PadButton::Square, None, "+ Add Remote Device ID"),
+            (PadButton::Square, None, strings::HINT_ADD_REMOTE_DEVICE_ID),
             (
                 PadButton::Circle,
                 Some(PadButton::Cross),
-                "Close QR / Device ID",
+                strings::HINT_CLOSE_QR_DEVICE_ID,
             ),
         ],
     );

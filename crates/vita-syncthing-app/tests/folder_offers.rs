@@ -155,6 +155,7 @@ fn test_settings_clear_declined_lets_peers_offer_again() {
     // Settings: Down to the declined folders card, Cross on `Clear Declined`
     state.active_tab = ActiveTab::Settings;
     state.reset_nav_for_tab();
+    state.nav.focus = vita_syncthing_app::domain::NavFocus::Content;
     press(&mut state, &repo, BTN_DOWN);
     assert!(state.is_settings_row_focused(1));
     press(&mut state, &repo, BTN_CROSS);

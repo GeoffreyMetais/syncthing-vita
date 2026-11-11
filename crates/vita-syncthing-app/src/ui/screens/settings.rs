@@ -4,6 +4,7 @@
 
 use crate::domain::{ActiveTab, AppState, ThemeMode};
 use crate::ui::gfx::{Align, FontWeight, Gfx, PadButton};
+use crate::ui::strings;
 use crate::ui::theme::{
     UiTheme, CONTENT_B, CONTENT_R, CONTENT_W, CONTENT_X, CONTENT_Y, C_BAD, C_GOOD,
     SETTINGS_DECLINED_B, SETTINGS_DECLINED_Y,
@@ -14,7 +15,7 @@ use crate::ui::widgets::{
 
 /// Renders Tab 4: **Settings & Log** (`Settings`).
 pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
-    draw_page_title(gfx, th, "Settings & Log", Some("Display & BEP/1.0"));
+    draw_page_title(gfx, th, strings::SETTINGS_TITLE, Some(strings::SETTINGS_SUBTITLE));
 
     // 1. Display & Theme Settings Card
     draw_card(gfx, th, CONTENT_X, CONTENT_Y, CONTENT_W, 118, true);
@@ -26,12 +27,12 @@ pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         FontWeight::Bold,
         th.accent_hi,
         Align::Left,
-        "DISPLAY AND OLED SAVER",
+        strings::SETTINGS_SEC_DISPLAY,
     );
 
     let theme_desc = match state.theme_mode {
-        ThemeMode::Dark => "Dark — VitaSend slate blue-grey look with teal accent",
-        ThemeMode::Oled => "OLED — Pure #000000 black background (saves PS Vita OLED battery)",
+        ThemeMode::Dark => strings::SETTINGS_DESC_THEME_DARK,
+        ThemeMode::Oled => strings::SETTINGS_DESC_THEME_OLED,
     };
     gfx.text(
         lx,
@@ -40,7 +41,7 @@ pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         FontWeight::Medium,
         th.text,
         Align::Left,
-        "Colour Theme",
+        strings::SETTINGS_LABEL_COLOUR_THEME,
     );
     gfx.text_fit(
         lx,
@@ -53,9 +54,9 @@ pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         theme_desc,
     );
 
-    let w_theme = action_width(gfx, PadButton::Cross, "Switch Theme");
-    let w_qr = action_width(gfx, PadButton::Circle, "QR / ID");
-    let w_add = action_width(gfx, PadButton::Triangle, "+ Add Device");
+    let w_theme = action_width(gfx, PadButton::Cross, strings::ACTION_SWITCH_THEME);
+    let w_qr = action_width(gfx, PadButton::Circle, strings::ACTION_QR_ID);
+    let w_add = action_width(gfx, PadButton::Triangle, strings::ACTION_ADD_DEVICE);
     let bx_theme = CONTENT_R - 20 - w_theme;
     let bx_qr = bx_theme - 8 - w_qr;
     let bx_add = bx_qr - 8 - w_add;
@@ -65,16 +66,16 @@ pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         bx_add,
         CONTENT_Y + 62,
         PadButton::Triangle,
-        "+ Add Device",
+        strings::ACTION_ADD_DEVICE,
     );
-    draw_action(gfx, th, bx_qr, CONTENT_Y + 62, PadButton::Circle, "QR / ID");
+    draw_action(gfx, th, bx_qr, CONTENT_Y + 62, PadButton::Circle, strings::ACTION_QR_ID);
     draw_action(
         gfx,
         th,
         bx_theme,
         CONTENT_Y + 62,
         PadButton::Cross,
-        "Switch Theme",
+        strings::ACTION_SWITCH_THEME,
     );
     let display_focus = state
         .focused_action(ActiveTab::Settings)
@@ -93,7 +94,7 @@ pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         FontWeight::Regular,
         th.faint,
         Align::Left,
-        "OLED Screensaver activates automatically after 12s during sync (or press SELECT anytime).",
+        strings::SETTINGS_SAVER_AUTO_HINT,
     );
 
     // 2. Declined Folder Offers Card
@@ -110,7 +111,7 @@ pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         FontWeight::Bold,
         th.accent_hi,
         Align::Left,
-        "BEP/1.0 & TLS 1.3 PROTOCOL LOG",
+        strings::SETTINGS_SEC_LOG,
     );
 
     let max_lines = ((lh - 56) / 22).max(0) as usize;
@@ -143,11 +144,11 @@ pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         gfx,
         th,
         &[
-            (PadButton::Dpad, Some(PadButton::Cross), "Navigate"),
-            (PadButton::Circle, None, "Device ID / QR"),
-            (PadButton::Triangle, None, "+ Add Device ID"),
-            (PadButton::Select, None, "Screensaver"),
-            (PadButton::Start, None, "Quit"),
+            (PadButton::Dpad, Some(PadButton::Cross), strings::HINT_NAVIGATE),
+            (PadButton::Circle, None, strings::ACTION_QR_ID),
+            (PadButton::Triangle, None, strings::ACTION_ADD_DEVICE_ID),
+            (PadButton::Select, None, strings::HINT_SCREENSAVER),
+            (PadButton::Start, None, strings::ACTION_QUIT),
         ],
     );
 }
@@ -165,19 +166,19 @@ fn render_declined_folders(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         FontWeight::Bold,
         th.accent_hi,
         Align::Left,
-        "DECLINED FOLDERS",
+        strings::SETTINGS_SEC_DECLINED,
     );
     let summary = if state.ignored_folders.is_empty() {
-        "None · folders offered by peers are always asked first".to_owned()
+        strings::SETTINGS_NO_DECLINED.to_owned()
     } else {
         let ids: Vec<&str> = state
             .ignored_folders
             .iter()
             .map(|f| f.folder_id.as_str())
             .collect();
-        format!("{} declined: {}", ids.len(), ids.join(", "))
+        strings::fmt_declined_summary(ids.len(), &ids.join(", "))
     };
-    let label = "Clear Declined";
+    let label = strings::ACTION_CLEAR_DECLINED;
     let w_clear = action_width(gfx, PadButton::Cross, label);
     let bx = CONTENT_R - 20 - w_clear;
     let cy = y + h / 2;

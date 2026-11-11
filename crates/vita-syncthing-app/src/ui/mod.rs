@@ -7,6 +7,7 @@ pub mod image;
 pub mod modals;
 pub mod renderer;
 pub mod screens;
+pub mod strings;
 pub mod theme;
 pub mod widgets;
 

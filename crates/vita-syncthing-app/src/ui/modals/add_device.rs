@@ -5,6 +5,7 @@ use syncthing_core::DeviceId;
 use super::fallback_keyboard::draw_fallback_keypad;
 use crate::domain::AppState;
 use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton, GFX_W};
+use crate::ui::strings;
 use crate::ui::theme::{add_device_modal_height, UiTheme, C_GOOD, C_WARN, HINT_Y};
 use crate::ui::widgets::{action_width, draw_action, draw_hints};
 
@@ -38,7 +39,7 @@ pub fn render_add_device_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, ke
         FontWeight::Bold,
         th.text,
         Align::Left,
-        "Add Remote Device by ID",
+        strings::MODAL_ADD_DEVICE_TITLE,
     );
     gfx.text(
         lx + 52,
@@ -47,7 +48,7 @@ pub fn render_add_device_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, ke
         FontWeight::Regular,
         th.dim,
         Align::Left,
-        "Enter the 7-character Short ID (recommended) or full 56-character Syncthing Device ID",
+        strings::MODAL_ADD_DEVICE_SUBTITLE,
     );
     gfx.line(
         (dx + 24) as f32,
@@ -75,9 +76,9 @@ pub fn render_add_device_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, ke
     gfx.rrect_outline(lx, box_y, content_w, box_h, 10, 1, border_col);
 
     let kbd_lbl = if keypad {
-        "Hide Keyboard"
+        strings::ACTION_HIDE_KEYBOARD
     } else {
-        "Virtual Keyboard"
+        strings::ACTION_VIRTUAL_KEYBOARD
     };
     let w_kbd = action_width(gfx, PadButton::Triangle, kbd_lbl);
     draw_action(
@@ -99,7 +100,7 @@ pub fn render_add_device_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, ke
             FontWeight::Regular,
             th.faint,
             Align::Left,
-            "e.g. MFZWI3D  or  MFZWI3D-BONSGYC-... (tap to type)",
+            strings::MODAL_ADD_DEVICE_EXAMPLE,
         );
     } else {
         let display_str = format!("{}|", state.device_id_input.to_uppercase());
@@ -118,8 +119,7 @@ pub fn render_add_device_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, ke
     // Live Validation & LAN Peer Resolution Status Line
     let (status_txt, status_col) = if state.device_id_input.trim().is_empty() {
         (
-            "Tip: You only need the first 7 characters (Short ID shown in Syncthing Web UI)."
-                .to_owned(),
+            strings::MODAL_ADD_DEVICE_TIP.to_owned(),
             th.dim,
         )
     } else {
@@ -176,9 +176,9 @@ pub fn render_add_device_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, ke
     }
 
     // Bottom modal action buttons
-    let w_confirm = action_width(gfx, PadButton::Start, "Add Device");
-    let w_bksp = action_width(gfx, PadButton::Square, "Backspace");
-    let w_cancel = action_width(gfx, PadButton::Circle, "Cancel");
+    let w_confirm = action_width(gfx, PadButton::Start, strings::MODAL_ADD_DEVICE_CONFIRM);
+    let w_bksp = action_width(gfx, PadButton::Square, strings::ACTION_BACKSPACE);
+    let w_cancel = action_width(gfx, PadButton::Circle, strings::ACTION_CANCEL);
     let bx_cancel = dx + w - 28 - w_cancel;
     let bx_bksp = bx_cancel - 10 - w_bksp;
     let bx_confirm = bx_bksp - 10 - w_confirm;
@@ -189,7 +189,7 @@ pub fn render_add_device_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, ke
         bx_confirm,
         dy + h - 28,
         PadButton::Start,
-        "Add Device",
+        strings::MODAL_ADD_DEVICE_CONFIRM,
     );
     draw_action(
         gfx,
@@ -197,20 +197,20 @@ pub fn render_add_device_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, ke
         bx_bksp,
         dy + h - 28,
         PadButton::Square,
-        "Backspace",
+        strings::ACTION_BACKSPACE,
     );
-    draw_action(gfx, th, bx_cancel, dy + h - 28, PadButton::Circle, "Cancel");
-    draw_action(gfx, th, lx, dy + h - 28, PadButton::R, "Scan QR");
+    draw_action(gfx, th, bx_cancel, dy + h - 28, PadButton::Circle, strings::ACTION_CANCEL);
+    draw_action(gfx, th, lx, dy + h - 28, PadButton::R, strings::ACTION_SCAN_QR);
 
     let mut hints = vec![
         (PadButton::Triangle, None, kbd_lbl),
-        (PadButton::Start, None, "Confirm & Add"),
-        (PadButton::R, None, "Scan QR"),
+        (PadButton::Start, None, strings::HINT_CONFIRM_ADD),
+        (PadButton::R, None, strings::ACTION_SCAN_QR),
     ];
     if keypad {
-        hints.push((PadButton::Dpad, Some(PadButton::Cross), "Type Key"));
+        hints.push((PadButton::Dpad, Some(PadButton::Cross), strings::HINT_TYPE_KEY));
     }
-    hints.push((PadButton::Square, None, "Backspace"));
-    hints.push((PadButton::Circle, None, "Cancel"));
+    hints.push((PadButton::Square, None, strings::ACTION_BACKSPACE));
+    hints.push((PadButton::Circle, None, strings::ACTION_CANCEL));
     draw_hints(gfx, th, &hints);
 }

@@ -32,7 +32,13 @@ fn setup(name: &str) -> (String, ConfigRepository, AppState) {
 fn test_dashboard_buttons_then_sidebar_tabs() {
     let (dir, repo, mut state) = setup("dpad-dashboard");
 
-    // Cross on the default focus (Sync Now) starts a sync; Left moves to QR / ID
+    // Initially focus is on Sidebar (Tab). Right enters page content.
+    assert_eq!(state.nav.focus, NavFocus::Sidebar);
+    press(&mut state, &repo, BTN_RIGHT);
+    assert_eq!(state.nav.focus, NavFocus::Content);
+
+    // In Content, col 0 is QR / ID; Right moves to Sync Now (col 1)
+    press(&mut state, &repo, BTN_RIGHT);
     assert_eq!(press(&mut state, &repo, BTN_CROSS), UserCommand::StartSync);
     press(&mut state, &repo, BTN_LEFT);
     press(&mut state, &repo, BTN_CROSS);
@@ -67,6 +73,7 @@ fn test_shares_rows_buttons_and_header() {
     state.selected_share_idx = 0;
     state.active_tab = ActiveTab::Shares;
     state.reset_nav_for_tab();
+    state.nav.focus = NavFocus::Content;
 
     // Down selects the second share, Right moves to its Delete button
     press(&mut state, &repo, BTN_DOWN);

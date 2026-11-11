@@ -3,6 +3,7 @@
 use crate::domain::AppState;
 use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton};
 use crate::ui::image::draw_gray_image;
+use crate::ui::strings;
 use crate::ui::theme::{scan_qr_modal_rect, UiTheme, C_WARN, SCAN_QR_VIEW_H, SCAN_QR_VIEW_W};
 use crate::ui::widgets::{action_width, draw_action, draw_hints};
 
@@ -32,7 +33,7 @@ pub fn render_scan_qr_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         FontWeight::Bold,
         th.text,
         Align::Left,
-        "Scan Device ID QR Code",
+        strings::MODAL_SCAN_QR_TITLE,
     );
     gfx.text_fit(
         lx + 52,
@@ -42,24 +43,24 @@ pub fn render_scan_qr_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         FontWeight::Regular,
         th.dim,
         Align::Left,
-        "Syncthing GUI: Actions > Show ID, then aim the rear camera at it",
+        strings::MODAL_SCAN_QR_SUBTITLE,
     );
 
     let vx = lx;
     let vy = dy + 76;
     draw_viewfinder(gfx, th, state, vx, vy);
 
-    let w_back = action_width(gfx, PadButton::Circle, "Back");
+    let w_back = action_width(gfx, PadButton::Circle, strings::ACTION_BACK);
     draw_action(
         gfx,
         th,
         dx + w - 28 - w_back,
         dy + h - 28,
         PadButton::Circle,
-        "Back",
+        strings::ACTION_BACK,
     );
 
-    draw_hints(gfx, th, &[(PadButton::Circle, None, "Back to Device ID")]);
+    draw_hints(gfx, th, &[(PadButton::Circle, None, strings::HINT_BACK_TO_DEVICE_ID)]);
 }
 
 /// Camera frame (or status text) with corner brackets marking where to place the QR code.

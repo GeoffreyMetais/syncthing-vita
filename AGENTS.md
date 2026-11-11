@@ -72,6 +72,7 @@ syncthing-vita
                 ├── image.rs          # Greyscale camera frame blit (QR viewfinder)
                 ├── gfx.rs            # 960x544 RGBA8888 2D anti-aliased vector & TrueType software renderer
                 ├── theme.rs          # UiTheme (Dark & OLED palettes) and layout constants
+                ├── strings.rs        # Factorized UI string resources, labels, controller hints & formatting helpers
                 ├── widgets.rs        # Reusable VitaSend UI components (cards, chips, actions, checkboxes, chrome, toast)
                 ├── screens/          # Feature-split screen views (Overview, Shares, Files, Settings, OLED Screensaver)
                 │   ├── mod.rs
@@ -158,6 +159,7 @@ Dependencies strictly point **inward**. Inner layers never import or depend on o
 4. **Layer 4: UI / Presentation Layer (`crates/vita-syncthing-app/src/ui/`)**
    - **Responsibility**: Visual presentation and 2D vector/font rendering.
    - **Key Modules**:
+     - `strings.rs`: Centralized user-facing strings, action constants, button hints, and zero-allocation formatting helpers.
      - `screens/`: Independent full-screen views (`dashboard.rs`, `shares.rs`, `folder_picker.rs`, `settings.rs`, `screensaver.rs`).
      - `modals/`: Isolated modal dialogs (`create_share.rs`, `manage_devices.rs`, `add_device.rs`, `device_id.rs`, `confirm_quit.rs`, `confirm_delete_share.rs`, `fallback_keyboard.rs`).
      - `widgets.rs`: Reusable UI elements (cards, chips, checkboxes, buttons, chrome, toast).
@@ -188,6 +190,7 @@ To prevent code degradation into large, unmaintainable files:
   - **New Screens**: Always create a separate file under `ui/screens/<feature>.rs` and expose it via `ui/screens/mod.rs`.
   - **New Modal Dialogs**: Always create a separate file under `ui/modals/<modal_name>.rs` and expose it via `ui/modals/mod.rs`.
   - **New Services**: Split distinct domain workflows into dedicated services in `application/` rather than adding methods to an existing unrelated service.
+  - **Factorized UI Copy & Strings**: Never scatter hardcoded user-facing strings or button labels across screens and modals. Place all reusable actions, tab titles, hints, status badges, and formatting helpers in `ui/strings.rs` so copy is deduplicated and i18n-ready without per-frame heap churn.
   - **Avoid "Omnibus" Files**: Never create catch-all files like `display.rs` or `utils.rs`. Group code by specific domain responsibility.
 
 These size and SRP rules apply to **both crates** (`vita-syncthing-app` and `syncthing-core`).

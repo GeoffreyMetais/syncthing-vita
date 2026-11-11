@@ -5,7 +5,7 @@ mod common;
 
 use common::temp_test_dir;
 use vita_syncthing_app::application::{InputController, ShareService, UserCommand};
-use vita_syncthing_app::domain::{ActiveTab, AppState, ModalDialog, ThemeMode};
+use vita_syncthing_app::domain::{ActiveTab, AppState, ModalDialog, NavFocus, ThemeMode};
 use vita_syncthing_app::infrastructure::{
     ConfigRepository, InputFrame, BTN_CIRCLE, BTN_CROSS, BTN_RIGHT, BTN_SQUARE, BTN_START,
     BTN_TRIANGLE,
@@ -58,6 +58,7 @@ fn test_input_controller_quit_dialog_and_theme_toggle() {
     state.modal = ModalDialog::None;
     state.active_tab = ActiveTab::Settings;
     state.reset_nav_for_tab();
+    state.nav.focus = NavFocus::Content;
     assert_eq!(state.theme_mode, ThemeMode::Dark);
     let _ = InputController::handle_input(
         &mut state,

@@ -5,6 +5,7 @@ use crate::domain::{ActiveTab, AppState, NavFocus};
 use crate::ui::gfx::{
     rgb, with_alpha, Align, Color, FontWeight, Gfx, Icon, PadButton, GFX_H, GFX_W,
 };
+use crate::ui::strings;
 use crate::ui::theme::{
     UiTheme, CONTENT_R, CONTENT_W, CONTENT_X, C_GOOD, C_WARN, HINT_Y, SIDEBAR_W,
 };
@@ -137,10 +138,10 @@ pub fn draw_page_title(gfx: &mut Gfx, th: &UiTheme, title: &str, right: Option<&
 
 pub fn draw_chrome(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
     let tabs = [
-        ("Overview", Icon::Vita, ActiveTab::Dashboard),
-        ("Shares", Icon::Folder, ActiveTab::Shares),
-        ("Files", Icon::Receive, ActiveTab::FolderPicker),
-        ("Settings", Icon::Settings, ActiveTab::Settings),
+        (strings::TAB_OVERVIEW, Icon::Vita, ActiveTab::Dashboard),
+        (strings::TAB_SHARES, Icon::Folder, ActiveTab::Shares),
+        (strings::TAB_FILES, Icon::Receive, ActiveTab::FolderPicker),
+        (strings::TAB_SETTINGS, Icon::Settings, ActiveTab::Settings),
     ];
 
     gfx.clear(th.bg);
@@ -161,7 +162,7 @@ pub fn draw_chrome(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         FontWeight::Bold,
         th.text,
         Align::Left,
-        "VitaSync",
+        strings::APP_TITLE,
     );
 
     // Sidebar tabs
@@ -188,9 +189,9 @@ pub fn draw_chrome(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
     gfx.rrect(12, card_y, SIDEBAR_W - 24, 82, 12, th.card);
     gfx.rrect_outline(12, card_y, SIDEBAR_W - 24, 82, 12, 1, th.border);
     let xfer_title = if state.sync_in_progress {
-        "Syncing BEP/1.0..."
+        strings::SIDEBAR_SYNCING
     } else {
-        "Last sync session"
+        strings::SIDEBAR_LAST_SYNC
     };
     let pct = state.progress_pct.min(100);
     gfx.text(
@@ -235,9 +236,9 @@ pub fn draw_chrome(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         if wifi_ok { C_GOOD } else { C_WARN },
     );
     let net_txt = if wifi_ok {
-        "BEP/1.0 TLS 1.3"
+        strings::PROTOCOL_TLS
     } else {
-        "UDP 21027..."
+        strings::PROTOCOL_DISCOVERY
     };
     gfx.text_fit(
         48,
@@ -256,7 +257,7 @@ pub fn draw_chrome(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         FontWeight::Regular,
         th.faint,
         Align::Left,
-        "v0.1.0 · Pure Rust",
+        strings::APP_VERSION_LABEL,
     );
 }
 

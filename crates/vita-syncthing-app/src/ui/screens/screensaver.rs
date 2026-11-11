@@ -2,6 +2,7 @@
 
 use crate::domain::AppState;
 use crate::ui::gfx::{rgb, Align, FontWeight, Gfx, Icon};
+use crate::ui::strings;
 use crate::ui::theme::UiTheme;
 use crate::ui::widgets::draw_progress;
 
@@ -30,14 +31,14 @@ pub fn render_oled_screensaver(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         FontWeight::Bold,
         rgb(235, 240, 245),
         Align::Left,
-        "VitaSync",
+        strings::APP_TITLE,
     );
 
     let pct = state.progress_pct.min(100);
     let status_line = if state.sync_in_progress {
-        format!("Syncing {}% · {}", pct, state.current_file)
+        strings::fmt_saver_syncing(pct, &state.current_file)
     } else {
-        format!("Idle ({}%) · {}", pct, state.status_line)
+        strings::fmt_saver_idle(pct, &state.status_line)
     };
     gfx.text_fit(
         bx + 2,
@@ -65,6 +66,6 @@ pub fn render_oled_screensaver(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         FontWeight::Regular,
         rgb(96, 106, 118),
         Align::Left,
-        "Touch screen or press any button to wake",
+        strings::SAVER_WAKE_HINT,
     );
 }

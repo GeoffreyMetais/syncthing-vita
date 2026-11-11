@@ -88,7 +88,7 @@ fn test_reopening_existing_share_never_discards_it() {
 #[test]
 fn test_selecting_a_folder_in_files_tab_starts_share_creation() {
     use vita_syncthing_app::domain::{ActiveTab, PickerMode};
-    use vita_syncthing_app::infrastructure::{BTN_DOWN, BTN_R};
+    use vita_syncthing_app::infrastructure::{BTN_DOWN, BTN_R, BTN_RIGHT};
 
     let dir = temp_test_dir("files-tab-create");
     std::fs::create_dir_all(format!("{}/saves", dir)).unwrap();
@@ -101,6 +101,9 @@ fn test_selecting_a_folder_in_files_tab_starts_share_creation() {
     assert_eq!(state.active_tab, ActiveTab::FolderPicker);
     assert_eq!(state.picker_mode, PickerMode::CreateNewShare);
     assert_eq!(state.picker_items[1].path, format!("{}/saves", dir));
+
+    // Right enters page content from sidebar
+    press(&mut state, &repo, BTN_RIGHT);
 
     // Cross on the "saves/" folder opens device linking for a new pending share
     press(&mut state, &repo, BTN_DOWN);
@@ -131,6 +134,7 @@ fn test_already_shared_folders_are_not_selectable_in_files_tab() {
 
     state.active_tab = ActiveTab::FolderPicker;
     state.picker_mode = PickerMode::CreateNewShare;
+    state.nav.focus = vita_syncthing_app::domain::NavFocus::Content;
     ShareService::refresh_picker_items(&mut state, &repo);
     assert_eq!(state.picker_items[1].path, saves);
     assert!(state.picker_items[1].is_shared);

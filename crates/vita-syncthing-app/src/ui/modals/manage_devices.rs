@@ -4,6 +4,7 @@ use syncthing_core::DeviceId;
 
 use crate::domain::AppState;
 use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton, GFX_W};
+use crate::ui::strings;
 use crate::ui::theme::{UiTheme, C_GOOD, C_WARN, HINT_Y, MANAGE_DEVICES_H, MANAGE_DEVICES_W};
 use crate::ui::widgets::{action_width, draw_action, draw_chip, draw_hints, draw_row_tick};
 
@@ -29,7 +30,7 @@ pub fn render_manage_devices_modal(
         .shares
         .get(share_idx)
         .map(|s| format!("{} ({})", s.label, s.folder_id))
-        .unwrap_or_else(|| "Share".to_owned());
+        .unwrap_or_else(|| strings::MODAL_MANAGE_DEVICES_DEFAULT_TITLE.to_owned());
     let shared_list = state
         .shares
         .get(share_idx)
@@ -45,6 +46,7 @@ pub fn render_manage_devices_modal(
         22.0,
         th.accent_hi,
     );
+    let header_title = strings::fmt_devices_for_share(&share_title);
     gfx.text_fit(
         lx + 52,
         dy + 32,
@@ -53,17 +55,17 @@ pub fn render_manage_devices_modal(
         FontWeight::Bold,
         th.text,
         Align::Left,
-        &format!("Devices for {}", share_title),
+        &header_title,
     );
     let incomplete = state.is_share_creation_incomplete(share_idx);
     let (subtitle, subtitle_col) = if incomplete {
         (
-            "Link at least one device to finish creating this share",
+            strings::MODAL_MANAGE_DEVICES_SUBTITLE_INCOMPLETE,
             C_WARN,
         )
     } else {
         (
-            "Tick the remote Syncthing devices that should synchronize this folder",
+            strings::MODAL_MANAGE_DEVICES_SUBTITLE,
             th.dim,
         )
     };
@@ -88,11 +90,11 @@ pub fn render_manage_devices_modal(
     if state.devices.is_empty() {
         let (headline, col) = if state.sync_in_progress {
             (
-                "Scanning LAN (UDP 21027 + TCP 22000) for Syncthing peers...",
+                strings::MODAL_MANAGE_DEVICES_SCANNING,
                 th.accent_hi,
             )
         } else {
-            ("No remote Syncthing devices discovered yet.", C_WARN)
+            (strings::MODAL_MANAGE_DEVICES_EMPTY, C_WARN)
         };
         gfx.text(
             lx,
@@ -106,7 +108,7 @@ pub fn render_manage_devices_modal(
         let sub_hint = if state.sync_in_progress {
             state.status_line.as_str()
         } else {
-            "Press Square (+ Add by ID) to enter a Short/Full ID, or Triangle to scan LAN."
+            strings::MODAL_MANAGE_DEVICES_EMPTY_HINT
         };
         gfx.text(
             lx,
@@ -141,7 +143,7 @@ pub fn render_manage_devices_modal(
                 if is_checked { th.accent_hi } else { th.dim },
             );
 
-            let badge_txt = if is_checked { "Linked" } else { "Not linked" };
+            let badge_txt = if is_checked { strings::ACTION_LINKED } else { strings::ACTION_NOT_LINKED };
             let badge_col = if is_checked { C_GOOD } else { th.dim };
             draw_chip(gfx, dx + w - 36, cy, badge_txt, badge_col);
 
@@ -182,28 +184,28 @@ pub fn render_manage_devices_modal(
 
     // Bottom modal action buttons
     let pause_lbl = if state.shares.get(share_idx).is_some_and(|s| s.enabled) {
-        "Pause"
+        strings::ACTION_PAUSE
     } else {
-        "Enable"
+        strings::ACTION_ENABLE
     };
     draw_action(gfx, th, lx, dy + h - 32, PadButton::Select, pause_lbl);
-    let w_add = action_width(gfx, PadButton::Square, "+ Add by ID");
-    let w_sync = action_width(gfx, PadButton::Triangle, "Apply & Sync");
-    let close_lbl = if incomplete { "Cancel" } else { "Done" };
+    let w_add = action_width(gfx, PadButton::Square, strings::ACTION_ADD_BY_ID);
+    let w_sync = action_width(gfx, PadButton::Triangle, strings::ACTION_APPLY_SYNC);
+    let close_lbl = if incomplete { strings::ACTION_CANCEL } else { strings::ACTION_DONE };
     let w_close = action_width(gfx, PadButton::Circle, close_lbl);
     let bx_close = dx + w - 28 - w_close;
     let bx_sync = bx_close - 10 - w_sync;
     let bx_add = bx_sync - 10 - w_add;
-    let w_scan = action_width(gfx, PadButton::R, "Scan QR");
+    let w_scan = action_width(gfx, PadButton::R, strings::ACTION_SCAN_QR);
     let bx_scan = bx_add - 10 - w_scan;
-    draw_action(gfx, th, bx_scan, dy + h - 32, PadButton::R, "Scan QR");
+    draw_action(gfx, th, bx_scan, dy + h - 32, PadButton::R, strings::ACTION_SCAN_QR);
     draw_action(
         gfx,
         th,
         bx_add,
         dy + h - 32,
         PadButton::Square,
-        "+ Add by ID",
+        strings::ACTION_ADD_BY_ID,
     );
     draw_action(
         gfx,
@@ -211,7 +213,7 @@ pub fn render_manage_devices_modal(
         bx_sync,
         dy + h - 32,
         PadButton::Triangle,
-        "Apply & Sync",
+        strings::ACTION_APPLY_SYNC,
     );
     draw_action(gfx, th, bx_close, dy + h - 32, PadButton::Circle, close_lbl);
 
@@ -219,12 +221,12 @@ pub fn render_manage_devices_modal(
         gfx,
         th,
         &[
-            (PadButton::DpadUd, None, "Select"),
-            (PadButton::Cross, None, "Toggle"),
-            (PadButton::Select, None, "Pause/Enable"),
-            (PadButton::Square, None, "+ Add by ID"),
-            (PadButton::R, None, "Scan QR"),
-            (PadButton::Triangle, None, "Apply & Sync"),
+            (PadButton::DpadUd, None, strings::HINT_SELECT),
+            (PadButton::Cross, None, strings::HINT_TOGGLE),
+            (PadButton::Select, None, strings::HINT_PAUSE_ENABLE),
+            (PadButton::Square, None, strings::HINT_ADD_BY_ID),
+            (PadButton::R, None, strings::HINT_SCAN_QR),
+            (PadButton::Triangle, None, strings::HINT_APPLY_SYNC),
             (PadButton::Circle, None, close_lbl),
         ],
     );

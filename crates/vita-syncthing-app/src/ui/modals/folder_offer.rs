@@ -2,6 +2,7 @@
 
 use crate::domain::AppState;
 use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton};
+use crate::ui::strings;
 use crate::ui::theme::{folder_offer_modal_rect, folder_offer_slot_x, UiTheme};
 use crate::ui::widgets::{draw_action, draw_hints};
 
@@ -34,7 +35,7 @@ pub fn render_folder_offer_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, 
         FontWeight::Bold,
         th.text,
         Align::Left,
-        "New shared folder",
+        strings::MODAL_FOLDER_OFFER_TITLE,
     );
     let device = state
         .devices
@@ -42,6 +43,7 @@ pub fn render_folder_offer_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, 
         .find(|d| d.device_id.matches_peer(&offer.device_id))
         .map(|d| format!("{} ({})", d.name, d.device_id.short()))
         .unwrap_or_else(|| format!("Device {}", offer.device_id.short()));
+    let requester_sub = strings::fmt_folder_offer_sub(&device);
     gfx.text_fit(
         lx + 52,
         dy + 54,
@@ -50,7 +52,7 @@ pub fn render_folder_offer_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, 
         FontWeight::Regular,
         th.dim,
         Align::Left,
-        &format!("{} wants to share a folder with this PS Vita", device),
+        &requester_sub,
     );
     gfx.line(
         (dx + 24) as f32,
@@ -61,6 +63,7 @@ pub fn render_folder_offer_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, 
         th.border,
     );
 
+    let title = strings::fmt_share_title(&offer.label, &offer.folder_id);
     gfx.text_fit(
         lx,
         dy + 110,
@@ -69,7 +72,7 @@ pub fn render_folder_offer_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, 
         FontWeight::Medium,
         th.text,
         Align::Left,
-        &format!("{}  ·  {}", offer.label, offer.folder_id),
+        &title,
     );
     gfx.text_fit(
         lx,
@@ -79,10 +82,11 @@ pub fn render_folder_offer_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, 
         FontWeight::Regular,
         th.dim,
         Align::Left,
-        "Accept to pick a folder on ux0:. Nothing syncs until you enable the share.",
+        strings::MODAL_FOLDER_OFFER_HINT,
     );
     let pending = state.folder_offers.len();
     if pending > 1 {
+        let waiting_str = strings::fmt_offers_waiting(pending - 1);
         gfx.text(
             lx,
             dy + 164,
@@ -90,7 +94,7 @@ pub fn render_folder_offer_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, 
             FontWeight::Regular,
             th.faint,
             Align::Left,
-            &format!("{} more offer(s) waiting", pending - 1),
+            &waiting_str,
         );
     }
 
@@ -101,7 +105,7 @@ pub fn render_folder_offer_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, 
         folder_offer_slot_x(0) as i32,
         cy,
         PadButton::Square,
-        "Decline",
+        strings::ACTION_DECLINE,
     );
     draw_action(
         gfx,
@@ -109,7 +113,7 @@ pub fn render_folder_offer_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, 
         folder_offer_slot_x(1) as i32,
         cy,
         PadButton::Circle,
-        "Later",
+        strings::ACTION_LATER,
     );
     draw_action(
         gfx,
@@ -117,16 +121,16 @@ pub fn render_folder_offer_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, 
         folder_offer_slot_x(2) as i32,
         cy,
         PadButton::Cross,
-        "Accept",
+        strings::ACTION_ACCEPT,
     );
 
     draw_hints(
         gfx,
         th,
         &[
-            (PadButton::Cross, None, "Accept share"),
-            (PadButton::Square, None, "Decline"),
-            (PadButton::Circle, None, "Later"),
+            (PadButton::Cross, None, strings::HINT_ACCEPT_SHARE),
+            (PadButton::Square, None, strings::ACTION_DECLINE),
+            (PadButton::Circle, None, strings::ACTION_LATER),
         ],
     );
 }

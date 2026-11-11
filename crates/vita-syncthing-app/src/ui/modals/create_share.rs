@@ -2,6 +2,7 @@
 
 use crate::domain::NEW_SHARE_TEMPLATES;
 use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton, GFX_W};
+use crate::ui::strings;
 use crate::ui::theme::{UiTheme, C_GOOD, HINT_Y};
 use crate::ui::widgets::draw_hints;
 
@@ -33,7 +34,7 @@ pub fn render_create_share_modal(gfx: &mut Gfx, th: &UiTheme, selected_idx: usiz
         FontWeight::Bold,
         th.text,
         Align::Left,
-        "Create New Share",
+        strings::MODAL_CREATE_SHARE_TITLE,
     );
     gfx.text(
         lx + 52,
@@ -42,7 +43,7 @@ pub fn render_create_share_modal(gfx: &mut Gfx, th: &UiTheme, selected_idx: usiz
         FontWeight::Regular,
         th.dim,
         Align::Left,
-        "Choose a PS Vita folder preset or browse ux0: to create a new Syncthing share",
+        strings::MODAL_CREATE_SHARE_SUBTITLE,
     );
     gfx.line(
         (dx + 24) as f32,
@@ -91,9 +92,9 @@ pub fn render_create_share_modal(gfx: &mut Gfx, th: &UiTheme, selected_idx: usiz
             label,
         );
         let sub = if is_browse {
-            "Open the interactive ux0: directory browser".to_owned()
+            strings::MODAL_CREATE_SHARE_BROWSE_SUB.to_owned()
         } else {
-            format!("ID: {}  ·  Path: {}", fid, path)
+            strings::fmt_template_sub(fid, path)
         };
         gfx.text(
             lx + 48,
@@ -110,9 +111,9 @@ pub fn render_create_share_modal(gfx: &mut Gfx, th: &UiTheme, selected_idx: usiz
         gfx,
         th,
         &[
-            (PadButton::DpadUd, None, "Select"),
-            (PadButton::Cross, None, "Create & Pick Devices"),
-            (PadButton::Circle, None, "Cancel"),
+            (PadButton::DpadUd, None, strings::HINT_SELECT),
+            (PadButton::Cross, None, strings::HINT_CREATE_PICK_DEVICES),
+            (PadButton::Circle, None, strings::ACTION_CANCEL),
         ],
     );
 }
