@@ -7,7 +7,7 @@ use p256::pkcs8::{EncodePrivateKey, EncodePublicKey};
 use p256::SecretKey;
 use sha2::{Digest, Sha256};
 
-use crate::disco::DeviceId;
+use crate::device_id::DeviceId;
 
 /// Cryptographic identity of a Syncthing node (X.509 DER certificate + PKCS#8 DER private key + `DeviceId`).
 #[derive(Clone)]
@@ -69,13 +69,7 @@ fn build_self_signed_x509_der(signing_key: &SigningKey, spki_der: &[u8]) -> Vec<
     ]);
 
     let tbs_certificate = der_seq(&[
-        version_v3,
-        serial,
-        &alg_id,
-        &name,
-        &validity,
-        &name,
-        spki_der,
+        version_v3, serial, &alg_id, &name, &validity, &name, spki_der,
     ]);
 
     let sig: Signature = signing_key.sign(&tbs_certificate);

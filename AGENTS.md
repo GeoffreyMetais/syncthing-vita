@@ -21,13 +21,20 @@ syncthing-vita
 ├── scripts/build_vpk.sh              # Full VPK build pipeline (vita-elf-create, vita-make-fself, vita-mksfoex, vita-pack-vpk)
 └── crates/
     ├── syncthing-core/               # Platform-independent Syncthing BEP/1.0 & Discovery engine
-    │   └── src/
-    │       ├── lib.rs                # Public API exports & unit test suite
-    │       ├── disco.rs              # UDP Local Discovery (port 21027), Protobuf Announce, Luhn-mod-32 DeviceId
-    │       ├── bep.rs                # BEP/1.0 framing, LZ4 block compression, Hello/ClusterConfig/Index/Request/Response
-    │       ├── cert.rs               # Deterministic/random ECDSA P-256 X.509 certificate & DER generator
-    │       ├── tls.rs                # TLS 1.3 mutual-auth handshake (ALPN "bep/1.0") + bidirectional delta sync
-    │       └── storage.rs            # SyncStorage trait & FsSyncStorage (128 KiB streaming I/O, local folder registry)
+    │   ├── src/
+    │   │   ├── lib.rs                # Module declarations & public API re-exports ONLY (no logic, no tests)
+    │   │   ├── proto.rs              # Protobuf wire primitives (varint, fields, WireIter)
+    │   │   ├── device_id/            # DeviceId: mod.rs (format, hex, short-ID matching), parse.rs (user input), base32.rs (Base32 + Luhn mod 32)
+    │   │   ├── cert.rs               # Deterministic ECDSA P-256 X.509 identity (VitaIdentity) & DER builder
+    │   │   ├── version_vector.rs     # Version vector arithmetic (ge / merge / bump, short device ID)
+    │   │   ├── bep/                  # BEP/1.0 pure codecs: header, framing, lz4, hello, cluster_config, index, request, close
+    │   │   ├── discovery/            # announce.rs (codec), addresses.rs, local_ip.rs, udp.rs (broadcast cycle), lan_scan.rs (TCP 22000 + TLS probe)
+    │   │   ├── storage/              # FsSyncStorage: mod.rs (folder registry & paths), blocks.rs, download.rs (temp file assembly), vita_fs.rs (sceIo quirks)
+    │   │   ├── local_db/             # Persistent folder DB: mod.rs (LocalEntry, FolderDb), codec.rs (text format), cache.rs (process-wide cache)
+    │   │   ├── folder_sync/          # Reconciliation: scan.rs (disk scan -> local Index), pull.rs (pull planning, conflicts, deletions)
+    │   │   ├── tls/                  # TLS 1.3 transport only: verifier.rs, client.rs (BEP streams, ID probe), polling.rs
+    │   │   └── session/              # BEP sync engine, one file per phase (see §3.3)
+    │   └── tests/                    # Integration tests, one file per module (+ common/ helpers)
     └── vita-syncthing-app/           # Native PlayStation Vita GUI application (Title ID: SYNCTHING, Clean Architecture)
         ├── assets/fonts/             # Embedded Poppins TrueType fonts (Regular, Medium, Bold — SIL OFL 1.1)
         └── src/
@@ -159,6 +166,59 @@ To prevent code degradation into large, unmaintainable files:
   - **New Services**: Split distinct domain workflows into dedicated services in `application/` rather than adding methods to an existing unrelated service.
   - **Avoid "Omnibus" Files**: Never create catch-all files like `display.rs` or `utils.rs`. Group code by specific domain responsibility.
 
+These size and SRP rules apply to **both crates** (`vita-syncthing-app` and `syncthing-core`).
+
+---
+
+### 3.3 `syncthing-core` Library Architecture
+
+`syncthing-core` is the platform-independent protocol library. It must stay as clean as the app: one responsibility per file, strict inward dependencies, no Vita syscalls.
+
+#### Layers (dependencies point downwards only)
+
+| Layer | Modules | Allowed I/O |
+| :--- | :--- | :--- |
+| 1. Wire codecs & identity | `proto`, `device_id/`, `bep/`, `discovery/announce.rs`, `discovery/addresses.rs`, `cert`, `version_vector` | **None** (pure functions on bytes / values) |
+| 2. Local persistence | `storage/`, `local_db/`, `folder_sync/` | Filesystem only |
+| 3. Transport | `tls/`, `discovery/udp.rs`, `discovery/lan_scan.rs`, `discovery/local_ip.rs` | Sockets only |
+| 4. Sync engine | `session/` | Orchestrates layers 1-3 |
+
+- A lower layer never imports a higher one (e.g. `bep/` never uses `tls/` or `storage/`; `tls/` never touches folders, indexes or `FsSyncStorage`).
+- `lib.rs` only declares modules and re-exports the public API used by the app. **No logic and no tests in `lib.rs`.** Keep the root re-exports stable: the app imports from `syncthing_core::*`.
+- No `#[cfg(target_os = "vita")]` and no `sce*` calls in this crate. PS Vita filesystem / socket quirks are handled portably (`storage/vita_fs.rs`, `tls/polling.rs`).
+
+#### Module responsibilities
+
+- **`bep/`**: one file per BEP message family (`header`, `framing`, `lz4`, `hello`, `cluster_config`, `index`, `request`, `close`). Encode/decode only — never read files or sockets beyond the generic `Read`/`Write` in `framing.rs` / `hello.rs`.
+- **`device_id/`**: `DeviceId` value object; parsing of user input (`parse.rs`) and Base32/Luhn primitives (`base32.rs`) are separate.
+- **`discovery/`**: `Announce` codec, address ordering, local IP detection, UDP broadcast cycle, LAN TCP-scan fallback — one file each.
+- **`storage/`**: `FsSyncStorage` split by concern — registry & paths (`mod.rs`), block hashing / delta / block reads (`blocks.rs`), crash-safe download temp files (`download.rs`), `sceIo` path quirks (`vita_fs.rs`). Extend `FsSyncStorage` with a new `impl` block in the file owning that concern instead of growing `mod.rs`.
+- **`local_db/`**: in-memory model (`mod.rs`), on-disk text format (`codec.rs`), process-wide cache + atomic save (`cache.rs`). Version arithmetic lives in `version_vector.rs`.
+- **`folder_sync/`**: disk scan → local `Index` (`scan.rs`) vs. pull planning, conflicts and deletions (`pull.rs`).
+- **`tls/`**: TLS transport only — certificate verifier, client connection setup / ID probe, frame polling. Nothing about sync.
+- **`session/`**: the BEP sync engine, **one file per phase or concern**:
+  - `mod.rs` — `connect_and_sync*` orchestrator (connect → `Hello` → phases), must stay a thin sequence of phase calls
+  - `cluster_exchange.rs` — initial `ClusterConfig` exchange + initial remote `Index`
+  - `secondary.rs` — `+2` secondary connections (open, promotion, polling, keepalive)
+  - `initial_sync.rs` — initial download, local `Index` publication, request draining
+  - `persistent.rs` — persistent keepalive / rescan loop
+  - `dispatch.rs` — routing of primary-connection messages in an established session
+  - `index_exchange.rs` — local index publication and runtime `ClusterConfig` / `Index` handling
+  - `download.rs` / `upload.rs` — block transfers (pull / serve)
+  - `folders.rs` — per-session folder state (pure); `context.rs` — `SessionContext` (identity, storage, stats, event sink); `control.rs`, `events.rs`, `outcome.rs` — public API types
+
+#### Rules for new code
+
+- **No long parameter lists**: pass `SessionContext` (identity, storage, peer, stats, `emit`) and `FolderSyncState` instead of threading counters and maps through functions. A new `#[allow(clippy::too_many_arguments)]` in `syncthing-core` is a design smell (the public `connect_and_sync_with_control` signature is the only accepted exception).
+- **Named constants for timings**: protocol timeouts and intervals are `const` items at the top of the file that uses them, never inline magic `Duration`s.
+- **New BEP message** → new file in `bep/`; **new session phase** → new file in `session/`; **new storage concern** → new file in `storage/` with its own `impl FsSyncStorage` block.
+
+#### Tests
+
+- **No `#[cfg(test)] mod tests` inside `src/`.** All `syncthing-core` tests live in `crates/syncthing-core/tests/`, one file per module (`bep_codec.rs`, `device_id.rs`, `discovery.rs`, `identity.rs`, `storage.rs`, `local_db.rs`, `folder_sync.rs`, `version_vector.rs`), with shared helpers in `tests/common/mod.rs` (e.g. `fresh_temp_dir`).
+- Tests exercise the public API. If something important can only be tested through a private item, it is usually a sign the item deserves its own module with a small public surface (as `storage::vita_fs::with_device_root_slash` or `FolderDb::{serialize, parse}`).
+- Filesystem tests use a unique `common::fresh_temp_dir("<name>")` per test so test binaries can run in parallel.
+
 ---
 
 ## 4. Critical PlayStation Vita Hardware Constraints (`C2-12828-1` Prevention)
@@ -208,7 +268,7 @@ All persistent application state lives in `ux0:data/syncthing/` (or `/tmp/syncth
 | `devices.cfg` | Known/discovered remote Syncthing peers | `<device_id_hex>\|<name>\|<ip:port>\n` |
 | `shares.cfg` | Configured shared folders and linked devices | `<folder_id>\|<label>\|<target_path>\|<0\|1>\|<dev_hex1,dev_hex2>\n` |
 | `syncthing.log` | Persistent protocol & UI event log | Plain text lines |
-| `sync/.syncthing_index_<folder>.db` | Local file index cache (`size\|mtime\|sha256\|name`) to avoid re-hashing unchanged files | Pipe-delimited text |
+| `sync/.syncthing_db_<folder>_<root hash>.txt` | Persistent folder database (`local_db/`): version vectors, sequences, blocks and tombstones per entry | `#vita-db-v1` tab-separated text |
 
 ---
 
@@ -218,13 +278,15 @@ All persistent application state lives in `ux0:data/syncthing/` (or `/tmp/syncth
 ```bash
 cargo test --workspace
 ```
-Tests cover:
-- Protobuf `Announce` encoding/decoding (`test_announce_protobuf_roundtrip`)
-- Luhn-mod-32 `DeviceId` formatting (`test_device_id_formatting`)
-- BEP `Hello` magic & framing (`test_bep_hello_roundtrip`)
-- LZ4 block decompression (`test_lz4_decompression`)
-- X.509 certificate & `DeviceId` derivation (`test_vita_x509_identity_generation`)
-- Delta sync block comparison & local index persistence (`test_delta_sync_and_local_index_roundtrip`)
+`syncthing-core` tests live in `crates/syncthing-core/tests/` (run only them with `just test-host`):
+- `bep_codec.rs`: BEP `Hello` magic & framing, secondary `ClusterConfig`, LZ4 block decompression
+- `device_id.rs`: Luhn-mod-32 `DeviceId` formatting, full / short / hex user-input parsing
+- `discovery.rs`: Protobuf `Announce` roundtrip, advertised TCP address resolution
+- `identity.rs`: X.509 certificate & `DeviceId` derivation
+- `storage.rs`: streaming download, delta sync, `ux0:` device-root path variants
+- `local_db.rs`: persistent folder database text format roundtrip
+- `folder_sync.rs`: version convergence across peers, local deletions become tombstones
+- `version_vector.rs`: version vector ordering / merge / bump
 
 ### Cross-Check for PS Vita (`armv7-sony-vita-newlibeabihf`)
 ```bash
