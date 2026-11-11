@@ -83,7 +83,7 @@ impl AppState {
         default_browse_root: &str,
     ) -> Self {
         Self {
-            theme_mode: ThemeMode::Dark,
+            theme_mode: ThemeMode::Oled,
             active_tab: ActiveTab::Dashboard,
             nav: NavState::new(ActiveTab::Dashboard),
             picker_mode: PickerMode::ChangeShareTarget,
