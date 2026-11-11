@@ -16,6 +16,7 @@ pub fn render_manage_devices_modal(
     share_idx: usize,
     selected_dev_idx: usize,
 ) {
+    let s = strings::strings(state.language);
     gfx.dim(175);
     let w = MANAGE_DEVICES_W;
     let h = MANAGE_DEVICES_H;
@@ -29,12 +30,12 @@ pub fn render_manage_devices_modal(
     let share_title = state
         .shares
         .get(share_idx)
-        .map(|s| format!("{} ({})", s.label, s.folder_id))
-        .unwrap_or_else(|| strings::MODAL_MANAGE_DEVICES_DEFAULT_TITLE.to_owned());
+        .map(|share| format!("{} ({})", share.label, share.folder_id))
+        .unwrap_or_else(|| s.modal_manage_devices_default_title.to_owned());
     let shared_list = state
         .shares
         .get(share_idx)
-        .map(|s| s.shared_devices.as_slice())
+        .map(|share| share.shared_devices.as_slice())
         .unwrap_or(&[]);
 
     let lx = dx + 28;
@@ -46,7 +47,7 @@ pub fn render_manage_devices_modal(
         22.0,
         th.accent_hi,
     );
-    let header_title = strings::fmt_devices_for_share(&share_title);
+    let header_title = s.fmt_devices_for_share(&share_title);
     gfx.text_fit(
         lx + 52,
         dy + 32,
@@ -60,12 +61,12 @@ pub fn render_manage_devices_modal(
     let incomplete = state.is_share_creation_incomplete(share_idx);
     let (subtitle, subtitle_col) = if incomplete {
         (
-            strings::MODAL_MANAGE_DEVICES_SUBTITLE_INCOMPLETE,
+            s.modal_manage_devices_subtitle_incomplete,
             C_WARN,
         )
     } else {
         (
-            strings::MODAL_MANAGE_DEVICES_SUBTITLE,
+            s.modal_manage_devices_subtitle,
             th.dim,
         )
     };
@@ -90,11 +91,11 @@ pub fn render_manage_devices_modal(
     if state.devices.is_empty() {
         let (headline, col) = if state.sync_in_progress {
             (
-                strings::MODAL_MANAGE_DEVICES_SCANNING,
+                s.modal_manage_devices_scanning,
                 th.accent_hi,
             )
         } else {
-            (strings::MODAL_MANAGE_DEVICES_EMPTY, C_WARN)
+            (s.modal_manage_devices_empty, C_WARN)
         };
         gfx.text(
             lx,
@@ -108,7 +109,7 @@ pub fn render_manage_devices_modal(
         let sub_hint = if state.sync_in_progress {
             state.status_line.as_str()
         } else {
-            strings::MODAL_MANAGE_DEVICES_EMPTY_HINT
+            s.modal_manage_devices_empty_hint
         };
         gfx.text(
             lx,
@@ -143,7 +144,7 @@ pub fn render_manage_devices_modal(
                 if is_checked { th.accent_hi } else { th.dim },
             );
 
-            let badge_txt = if is_checked { strings::ACTION_LINKED } else { strings::ACTION_NOT_LINKED };
+            let badge_txt = if is_checked { s.action_linked } else { s.action_not_linked };
             let badge_col = if is_checked { C_GOOD } else { th.dim };
             draw_chip(gfx, dx + w - 36, cy, badge_txt, badge_col);
 
@@ -183,29 +184,29 @@ pub fn render_manage_devices_modal(
     }
 
     // Bottom modal action buttons
-    let pause_lbl = if state.shares.get(share_idx).is_some_and(|s| s.enabled) {
-        strings::ACTION_PAUSE
+    let pause_lbl = if state.shares.get(share_idx).is_some_and(|sh| sh.enabled) {
+        s.action_pause
     } else {
-        strings::ACTION_ENABLE
+        s.action_enable
     };
     draw_action(gfx, th, lx, dy + h - 32, PadButton::Select, pause_lbl);
-    let w_add = action_width(gfx, PadButton::Square, strings::ACTION_ADD_BY_ID);
-    let w_sync = action_width(gfx, PadButton::Triangle, strings::ACTION_APPLY_SYNC);
-    let close_lbl = if incomplete { strings::ACTION_CANCEL } else { strings::ACTION_DONE };
+    let w_add = action_width(gfx, PadButton::Square, s.action_add_by_id);
+    let w_sync = action_width(gfx, PadButton::Triangle, s.action_apply_sync);
+    let close_lbl = if incomplete { s.action_cancel } else { s.action_done };
     let w_close = action_width(gfx, PadButton::Circle, close_lbl);
     let bx_close = dx + w - 28 - w_close;
     let bx_sync = bx_close - 10 - w_sync;
     let bx_add = bx_sync - 10 - w_add;
-    let w_scan = action_width(gfx, PadButton::R, strings::ACTION_SCAN_QR);
+    let w_scan = action_width(gfx, PadButton::R, s.action_scan_qr);
     let bx_scan = bx_add - 10 - w_scan;
-    draw_action(gfx, th, bx_scan, dy + h - 32, PadButton::R, strings::ACTION_SCAN_QR);
+    draw_action(gfx, th, bx_scan, dy + h - 32, PadButton::R, s.action_scan_qr);
     draw_action(
         gfx,
         th,
         bx_add,
         dy + h - 32,
         PadButton::Square,
-        strings::ACTION_ADD_BY_ID,
+        s.action_add_by_id,
     );
     draw_action(
         gfx,
@@ -213,7 +214,7 @@ pub fn render_manage_devices_modal(
         bx_sync,
         dy + h - 32,
         PadButton::Triangle,
-        strings::ACTION_APPLY_SYNC,
+        s.action_apply_sync,
     );
     draw_action(gfx, th, bx_close, dy + h - 32, PadButton::Circle, close_lbl);
 
@@ -221,12 +222,12 @@ pub fn render_manage_devices_modal(
         gfx,
         th,
         &[
-            (PadButton::DpadUd, None, strings::HINT_SELECT),
-            (PadButton::Cross, None, strings::HINT_TOGGLE),
-            (PadButton::Select, None, strings::HINT_PAUSE_ENABLE),
-            (PadButton::Square, None, strings::HINT_ADD_BY_ID),
-            (PadButton::R, None, strings::HINT_SCAN_QR),
-            (PadButton::Triangle, None, strings::HINT_APPLY_SYNC),
+            (PadButton::DpadUd, None, s.hint_select),
+            (PadButton::Cross, None, s.hint_toggle),
+            (PadButton::Select, None, s.hint_pause_enable),
+            (PadButton::Square, None, s.hint_add_by_id),
+            (PadButton::R, None, s.hint_scan_qr),
+            (PadButton::Triangle, None, s.hint_apply_sync),
             (PadButton::Circle, None, close_lbl),
         ],
     );

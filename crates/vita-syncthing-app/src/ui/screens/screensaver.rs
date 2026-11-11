@@ -11,6 +11,7 @@ pub const SAVER_H: f32 = 132.0;
 
 /// Renders the bouncing DVD-style **OLED Screensaver** (`#000000` background).
 pub fn render_oled_screensaver(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
+    let s = strings::strings(state.language);
     gfx.clear(rgb(0, 0, 0));
 
     let bx = state.saver_x as i32;
@@ -31,14 +32,14 @@ pub fn render_oled_screensaver(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         FontWeight::Bold,
         rgb(235, 240, 245),
         Align::Left,
-        strings::APP_TITLE,
+        s.app_title,
     );
 
     let pct = state.progress_pct.min(100);
     let status_line = if state.sync_in_progress {
-        strings::fmt_saver_syncing(pct, &state.current_file)
+        s.fmt_saver_syncing(pct, &state.current_file)
     } else {
-        strings::fmt_saver_idle(pct, &state.status_line)
+        s.fmt_saver_idle(pct, &state.status_line)
     };
     gfx.text_fit(
         bx + 2,
@@ -66,6 +67,6 @@ pub fn render_oled_screensaver(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         FontWeight::Regular,
         rgb(96, 106, 118),
         Align::Left,
-        strings::SAVER_WAKE_HINT,
+        s.saver_wake_hint,
     );
 }

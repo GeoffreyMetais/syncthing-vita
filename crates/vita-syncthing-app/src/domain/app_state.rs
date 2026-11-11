@@ -4,8 +4,8 @@
 use syncthing_core::DeviceId;
 
 use crate::domain::models::{
-    ActiveTab, CameraPreview, FolderOffer, IgnoredFolder, KnownDevice, ModalDialog, PickerItem,
-    PickerMode, ShareConfigEntry, ThemeMode, BROWSER_ROWS,
+    ActiveTab, CameraPreview, FolderOffer, IgnoredFolder, KnownDevice, Language, ModalDialog,
+    PickerItem, PickerMode, ShareConfigEntry, ThemeMode, BROWSER_ROWS,
 };
 use crate::domain::navigation::{default_col, NavFocus, NavState};
 
@@ -13,6 +13,7 @@ use crate::domain::navigation::{default_col, NavFocus, NavState};
 /// All UI screens and modals read `&AppState` without performing I/O or mutating business rules.
 pub struct AppState {
     pub theme_mode: ThemeMode,
+    pub language: Language,
     pub active_tab: ActiveTab,
     /// D-pad focus (sidebar or page element).
     pub nav: NavState,
@@ -84,6 +85,7 @@ impl AppState {
     ) -> Self {
         Self {
             theme_mode: ThemeMode::Oled,
+            language: Language::English,
             active_tab: ActiveTab::Dashboard,
             nav: NavState::new(ActiveTab::Dashboard),
             picker_mode: PickerMode::ChangeShareTarget,
@@ -207,7 +209,7 @@ impl AppState {
             && self.nav.row == row
     }
 
-    /// True when `tab`'s top button (`+ New Share`, `Up`) has D-pad focus.
+    /// True when `tab`'s top button (`New Share`, `Up`) has D-pad focus.
     pub fn is_header_focused(&self, tab: ActiveTab) -> bool {
         self.active_tab == tab && self.nav.focus == NavFocus::Content && self.nav.header
     }
@@ -251,6 +253,13 @@ impl AppState {
             ThemeMode::Oled => "Theme: OLED (Pure Black #000000)",
         };
         self.show_toast(label);
+    }
+
+    /// Cycles through supported UI languages (English -> Français -> Español -> Deutsch -> Italiano -> English).
+    pub fn toggle_language(&mut self) {
+        self.language = self.language.next();
+        let label = format!("Language: {}", self.language.name());
+        self.show_toast(&label);
     }
 
     /// Displays a transient toast notification for ~1.8 seconds (110 frames at 60 FPS).

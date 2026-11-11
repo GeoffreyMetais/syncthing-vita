@@ -5,6 +5,47 @@ use syncthing_core::DeviceId;
 /// Number of visible rows in the `ux0:` directory browser.
 pub const BROWSER_ROWS: usize = 8;
 
+/// User interface languages supported by VitaSyncthing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum Language {
+    #[default]
+    English = 0,
+    French = 1,
+    Spanish = 2,
+    German = 3,
+    Italian = 4,
+}
+
+impl Language {
+    pub const ALL: [Language; 5] = [
+        Language::English,
+        Language::French,
+        Language::Spanish,
+        Language::German,
+        Language::Italian,
+    ];
+
+    pub fn name(self) -> &'static str {
+        match self {
+            Language::English => "English",
+            Language::French => "Français",
+            Language::Spanish => "Español",
+            Language::German => "Deutsch",
+            Language::Italian => "Italiano",
+        }
+    }
+
+    pub fn next(self) -> Self {
+        match self {
+            Language::English => Language::French,
+            Language::French => Language::Spanish,
+            Language::Spanish => Language::German,
+            Language::German => Language::Italian,
+            Language::Italian => Language::English,
+        }
+    }
+}
+
 /// Colour theme modes supported by the UI.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ThemeMode {

@@ -13,18 +13,19 @@ use crate::ui::widgets::{
 
 /// Renders Tab 3: **Files** (`FolderPicker`).
 pub fn render_folder_picker_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
+    let s = strings::strings(state.language);
     let (page_title, share_name) = if state.picker_mode == PickerMode::CreateNewShare {
         (
-            strings::PICKER_TITLE_CREATE,
-            strings::PICKER_SUBTITLE_CREATE.to_owned(),
+            s.picker_title_create,
+            s.picker_subtitle_create.to_owned(),
         )
     } else {
-        let s = state
+        let title_sub = state
             .shares
             .get(state.selected_share_idx)
-            .map(|s| strings::fmt_picker_target(&s.label, &s.folder_id))
-            .unwrap_or_else(|| strings::PICKER_DEFAULT_SHARE.to_owned());
-        (strings::PICKER_TITLE_CHOOSE, s)
+            .map(|share| s.fmt_picker_target(&share.label, &share.folder_id))
+            .unwrap_or_else(|| s.picker_default_share.to_owned());
+        (s.picker_title_choose, title_sub)
     };
 
     draw_page_title(gfx, th, page_title, Some(&share_name));
@@ -39,15 +40,15 @@ pub fn render_folder_picker_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         th.accent_hi,
     );
 
-    let uw = action_width(gfx, PadButton::Circle, strings::ACTION_UP);
-    draw_action(gfx, th, CONTENT_R - 10 - uw, 101, PadButton::Circle, strings::ACTION_UP);
+    let uw = action_width(gfx, PadButton::Circle, s.action_up);
+    draw_action(gfx, th, CONTENT_R - 10 - uw, 101, PadButton::Circle, s.action_up);
     if state.is_header_focused(ActiveTab::FolderPicker) {
         draw_focus_ring(gfx, th, CONTENT_R - 10 - uw, 101, uw);
     }
     let mut right = CONTENT_R - 18 - uw;
 
     if !state.picker_items.is_empty() {
-        let cnt = strings::fmt_item_counter(
+        let cnt = s.fmt_item_counter(
             state.selected_picker_idx + 1,
             state.picker_items.len(),
         );
@@ -108,11 +109,11 @@ pub fn render_folder_picker_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         gfx.icon(ic, (tx + 12) as f32, cy as f32, 22.0, ic_col);
 
         let badge = if item.is_shared {
-            strings::ACTION_SHARED
+            s.action_shared
         } else if item.is_preset {
-            strings::HINT_SELECT
+            s.hint_select
         } else {
-            strings::ACTION_OPEN
+            s.action_open
         };
         let bw = draw_chip(gfx, CONTENT_R - 26, cy, badge, ic_col);
 
@@ -147,19 +148,19 @@ pub fn render_folder_picker_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         gfx,
         th,
         &[
-            (PadButton::Dpad, None, strings::HINT_MOVE),
+            (PadButton::Dpad, None, s.hint_move),
             (
                 PadButton::Cross,
                 None,
                 if state.picker_mode == PickerMode::CreateNewShare {
-                    strings::HINT_SHARE_FOLDER
+                    s.hint_share_folder
                 } else {
-                    strings::HINT_SELECT_TARGET
+                    s.hint_select_target
                 },
             ),
-            (PadButton::Triangle, None, strings::HINT_OPEN_SUBFOLDER),
-            (PadButton::Circle, None, strings::HINT_UP_BACK),
-            (PadButton::L, Some(PadButton::R), strings::HINT_TABS),
+            (PadButton::Triangle, None, s.hint_open_subfolder),
+            (PadButton::Circle, None, s.hint_up_back),
+            (PadButton::L, Some(PadButton::R), s.hint_tabs),
         ],
     );
 }

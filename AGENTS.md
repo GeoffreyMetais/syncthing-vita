@@ -60,7 +60,7 @@ syncthing-vita
             │   ├── mod.rs
             │   ├── config_repo.rs    # ConfigRepository (devices.cfg, shares.cfg, syncthing.log, ux0: directory listing)
             │   ├── identity_store.rs # IdentityStore (sceKernelGetRandomNumber, device_seed.bin, cert.der)
-            │   ├── vita_system.rs    # init_vita_network (SceSysmodule + SceSysmem + SceNet + SceNetCtl)
+            │   ├── vita_system.rs    # init_vita_network (SceSysmodule + SceSysmem + SceNet + SceNetCtl) & detect_system_language (SceAppUtil)
             │   ├── ui_script.rs      # Opt-in `ui-script` feature: scripted input replay + frame dumps for Vita3K
             │   ├── qr_camera.rs      # QrScanner (SceCamera rear camera thread: 640x360 preview + QR decoding)
             │   ├── qr_decoder.rs     # QrDecoder (pure-Rust `quircs` QR decoder on greyscale frames, host-testable)
@@ -69,6 +69,13 @@ syncthing-vita
             │   └── input.rs          # VitaInput & InputFrame (SceCtrl + SceTouch hardware driver)
             └── ui/                   # Layer 4: Pure Presentation & Rendering Layer (reads &AppState, zero business logic)
                 ├── mod.rs
+                ├── i18n/             # Multi-language string catalogs (en, fr, es, de, it) with zero allocation in 60 FPS loop
+                │   ├── mod.rs        # Strings struct, dynamic formatters, strings(Language) selector
+                │   ├── en.rs         # English static catalog (STRINGS_EN)
+                │   ├── fr.rs         # French static catalog (STRINGS_FR)
+                │   ├── es.rs         # Spanish static catalog (STRINGS_ES)
+                │   ├── de.rs         # German static catalog (STRINGS_DE)
+                │   └── it.rs         # Italian static catalog (STRINGS_IT)
                 ├── image.rs          # Greyscale camera frame blit (QR viewfinder)
                 ├── gfx.rs            # 960x544 RGBA8888 2D anti-aliased vector & TrueType software renderer
                 ├── theme.rs          # UiTheme (Dark & OLED palettes) and layout constants
@@ -153,13 +160,14 @@ Dependencies strictly point **inward**. Inner layers never import or depend on o
      - `framebuffer.rs`: PS Vita hardware framebuffer management (`SceDisplay`, `SceSysmem`).
      - `input.rs`: Controller & touchscreen hardware drivers (`SceCtrl`, `SceTouch`).
      - `sync_worker.rs`: Background sync thread (UDP discovery, BEP protocol, TLS 1.3).
-     - `vita_system.rs`: Network stack and sysmodule initialization.
+     - `vita_system.rs`: Network stack, sysmodule initialization, and automatic system language detection (`detect_system_language` via `SceAppUtil` on Vita and `LANG`/`LC_ALL` on host).
    - **Strict Rule**: All platform-specific `#[cfg(target_os = "vita")]` hardware syscalls (`sce*`) must be encapsulated here. Never leak them into UI or Domain.
 
 4. **Layer 4: UI / Presentation Layer (`crates/vita-syncthing-app/src/ui/`)**
    - **Responsibility**: Visual presentation and 2D vector/font rendering.
    - **Key Modules**:
-     - `strings.rs`: Centralized user-facing strings, action constants, button hints, and zero-allocation formatting helpers.
+     - `i18n/`: Zero-allocation multi-language catalogs (`Strings`) supporting English (`en`), French (`fr`), Spanish (`es`), German (`de`), and Italian (`it`).
+     - `strings.rs`: Centralized user-facing strings, action constants, button hints, and zero-allocation formatting helpers re-exporting `ui::i18n`.
      - `screens/`: Independent full-screen views (`dashboard.rs`, `shares.rs`, `folder_picker.rs`, `settings.rs`, `screensaver.rs`).
      - `modals/`: Isolated modal dialogs (`create_share.rs`, `manage_devices.rs`, `add_device.rs`, `device_id.rs`, `confirm_quit.rs`, `confirm_delete_share.rs`, `fallback_keyboard.rs`).
      - `widgets.rs`: Reusable UI elements (cards, chips, checkboxes, buttons, chrome, toast).
@@ -190,7 +198,7 @@ To prevent code degradation into large, unmaintainable files:
   - **New Screens**: Always create a separate file under `ui/screens/<feature>.rs` and expose it via `ui/screens/mod.rs`.
   - **New Modal Dialogs**: Always create a separate file under `ui/modals/<modal_name>.rs` and expose it via `ui/modals/mod.rs`.
   - **New Services**: Split distinct domain workflows into dedicated services in `application/` rather than adding methods to an existing unrelated service.
-  - **Factorized UI Copy & Strings**: Never scatter hardcoded user-facing strings or button labels across screens and modals. Place all reusable actions, tab titles, hints, status badges, and formatting helpers in `ui/strings.rs` so copy is deduplicated and i18n-ready without per-frame heap churn.
+  - **Factorized UI Copy & Multi-Language Support**: Never scatter hardcoded user-facing strings or button labels across screens and modals. Place all reusable actions, tab titles, hints, status badges, and formatting helpers in `ui/i18n/` (with static language catalogs in `en.rs`, `fr.rs`, `es.rs`, `de.rs`, `it.rs`) and `ui/strings.rs` so copy is deduplicated and i18n-ready without per-frame heap churn.
   - **Avoid "Omnibus" Files**: Never create catch-all files like `display.rs` or `utils.rs`. Group code by specific domain responsibility.
 
 These size and SRP rules apply to **both crates** (`vita-syncthing-app` and `syncthing-core`).

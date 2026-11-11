@@ -13,6 +13,7 @@ pub fn render_confirm_delete_share_modal(
     state: &AppState,
     share_idx: usize,
 ) {
+    let s = strings::strings(state.language);
     gfx.dim(180);
     let w = 520;
     let h = 236;
@@ -38,7 +39,7 @@ pub fn render_confirm_delete_share_modal(
         FontWeight::Bold,
         th.text,
         Align::Left,
-        strings::MODAL_DELETE_SHARE_TITLE,
+        s.modal_delete_share_title,
     );
     gfx.text(
         lx + 52,
@@ -47,7 +48,7 @@ pub fn render_confirm_delete_share_modal(
         FontWeight::Regular,
         th.dim,
         Align::Left,
-        strings::MODAL_DELETE_SHARE_SUBTITLE,
+        s.modal_delete_share_subtitle,
     );
     gfx.line(
         (dx + 24) as f32,
@@ -59,8 +60,8 @@ pub fn render_confirm_delete_share_modal(
     );
 
     if let Some(share) = state.shares.get(share_idx) {
-        let title = strings::fmt_share_title(&share.label, &share.folder_id);
-        let files_msg = strings::fmt_files_kept_on_vita(&share.target_path);
+        let title = s.fmt_share_title(&share.label, &share.folder_id);
+        let files_msg = s.fmt_files_kept_on_vita(&share.target_path);
         gfx.text_fit(
             lx,
             dy + 110,
@@ -89,19 +90,19 @@ pub fn render_confirm_delete_share_modal(
             FontWeight::Regular,
             th.faint,
             Align::Left,
-            strings::MODAL_DELETE_SHARE_DECLINE_HINT,
+            s.modal_delete_share_decline_hint,
         );
     }
 
-    let w_delete = action_width(gfx, PadButton::Cross, strings::ACTION_DELETE);
-    let w_cancel = action_width(gfx, PadButton::Circle, strings::ACTION_CANCEL);
+    let w_delete = action_width(gfx, PadButton::Cross, s.action_delete);
+    let w_cancel = action_width(gfx, PadButton::Circle, s.action_cancel);
     draw_action(
         gfx,
         th,
         dx + w - 28 - w_delete - 12 - w_cancel,
         dy + h - 34,
         PadButton::Circle,
-        strings::ACTION_CANCEL,
+        s.action_cancel,
     );
     draw_action(
         gfx,
@@ -109,15 +110,15 @@ pub fn render_confirm_delete_share_modal(
         dx + w - 28 - w_delete,
         dy + h - 34,
         PadButton::Cross,
-        strings::ACTION_DELETE,
+        s.action_delete,
     );
 
     draw_hints(
         gfx,
         th,
         &[
-            (PadButton::Cross, None, strings::HINT_CONFIRM_DELETE),
-            (PadButton::Circle, None, strings::ACTION_CANCEL),
+            (PadButton::Cross, None, s.hint_confirm_delete),
+            (PadButton::Circle, None, s.action_cancel),
         ],
     );
 }

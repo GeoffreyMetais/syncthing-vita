@@ -9,6 +9,7 @@ use crate::ui::widgets::{action_width, draw_action, draw_hints};
 
 /// Renders the `ScanDeviceQr` modal: live camera preview with a viewfinder frame.
 pub fn render_scan_qr_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
+    let s = strings::strings(state.language);
     gfx.dim(180);
     let (dx, dy, w, h) = scan_qr_modal_rect();
     let (dx, dy, w, h) = (dx as i32, dy as i32, w as i32, h as i32);
@@ -33,7 +34,7 @@ pub fn render_scan_qr_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         FontWeight::Bold,
         th.text,
         Align::Left,
-        strings::MODAL_SCAN_QR_TITLE,
+        s.modal_scan_qr_title,
     );
     gfx.text_fit(
         lx + 52,
@@ -43,24 +44,24 @@ pub fn render_scan_qr_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         FontWeight::Regular,
         th.dim,
         Align::Left,
-        strings::MODAL_SCAN_QR_SUBTITLE,
+        s.modal_scan_qr_subtitle,
     );
 
     let vx = lx;
     let vy = dy + 76;
     draw_viewfinder(gfx, th, state, vx, vy);
 
-    let w_back = action_width(gfx, PadButton::Circle, strings::ACTION_BACK);
+    let w_back = action_width(gfx, PadButton::Circle, s.action_back);
     draw_action(
         gfx,
         th,
         dx + w - 28 - w_back,
         dy + h - 28,
         PadButton::Circle,
-        strings::ACTION_BACK,
+        s.action_back,
     );
 
-    draw_hints(gfx, th, &[(PadButton::Circle, None, strings::HINT_BACK_TO_DEVICE_ID)]);
+    draw_hints(gfx, th, &[(PadButton::Circle, None, s.hint_back_to_device_id)]);
 }
 
 /// Camera frame (or status text) with corner brackets marking where to place the QR code.

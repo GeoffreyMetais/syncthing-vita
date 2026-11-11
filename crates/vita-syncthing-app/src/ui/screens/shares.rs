@@ -11,17 +11,18 @@ use crate::ui::widgets::{
 
 /// Renders Tab 2: **Shared Folders** (`Shares`).
 pub fn render_shares_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
-    draw_page_title(gfx, th, strings::SHARES_TITLE, None);
+    let s = strings::strings(state.language);
+    draw_page_title(gfx, th, s.shares_title, None);
 
     // Top-right "+ New Share" action button (Circle)
-    let w_new = action_width(gfx, PadButton::Circle, strings::ACTION_NEW_SHARE);
+    let w_new = action_width(gfx, PadButton::Circle, s.action_new_share);
     draw_action(
         gfx,
         th,
         CONTENT_R - w_new,
         46,
         PadButton::Circle,
-        strings::ACTION_NEW_SHARE,
+        s.action_new_share,
     );
     if state.is_header_focused(ActiveTab::Shares) {
         draw_focus_ring(gfx, th, CONTENT_R - w_new, 46, w_new);
@@ -36,7 +37,7 @@ pub fn render_shares_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
             FontWeight::Medium,
             th.text,
             Align::Left,
-            strings::MSG_NO_SHARES,
+            s.msg_no_shares,
         );
         gfx.text(
             CONTENT_X + 28,
@@ -45,7 +46,7 @@ pub fn render_shares_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
             FontWeight::Regular,
             th.dim,
             Align::Left,
-            strings::MSG_NO_SHARES_HINT_1,
+            s.msg_no_shares_hint_1,
         );
         gfx.text(
             CONTENT_X + 28,
@@ -54,7 +55,7 @@ pub fn render_shares_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
             FontWeight::Regular,
             th.dim,
             Align::Left,
-            strings::MSG_NO_SHARES_HINT_2,
+            s.msg_no_shares_hint_2,
         );
     } else {
         for (i, share) in state.shares.iter().take(4).enumerate() {
@@ -75,17 +76,17 @@ pub fn render_shares_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
             );
 
             // Action buttons on the right: [X Devices] [SQ Delete] [TRI Folder]
-            let w_folder = action_width(gfx, PadButton::Triangle, strings::ACTION_FOLDER);
-            let w_toggle = action_width(gfx, PadButton::Square, strings::ACTION_DELETE);
-            let w_devs = action_width(gfx, PadButton::Cross, strings::ACTION_DEVICES);
+            let w_folder = action_width(gfx, PadButton::Triangle, s.action_folder);
+            let w_toggle = action_width(gfx, PadButton::Square, s.action_delete);
+            let w_devs = action_width(gfx, PadButton::Cross, s.action_devices);
 
             let bx_folder = CONTENT_R - 14 - w_folder;
             let bx_toggle = bx_folder - 8 - w_toggle;
             let bx_devs = bx_toggle - 8 - w_devs;
 
-            draw_action(gfx, th, bx_devs, ry + 56, PadButton::Cross, strings::ACTION_DEVICES);
-            draw_action(gfx, th, bx_toggle, ry + 56, PadButton::Square, strings::ACTION_DELETE);
-            draw_action(gfx, th, bx_folder, ry + 56, PadButton::Triangle, strings::ACTION_FOLDER);
+            draw_action(gfx, th, bx_devs, ry + 56, PadButton::Cross, s.action_devices);
+            draw_action(gfx, th, bx_toggle, ry + 56, PadButton::Square, s.action_delete);
+            draw_action(gfx, th, bx_folder, ry + 56, PadButton::Triangle, s.action_folder);
             if is_sel {
                 match state.focused_action(ActiveTab::Shares) {
                     Some(0) => draw_focus_ring(gfx, th, bx_devs, ry + 56, w_devs),
@@ -96,11 +97,11 @@ pub fn render_shares_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
             }
 
             let status_col = if share.enabled { C_GOOD } else { C_WARN };
-            let status_txt = if share.enabled { strings::STATUS_ACTIVE } else { strings::STATUS_PAUSED };
+            let status_txt = if share.enabled { s.status_active } else { s.status_paused };
             let chip_w = draw_chip(gfx, CONTENT_R - 14, ry + 22, status_txt, status_col);
 
             let tx = lx + 66;
-            let title = strings::fmt_share_title(&share.label, &share.folder_id);
+            let title = s.fmt_share_title(&share.label, &share.folder_id);
             gfx.text_fit(
                 tx,
                 ry + 22,
@@ -146,11 +147,11 @@ pub fn render_shares_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         gfx,
         th,
         &[
-            (PadButton::Dpad, Some(PadButton::Cross), strings::HINT_NAVIGATE),
-            (PadButton::Circle, None, strings::ACTION_NEW_SHARE),
-            (PadButton::Square, None, strings::ACTION_DELETE),
-            (PadButton::Triangle, None, strings::HINT_FOLDER_PATH),
-            (PadButton::L, Some(PadButton::R), strings::HINT_TABS),
+            (PadButton::Dpad, Some(PadButton::Cross), s.hint_navigate),
+            (PadButton::Circle, None, s.action_new_share),
+            (PadButton::Square, None, s.action_delete),
+            (PadButton::Triangle, None, s.hint_folder_path),
+            (PadButton::L, Some(PadButton::R), s.hint_tabs),
         ],
     );
 }

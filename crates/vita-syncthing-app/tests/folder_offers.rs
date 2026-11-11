@@ -168,7 +168,7 @@ fn test_settings_clear_declined_lets_peers_offer_again() {
     );
     assert_eq!(
         state.theme_mode,
-        vita_syncthing_app::domain::ThemeMode::Dark
+        vita_syncthing_app::domain::ThemeMode::Oled
     );
 
     FolderOfferService::receive(&mut state, &repo, PEER, "docs", "Docs");

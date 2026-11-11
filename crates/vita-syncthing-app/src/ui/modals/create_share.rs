@@ -1,13 +1,19 @@
 //! Modal Dialog: Create a new share on PS Vita (from template or custom `ux0:` folder).
 
-use crate::domain::NEW_SHARE_TEMPLATES;
+use crate::domain::{AppState, NEW_SHARE_TEMPLATES};
 use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton, GFX_W};
 use crate::ui::strings;
 use crate::ui::theme::{UiTheme, C_GOOD, HINT_Y};
 use crate::ui::widgets::draw_hints;
 
 /// Modal Dialog 1: Create a new share on PS Vita (from template or custom `ux0:` folder).
-pub fn render_create_share_modal(gfx: &mut Gfx, th: &UiTheme, selected_idx: usize) {
+pub fn render_create_share_modal(
+    gfx: &mut Gfx,
+    th: &UiTheme,
+    state: &AppState,
+    selected_idx: usize,
+) {
+    let s = strings::strings(state.language);
     gfx.dim(175);
     let w = 680;
     let h = 408;
@@ -34,7 +40,7 @@ pub fn render_create_share_modal(gfx: &mut Gfx, th: &UiTheme, selected_idx: usiz
         FontWeight::Bold,
         th.text,
         Align::Left,
-        strings::MODAL_CREATE_SHARE_TITLE,
+        s.modal_create_share_title,
     );
     gfx.text(
         lx + 52,
@@ -43,7 +49,7 @@ pub fn render_create_share_modal(gfx: &mut Gfx, th: &UiTheme, selected_idx: usiz
         FontWeight::Regular,
         th.dim,
         Align::Left,
-        strings::MODAL_CREATE_SHARE_SUBTITLE,
+        s.modal_create_share_subtitle,
     );
     gfx.line(
         (dx + 24) as f32,
@@ -92,9 +98,9 @@ pub fn render_create_share_modal(gfx: &mut Gfx, th: &UiTheme, selected_idx: usiz
             label,
         );
         let sub = if is_browse {
-            strings::MODAL_CREATE_SHARE_BROWSE_SUB.to_owned()
+            s.modal_create_share_browse_sub.to_owned()
         } else {
-            strings::fmt_template_sub(fid, path)
+            s.fmt_template_sub(fid, path)
         };
         gfx.text(
             lx + 48,
@@ -111,9 +117,9 @@ pub fn render_create_share_modal(gfx: &mut Gfx, th: &UiTheme, selected_idx: usiz
         gfx,
         th,
         &[
-            (PadButton::DpadUd, None, strings::HINT_SELECT),
-            (PadButton::Cross, None, strings::HINT_CREATE_PICK_DEVICES),
-            (PadButton::Circle, None, strings::ACTION_CANCEL),
+            (PadButton::DpadUd, None, s.hint_select),
+            (PadButton::Cross, None, s.hint_create_pick_devices),
+            (PadButton::Circle, None, s.action_cancel),
         ],
     );
 }

@@ -15,7 +15,8 @@ use crate::ui::widgets::{
 
 /// Renders Tab 4: **Settings & Log** (`Settings`).
 pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
-    draw_page_title(gfx, th, strings::SETTINGS_TITLE, Some(strings::SETTINGS_SUBTITLE));
+    let s = strings::strings(state.language);
+    draw_page_title(gfx, th, s.settings_title, Some(s.settings_subtitle));
 
     // 1. Display & Theme Settings Card
     draw_card(gfx, th, CONTENT_X, CONTENT_Y, CONTENT_W, 118, true);
@@ -27,12 +28,12 @@ pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         FontWeight::Bold,
         th.accent_hi,
         Align::Left,
-        strings::SETTINGS_SEC_DISPLAY,
+        s.settings_sec_display,
     );
 
     let theme_desc = match state.theme_mode {
-        ThemeMode::Dark => strings::SETTINGS_DESC_THEME_DARK,
-        ThemeMode::Oled => strings::SETTINGS_DESC_THEME_OLED,
+        ThemeMode::Dark => s.settings_desc_theme_dark,
+        ThemeMode::Oled => s.settings_desc_theme_oled,
     };
     gfx.text(
         lx,
@@ -41,7 +42,7 @@ pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         FontWeight::Medium,
         th.text,
         Align::Left,
-        strings::SETTINGS_LABEL_COLOUR_THEME,
+        s.settings_label_colour_theme,
     );
     gfx.text_fit(
         lx,
@@ -54,9 +55,9 @@ pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         theme_desc,
     );
 
-    let w_theme = action_width(gfx, PadButton::Cross, strings::ACTION_SWITCH_THEME);
-    let w_qr = action_width(gfx, PadButton::Circle, strings::ACTION_QR_ID);
-    let w_add = action_width(gfx, PadButton::Triangle, strings::ACTION_ADD_DEVICE);
+    let w_theme = action_width(gfx, PadButton::Cross, s.action_switch_theme);
+    let w_qr = action_width(gfx, PadButton::Circle, s.action_qr_id);
+    let w_add = action_width(gfx, PadButton::Triangle, s.action_add_device);
     let bx_theme = CONTENT_R - 20 - w_theme;
     let bx_qr = bx_theme - 8 - w_qr;
     let bx_add = bx_qr - 8 - w_add;
@@ -66,16 +67,16 @@ pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         bx_add,
         CONTENT_Y + 62,
         PadButton::Triangle,
-        strings::ACTION_ADD_DEVICE,
+        s.action_add_device,
     );
-    draw_action(gfx, th, bx_qr, CONTENT_Y + 62, PadButton::Circle, strings::ACTION_QR_ID);
+    draw_action(gfx, th, bx_qr, CONTENT_Y + 62, PadButton::Circle, s.action_qr_id);
     draw_action(
         gfx,
         th,
         bx_theme,
         CONTENT_Y + 62,
         PadButton::Cross,
-        strings::ACTION_SWITCH_THEME,
+        s.action_switch_theme,
     );
     let display_focus = state
         .focused_action(ActiveTab::Settings)
@@ -94,7 +95,7 @@ pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         FontWeight::Regular,
         th.faint,
         Align::Left,
-        strings::SETTINGS_SAVER_AUTO_HINT,
+        s.settings_saver_auto_hint,
     );
 
     // 2. Declined Folder Offers Card
@@ -111,7 +112,7 @@ pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         FontWeight::Bold,
         th.accent_hi,
         Align::Left,
-        strings::SETTINGS_SEC_LOG,
+        s.settings_sec_log,
     );
 
     let max_lines = ((lh - 56) / 22).max(0) as usize;
@@ -144,17 +145,18 @@ pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         gfx,
         th,
         &[
-            (PadButton::Dpad, Some(PadButton::Cross), strings::HINT_NAVIGATE),
-            (PadButton::Circle, None, strings::ACTION_QR_ID),
-            (PadButton::Triangle, None, strings::ACTION_ADD_DEVICE_ID),
-            (PadButton::Select, None, strings::HINT_SCREENSAVER),
-            (PadButton::Start, None, strings::ACTION_QUIT),
+            (PadButton::Dpad, Some(PadButton::Cross), s.hint_navigate),
+            (PadButton::Circle, None, s.action_qr_id),
+            (PadButton::Triangle, None, s.action_add_device_id),
+            (PadButton::Select, None, s.hint_screensaver),
+            (PadButton::Start, None, s.action_quit),
         ],
     );
 }
 
 /// Card listing folder offers declined in the `FolderOffer` modal, with a `Clear Declined` button.
 fn render_declined_folders(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
+    let s = strings::strings(state.language);
     let y = SETTINGS_DECLINED_Y;
     let h = SETTINGS_DECLINED_B - SETTINGS_DECLINED_Y;
     draw_card(gfx, th, CONTENT_X, y, CONTENT_W, h, false);
@@ -166,19 +168,19 @@ fn render_declined_folders(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         FontWeight::Bold,
         th.accent_hi,
         Align::Left,
-        strings::SETTINGS_SEC_DECLINED,
+        s.settings_sec_declined,
     );
     let summary = if state.ignored_folders.is_empty() {
-        strings::SETTINGS_NO_DECLINED.to_owned()
+        s.settings_no_declined.to_owned()
     } else {
         let ids: Vec<&str> = state
             .ignored_folders
             .iter()
             .map(|f| f.folder_id.as_str())
             .collect();
-        strings::fmt_declined_summary(ids.len(), &ids.join(", "))
+        s.fmt_declined_summary(ids.len(), &ids.join(", "))
     };
-    let label = strings::ACTION_CLEAR_DECLINED;
+    let label = s.action_clear_declined;
     let w_clear = action_width(gfx, PadButton::Cross, label);
     let bx = CONTENT_R - 20 - w_clear;
     let cy = y + h / 2;

@@ -57,7 +57,7 @@ impl VitaUiRenderer {
         match state.modal {
             ModalDialog::None => {}
             ModalDialog::CreateShare { selected_idx } => {
-                render_create_share_modal(&mut self.gfx, &th, selected_idx);
+                render_create_share_modal(&mut self.gfx, &th, state, selected_idx);
             }
             ModalDialog::ManageDevices {
                 share_idx,

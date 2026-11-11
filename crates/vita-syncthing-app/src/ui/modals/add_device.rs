@@ -11,6 +11,7 @@ use crate::ui::widgets::{action_width, draw_action, draw_hints};
 
 /// Modal Dialog 2b: Add a remote Syncthing device by entering its Short ID (7+ chars) or Full ID (56 chars).
 pub fn render_add_device_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, keypad_idx: usize) {
+    let s = strings::strings(state.language);
     gfx.dim(180);
     let keypad = state.fallback_keypad_visible;
     let w = 700;
@@ -39,7 +40,7 @@ pub fn render_add_device_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, ke
         FontWeight::Bold,
         th.text,
         Align::Left,
-        strings::MODAL_ADD_DEVICE_TITLE,
+        s.modal_add_device_title,
     );
     gfx.text(
         lx + 52,
@@ -48,7 +49,7 @@ pub fn render_add_device_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, ke
         FontWeight::Regular,
         th.dim,
         Align::Left,
-        strings::MODAL_ADD_DEVICE_SUBTITLE,
+        s.modal_add_device_subtitle,
     );
     gfx.line(
         (dx + 24) as f32,
@@ -76,9 +77,9 @@ pub fn render_add_device_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, ke
     gfx.rrect_outline(lx, box_y, content_w, box_h, 10, 1, border_col);
 
     let kbd_lbl = if keypad {
-        strings::ACTION_HIDE_KEYBOARD
+        s.action_hide_keyboard
     } else {
-        strings::ACTION_VIRTUAL_KEYBOARD
+        s.action_virtual_keyboard
     };
     let w_kbd = action_width(gfx, PadButton::Triangle, kbd_lbl);
     draw_action(
@@ -100,7 +101,7 @@ pub fn render_add_device_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, ke
             FontWeight::Regular,
             th.faint,
             Align::Left,
-            strings::MODAL_ADD_DEVICE_EXAMPLE,
+            s.modal_add_device_example,
         );
     } else {
         let display_str = format!("{}|", state.device_id_input.to_uppercase());
@@ -119,7 +120,7 @@ pub fn render_add_device_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, ke
     // Live Validation & LAN Peer Resolution Status Line
     let (status_txt, status_col) = if state.device_id_input.trim().is_empty() {
         (
-            strings::MODAL_ADD_DEVICE_TIP.to_owned(),
+            s.modal_add_device_tip.to_owned(),
             th.dim,
         )
     } else {
@@ -176,9 +177,9 @@ pub fn render_add_device_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, ke
     }
 
     // Bottom modal action buttons
-    let w_confirm = action_width(gfx, PadButton::Start, strings::MODAL_ADD_DEVICE_CONFIRM);
-    let w_bksp = action_width(gfx, PadButton::Square, strings::ACTION_BACKSPACE);
-    let w_cancel = action_width(gfx, PadButton::Circle, strings::ACTION_CANCEL);
+    let w_confirm = action_width(gfx, PadButton::Start, s.modal_add_device_confirm);
+    let w_bksp = action_width(gfx, PadButton::Square, s.action_backspace);
+    let w_cancel = action_width(gfx, PadButton::Circle, s.action_cancel);
     let bx_cancel = dx + w - 28 - w_cancel;
     let bx_bksp = bx_cancel - 10 - w_bksp;
     let bx_confirm = bx_bksp - 10 - w_confirm;
@@ -189,7 +190,7 @@ pub fn render_add_device_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, ke
         bx_confirm,
         dy + h - 28,
         PadButton::Start,
-        strings::MODAL_ADD_DEVICE_CONFIRM,
+        s.modal_add_device_confirm,
     );
     draw_action(
         gfx,
@@ -197,20 +198,20 @@ pub fn render_add_device_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, ke
         bx_bksp,
         dy + h - 28,
         PadButton::Square,
-        strings::ACTION_BACKSPACE,
+        s.action_backspace,
     );
-    draw_action(gfx, th, bx_cancel, dy + h - 28, PadButton::Circle, strings::ACTION_CANCEL);
-    draw_action(gfx, th, lx, dy + h - 28, PadButton::R, strings::ACTION_SCAN_QR);
+    draw_action(gfx, th, bx_cancel, dy + h - 28, PadButton::Circle, s.action_cancel);
+    draw_action(gfx, th, lx, dy + h - 28, PadButton::R, s.action_scan_qr);
 
     let mut hints = vec![
         (PadButton::Triangle, None, kbd_lbl),
-        (PadButton::Start, None, strings::HINT_CONFIRM_ADD),
-        (PadButton::R, None, strings::ACTION_SCAN_QR),
+        (PadButton::Start, None, s.hint_confirm_add),
+        (PadButton::R, None, s.action_scan_qr),
     ];
     if keypad {
-        hints.push((PadButton::Dpad, Some(PadButton::Cross), strings::HINT_TYPE_KEY));
+        hints.push((PadButton::Dpad, Some(PadButton::Cross), s.hint_type_key));
     }
-    hints.push((PadButton::Square, None, strings::ACTION_BACKSPACE));
-    hints.push((PadButton::Circle, None, strings::ACTION_CANCEL));
+    hints.push((PadButton::Square, None, s.action_backspace));
+    hints.push((PadButton::Circle, None, s.action_cancel));
     draw_hints(gfx, th, &hints);
 }

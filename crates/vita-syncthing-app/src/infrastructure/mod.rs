@@ -22,4 +22,6 @@ pub use input::{
 pub use qr_camera::{QrScanEvent, QrScanner, CAMERA_H, CAMERA_W};
 pub use qr_decoder::QrDecoder;
 pub use sync_worker::{spawn_sync_worker, WorkerMsg};
-pub use vita_system::{init_vita_network, is_on_external_power, keep_system_awake};
+pub use vita_system::{
+    detect_system_language, init_vita_network, is_on_external_power, keep_system_awake,
+};

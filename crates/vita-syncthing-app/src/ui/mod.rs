@@ -3,6 +3,7 @@
 //! Contains zero business logic, configuration persistence, or network I/O.
 
 pub mod gfx;
+pub mod i18n;
 pub mod image;
 pub mod modals;
 pub mod renderer;

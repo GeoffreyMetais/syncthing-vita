@@ -13,9 +13,10 @@ use crate::ui::widgets::{
 
 /// Renders Tab 1: **Overview** (`Dashboard`).
 pub fn render_dashboard_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
+    let s = strings::strings(state.language);
     let active_count = state.shares.iter().filter(|s| s.enabled).count();
-    let subtitle = strings::fmt_active_shares_devices(active_count, state.devices.len());
-    draw_page_title(gfx, th, strings::DASHBOARD_TITLE, Some(&subtitle));
+    let subtitle = s.fmt_active_shares_devices(active_count, state.devices.len());
+    draw_page_title(gfx, th, s.dashboard_title, Some(&subtitle));
 
     // 1. "This device" hero card
     draw_card(gfx, th, CONTENT_X, CONTENT_Y, CONTENT_W, 152, true);
@@ -31,11 +32,11 @@ pub fn render_dashboard_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
 
     let tx = lx + 100;
     let (chip_txt, chip_col) = if state.sync_in_progress {
-        (strings::STATUS_SYNCING, th.accent_hi)
+        (s.status_syncing, th.accent_hi)
     } else if state.peer_label.contains("Scanning") {
-        (strings::STATUS_SCANNING, C_WARN)
+        (s.status_scanning, C_WARN)
     } else {
-        (strings::STATUS_READY, C_GOOD)
+        (s.status_ready, C_GOOD)
     };
     let cw = draw_chip(gfx, CONTENT_R - 22, CONTENT_Y + 26, chip_txt, chip_col);
     let avail = CONTENT_R - 24 - tx - cw;
@@ -47,7 +48,7 @@ pub fn render_dashboard_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         FontWeight::Regular,
         th.dim,
         Align::Left,
-        strings::HERO_THIS_DEVICE,
+        s.hero_this_device,
     );
     gfx.text_fit(
         tx,
@@ -57,10 +58,10 @@ pub fn render_dashboard_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         FontWeight::Bold,
         th.text,
         Align::Left,
-        strings::HERO_DEVICE_NAME,
+        s.hero_device_name,
     );
 
-    let peer_str = strings::fmt_peer_and_folders(&state.peer_label, &state.folder_label);
+    let peer_str = s.fmt_peer_and_folders(&state.peer_label, &state.folder_label);
     gfx.text_fit(
         tx,
         CONTENT_Y + 80,
@@ -83,8 +84,8 @@ pub fn render_dashboard_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         &state.status_line,
     );
 
-    let act_sync_w = action_width(gfx, PadButton::Cross, strings::ACTION_SYNC_NOW);
-    let act_qr_w = action_width(gfx, PadButton::Circle, strings::ACTION_QR_ID);
+    let act_sync_w = action_width(gfx, PadButton::Cross, s.action_sync_now);
+    let act_qr_w = action_width(gfx, PadButton::Circle, s.action_qr_id);
     let bx_sync = CONTENT_R - 18 - act_sync_w;
     let bx_qr = bx_sync - 10 - act_qr_w;
 
@@ -95,7 +96,7 @@ pub fn render_dashboard_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         FontWeight::Regular,
         th.faint,
         Align::Left,
-        strings::HERO_DEVICE_ID_LABEL,
+        s.hero_device_id_label,
     );
     gfx.text_fit(
         lx + 82,
@@ -114,7 +115,7 @@ pub fn render_dashboard_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         bx_qr,
         CONTENT_Y + 128,
         PadButton::Circle,
-        strings::ACTION_QR_ID,
+        s.action_qr_id,
     );
     draw_action(
         gfx,
@@ -122,7 +123,7 @@ pub fn render_dashboard_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         bx_sync,
         CONTENT_Y + 128,
         PadButton::Cross,
-        strings::ACTION_SYNC_NOW,
+        s.action_sync_now,
     );
     match state.focused_action(ActiveTab::Dashboard) {
         Some(0) => draw_focus_ring(gfx, th, bx_qr, CONTENT_Y + 128, act_qr_w),
@@ -141,10 +142,10 @@ pub fn render_dashboard_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         FontWeight::Medium,
         th.text,
         Align::Left,
-        strings::SECTION_RECENT_ACTIVITY,
+        s.section_recent_activity,
     );
 
-    let stats_chip = strings::fmt_recent_stats(
+    let stats_chip = s.fmt_recent_stats(
         state.files_up_to_date,
         state.files_downloaded,
         state.blocks_uploaded,
@@ -164,7 +165,7 @@ pub fn render_dashboard_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
             FontWeight::Regular,
             th.faint,
             Align::Left,
-            strings::MSG_NO_SYNC_EVENTS,
+            s.msg_no_sync_events,
         );
     } else {
         for (i, line) in recent.iter().rev().enumerate() {
@@ -200,12 +201,12 @@ pub fn render_dashboard_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         gfx,
         th,
         &[
-            (PadButton::Dpad, Some(PadButton::Cross), strings::HINT_NAVIGATE),
-            (PadButton::Circle, None, strings::ACTION_QR_ID),
-            (PadButton::Square, None, strings::ACTION_PAUSE),
-            (PadButton::Triangle, None, strings::HINT_FOLDER),
-            (PadButton::L, Some(PadButton::R), strings::HINT_TABS),
-            (PadButton::Select, None, strings::HINT_SCREENSAVER),
+            (PadButton::Dpad, Some(PadButton::Cross), s.hint_navigate),
+            (PadButton::Circle, None, s.action_qr_id),
+            (PadButton::Square, None, s.action_pause),
+            (PadButton::Triangle, None, s.hint_folder),
+            (PadButton::L, Some(PadButton::R), s.hint_tabs),
+            (PadButton::Select, None, s.hint_screensaver),
         ],
     );
 }

@@ -137,11 +137,12 @@ pub fn draw_page_title(gfx: &mut Gfx, th: &UiTheme, title: &str, right: Option<&
 }
 
 pub fn draw_chrome(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
+    let s = strings::strings(state.language);
     let tabs = [
-        (strings::TAB_OVERVIEW, Icon::Vita, ActiveTab::Dashboard),
-        (strings::TAB_SHARES, Icon::Folder, ActiveTab::Shares),
-        (strings::TAB_FILES, Icon::Receive, ActiveTab::FolderPicker),
-        (strings::TAB_SETTINGS, Icon::Settings, ActiveTab::Settings),
+        (s.tab_overview, Icon::Vita, ActiveTab::Dashboard),
+        (s.tab_shares, Icon::Folder, ActiveTab::Shares),
+        (s.tab_files, Icon::Receive, ActiveTab::FolderPicker),
+        (s.tab_settings, Icon::Settings, ActiveTab::Settings),
     ];
 
     gfx.clear(th.bg);
@@ -162,7 +163,7 @@ pub fn draw_chrome(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         FontWeight::Bold,
         th.text,
         Align::Left,
-        strings::APP_TITLE,
+        s.app_title,
     );
 
     // Sidebar tabs
@@ -189,9 +190,9 @@ pub fn draw_chrome(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
     gfx.rrect(12, card_y, SIDEBAR_W - 24, 82, 12, th.card);
     gfx.rrect_outline(12, card_y, SIDEBAR_W - 24, 82, 12, 1, th.border);
     let xfer_title = if state.sync_in_progress {
-        strings::SIDEBAR_SYNCING
+        s.sidebar_syncing
     } else {
-        strings::SIDEBAR_LAST_SYNC
+        s.sidebar_last_sync
     };
     let pct = state.progress_pct.min(100);
     gfx.text(
@@ -236,9 +237,9 @@ pub fn draw_chrome(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         if wifi_ok { C_GOOD } else { C_WARN },
     );
     let net_txt = if wifi_ok {
-        strings::PROTOCOL_TLS
+        s.protocol_tls
     } else {
-        strings::PROTOCOL_DISCOVERY
+        s.protocol_discovery
     };
     gfx.text_fit(
         48,
@@ -257,7 +258,7 @@ pub fn draw_chrome(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         FontWeight::Regular,
         th.faint,
         Align::Left,
-        strings::APP_VERSION_LABEL,
+        s.app_version_label,
     );
 }
 

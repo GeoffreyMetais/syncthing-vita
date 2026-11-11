@@ -11,6 +11,7 @@ pub fn render_folder_offer_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, 
     let Some(offer) = state.folder_offers.get(offer_idx) else {
         return;
     };
+    let s = strings::strings(state.language);
     gfx.dim(180);
     let (dx, dy, w, h) = folder_offer_modal_rect();
     let (dx, dy, w, h) = (dx as i32, dy as i32, w as i32, h as i32);
@@ -35,7 +36,7 @@ pub fn render_folder_offer_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, 
         FontWeight::Bold,
         th.text,
         Align::Left,
-        strings::MODAL_FOLDER_OFFER_TITLE,
+        s.modal_folder_offer_title,
     );
     let device = state
         .devices
@@ -43,7 +44,7 @@ pub fn render_folder_offer_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, 
         .find(|d| d.device_id.matches_peer(&offer.device_id))
         .map(|d| format!("{} ({})", d.name, d.device_id.short()))
         .unwrap_or_else(|| format!("Device {}", offer.device_id.short()));
-    let requester_sub = strings::fmt_folder_offer_sub(&device);
+    let requester_sub = s.fmt_folder_offer_sub(&device);
     gfx.text_fit(
         lx + 52,
         dy + 54,
@@ -63,7 +64,7 @@ pub fn render_folder_offer_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, 
         th.border,
     );
 
-    let title = strings::fmt_share_title(&offer.label, &offer.folder_id);
+    let title = s.fmt_share_title(&offer.label, &offer.folder_id);
     gfx.text_fit(
         lx,
         dy + 110,
@@ -82,11 +83,11 @@ pub fn render_folder_offer_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, 
         FontWeight::Regular,
         th.dim,
         Align::Left,
-        strings::MODAL_FOLDER_OFFER_HINT,
+        s.modal_folder_offer_hint,
     );
     let pending = state.folder_offers.len();
     if pending > 1 {
-        let waiting_str = strings::fmt_offers_waiting(pending - 1);
+        let waiting_str = s.fmt_offers_waiting(pending - 1);
         gfx.text(
             lx,
             dy + 164,
@@ -105,7 +106,7 @@ pub fn render_folder_offer_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, 
         folder_offer_slot_x(0) as i32,
         cy,
         PadButton::Square,
-        strings::ACTION_DECLINE,
+        s.action_decline,
     );
     draw_action(
         gfx,
@@ -113,7 +114,7 @@ pub fn render_folder_offer_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, 
         folder_offer_slot_x(1) as i32,
         cy,
         PadButton::Circle,
-        strings::ACTION_LATER,
+        s.action_later,
     );
     draw_action(
         gfx,
@@ -121,16 +122,16 @@ pub fn render_folder_offer_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, 
         folder_offer_slot_x(2) as i32,
         cy,
         PadButton::Cross,
-        strings::ACTION_ACCEPT,
+        s.action_accept,
     );
 
     draw_hints(
         gfx,
         th,
         &[
-            (PadButton::Cross, None, strings::HINT_ACCEPT_SHARE),
-            (PadButton::Square, None, strings::ACTION_DECLINE),
-            (PadButton::Circle, None, strings::ACTION_LATER),
+            (PadButton::Cross, None, s.hint_accept_share),
+            (PadButton::Square, None, s.action_decline),
+            (PadButton::Circle, None, s.action_later),
         ],
     );
 }

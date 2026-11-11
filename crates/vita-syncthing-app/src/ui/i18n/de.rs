@@ -1,0 +1,185 @@
+//! German (`de`) string catalog for VitaSyncthing.
+
+use crate::domain::Language;
+use super::Strings;
+
+pub static STRINGS_DE: Strings = Strings {
+    language: Language::German,
+
+    // Common Actions
+    action_cancel: "Abbrechen",
+    action_save: "Speichern",
+    action_delete: "Löschen",
+    action_done: "Fertig",
+    action_close: "Schließen",
+    action_confirm: "Bestätigen",
+    action_quit: "Beenden",
+    action_quit_app: "App beenden",
+    action_back: "Zurück",
+    action_accept: "Annehmen",
+    action_decline: "Ablehnen",
+    action_later: "Später",
+    action_up: "Hoch",
+    action_open: "Öffnen",
+    action_share: "Freigeben",
+    action_shared: "Geteilt",
+    action_linked: "Verknüpft",
+    action_not_linked: "Nicht verknüpft",
+    action_pause: "Pausieren",
+    action_enable: "Aktivieren",
+    action_devices: "Geräte",
+    action_folder: "Ordner",
+    action_folder_path: "Ordnerpfad",
+    action_add_by_id: "Über ID hinzufügen",
+    action_add_device: "Gerät hinzufügen",
+    action_add_device_id: "Geräte-ID hinzufügen",
+    action_add_remote_device: "Remote-Gerät hinzufügen",
+    action_apply_sync: "Übernehmen & Sync",
+    action_scan_qr: "QR scannen",
+    action_new_share: "Neue Freigabe",
+    action_sync_now: "Jetzt synchronisieren",
+    action_qr_id: "QR / ID",
+    action_switch_theme: "Design wechseln",
+    action_clear_declined: "Abgelehnte löschen",
+    action_virtual_keyboard: "Virtuelle Tastatur",
+    action_hide_keyboard: "Tastatur ausblenden",
+    action_backspace: "Rücktaste",
+
+    // Status Badges & Chips
+    status_ready: "Bereit",
+    status_syncing: "Synchronisiere",
+    status_scanning: "Scanne...",
+    status_active: "Aktiv",
+    status_paused: "Pausiert",
+
+    // Navigation & Sidebar
+    tab_overview: "Übersicht",
+    tab_shares: "Freigaben",
+    tab_files: "Dateien",
+    tab_settings: "Einstellungen",
+    app_title: "VitaSync",
+    app_version_label: "v0.1.0 · Pure Rust",
+    sidebar_syncing: "BEP/1.0 Sync...",
+    sidebar_last_sync: "Letzte Sitzung",
+    protocol_tls: "BEP/1.0 TLS 1.3",
+    protocol_discovery: "UDP 21027...",
+
+    // Controller Hints
+    hint_navigate: "Navigieren",
+    hint_select: "Auswählen",
+    hint_toggle: "Umschalten",
+    hint_back: "Zurück",
+    hint_tabs: "Reiter",
+    hint_quit: "Beenden",
+    hint_move: "Bewegen",
+    hint_screensaver: "Bildschirmschoner",
+    hint_folder: "Ordner",
+    hint_folder_path: "Ordnerpfad",
+    hint_share_folder: "Ordner freigeben",
+    hint_select_target: "Ziel auswählen",
+    hint_open_subfolder: "Unterordner öffnen",
+    hint_up_one_level: "Eine Ebene höher",
+    hint_up_back: "Hoch / Zurück",
+    hint_back_to_device_id: "Zurück zu Geräte-ID",
+    hint_pause_enable: "Pause/Aktivieren",
+    hint_add_by_id: "Über ID hinzufügen",
+    hint_scan_qr: "QR scannen",
+    hint_apply_sync: "Übernehmen & Sync",
+    hint_confirm_delete: "Löschen bestätigen",
+    hint_confirm_quit: "Beenden bestätigen",
+    hint_create_pick_devices: "Erstellen & Geräte wählen",
+    hint_add_remote_device_id: "Remote-Geräte-ID hinzufügen",
+    hint_close_qr_device_id: "QR / ID schließen",
+    hint_accept_share: "Freigabe annehmen",
+    hint_confirm_add: "Bestätigen & Hinzufügen",
+    hint_type_key: "Taste drücken",
+
+    // Screen 1: Dashboard (Overview)
+    dashboard_title: "Übersicht",
+    hero_this_device: "Dieses Gerät",
+    hero_device_name: "PlayStation Vita",
+    hero_device_id_label: "Geräte-ID",
+    section_recent_activity: "Letzte Aktivitäten",
+    msg_no_sync_events: "Noch keine Synchronisationsereignisse aufgezeichnet.",
+
+    // Screen 2: Shared Folders
+    shares_title: "Freigegebene Ordner",
+    msg_no_shares: "Noch keine freigegebenen Ordner eingerichtet",
+    msg_no_shares_hint_1: "Kreis (Neue Freigabe) drücken, um einen Ordner freizugeben,",
+    msg_no_shares_hint_2: "oder Übersicht -> Jetzt synchronisieren drücken, um Freigaben zu importieren.",
+
+    // Screen 3: Files & Folder Picker
+    picker_title_create: "Ordner freigeben",
+    picker_subtitle_create: "Wähle einen Ordner zum Freigeben oder öffne ihn zum Durchsuchen",
+    picker_title_choose: "Zielordner wählen",
+    picker_default_share: "Standard-Freigabe",
+
+    // Screen 4: Settings & Protocol Log
+    settings_title: "Einstellungen & Log",
+    settings_subtitle: "Anzeige & BEP/1.0",
+    settings_sec_display: "ANZEIGE & OLED-SCHONER",
+    settings_label_colour_theme: "Farbdesign",
+    settings_desc_theme_dark: "Dunkel — Schiefergrauer VitaSend-Look mit Türkis-Akzent",
+    settings_desc_theme_oled: "OLED — Reines Schwarz #000000 (spart PS Vita OLED-Akku)",
+    settings_saver_auto_hint: "OLED-Schoner aktiviert sich nach 12s Sync (oder Taste SELECT).",
+    settings_sec_log: "BEP/1.0 & TLS 1.3 PROTOKOLL",
+    settings_sec_declined: "ABGELEHNTE ORDNER",
+    settings_no_declined: "Keine · von Peers angebotene Ordner werden stets abgefragt",
+
+    // Screensaver
+    saver_wake_hint: "Tippe auf den Bildschirm oder drücke eine Taste",
+
+    // Modals: Create Share
+    modal_create_share_title: "Neue Freigabe erstellen",
+    modal_create_share_subtitle: "Wähle eine Vorlage oder durchsuche ux0: für eine neue Freigabe",
+    modal_create_share_browse_sub: "Interaktiven ux0:-Dateibrowser öffnen",
+
+    // Modals: Manage Devices
+    modal_manage_devices_default_title: "Freigabe",
+    modal_manage_devices_subtitle_incomplete: "Verknüpfe mindestens ein Gerät, um die Freigabe zu erstellen",
+    modal_manage_devices_subtitle: "Wähle die Remote-Geräte aus, die diesen Ordner synchronisieren sollen",
+    modal_manage_devices_scanning: "Suche nach Syncthing-Peers im lokalen Netzwerk (UDP 21027 + TCP 22000)...",
+    modal_manage_devices_empty: "Noch keine Syncthing-Geräte im Netzwerk entdeckt.",
+    modal_manage_devices_empty_hint: "Drücke Quadrat (Über ID hinzufügen) oder Dreieck zum Scannen.",
+
+    // Modals: Add Device
+    modal_add_device_title: "Remote-Gerät über ID hinzufügen",
+    modal_add_device_subtitle: "Gib die 7-stellige Kurz-ID oder die vollständige 56-stellige Geräte-ID ein",
+    modal_add_device_example: "z.B. MFZWI3D oder MFZWI3D-BONSGYC-... (tippen zum Eingeben)",
+    modal_add_device_tip: "Tipp: Die ersten 7 Zeichen reichen aus (Kurz-ID in Syncthing).",
+    modal_add_device_placeholder: "7-stellige Kurz-ID oder 56-stellige Voll-ID eingeben...",
+    modal_add_device_name_label: "Gerätename (optional):",
+    modal_add_device_name_empty: "(tippen, um Name einzugeben)",
+    modal_add_device_confirm: "Gerät hinzufügen",
+
+    // Modals: Confirm Delete
+    modal_delete_share_title: "Diese Freigabe löschen?",
+    modal_delete_share_subtitle: "Der Ordner wird nicht mehr mit verknüpften Geräten synchronisiert",
+    modal_delete_share_decline_hint: "Angebote von Peers werden abgelehnt (in Einstellungen änderbar).",
+
+    // Modals: Confirm Quit
+    modal_quit_title: "VitaSync beenden?",
+    modal_quit_subtitle: "Bestätige, ob du die Anwendung schließen und zum LiveArea zurückkehren möchtest",
+    modal_quit_syncing_warn: "Eine BEP/1.0-Synchronisation läuft derzeit.",
+    modal_quit_syncing_hint: "Ein Beenden unterbricht aktive Dateiübertragungen.",
+    modal_quit_idle_ready: "Möchtest du VitaSync wirklich beenden?",
+    modal_quit_idle_hint: "Alle Freigaben und Einstellungen sind sicher auf ux0: gespeichert.",
+
+    // Modals: Device ID
+    modal_device_id_title: "PS Vita Syncthing Geräte-ID",
+    modal_device_id_subtitle: "Scanne den QR-Code in Syncthing oder gib die 56-stellige ID ein",
+    modal_device_id_scan_web: "QR-Code in Syncthing Web / App scannen",
+    modal_device_id_dev_name: "Gerätename: PlayStation Vita (vita-syncthing)",
+    modal_device_id_cert_path: "Identitätszertifikat: ux0:data/syncthing/cert.der",
+    modal_device_id_short_label: "Kurz-ID (LAN-Erkennung):",
+    modal_device_id_full_label: "Vollständige 56-stellige Geräte-ID:",
+    modal_device_id_scan_hint: "Auf Smartphone/PC: Syncthing > Geräte > Hinzufügen > QR scannen",
+
+    // Modals: Folder Offer
+    modal_folder_offer_title: "Neuer freigegebener Ordner",
+    modal_folder_offer_hint: "Annehmen, um einen Pfad auf ux0: zu wählen. Vor Aktivierung erfolgt kein Sync.",
+
+    // Modals: Scan QR
+    modal_scan_qr_title: "Geräte-ID QR-Code scannen",
+    modal_scan_qr_subtitle: "Syncthing: Aktionen > ID anzeigen, dann Rückkamera darauf richten",
+};

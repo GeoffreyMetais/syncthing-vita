@@ -8,6 +8,7 @@ use crate::ui::widgets::{action_width, draw_action, draw_hints};
 
 /// Modal Dialog 4: Confirmation before exiting VitaSync (`START` button).
 pub fn render_confirm_quit_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
+    let s = strings::strings(state.language);
     gfx.dim(180);
     let w = 520;
     let h = 236;
@@ -33,7 +34,7 @@ pub fn render_confirm_quit_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState) 
         FontWeight::Bold,
         th.text,
         Align::Left,
-        strings::MODAL_QUIT_TITLE,
+        s.modal_quit_title,
     );
     gfx.text(
         lx + 52,
@@ -42,7 +43,7 @@ pub fn render_confirm_quit_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState) 
         FontWeight::Regular,
         th.dim,
         Align::Left,
-        strings::MODAL_QUIT_SUBTITLE,
+        s.modal_quit_subtitle,
     );
     gfx.line(
         (dx + 24) as f32,
@@ -61,7 +62,7 @@ pub fn render_confirm_quit_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState) 
             FontWeight::Medium,
             C_WARN,
             Align::Left,
-            strings::MODAL_QUIT_SYNCING_WARN,
+            s.modal_quit_syncing_warn,
         );
         gfx.text(
             lx,
@@ -70,7 +71,7 @@ pub fn render_confirm_quit_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState) 
             FontWeight::Regular,
             th.dim,
             Align::Left,
-            strings::MODAL_QUIT_SYNCING_HINT,
+            s.modal_quit_syncing_hint,
         );
     } else {
         gfx.text(
@@ -80,7 +81,7 @@ pub fn render_confirm_quit_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState) 
             FontWeight::Medium,
             th.text,
             Align::Left,
-            strings::MODAL_QUIT_IDLE_READY,
+            s.modal_quit_idle_ready,
         );
         gfx.text(
             lx,
@@ -89,19 +90,19 @@ pub fn render_confirm_quit_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState) 
             FontWeight::Regular,
             th.dim,
             Align::Left,
-            strings::MODAL_QUIT_IDLE_HINT,
+            s.modal_quit_idle_hint,
         );
     }
 
-    let w_quit = action_width(gfx, PadButton::Cross, strings::ACTION_QUIT_APP);
-    let w_cancel = action_width(gfx, PadButton::Circle, strings::ACTION_CANCEL);
+    let w_quit = action_width(gfx, PadButton::Cross, s.action_quit_app);
+    let w_cancel = action_width(gfx, PadButton::Circle, s.action_cancel);
     draw_action(
         gfx,
         th,
         dx + w - 28 - w_quit - 12 - w_cancel,
         dy + h - 34,
         PadButton::Circle,
-        strings::ACTION_CANCEL,
+        s.action_cancel,
     );
     draw_action(
         gfx,
@@ -109,15 +110,15 @@ pub fn render_confirm_quit_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState) 
         dx + w - 28 - w_quit,
         dy + h - 34,
         PadButton::Cross,
-        strings::ACTION_QUIT_APP,
+        s.action_quit_app,
     );
 
     draw_hints(
         gfx,
         th,
         &[
-            (PadButton::Cross, None, strings::HINT_CONFIRM_QUIT),
-            (PadButton::Circle, None, strings::ACTION_CANCEL),
+            (PadButton::Cross, None, s.hint_confirm_quit),
+            (PadButton::Circle, None, s.action_cancel),
         ],
     );
 }

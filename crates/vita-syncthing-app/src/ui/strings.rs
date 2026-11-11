@@ -4,6 +4,8 @@
 //! button hints, modal dialog prompts, and formatting helpers) into a
 //! zero-allocation static catalog.
 
+pub use crate::ui::i18n::*;
+
 // ============================================================================
 // Common Actions
 // ============================================================================

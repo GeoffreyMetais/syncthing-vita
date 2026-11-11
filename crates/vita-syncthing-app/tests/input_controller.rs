@@ -54,12 +54,12 @@ fn test_input_controller_quit_dialog_and_theme_toggle() {
     );
     assert_eq!(cmd2, UserCommand::QuitApp);
 
-    // Switching to Settings and pressing CROSS toggles Dark -> OLED theme
+    // Switching to Settings and pressing CROSS toggles OLED -> Dark theme
     state.modal = ModalDialog::None;
     state.active_tab = ActiveTab::Settings;
     state.reset_nav_for_tab();
     state.nav.focus = NavFocus::Content;
-    assert_eq!(state.theme_mode, ThemeMode::Dark);
+    assert_eq!(state.theme_mode, ThemeMode::Oled);
     let _ = InputController::handle_input(
         &mut state,
         &repo,
@@ -69,7 +69,7 @@ fn test_input_controller_quit_dialog_and_theme_toggle() {
             ..Default::default()
         },
     );
-    assert_eq!(state.theme_mode, ThemeMode::Oled);
+    assert_eq!(state.theme_mode, ThemeMode::Dark);
 
     let _ = std::fs::remove_dir_all(&dir);
 }

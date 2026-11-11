@@ -10,6 +10,7 @@ use crate::ui::widgets::{action_width, draw_action, draw_chip, draw_hints};
 
 /// Modal Dialog 3: Display the PS Vita's Syncthing Device ID + scannable QR code.
 pub fn render_device_id_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
+    let s = strings::strings(state.language);
     gfx.dim(180);
     let w = 720;
     let h = 414;
@@ -36,7 +37,7 @@ pub fn render_device_id_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         FontWeight::Bold,
         th.text,
         Align::Left,
-        strings::MODAL_DEVICE_ID_TITLE,
+        s.modal_device_id_title,
     );
     gfx.text(
         lx + 52,
@@ -45,7 +46,7 @@ pub fn render_device_id_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         FontWeight::Regular,
         th.dim,
         Align::Left,
-        strings::MODAL_DEVICE_ID_SUBTITLE,
+        s.modal_device_id_subtitle,
     );
     gfx.line(
         (dx + 24) as f32,
@@ -199,7 +200,7 @@ pub fn render_device_id_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         "TLS 1.3 · ECDSA P-256",
         C_GOOD,
     );
-    let short_id_label = strings::fmt_short_id_label(short_id);
+    let short_id_label = s.fmt_short_id_label(short_id);
     gfx.text(
         rx + 14,
         meta_y + 22,
@@ -216,7 +217,7 @@ pub fn render_device_id_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         FontWeight::Regular,
         th.dim,
         Align::Left,
-        strings::MODAL_DEVICE_ID_DEV_NAME,
+        s.modal_device_id_dev_name,
     );
     gfx.text(
         rx + 14,
@@ -225,19 +226,19 @@ pub fn render_device_id_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         FontWeight::Regular,
         th.faint,
         Align::Left,
-        strings::MODAL_DEVICE_ID_CERT_PATH,
+        s.modal_device_id_cert_path,
     );
 
     // Bottom buttons at bottom-right of modal
-    let w_add = action_width(gfx, PadButton::Square, strings::ACTION_ADD_REMOTE_DEVICE);
-    let w_close = action_width(gfx, PadButton::Circle, strings::ACTION_CLOSE);
+    let w_add = action_width(gfx, PadButton::Square, s.action_add_remote_device);
+    let w_close = action_width(gfx, PadButton::Circle, s.action_close);
     draw_action(
         gfx,
         th,
         dx + w - 28 - w_close - 10 - w_add,
         dy + h - 32,
         PadButton::Square,
-        strings::ACTION_ADD_REMOTE_DEVICE,
+        s.action_add_remote_device,
     );
     draw_action(
         gfx,
@@ -245,18 +246,18 @@ pub fn render_device_id_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         dx + w - 28 - w_close,
         dy + h - 32,
         PadButton::Circle,
-        strings::ACTION_CLOSE,
+        s.action_close,
     );
 
     draw_hints(
         gfx,
         th,
         &[
-            (PadButton::Square, None, strings::HINT_ADD_REMOTE_DEVICE_ID),
+            (PadButton::Square, None, s.hint_add_remote_device_id),
             (
                 PadButton::Circle,
                 Some(PadButton::Cross),
-                strings::HINT_CLOSE_QR_DEVICE_ID,
+                s.hint_close_qr_device_id,
             ),
         ],
     );

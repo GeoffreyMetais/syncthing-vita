@@ -14,8 +14,8 @@ use vita_syncthing_app::application::{
 };
 use vita_syncthing_app::domain::{AppState, ModalDialog};
 use vita_syncthing_app::infrastructure::{
-    init_vita_network, is_on_external_power, keep_system_awake, spawn_sync_worker,
-    ConfigRepository, IdentityStore, QrScanner, VitaInput, WorkerMsg,
+    detect_system_language, init_vita_network, is_on_external_power, keep_system_awake,
+    spawn_sync_worker, ConfigRepository, IdentityStore, QrScanner, VitaInput, WorkerMsg,
 };
 use vita_syncthing_app::ui::VitaUiRenderer;
 
@@ -50,6 +50,7 @@ fn main() {
     let devices = repo.load_devices();
     let shares = repo.load_shares();
     let mut state = AppState::new(shares, devices, ConfigRepository::default_browse_root());
+    state.language = detect_system_language();
     state.ignored_folders = repo.load_ignored_folders();
     if state.sanitize_legacy_unpaired_peers() {
         repo.save_devices(&state.approved_devices());
