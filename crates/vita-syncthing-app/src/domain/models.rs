@@ -53,6 +53,10 @@ pub enum ModalDialog {
     ShowDeviceId,
     /// Confirmation dialog before quitting the application (`START` button).
     ConfirmQuit,
+    /// Confirmation dialog before removing `shares[share_idx]` from the configuration.
+    ConfirmDeleteShare {
+        share_idx: usize,
+    },
 }
 
 /// Known or discovered remote Syncthing device.

@@ -7,8 +7,20 @@ use common::temp_test_dir;
 use vita_syncthing_app::application::{InputController, ShareService, UserCommand};
 use vita_syncthing_app::domain::{ActiveTab, AppState, ModalDialog, ThemeMode};
 use vita_syncthing_app::infrastructure::{
-    ConfigRepository, InputFrame, BTN_CROSS, BTN_SQUARE, BTN_START,
+    ConfigRepository, InputFrame, BTN_CIRCLE, BTN_CROSS, BTN_SQUARE, BTN_START,
 };
+
+fn press(state: &mut AppState, repo: &ConfigRepository, buttons: u32) -> UserCommand {
+    InputController::handle_input(
+        state,
+        repo,
+        InputFrame {
+            pressed: buttons,
+            any_activity: true,
+            ..Default::default()
+        },
+    )
+}
 
 #[test]
 fn test_input_controller_quit_dialog_and_theme_toggle() {
@@ -138,6 +150,37 @@ fn test_add_device_by_short_id_and_system_keyboard_flow() {
         state.shares[share_idx].shared_devices,
         vec![full_peer_id.to_hex()]
     );
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_square_on_shares_tab_asks_confirmation_before_deleting() {
+    let dir = temp_test_dir("delete-share-input");
+    let repo = ConfigRepository::new(&dir);
+    let mut state = AppState::new(Vec::new(), Vec::new(), &dir);
+    ShareService::create_share(&mut state, &repo, "a", "Share A", &format!("{}/a", dir));
+    state.active_tab = ActiveTab::Shares;
+
+    // Square opens the confirmation; Circle cancels without deleting
+    press(&mut state, &repo, BTN_SQUARE);
+    assert_eq!(
+        state.modal,
+        ModalDialog::ConfirmDeleteShare { share_idx: 0 }
+    );
+    press(&mut state, &repo, BTN_CIRCLE);
+    assert_eq!(state.modal, ModalDialog::None);
+    assert_eq!(state.shares.len(), 1);
+
+    // Square then Cross deletes the share
+    press(&mut state, &repo, BTN_SQUARE);
+    press(&mut state, &repo, BTN_CROSS);
+    assert_eq!(state.modal, ModalDialog::None);
+    assert!(state.shares.is_empty());
+
+    // Square with no share does nothing
+    press(&mut state, &repo, BTN_SQUARE);
+    assert_eq!(state.modal, ModalDialog::None);
 
     let _ = std::fs::remove_dir_all(&dir);
 }

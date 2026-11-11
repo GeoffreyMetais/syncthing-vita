@@ -46,6 +46,7 @@ impl InputController {
 
         let mut trigger_sync = false;
         let mut toggle_share = false;
+        let mut delete_share = false;
         let mut open_picker = false;
 
         // 2. Front touchscreen tap detection (960x544, VitaSend layout)
@@ -79,7 +80,7 @@ impl InputController {
                             };
                         }
                     } else if tx < 610 {
-                        toggle_share = true;
+                        delete_share = true;
                     } else if tx < 790 {
                         open_picker = true;
                     }
@@ -141,7 +142,7 @@ impl InputController {
                                                 selected_dev_idx: 0,
                                             };
                                         } else if (696..=810).contains(&tx) {
-                                            toggle_share = true;
+                                            delete_share = true;
                                         } else if (811..=936).contains(&tx) {
                                             open_picker = true;
                                         }
@@ -258,7 +259,7 @@ impl InputController {
                     }
                 }
                 if (input.pressed & BTN_SQUARE) != 0 {
-                    toggle_share = true;
+                    delete_share = true;
                 }
                 if (input.pressed & BTN_TRIANGLE) != 0 {
                     open_picker = true;
@@ -300,6 +301,12 @@ impl InputController {
 
         if toggle_share {
             ShareService::toggle_selected_share(state, repo);
+        }
+
+        if delete_share && state.selected_share_idx < state.shares.len() {
+            state.modal = ModalDialog::ConfirmDeleteShare {
+                share_idx: state.selected_share_idx,
+            };
         }
 
         if open_picker {
@@ -408,6 +415,11 @@ impl InputController {
                 if (input.pressed & BTN_SQUARE) != 0 {
                     return Self::open_add_device_modal(state, Some(share_idx));
                 }
+                if (input.pressed & BTN_SELECT) != 0 {
+                    state.selected_share_idx = share_idx;
+                    ShareService::toggle_selected_share(state, repo);
+                    return UserCommand::None;
+                }
                 if (input.pressed & BTN_TRIANGLE) != 0 {
                     if let Some(share) = state.shares.get(share_idx) {
                         if share.enabled && !share.shared_devices.is_empty() {
@@ -455,6 +467,9 @@ impl InputController {
                                 }
                             } else if tx >= dx + w - 500 {
                                 return Self::open_add_device_modal(state, Some(share_idx));
+                            } else {
+                                state.selected_share_idx = share_idx;
+                                ShareService::toggle_selected_share(state, repo);
                             }
                             return UserCommand::None;
                         }
@@ -653,6 +668,34 @@ impl InputController {
                     return UserCommand::None;
                 }
                 if (input.pressed & (BTN_CIRCLE | BTN_CROSS | BTN_TRIANGLE)) != 0 {
+                    state.modal = ModalDialog::None;
+                }
+                UserCommand::None
+            }
+            ModalDialog::ConfirmDeleteShare { share_idx } => {
+                let mut confirm = (input.pressed & BTN_CROSS) != 0;
+                let mut cancel = (input.pressed & (BTN_CIRCLE | BTN_SQUARE | BTN_TRIANGLE)) != 0;
+                if let Some((tx, ty)) = input.touch_tap {
+                    let w = 520usize;
+                    let h = 236usize;
+                    let dx = (960 - w) / 2;
+                    let dy = (500 - h) / 2;
+                    let on_delete_btn = tx >= dx + w - 160
+                        && tx <= dx + w - 16
+                        && ty >= dy + h - 56
+                        && ty <= dy + h - 12;
+                    if on_delete_btn || (ty >= 500 && tx < 200) {
+                        confirm = true;
+                    } else {
+                        cancel = true;
+                    }
+                }
+                if confirm {
+                    state.modal = ModalDialog::None;
+                    if let Some(label) = ShareService::delete_share(state, repo, share_idx) {
+                        state.show_toast(&format!("Deleted share '{}'", label));
+                    }
+                } else if cancel {
                     state.modal = ModalDialog::None;
                 }
                 UserCommand::None

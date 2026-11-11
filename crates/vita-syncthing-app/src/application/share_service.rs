@@ -354,6 +354,36 @@ impl ShareService {
         }
     }
 
+    /// Removes `shares[share_idx]` from the configuration (files on disk are kept).
+    /// Returns the label of the removed share.
+    pub fn delete_share(
+        state: &mut AppState,
+        repo: &ConfigRepository,
+        share_idx: usize,
+    ) -> Option<String> {
+        if share_idx >= state.shares.len() {
+            return None;
+        }
+        let removed = state.shares.remove(share_idx);
+        state
+            .pending_folder_offers
+            .retain(|fid| fid != &removed.folder_id);
+        if state.selected_share_idx >= state.shares.len() {
+            state.selected_share_idx = state.shares.len().saturating_sub(1);
+        }
+        state.config_dirty = true;
+        repo.save_shares(&state.shares);
+        Self::log_event(
+            state,
+            repo,
+            &format!(
+                "Deleted share '{}' ({}) -> {}",
+                removed.label, removed.folder_id, removed.target_path
+            ),
+        );
+        Some(removed.label)
+    }
+
     /// Toggles `enabled` (Active / Paused) on the currently selected share.
     pub fn toggle_selected_share(state: &mut AppState, repo: &ConfigRepository) {
         let mut toggle_info = None;

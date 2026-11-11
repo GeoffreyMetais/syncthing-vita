@@ -77,7 +77,8 @@ syncthing-vita
                 │   ├── add_device.rs
                 │   ├── fallback_keyboard.rs
                 │   ├── device_id.rs
-                │   └── confirm_quit.rs
+                │   ├── confirm_quit.rs
+                │   └── confirm_delete_share.rs
                 └── renderer.rs       # VitaUiRenderer (coordinates Gfx + VitaFramebuffer presentation)
 ```
 
@@ -142,7 +143,7 @@ Dependencies strictly point **inward**. Inner layers never import or depend on o
    - **Responsibility**: Visual presentation and 2D vector/font rendering.
    - **Key Modules**:
      - `screens/`: Independent full-screen views (`dashboard.rs`, `shares.rs`, `folder_picker.rs`, `settings.rs`, `screensaver.rs`).
-     - `modals/`: Isolated modal dialogs (`create_share.rs`, `manage_devices.rs`, `add_device.rs`, `device_id.rs`, `confirm_quit.rs`, `fallback_keyboard.rs`).
+     - `modals/`: Isolated modal dialogs (`create_share.rs`, `manage_devices.rs`, `add_device.rs`, `device_id.rs`, `confirm_quit.rs`, `confirm_delete_share.rs`, `fallback_keyboard.rs`).
      - `widgets.rs`: Reusable UI elements (cards, chips, checkboxes, buttons, chrome, toast).
      - `gfx.rs`: Software 2D rendering primitives, anti-aliased geometry, and TrueType rasterization.
      - `renderer.rs`: Main UI coordinator invoking active screen and modal renderers.
@@ -334,12 +335,13 @@ The UI (`gfx.rs` + `ui/screens/*` + `ui/modals/*` + `ui/renderer.rs`) renders at
 
 - **Left Sidebar Tabs** (`L` / `R` shoulder buttons or touch tap):
   1. `Overview` (`ActiveTab::Dashboard`): Device status card, `QR / ID` modal button (`Circle`), `Sync Now` button (`Cross`), transfer statistics, and recent activity feed.
-  2. `Shares` (`ActiveTab::Shares`): List of shared folders, `+ New Share` modal (`Circle`), `Devices` assignment modal (`Cross`), `Pause/Enable` toggle (`Square`), and `Folder` path picker (`Triangle`).
+  2. `Shares` (`ActiveTab::Shares`): List of shared folders, `+ New Share` modal (`Circle`), `Devices` assignment modal (`Cross`), `Delete` with confirmation (`Square`), and `Folder` path picker (`Triangle`).
   3. `Files` (`ActiveTab::FolderPicker`): Interactive `ux0:` directory browser with presets and subfolder navigation (`Cross` select, `Triangle` open subfolder, `Circle` up/back).
   4. `Settings` (`ActiveTab::Settings`): Dark / Pure-Black OLED theme switcher (`Cross`), `QR / ID` modal (`Circle`), and BEP/1.0 protocol log viewer.
 - **Modal Dialogs** (`ModalDialog` in `domain/models.rs`, rendered by `ui/modals/*`):
   - `CreateShare`: Create a share from PS Vita folder presets (`ux0:user/00/savedata`, `ux0:picture`, `ux0:music`, RetroArch saves) or browse `ux0:`.
-  - `ManageDevices`: Link/unlink discovered Syncthing peers to a share with circular checkboxes (`draw_row_tick`) and trigger immediate `ClusterConfig` advertising (`Triangle · Apply & Sync`).
+  - `ManageDevices`: Link/unlink discovered Syncthing peers to a share with circular checkboxes (`draw_row_tick`) and trigger immediate `ClusterConfig` advertising (`Triangle · Apply & Sync`); `SELECT` pauses / enables the share.
   - `ShowDeviceId`: Displays a scannable QR code (`qrcodegen`) alongside the 8-group Syncthing Device ID.
+  - `ConfirmDeleteShare`: Triggered by `Square` on the `Shares` tab; removes the share from `shares.cfg` (files on `ux0:` are kept).
   - `ConfirmQuit`: Triggered by `START` (or tapping `Quit`), warns if a sync is in progress before exiting to LiveArea.
 - **OLED Screensaver**: Activates automatically after 12s of inactivity during active sync (or 45s when idle, or immediately via `SELECT`), rendering a pure `#000000` black background with a bouncing progress widget to protect PS Vita 1000 OLED screens.

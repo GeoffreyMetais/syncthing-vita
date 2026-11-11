@@ -1,5 +1,5 @@
 //! Tab 2 (`Shared Folders` / `Shares`): List of configured Syncthing shares, `+ New Share` button,
-//! and per-share actions (`Devices`, `Pause`/`Enable`, `Folder`).
+//! and per-share actions (`Devices`, `Delete`, `Folder`).
 
 use crate::domain::AppState;
 use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton};
@@ -70,13 +70,9 @@ pub fn render_shares_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
                 if share.enabled { th.accent_hi } else { th.dim },
             );
 
-            // Action buttons on the right: [X Devices] [SQ Pause] [TRI Folder]
+            // Action buttons on the right: [X Devices] [SQ Delete] [TRI Folder]
             let w_folder = action_width(gfx, PadButton::Triangle, "Folder");
-            let w_toggle = action_width(
-                gfx,
-                PadButton::Square,
-                if share.enabled { "Pause" } else { "Enable" },
-            );
+            let w_toggle = action_width(gfx, PadButton::Square, "Delete");
             let w_devs = action_width(gfx, PadButton::Cross, "Devices");
 
             let bx_folder = CONTENT_R - 14 - w_folder;
@@ -84,14 +80,7 @@ pub fn render_shares_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
             let bx_devs = bx_toggle - 8 - w_devs;
 
             draw_action(gfx, th, bx_devs, ry + 56, PadButton::Cross, "Devices");
-            draw_action(
-                gfx,
-                th,
-                bx_toggle,
-                ry + 56,
-                PadButton::Square,
-                if share.enabled { "Pause" } else { "Enable" },
-            );
+            draw_action(gfx, th, bx_toggle, ry + 56, PadButton::Square, "Delete");
             draw_action(gfx, th, bx_folder, ry + 56, PadButton::Triangle, "Folder");
 
             let status_col = if share.enabled { C_GOOD } else { C_WARN };
@@ -147,7 +136,7 @@ pub fn render_shares_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         &[
             (PadButton::Circle, None, "+ New Share"),
             (PadButton::Cross, None, "Add/Edit Devices"),
-            (PadButton::Square, None, "Pause/Enable"),
+            (PadButton::Square, None, "Delete"),
             (PadButton::Triangle, None, "Folder Path"),
             (PadButton::L, Some(PadButton::R), "Tabs"),
         ],

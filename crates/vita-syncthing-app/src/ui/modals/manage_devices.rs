@@ -169,6 +169,12 @@ pub fn render_manage_devices_modal(
     }
 
     // Bottom modal action buttons
+    let pause_lbl = if state.shares.get(share_idx).is_some_and(|s| s.enabled) {
+        "Pause"
+    } else {
+        "Enable"
+    };
+    draw_action(gfx, th, lx, dy + h - 32, PadButton::Select, pause_lbl);
     let w_add = action_width(gfx, PadButton::Square, "+ Add by ID");
     let w_sync = action_width(gfx, PadButton::Triangle, "Apply & Sync");
     let w_close = action_width(gfx, PadButton::Circle, "Done");
@@ -199,6 +205,7 @@ pub fn render_manage_devices_modal(
         &[
             (PadButton::DpadUd, None, "Select"),
             (PadButton::Cross, None, "Toggle"),
+            (PadButton::Select, None, "Pause/Enable"),
             (PadButton::Square, None, "+ Add by ID"),
             (PadButton::Triangle, None, "Apply & Sync"),
             (PadButton::Circle, None, "Done"),

@@ -83,7 +83,7 @@ impl ConfigRepository {
                 d.address
             ));
         }
-        let _ = fs::write(cfg_path, out);
+        write_replacing(&cfg_path, &out);
     }
 
     /// Loads shared folder configuration from `<base_data_dir>/shares.cfg`.
@@ -148,7 +148,7 @@ impl ConfigRepository {
                 devs
             ));
         }
-        let _ = fs::write(cfg_path, out);
+        write_replacing(&cfg_path, &out);
     }
 
     /// Lists sorted non-hidden subdirectory names inside `dir_path`.
@@ -174,5 +174,16 @@ impl ConfigRepository {
             subdirs.sort();
         }
         subdirs
+    }
+}
+
+/// Replaces `path` with `content` via a fresh temp file + rename.
+/// `sceIo` does not reliably honor `O_TRUNC`, so a shorter rewrite would keep the old file's tail.
+fn write_replacing(path: &str, content: &str) {
+    let tmp = format!("{}.tmp", path);
+    let _ = fs::remove_file(&tmp);
+    if fs::write(&tmp, content).is_ok() {
+        let _ = fs::remove_file(path);
+        let _ = fs::rename(&tmp, path);
     }
 }

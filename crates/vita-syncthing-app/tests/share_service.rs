@@ -108,3 +108,28 @@ fn test_passive_lan_discovery_does_not_auto_link_or_connect() {
 
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn test_delete_share_removes_config_and_pending_offer() {
+    let dir = temp_test_dir("delete-share");
+    let repo = ConfigRepository::new(&dir);
+    let mut state = AppState::new(Vec::new(), Vec::new(), &dir);
+
+    let dev_id = DeviceId([0x24; 32]);
+    ShareService::upsert_device(&mut state, &repo, dev_id, "Laptop", "192.168.1.20:22000");
+    ShareService::create_share(&mut state, &repo, "a", "Share A", &format!("{}/a", dir));
+    let b = ShareService::create_share(&mut state, &repo, "b", "Share B", &format!("{}/b", dir));
+    ShareService::toggle_device_for_share(&mut state, &repo, b, dev_id).unwrap();
+    assert!(state.pending_folder_offers.contains(&"b".to_owned()));
+
+    let label = ShareService::delete_share(&mut state, &repo, b);
+    assert_eq!(label.as_deref(), Some("Share B"));
+    assert_eq!(state.shares.len(), 1);
+    assert_eq!(state.shares[0].folder_id, "a");
+    assert_eq!(state.selected_share_idx, 0);
+    assert!(state.pending_folder_offers.is_empty());
+    assert_eq!(repo.load_shares().len(), 1);
+    assert!(ShareService::delete_share(&mut state, &repo, 5).is_none());
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
