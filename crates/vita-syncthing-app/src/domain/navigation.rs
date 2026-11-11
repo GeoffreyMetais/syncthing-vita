@@ -26,7 +26,7 @@ pub struct NavState {
 impl NavState {
     pub fn new(tab: ActiveTab) -> Self {
         Self {
-            focus: NavFocus::Content,
+            focus: NavFocus::Sidebar,
             col: default_col(tab),
             header: false,
             row: 0,
@@ -60,7 +60,7 @@ pub const SETTINGS_ROWS: usize = 2;
 /// Button focused when entering a tab: the one `Cross` triggered before D-pad navigation.
 pub const fn default_col(tab: ActiveTab) -> usize {
     match tab {
-        ActiveTab::Dashboard => 1,
+        ActiveTab::Dashboard => 0,
         ActiveTab::Settings => 2,
         ActiveTab::Shares | ActiveTab::FolderPicker => 0,
     }
