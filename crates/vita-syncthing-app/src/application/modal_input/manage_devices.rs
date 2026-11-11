@@ -1,10 +1,10 @@
 //! `ManageDevices` modal input: link devices to a share, pause it, apply & sync.
 
 use super::open_add_device_modal;
-use crate::application::{ShareCreation, ShareService, UserCommand};
+use crate::application::{QrScanFlow, ShareCreation, ShareService, UserCommand};
 use crate::domain::{AppState, ModalDialog};
 use crate::infrastructure::{
-    ConfigRepository, InputFrame, BTN_CIRCLE, BTN_CROSS, BTN_DOWN, BTN_SELECT, BTN_SQUARE,
+    ConfigRepository, InputFrame, BTN_CIRCLE, BTN_CROSS, BTN_DOWN, BTN_R, BTN_SELECT, BTN_SQUARE,
     BTN_TRIANGLE, BTN_UP,
 };
 
@@ -37,6 +37,10 @@ pub fn handle(
     }
     if (input.pressed & BTN_SQUARE) != 0 {
         return open_add_device_modal(state, Some(share_idx));
+    }
+    if (input.pressed & BTN_R) != 0 {
+        QrScanFlow::open(state, Some(share_idx));
+        return UserCommand::None;
     }
     if (input.pressed & BTN_SELECT) != 0 {
         state.selected_share_idx = share_idx;

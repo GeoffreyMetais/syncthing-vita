@@ -18,6 +18,20 @@ pub const OPEN_CHIP_W: i32 = 120;
 /// Touch width of the `Virtual Keyboard` button inside the `AddDeviceById` text box.
 pub const VIRTUAL_KEYBOARD_BTN_W: usize = 200;
 
+/// Touch width of the `R · Scan QR` action at the bottom left of the `AddDeviceById` modal.
+pub const SCAN_QR_BTN_W: usize = 150;
+
+/// Size of the camera viewfinder in the `ScanDeviceQr` modal (`640x360` frames scaled by 3/4).
+pub const SCAN_QR_VIEW_W: i32 = 480;
+pub const SCAN_QR_VIEW_H: i32 = 270;
+
+/// `(x, y, w, h)` of the `ScanDeviceQr` modal, centred above the hint bar.
+pub const fn scan_qr_modal_rect() -> (usize, usize, usize, usize) {
+    let w = SCAN_QR_VIEW_W as usize + 56;
+    let h = SCAN_QR_VIEW_H as usize + 140;
+    ((960 - w) / 2, (HINT_Y as usize - h) / 2, w, h)
+}
+
 /// Height of the `AddDeviceById` modal, which grows when the fallback keypad is shown.
 pub const fn add_device_modal_height(keypad_visible: bool) -> i32 {
     if keypad_visible {

@@ -1,12 +1,13 @@
-//! `AddDeviceById` modal input: system keyboard, virtual keypad and device confirmation.
+//! `AddDeviceById` modal input: system keyboard, virtual keypad, QR scanner entry and device
+//! confirmation.
 
-use crate::application::{ShareService, UserCommand};
+use crate::application::{QrScanFlow, ShareService, UserCommand};
 use crate::domain::{AppState, ModalDialog, ADD_DEVICE_KEYPAD};
 use crate::infrastructure::{
-    ConfigRepository, InputFrame, BTN_CIRCLE, BTN_CROSS, BTN_DOWN, BTN_LEFT, BTN_RIGHT, BTN_SQUARE,
-    BTN_START, BTN_TRIANGLE, BTN_UP,
+    ConfigRepository, InputFrame, BTN_CIRCLE, BTN_CROSS, BTN_DOWN, BTN_LEFT, BTN_R, BTN_RIGHT,
+    BTN_SQUARE, BTN_START, BTN_TRIANGLE, BTN_UP,
 };
-use crate::ui::theme::{add_device_modal_height, VIRTUAL_KEYBOARD_BTN_W};
+use crate::ui::theme::{add_device_modal_height, SCAN_QR_BTN_W, VIRTUAL_KEYBOARD_BTN_W};
 
 /// Handles input in the `AddDeviceById` modal.
 pub fn handle(
@@ -32,6 +33,10 @@ pub fn handle(
     // 2. Gamepad actions when the OS keyboard overlay is closed
     if (input.pressed & BTN_TRIANGLE) != 0 {
         state.fallback_keypad_visible = !state.fallback_keypad_visible;
+        return UserCommand::None;
+    }
+    if (input.pressed & BTN_R) != 0 {
+        QrScanFlow::open(state, return_share_idx);
         return UserCommand::None;
     }
     if (input.pressed & BTN_START) != 0 {
@@ -90,6 +95,8 @@ pub fn handle(
                 state.fallback_keypad_visible = !keypad;
             } else if tx < 420 {
                 return confirm_add_device(state, repo, return_share_idx);
+            } else if tx < 540 {
+                QrScanFlow::open(state, return_share_idx);
             } else if tx >= 760 {
                 close_add_device_modal(state, return_share_idx);
             }
@@ -106,7 +113,7 @@ pub fn handle(
                 }
                 return UserCommand::OpenSystemKeyboard;
             }
-            // Tapping bottom action buttons (`Add Device`, `Backspace`, `Cancel`)
+            // Tapping bottom action buttons (`Scan QR`, `Add Device`, `Backspace`, `Cancel`)
             if ty >= dy + h - 52 {
                 if tx >= dx + w - 135 {
                     close_add_device_modal(state, return_share_idx);
@@ -114,6 +121,8 @@ pub fn handle(
                     state.device_id_input.pop();
                 } else if tx >= dx + w - 440 {
                     return confirm_add_device(state, repo, return_share_idx);
+                } else if tx < lx + SCAN_QR_BTN_W {
+                    QrScanFlow::open(state, return_share_idx);
                 }
                 return UserCommand::None;
             }
@@ -189,7 +198,7 @@ fn close_add_device_modal(state: &mut AppState, return_share_idx: Option<usize>)
     }
 }
 
-fn confirm_add_device(
+pub(crate) fn confirm_add_device(
     state: &mut AppState,
     repo: &ConfigRepository,
     return_share_idx: Option<usize>,

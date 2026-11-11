@@ -10,12 +10,12 @@ use std::time::{Duration, Instant};
 use syncthing_core::SyncControl;
 use vita_syncthing_app::application::power_policy::should_block_standby;
 use vita_syncthing_app::application::{
-    InputController, ShareService, SyncCoordinator, UserCommand,
+    InputController, QrScanFlow, ShareService, SyncCoordinator, UserCommand,
 };
 use vita_syncthing_app::domain::{AppState, ModalDialog};
 use vita_syncthing_app::infrastructure::{
     init_vita_network, is_on_external_power, keep_system_awake, spawn_sync_worker,
-    ConfigRepository, IdentityStore, VitaInput, WorkerMsg,
+    ConfigRepository, IdentityStore, QrScanner, VitaInput, WorkerMsg,
 };
 use vita_syncthing_app::ui::VitaUiRenderer;
 
@@ -63,6 +63,7 @@ fn main() {
     renderer.render(&mut state);
 
     let mut input_ctl = VitaInput::new();
+    let mut qr_scanner = QrScanner::new();
 
     ShareService::log_event(
         &mut state,
@@ -130,7 +131,21 @@ fn main() {
             last_activity = Instant::now();
         }
 
-        match InputController::handle_input(&mut state, &repo, frame_input) {
+        let mut command = InputController::handle_input(&mut state, &repo, frame_input);
+
+        // Rear camera runs only while the QR scanner modal is open
+        qr_scanner.set_active(state.is_scanning_qr());
+        if state.is_scanning_qr() {
+            last_activity = Instant::now();
+            if let Some(event) = qr_scanner.poll(&mut state.qr_preview) {
+                let scan_cmd = QrScanFlow::handle_event(&mut state, &repo, event);
+                if scan_cmd != UserCommand::None {
+                    command = scan_cmd;
+                }
+            }
+        }
+
+        match command {
             UserCommand::None => {}
             UserCommand::OpenSystemKeyboard => {
                 state.ime_active = input_ctl.open_ime(&state.device_id_input);

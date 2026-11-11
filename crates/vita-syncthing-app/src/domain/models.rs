@@ -49,6 +49,11 @@ pub enum ModalDialog {
         return_share_idx: Option<usize>,
         keypad_idx: usize,
     },
+    /// Scan a remote device's Syncthing Device ID QR code with the rear camera (`SceCamera`).
+    /// Closing it returns to `AddDeviceById` with the same `return_share_idx`.
+    ScanDeviceQr {
+        return_share_idx: Option<usize>,
+    },
     /// Display the PS Vita's full Syncthing Device ID and scannable QR code.
     ShowDeviceId,
     /// Confirmation dialog before quitting the application (`START` button).
@@ -76,6 +81,27 @@ pub struct ShareConfigEntry {
     pub enabled: bool,
     /// Hex strings (`DeviceId::to_hex()`) of remote devices this folder is shared with.
     pub shared_devices: Vec<String>,
+}
+
+/// Latest greyscale camera frame shown in the `ScanDeviceQr` viewfinder.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct CameraPreview {
+    pub width: usize,
+    pub height: usize,
+    /// `width * height` luma bytes, row-major. Empty until the first frame arrives.
+    pub gray: Vec<u8>,
+}
+
+impl CameraPreview {
+    pub fn has_frame(&self) -> bool {
+        self.width > 0 && self.height > 0 && self.gray.len() == self.width * self.height
+    }
+
+    pub fn clear(&mut self) {
+        self.width = 0;
+        self.height = 0;
+        self.gray.clear();
+    }
 }
 
 /// Item in the target folder picker (`ux0:`).

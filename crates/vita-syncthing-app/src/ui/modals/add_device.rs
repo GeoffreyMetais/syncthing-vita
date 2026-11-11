@@ -200,10 +200,12 @@ pub fn render_add_device_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, ke
         "Backspace",
     );
     draw_action(gfx, th, bx_cancel, dy + h - 28, PadButton::Circle, "Cancel");
+    draw_action(gfx, th, lx, dy + h - 28, PadButton::R, "Scan QR");
 
     let mut hints = vec![
         (PadButton::Triangle, None, kbd_lbl),
         (PadButton::Start, None, "Confirm & Add"),
+        (PadButton::R, None, "Scan QR"),
     ];
     if keypad {
         hints.push((PadButton::Dpad, Some(PadButton::Cross), "Type Key"));

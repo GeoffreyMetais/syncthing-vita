@@ -4,8 +4,8 @@
 use syncthing_core::DeviceId;
 
 use crate::domain::models::{
-    ActiveTab, KnownDevice, ModalDialog, PickerItem, PickerMode, ShareConfigEntry, ThemeMode,
-    BROWSER_ROWS,
+    ActiveTab, CameraPreview, KnownDevice, ModalDialog, PickerItem, PickerMode, ShareConfigEntry,
+    ThemeMode, BROWSER_ROWS,
 };
 use crate::domain::navigation::{default_col, NavFocus, NavState};
 
@@ -66,6 +66,10 @@ pub struct AppState {
     pub ime_active: bool,
     /// True when the on-screen fallback Base32 keypad (`Virtual Keyboard`) is shown in `AddDeviceById`.
     pub fallback_keypad_visible: bool,
+    /// Latest rear-camera frame shown while `ModalDialog::ScanDeviceQr` is open.
+    pub qr_preview: CameraPreview,
+    /// Camera failure reported while scanning (e.g. PlayStation TV has no camera).
+    pub qr_camera_error: Option<String>,
 }
 
 impl AppState {
@@ -115,6 +119,8 @@ impl AppState {
             device_id_input: String::new(),
             ime_active: false,
             fallback_keypad_visible: false,
+            qr_preview: CameraPreview::default(),
+            qr_camera_error: None,
         }
     }
 
@@ -204,6 +210,11 @@ impl AppState {
     }
 
     /// Toggles between Dark (VitaSend slate) and OLED (pure `#000000`) theme modes.
+    /// True while the QR scanner modal is open (the camera must run and the screensaver stay off).
+    pub fn is_scanning_qr(&self) -> bool {
+        matches!(self.modal, ModalDialog::ScanDeviceQr { .. })
+    }
+
     pub fn toggle_theme(&mut self) {
         self.theme_mode = match self.theme_mode {
             ThemeMode::Dark => ThemeMode::Oled,

@@ -51,20 +51,24 @@ syncthing-vita
             │   ├── share_service.rs  # ShareService (create_share, upsert_device, toggle_device_for_share, refresh_picker_items)
             │   ├── share_creation.rs # ShareCreation (new share kept only once a device is linked)
             │   ├── dpad_navigation.rs # DpadNavigation (sidebar <-> page focus, Cross on focused element)
+            │   ├── qr_scan.rs        # QrScanFlow (scanner events -> AddDeviceById confirmation), extract_device_id
             │   ├── sync_coordinator.rs # SyncCoordinator (maps WorkerMsg & SyncEvent into AppState & ShareService)
             │   ├── input_controller.rs # InputController (main-screen InputFrame -> AppState + ShareService -> UserCommand)
-            │   └── modal_input/      # ModalInput: one input handler per modal (create_share, manage_devices, add_device, dialogs)
+            │   └── modal_input/      # ModalInput: one input handler per modal (create_share, manage_devices, add_device, scan_qr, dialogs)
             ├── infrastructure/       # Layer 3: Persistence, OS Filesystem, PS Vita Hardware & BEP Worker Thread
             │   ├── mod.rs
             │   ├── config_repo.rs    # ConfigRepository (devices.cfg, shares.cfg, syncthing.log, ux0: directory listing)
             │   ├── identity_store.rs # IdentityStore (sceKernelGetRandomNumber, device_seed.bin, cert.der)
             │   ├── vita_system.rs    # init_vita_network (SceSysmodule + SceSysmem + SceNet + SceNetCtl)
             │   ├── ui_script.rs      # Opt-in `ui-script` feature: scripted input replay + frame dumps for Vita3K
+            │   ├── qr_camera.rs      # QrScanner (SceCamera rear camera thread: 640x360 preview + QR decoding)
+            │   ├── qr_decoder.rs     # QrDecoder (pure-Rust `quircs` QR decoder on greyscale frames, host-testable)
             │   ├── sync_worker.rs    # spawn_sync_worker (background thread for fast-path BEP + UDP discovery + TLS 1.3)
             │   ├── framebuffer.rs    # VitaFramebuffer (SceDisplay + SceSysmem 960x544 RGBA8888 hardware driver)
             │   └── input.rs          # VitaInput & InputFrame (SceCtrl + SceTouch hardware driver)
             └── ui/                   # Layer 4: Pure Presentation & Rendering Layer (reads &AppState, zero business logic)
                 ├── mod.rs
+                ├── image.rs          # Greyscale camera frame blit (QR viewfinder)
                 ├── gfx.rs            # 960x544 RGBA8888 2D anti-aliased vector & TrueType software renderer
                 ├── theme.rs          # UiTheme (Dark & OLED palettes) and layout constants
                 ├── widgets.rs        # Reusable VitaSend UI components (cards, chips, actions, checkboxes, chrome, toast)
@@ -80,6 +84,7 @@ syncthing-vita
                 │   ├── create_share.rs
                 │   ├── manage_devices.rs
                 │   ├── add_device.rs
+                │   ├── scan_qr.rs
                 │   ├── fallback_keyboard.rs
                 │   ├── device_id.rs
                 │   ├── confirm_quit.rs
@@ -309,6 +314,7 @@ cargo test --workspace
 - `share_service.rs`: share deletion, share creation, device linking, paused discovered folders, `ConfigRepository` roundtrip, manual LAN pairing
 - `input_controller.rs`: `START` quit dialog, theme toggle, add-device-by-short-ID via system keyboard, share deletion confirmation, `Files` up navigation, virtual keyboard toggle
 - `dpad_navigation.rs`: sidebar <-> page focus, Shares rows / buttons / header, Files rows / Up button
+- `qr_scan.rs`: Device ID extraction from QR payloads, `quircs` decoding of a rendered QR code, scanner modal navigation, adding the scanned device
 - `power_policy.rs`: standby blocking while syncing (charging / battery / transfer grace period)
 
 ### Cross-Check for PS Vita (`armv7-sony-vita-newlibeabihf`)
@@ -361,6 +367,7 @@ The UI (`gfx.rs` + `ui/screens/*` + `ui/modals/*` + `ui/renderer.rs`) renders at
   - `CreateShare`: Create a share from PS Vita folder presets (`ux0:user/00/savedata`, `ux0:picture`, `ux0:music`, RetroArch saves) or browse `ux0:`. The share is only kept once a device is linked in the `ManageDevices` modal that follows.
   - `ManageDevices`: Link/unlink discovered Syncthing peers to a share with circular checkboxes (`draw_row_tick`) and trigger immediate `ClusterConfig` advertising (`Triangle · Apply & Sync`); `SELECT` pauses / enables the share.
   - `AddDeviceById`: Enter a remote Short / Full Device ID with the PS Vita system keyboard (opened on entry or by tapping the text box). The fallback Base32 keypad is hidden by default; `Triangle · Virtual Keyboard` shows / hides it.
+  - `ScanDeviceQr`: Rear-camera (`SceCamera`) viewfinder opened with `R · Scan QR` from `AddDeviceById` (or `R` in `ManageDevices`). The camera runs only while the modal is open; a decoded full Device ID is added like a typed one, `Circle` goes back to the ID form. Vita3K's emulated camera only delivers blank frames, so decoding must be tested on hardware.
   - `ShowDeviceId`: Displays a scannable QR code (`qrcodegen`) alongside the 8-group Syncthing Device ID.
   - `ConfirmDeleteShare`: Triggered by `Square` on the `Shares` tab; removes the share from `shares.cfg` (files on `ux0:` are kept).
   - `ConfirmQuit`: Triggered by `START` (or tapping `Quit`), warns if a sync is in progress before exiting to LiveArea.

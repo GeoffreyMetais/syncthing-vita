@@ -5,8 +5,9 @@ mod add_device;
 mod create_share;
 mod dialogs;
 mod manage_devices;
+mod scan_qr;
 
-pub(crate) use add_device::open_add_device_modal;
+pub(crate) use add_device::{confirm_add_device, open_add_device_modal};
 
 use crate::application::UserCommand;
 use crate::domain::{AppState, ModalDialog};
@@ -30,6 +31,9 @@ impl ModalInput {
                 return_share_idx,
                 keypad_idx,
             } => add_device::handle(state, repo, input, return_share_idx, keypad_idx),
+            ModalDialog::ScanDeviceQr { return_share_idx } => {
+                scan_qr::handle(state, input, return_share_idx)
+            }
             ModalDialog::ShowDeviceId => dialogs::show_device_id(state, input),
             ModalDialog::ConfirmDeleteShare { share_idx } => {
                 dialogs::confirm_delete_share(state, repo, input, share_idx)

@@ -220,6 +220,7 @@ pub fn render_manage_devices_modal(
             (PadButton::Cross, None, "Toggle"),
             (PadButton::Select, None, "Pause/Enable"),
             (PadButton::Square, None, "+ Add by ID"),
+            (PadButton::R, None, "Scan QR"),
             (PadButton::Triangle, None, "Apply & Sync"),
             (PadButton::Circle, None, close_lbl),
         ],
