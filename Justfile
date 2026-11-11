@@ -41,3 +41,8 @@ run-vita3k: vpk
     unzip -qo "{{vpk_path}}" -d "{{vita3k_ux0}}/app/{{title_id}}"
     @echo "Running {{title_id}} in Vita3K (SDL mode + stdout streaming)..."
     {{vita3k_bin}} --console 1 --frontend sdl -l 2 -r {{title_id}}
+
+# Build with scripted input, replay a UI script in Vita3K and save PNG frame dumps to target/ui-shots
+ui-scenario script secs="15":
+    CARGO_FEATURES=ui-script just vpk
+    ./scripts/vita3k_scenario.sh {{script}} {{secs}}

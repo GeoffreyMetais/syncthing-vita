@@ -159,6 +159,8 @@ impl VitaFramebuffer {
     /// Copies the 960x544 RGBA8888 backbuffer into the hidden hardware buffer,
     /// flips it to the display on the next VBlank, and waits for that VBlank.
     pub fn present(&mut self, pixels: &[u32]) {
+        #[cfg(feature = "ui-script")]
+        crate::infrastructure::ui_script::dump_if_requested(pixels);
         #[cfg(target_os = "vita")]
         {
             let dst = self.fb_ptrs[self.back_idx];

@@ -264,6 +264,8 @@ pub struct VitaInput {
     ime_open: bool,
     #[cfg(target_os = "vita")]
     ime_state: Box<ImeRuntimeState>,
+    #[cfg(feature = "ui-script")]
+    script: crate::infrastructure::ui_script::UiScript,
 }
 
 impl VitaInput {
@@ -284,6 +286,8 @@ impl VitaInput {
             ime_open: false,
             #[cfg(target_os = "vita")]
             ime_state: Box::new(ImeRuntimeState::new()),
+            #[cfg(feature = "ui-script")]
+            script: crate::infrastructure::ui_script::UiScript::load(),
         }
     }
 
@@ -365,6 +369,14 @@ impl VitaInput {
     }
 
     pub fn poll(&mut self) -> InputFrame {
+        #[allow(unused_mut)]
+        let mut frame = self.poll_hardware();
+        #[cfg(feature = "ui-script")]
+        self.script.apply(&mut frame);
+        frame
+    }
+
+    fn poll_hardware(&mut self) -> InputFrame {
         #[cfg(target_os = "vita")]
         unsafe {
             use input_ffi::*;

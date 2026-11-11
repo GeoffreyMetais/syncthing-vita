@@ -10,6 +10,9 @@ libc = { workspace = true }
 ab_glyph = "0.2"
 qrcodegen = "1.8"
 
+[features]
+ui-script = []
+
 # PS Vita target specific dependencies
 [target.'cfg(target_os = "vita")'.dependencies]
 # vitasdk-sys = "0.2"

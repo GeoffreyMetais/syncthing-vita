@@ -6,6 +6,8 @@ pub mod framebuffer;
 pub mod identity_store;
 pub mod input;
 pub mod sync_worker;
+#[cfg(feature = "ui-script")]
+pub mod ui_script;
 pub mod vita_system;
 
 pub use config_repo::ConfigRepository;

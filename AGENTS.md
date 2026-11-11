@@ -56,6 +56,7 @@ syncthing-vita
             │   ├── config_repo.rs    # ConfigRepository (devices.cfg, shares.cfg, syncthing.log, ux0: directory listing)
             │   ├── identity_store.rs # IdentityStore (sceKernelGetRandomNumber, device_seed.bin, cert.der)
             │   ├── vita_system.rs    # init_vita_network (SceSysmodule + SceSysmem + SceNet + SceNetCtl)
+            │   ├── ui_script.rs      # Opt-in `ui-script` feature: scripted input replay + frame dumps for Vita3K
             │   ├── sync_worker.rs    # spawn_sync_worker (background thread for fast-path BEP + UDP discovery + TLS 1.3)
             │   ├── framebuffer.rs    # VitaFramebuffer (SceDisplay + SceSysmem 960x544 RGBA8888 hardware driver)
             │   └── input.rs          # VitaInput & InputFrame (SceCtrl + SceTouch hardware driver)
@@ -329,6 +330,14 @@ After running `just vpk`, you can verify that the required Newlib heap and threa
 unzip -o target/armv7-sony-vita-newlibeabihf/release/SYNCTHING.vpk -d ~/.local/share/Vita3K/Vita3K/ux0/app/SYNCTHING
 timeout 6s ~/.local/bin/Vita3K --console 1 --frontend sdl -l 2 -r SYNCTHING || true
 ```
+
+### Scripted UI Smoke Tests in Vita3K (`ui-script` feature)
+The opt-in `ui-script` Cargo feature (never in release builds) replays inputs from `ux0:data/syncthing/ui_script.txt` and dumps frames on request (`infrastructure/ui_script.rs`). Steps, one per line: `wait <frames>`, `press <BUTTON>` (`CROSS`, `CIRCLE`, `SQUARE`, `TRIANGLE`, `UP`/`DOWN`/`LEFT`/`RIGHT`, `L`, `R`, `START`, `SELECT`), `tap <x> <y>`, `ime <text>`, `shot <name>`.
+```bash
+printf 'wait 60\npress R\nwait 10\nshot shares\n' > /tmp/shares.txt
+just ui-scenario /tmp/shares.txt
+```
+PNGs land in `target/ui-shots/`; the Vita3K app data directory is backed up and restored around the run.
 
 ---
 

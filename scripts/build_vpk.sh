@@ -20,7 +20,7 @@ echo "[1/5] Compiling Rust (target: ${TARGET}, profile: ${PROFILE})..."
 cargo +nightly build \
     -Z build-std=std,panic_abort \
     --package "${APP_NAME}" \
-    --target "${TARGET}" \
+    --target "${TARGET}" ${CARGO_FEATURES:+--features ${CARGO_FEATURES}} \
     $( [[ "${PROFILE}" == "release" ]] && echo "--release" )
 
 mkdir -p "${SCE_SYS_DIR}"
