@@ -16,10 +16,11 @@ use std::sync::mpsc::Receiver;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
+use application::power_policy::should_block_standby;
 use application::{InputController, ShareService, SyncCoordinator, UserCommand};
 use domain::{AppState, ModalDialog};
 use infrastructure::{
-    init_vita_network, keep_system_awake, spawn_sync_worker, ConfigRepository, IdentityStore,
+    init_vita_network, is_on_external_power, keep_system_awake, spawn_sync_worker, ConfigRepository, IdentityStore,
     VitaInput, WorkerMsg,
 };
 use syncthing_core::SyncControl;
@@ -126,6 +127,8 @@ fn main() {
     let mut last_activity = Instant::now();
     let mut last_sync_finished = Instant::now();
     let mut last_power_tick = Instant::now() - Duration::from_secs(60);
+    let mut seen_transfer_activity = state.transfer_activity;
+    let mut last_transfer_at: Option<Instant> = None;
 
     // Main interactive 60 FPS loop (Gamepad SceCtrl + Touch SceTouch + OLED Saver)
     loop {
@@ -238,12 +241,22 @@ fn main() {
             worker_ctl = Some(ctl);
         }
 
-        // Keep the console out of automatic standby while connected / reconnecting to peers.
-        if (worker_rx.is_some() || state.auto_reconnect_enabled)
-            && last_power_tick.elapsed() >= Duration::from_secs(10)
-        {
+        // Keep the console out of automatic standby only when useful: while charging, or during
+        // transfers (plus a grace period). On battery and idle, standby is allowed.
+        if state.transfer_activity != seen_transfer_activity {
+            seen_transfer_activity = state.transfer_activity;
+            last_transfer_at = Some(Instant::now());
+        }
+        if last_power_tick.elapsed() >= Duration::from_secs(10) {
             last_power_tick = Instant::now();
-            keep_system_awake();
+            let sync_active = worker_rx.is_some() || state.auto_reconnect_enabled;
+            if should_block_standby(
+                sync_active,
+                is_on_external_power(),
+                last_transfer_at.map(|t| t.elapsed()),
+            ) {
+                keep_system_awake();
+            }
         }
 
         // Automatic activation of OLED screensaver (pure black #000000 background):

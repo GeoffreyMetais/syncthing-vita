@@ -31,6 +31,12 @@ pub mod vita_ffi {
         pub fn sceKernelPowerTick(tick_type: c_int) -> c_int;
     }
 
+    #[link(name = "ScePower_stub")]
+    extern "C" {
+        /// Returns 1 when the console runs on external power (AC adapter / USB charging).
+        pub fn scePowerIsPowerOnline() -> c_int;
+    }
+
     #[link(name = "SceSysmem_stub")]
     extern "C" {
         pub fn sceKernelAllocMemBlock(
@@ -114,9 +120,9 @@ pub fn init_vita_network() -> Result<Vec<u8>, String> {
     Ok(Vec::new())
 }
 
-/// Keeps the PS Vita out of automatic standby while a sync session is active. Standby suspends
-/// Wi-Fi and drops every BEP connection, which peers see as the Vita going "Disconnected".
-/// The screen can still dim / switch off. Must be called periodically (the timer is ~1 minute).
+/// Keeps the PS Vita out of automatic standby (see `application::power_policy` for when).
+/// Standby suspends Wi-Fi and drops every BEP connection; the screen can still dim / switch off.
+/// Must be called periodically (the standby timer is reset by each call).
 #[cfg(target_os = "vita")]
 pub fn keep_system_awake() {
     unsafe {
@@ -126,3 +132,14 @@ pub fn keep_system_awake() {
 
 #[cfg(not(target_os = "vita"))]
 pub fn keep_system_awake() {}
+
+/// Returns `true` when the console is on external power (charging).
+#[cfg(target_os = "vita")]
+pub fn is_on_external_power() -> bool {
+    unsafe { vita_ffi::scePowerIsPowerOnline() == 1 }
+}
+
+#[cfg(not(target_os = "vita"))]
+pub fn is_on_external_power() -> bool {
+    false
+}

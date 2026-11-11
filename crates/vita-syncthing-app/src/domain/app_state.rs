@@ -39,6 +39,9 @@ pub struct AppState {
     pub session_connected: bool,
     /// True when automatic background reconnection is permitted (disabled when a peer is awaiting manual pairing).
     pub auto_reconnect_enabled: bool,
+    /// Incremented on every data transfer or applied remote change (downloads, uploads, deletions).
+    /// Lets the composition root detect transfer activity without the domain knowing about time.
+    pub transfer_activity: u64,
     /// True when share/device configuration was modified and the background session should reload once modals close.
     pub config_dirty: bool,
     /// Folder IDs explicitly created, enabled, or linked to a device by the user during this session
@@ -89,6 +92,7 @@ impl AppState {
             unpaired_lan_peers: Vec::new(),
             session_connected: false,
             auto_reconnect_enabled: true,
+            transfer_activity: 0,
             config_dirty: false,
             pending_folder_offers: Vec::new(),
             selected_share_idx: 0,

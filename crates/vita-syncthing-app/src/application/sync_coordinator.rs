@@ -135,6 +135,7 @@ impl SyncCoordinator {
                 ..
             } => {
                 state.sync_in_progress = true;
+                state.transfer_activity += 1;
                 state.bytes_transferred += size;
                 state.current_file = name.clone();
                 let pct = if total_size > 0 {
@@ -152,6 +153,7 @@ impl SyncCoordinator {
                 ..
             } => {
                 state.files_downloaded += 1;
+                state.transfer_activity += 1;
                 state.current_file = name.clone();
                 ShareService::log_event(
                     state,
@@ -175,6 +177,7 @@ impl SyncCoordinator {
                 name, offset, size, ..
             } => {
                 state.blocks_uploaded += 1;
+                state.transfer_activity += 1;
                 state.bytes_transferred += size;
                 state.current_file = name.clone();
                 state.status_line = format!("Uploading to peer: {}", name);
@@ -228,6 +231,7 @@ impl SyncCoordinator {
                 folder,
                 description,
             } => {
+                state.transfer_activity += 1;
                 ShareService::log_event(state, repo, &format!("[{}] {}", folder, description));
             }
             SyncEvent::FileError {

@@ -2,6 +2,7 @@
 //! (`SyncCoordinator`), and user input presenter/controller (`InputController`).
 
 pub mod input_controller;
+pub mod power_policy;
 pub mod share_service;
 pub mod sync_coordinator;
 

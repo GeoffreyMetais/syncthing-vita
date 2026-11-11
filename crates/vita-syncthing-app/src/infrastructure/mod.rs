@@ -16,4 +16,4 @@ pub use input::{
     BTN_SELECT, BTN_SQUARE, BTN_START, BTN_TRIANGLE, BTN_UP,
 };
 pub use sync_worker::{spawn_sync_worker, WorkerMsg};
-pub use vita_system::{init_vita_network, keep_system_awake};
+pub use vita_system::{init_vita_network, is_on_external_power, keep_system_awake};
