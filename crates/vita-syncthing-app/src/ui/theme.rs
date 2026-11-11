@@ -18,6 +18,10 @@ pub const OPEN_CHIP_W: i32 = 120;
 /// Touch width of the `Virtual Keyboard` button inside the `AddDeviceById` text box.
 pub const VIRTUAL_KEYBOARD_BTN_W: usize = 200;
 
+/// Size of the `ManageDevices` modal (wide enough for its five bottom actions).
+pub const MANAGE_DEVICES_W: i32 = 780;
+pub const MANAGE_DEVICES_H: i32 = 390;
+
 /// Touch width of the `R · Scan QR` action at the bottom left of the `AddDeviceById` modal.
 pub const SCAN_QR_BTN_W: usize = 150;
 

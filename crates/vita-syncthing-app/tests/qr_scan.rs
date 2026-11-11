@@ -165,3 +165,48 @@ fn test_scanning_own_device_id_returns_to_form() {
         }
     ));
 }
+
+#[test]
+fn test_scan_qr_action_in_manage_devices_modal() {
+    let dir = temp_test_dir("qr-share");
+    let repo = ConfigRepository::new(&dir);
+    let mut state = AppState::new(Vec::new(), Vec::new(), &dir);
+    let manage = ModalDialog::ManageDevices {
+        share_idx: 0,
+        selected_dev_idx: 0,
+    };
+    let tap = |state: &mut AppState, x: usize, y: usize| {
+        InputController::handle_input(
+            state,
+            &repo,
+            InputFrame {
+                touch_tap: Some((x, y)),
+                any_activity: true,
+                ..Default::default()
+            },
+        )
+    };
+    let scanning_share_0 = ModalDialog::ScanDeviceQr {
+        return_share_idx: Some(0),
+    };
+
+    // `R` shortcut
+    state.modal = manage;
+    press(&mut state, &repo, BTN_R);
+    assert_eq!(state.modal, scanning_share_0);
+
+    // `R · Scan QR` button next to `+ Add by ID` at the bottom of the modal
+    state.modal = manage;
+    tap(&mut state, 350, 413);
+    assert_eq!(state.modal, scanning_share_0);
+
+    // `+ Add by ID` button right of it still opens the ID form
+    state.modal = manage;
+    tap(&mut state, 480, 413);
+    assert!(matches!(state.modal, ModalDialog::AddDeviceById { .. }));
+
+    // `R Scan QR` hint in the bottom bar
+    state.modal = manage;
+    tap(&mut state, 640, 520);
+    assert_eq!(state.modal, scanning_share_0);
+}

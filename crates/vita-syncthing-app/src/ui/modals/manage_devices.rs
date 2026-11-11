@@ -4,7 +4,7 @@ use syncthing_core::DeviceId;
 
 use crate::domain::AppState;
 use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton, GFX_W};
-use crate::ui::theme::{UiTheme, C_GOOD, C_WARN, HINT_Y};
+use crate::ui::theme::{UiTheme, C_GOOD, C_WARN, HINT_Y, MANAGE_DEVICES_H, MANAGE_DEVICES_W};
 use crate::ui::widgets::{action_width, draw_action, draw_chip, draw_hints, draw_row_tick};
 
 /// Modal Dialog 2: Add or remove Syncthing devices for a share (`shares[share_idx]`).
@@ -16,8 +16,8 @@ pub fn render_manage_devices_modal(
     selected_dev_idx: usize,
 ) {
     gfx.dim(175);
-    let w = 680;
-    let h = 390;
+    let w = MANAGE_DEVICES_W;
+    let h = MANAGE_DEVICES_H;
     let dx = (GFX_W - w) / 2;
     let dy = (HINT_Y - h) / 2;
 
@@ -194,6 +194,9 @@ pub fn render_manage_devices_modal(
     let bx_close = dx + w - 28 - w_close;
     let bx_sync = bx_close - 10 - w_sync;
     let bx_add = bx_sync - 10 - w_add;
+    let w_scan = action_width(gfx, PadButton::R, "Scan QR");
+    let bx_scan = bx_add - 10 - w_scan;
+    draw_action(gfx, th, bx_scan, dy + h - 32, PadButton::R, "Scan QR");
     draw_action(
         gfx,
         th,

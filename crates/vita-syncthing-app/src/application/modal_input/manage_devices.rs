@@ -7,6 +7,7 @@ use crate::infrastructure::{
     ConfigRepository, InputFrame, BTN_CIRCLE, BTN_CROSS, BTN_DOWN, BTN_R, BTN_SELECT, BTN_SQUARE,
     BTN_TRIANGLE, BTN_UP,
 };
+use crate::ui::theme::{MANAGE_DEVICES_H, MANAGE_DEVICES_W};
 
 /// Handles input in the `ManageDevices` modal.
 pub fn handle(
@@ -53,22 +54,28 @@ pub fn handle(
 
     let mut toggle_dev = (input.pressed & BTN_CROSS) != 0;
     if let Some((tx, ty)) = input.touch_tap {
-        let w = 680usize;
-        let h = 390usize;
+        let w = MANAGE_DEVICES_W as usize;
+        let h = MANAGE_DEVICES_H as usize;
         let dx = (960 - w) / 2;
         let dy = (500 - h) / 2;
-        if ty >= 500 && (320..=520).contains(&tx) {
+        if ty >= 500 && (450..=575).contains(&tx) {
             return open_add_device_modal(state, Some(share_idx));
         }
+        if ty >= 500 && (590..=705).contains(&tx) {
+            QrScanFlow::open(state, Some(share_idx));
+            return UserCommand::None;
+        }
         if tx >= dx && tx <= dx + w && ty >= dy && ty <= dy + h {
-            // Bottom buttons inside modal (+ Add by ID / Apply & Sync / Done)
+            // Bottom buttons inside modal (Pause / Scan QR / + Add by ID / Apply & Sync / Done)
             if ty >= dy + h - 56 {
                 if tx >= dx + w - 140 {
                     close_manage_devices(state, repo);
                 } else if tx >= dx + w - 330 {
                     return apply_and_sync(state, repo, share_idx);
-                } else if tx >= dx + w - 500 {
+                } else if tx >= dx + w - 445 {
                     return open_add_device_modal(state, Some(share_idx));
+                } else if tx >= dx + w - 578 {
+                    QrScanFlow::open(state, Some(share_idx));
                 } else {
                     state.selected_share_idx = share_idx;
                     ShareService::toggle_selected_share(state, repo);
