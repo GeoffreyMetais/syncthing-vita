@@ -301,7 +301,7 @@ cargo test --workspace
 `vita-syncthing-app` tests live in `crates/vita-syncthing-app/tests/` (`cargo test -p vita-syncthing-app`):
 - `share_creation.rs`: a new share without a linked device is discarded, a linked one is kept, `Files` tab folder selection, already-shared folders are not selectable
 - `share_service.rs`: share deletion, share creation, device linking, paused discovered folders, `ConfigRepository` roundtrip, manual LAN pairing
-- `input_controller.rs`: `START` quit dialog, theme toggle, add-device-by-short-ID via system keyboard, share deletion confirmation, `Files` up navigation
+- `input_controller.rs`: `START` quit dialog, theme toggle, add-device-by-short-ID via system keyboard, share deletion confirmation, `Files` up navigation, virtual keyboard toggle
 - `power_policy.rs`: standby blocking while syncing (charging / battery / transfer grace period)
 
 ### Cross-Check for PS Vita (`armv7-sony-vita-newlibeabihf`)
@@ -344,6 +344,7 @@ The UI (`gfx.rs` + `ui/screens/*` + `ui/modals/*` + `ui/renderer.rs`) renders at
 - **Modal Dialogs** (`ModalDialog` in `domain/models.rs`, rendered by `ui/modals/*`):
   - `CreateShare`: Create a share from PS Vita folder presets (`ux0:user/00/savedata`, `ux0:picture`, `ux0:music`, RetroArch saves) or browse `ux0:`. The share is only kept once a device is linked in the `ManageDevices` modal that follows.
   - `ManageDevices`: Link/unlink discovered Syncthing peers to a share with circular checkboxes (`draw_row_tick`) and trigger immediate `ClusterConfig` advertising (`Triangle · Apply & Sync`); `SELECT` pauses / enables the share.
+  - `AddDeviceById`: Enter a remote Short / Full Device ID with the PS Vita system keyboard (opened on entry or by tapping the text box). The fallback Base32 keypad is hidden by default; `Triangle · Virtual Keyboard` shows / hides it.
   - `ShowDeviceId`: Displays a scannable QR code (`qrcodegen`) alongside the 8-group Syncthing Device ID.
   - `ConfirmDeleteShare`: Triggered by `Square` on the `Shares` tab; removes the share from `shares.cfg` (files on `ux0:` are kept).
   - `ConfirmQuit`: Triggered by `START` (or tapping `Quit`), warns if a sync is in progress before exiting to LiveArea.

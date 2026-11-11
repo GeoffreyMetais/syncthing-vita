@@ -61,6 +61,8 @@ pub struct AppState {
     pub device_id_input: String,
     /// True while the native PS Vita System Keyboard (`SceIme`) overlay is active.
     pub ime_active: bool,
+    /// True when the on-screen fallback Base32 keypad (`Virtual Keyboard`) is shown in `AddDeviceById`.
+    pub fallback_keypad_visible: bool,
 }
 
 impl AppState {
@@ -108,6 +110,7 @@ impl AppState {
             toast_msg: None,
             device_id_input: String::new(),
             ime_active: false,
+            fallback_keypad_visible: false,
         }
     }
 

@@ -1,5 +1,5 @@
 //! On-screen fallback Base32 keypad component for manual device ID entry.
-//! Used when the native PS Vita System Keyboard (`SceIme`) is closed or as a touch/gamepad fallback.
+//! Shown on demand (`Virtual Keyboard`) as a touch/gamepad fallback to the PS Vita System Keyboard (`SceIme`).
 
 use crate::domain::ADD_DEVICE_KEYPAD;
 use crate::ui::gfx::{rgba, Align, Color, FontWeight, Gfx};

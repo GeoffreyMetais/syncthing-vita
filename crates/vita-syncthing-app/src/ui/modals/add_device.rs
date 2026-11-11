@@ -5,14 +5,15 @@ use syncthing_core::DeviceId;
 use super::fallback_keyboard::draw_fallback_keypad;
 use crate::domain::AppState;
 use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton, GFX_W};
-use crate::ui::theme::{UiTheme, C_GOOD, C_WARN, HINT_Y};
+use crate::ui::theme::{add_device_modal_height, UiTheme, C_GOOD, C_WARN, HINT_Y};
 use crate::ui::widgets::{action_width, draw_action, draw_hints};
 
 /// Modal Dialog 2b: Add a remote Syncthing device by entering its Short ID (7+ chars) or Full ID (56 chars).
 pub fn render_add_device_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, keypad_idx: usize) {
     gfx.dim(180);
+    let keypad = state.fallback_keypad_visible;
     let w = 700;
-    let h = 424;
+    let h = add_device_modal_height(keypad);
     let dx = (GFX_W - w) / 2;
     let dy = (HINT_Y - h) / 2;
 
@@ -73,14 +74,19 @@ pub fn render_add_device_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, ke
     gfx.rrect(lx, box_y, content_w, box_h, 10, th.bg);
     gfx.rrect_outline(lx, box_y, content_w, box_h, 10, 1, border_col);
 
-    let w_kbd = action_width(gfx, PadButton::Triangle, "System Keyboard");
+    let kbd_lbl = if keypad {
+        "Hide Keyboard"
+    } else {
+        "Virtual Keyboard"
+    };
+    let w_kbd = action_width(gfx, PadButton::Triangle, kbd_lbl);
     draw_action(
         gfx,
         th,
         lx + content_w - 10 - w_kbd,
         box_y + box_h / 2,
         PadButton::Triangle,
-        "System Keyboard",
+        kbd_lbl,
     );
 
     let text_max_w = content_w - w_kbd - 32;
@@ -93,7 +99,7 @@ pub fn render_add_device_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, ke
             FontWeight::Regular,
             th.faint,
             Align::Left,
-            "e.g. MFZWI3D  or  MFZWI3D-BONSGYC-... (Press Triangle for Keyboard)",
+            "e.g. MFZWI3D  or  MFZWI3D-BONSGYC-... (tap to type)",
         );
     } else {
         let display_str = format!("{}|", state.device_id_input.to_uppercase());
@@ -164,9 +170,10 @@ pub fn render_add_device_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, ke
         &status_txt,
     );
 
-    // Render the dedicated fallback Base32 keypad component
-    let grid_y = dy + 162;
-    draw_fallback_keypad(gfx, th, lx, grid_y, keypad_idx, state.ime_active);
+    // Render the dedicated fallback Base32 keypad component (`Virtual Keyboard`) on demand
+    if keypad {
+        draw_fallback_keypad(gfx, th, lx, dy + 162, keypad_idx, state.ime_active);
+    }
 
     // Bottom modal action buttons
     let w_confirm = action_width(gfx, PadButton::Start, "Add Device");
@@ -194,15 +201,14 @@ pub fn render_add_device_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, ke
     );
     draw_action(gfx, th, bx_cancel, dy + h - 28, PadButton::Circle, "Cancel");
 
-    draw_hints(
-        gfx,
-        th,
-        &[
-            (PadButton::Triangle, None, "System Keyboard"),
-            (PadButton::Start, None, "Confirm & Add"),
-            (PadButton::Dpad, Some(PadButton::Cross), "Type Key"),
-            (PadButton::Square, None, "Backspace"),
-            (PadButton::Circle, None, "Cancel"),
-        ],
-    );
+    let mut hints = vec![
+        (PadButton::Triangle, None, kbd_lbl),
+        (PadButton::Start, None, "Confirm & Add"),
+    ];
+    if keypad {
+        hints.push((PadButton::Dpad, Some(PadButton::Cross), "Type Key"));
+    }
+    hints.push((PadButton::Square, None, "Backspace"));
+    hints.push((PadButton::Circle, None, "Cancel"));
+    draw_hints(gfx, th, &hints);
 }

@@ -10,7 +10,10 @@ use crate::infrastructure::{
     ConfigRepository, InputFrame, BTN_CIRCLE, BTN_CROSS, BTN_DOWN, BTN_L, BTN_LEFT, BTN_R,
     BTN_RIGHT, BTN_SELECT, BTN_SQUARE, BTN_START, BTN_TRIANGLE, BTN_UP,
 };
-use crate::ui::theme::{BROWSER_STEP, BROWSER_TOP, CONTENT_R, OPEN_CHIP_W};
+use crate::ui::theme::{
+    add_device_modal_height, BROWSER_STEP, BROWSER_TOP, CONTENT_R, OPEN_CHIP_W,
+    VIRTUAL_KEYBOARD_BTN_W,
+};
 
 /// High-level command returned by `InputController` to the main application loop.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -492,7 +495,8 @@ impl InputController {
 
                 // 2. Gamepad actions when the OS keyboard overlay is closed
                 if (input.pressed & BTN_TRIANGLE) != 0 {
-                    return UserCommand::OpenSystemKeyboard;
+                    state.fallback_keypad_visible = !state.fallback_keypad_visible;
+                    return UserCommand::None;
                 }
                 if (input.pressed & BTN_START) != 0 {
                     return Self::confirm_add_device(state, repo, return_share_idx);
@@ -505,29 +509,31 @@ impl InputController {
                     state.device_id_input.pop();
                 }
 
-                // 9x4 Keypad navigation
-                if (input.pressed & BTN_LEFT) != 0 && keypad_idx % 9 > 0 {
+                // 9x4 Keypad navigation (only while the virtual keyboard is shown)
+                let keypad = state.fallback_keypad_visible;
+                let pressed = if keypad { input.pressed } else { 0 };
+                if (pressed & BTN_LEFT) != 0 && keypad_idx % 9 > 0 {
                     keypad_idx -= 1;
                     state.modal = ModalDialog::AddDeviceById {
                         return_share_idx,
                         keypad_idx,
                     };
                 }
-                if (input.pressed & BTN_RIGHT) != 0 && keypad_idx % 9 < 8 {
+                if (pressed & BTN_RIGHT) != 0 && keypad_idx % 9 < 8 {
                     keypad_idx += 1;
                     state.modal = ModalDialog::AddDeviceById {
                         return_share_idx,
                         keypad_idx,
                     };
                 }
-                if (input.pressed & BTN_UP) != 0 && keypad_idx >= 9 {
+                if (pressed & BTN_UP) != 0 && keypad_idx >= 9 {
                     keypad_idx -= 9;
                     state.modal = ModalDialog::AddDeviceById {
                         return_share_idx,
                         keypad_idx,
                     };
                 }
-                if (input.pressed & BTN_DOWN) != 0 && keypad_idx + 9 < ADD_DEVICE_KEYPAD.len() {
+                if (pressed & BTN_DOWN) != 0 && keypad_idx + 9 < ADD_DEVICE_KEYPAD.len() {
                     keypad_idx += 9;
                     state.modal = ModalDialog::AddDeviceById {
                         return_share_idx,
@@ -535,17 +541,17 @@ impl InputController {
                     };
                 }
 
-                let mut activate_key = (input.pressed & BTN_CROSS) != 0;
+                let mut activate_key = (pressed & BTN_CROSS) != 0;
                 if let Some((tx, ty)) = input.touch_tap {
                     let w = 700usize;
-                    let h = 424usize;
+                    let h = add_device_modal_height(keypad) as usize;
                     let dx = (960 - w) / 2;
                     let dy = (500 - h) / 2;
                     let lx = dx + 28;
 
                     if ty >= 500 {
                         if tx < 220 {
-                            return UserCommand::OpenSystemKeyboard;
+                            state.fallback_keypad_visible = !keypad;
                         } else if tx < 420 {
                             return Self::confirm_add_device(state, repo, return_share_idx);
                         } else if tx >= 760 {
@@ -555,8 +561,13 @@ impl InputController {
                     }
 
                     if tx >= dx && tx <= dx + w && ty >= dy && ty <= dy + h {
-                        // Tapping the text input box opens the PS Vita System Keyboard
+                        // Tapping the text input box opens the PS Vita System Keyboard, except
+                        // its `Virtual Keyboard` button which toggles the fallback keypad
                         if (dy + 76..=dy + 132).contains(&ty) {
+                            if tx >= dx + w - 28 - VIRTUAL_KEYBOARD_BTN_W {
+                                state.fallback_keypad_visible = !keypad;
+                                return UserCommand::None;
+                            }
                             return UserCommand::OpenSystemKeyboard;
                         }
                         // Tapping bottom action buttons (`Add Device`, `Backspace`, `Cancel`)
@@ -572,7 +583,8 @@ impl InputController {
                         }
                         // Tapping a key in the 9x4 Base32 keypad grid
                         let grid_y = dy + 162;
-                        for idx in 0..ADD_DEVICE_KEYPAD.len() {
+                        let key_count = if keypad { ADD_DEVICE_KEYPAD.len() } else { 0 };
+                        for idx in 0..key_count {
                             let col = idx % 9;
                             let row = idx / 9;
                             let kx = lx + col * 72;
@@ -735,6 +747,7 @@ impl InputController {
 
     fn open_add_device_modal(state: &mut AppState, return_share_idx: Option<usize>) -> UserCommand {
         state.device_id_input.clear();
+        state.fallback_keypad_visible = false;
         state.modal = ModalDialog::AddDeviceById {
             return_share_idx,
             keypad_idx: 0,

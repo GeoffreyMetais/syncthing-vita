@@ -7,7 +7,8 @@ use common::temp_test_dir;
 use vita_syncthing_app::application::{InputController, ShareService, UserCommand};
 use vita_syncthing_app::domain::{ActiveTab, AppState, ModalDialog, ThemeMode};
 use vita_syncthing_app::infrastructure::{
-    ConfigRepository, InputFrame, BTN_CIRCLE, BTN_CROSS, BTN_SQUARE, BTN_START,
+    ConfigRepository, InputFrame, BTN_CIRCLE, BTN_CROSS, BTN_RIGHT, BTN_SQUARE, BTN_START,
+    BTN_TRIANGLE,
 };
 
 fn press(state: &mut AppState, repo: &ConfigRepository, buttons: u32) -> UserCommand {
@@ -201,6 +202,51 @@ fn test_files_tab_up_navigation_walks_device_root_paths() {
     assert_eq!(state.active_tab, ActiveTab::FolderPicker);
     press(&mut state, &repo, BTN_CIRCLE);
     assert_eq!(state.active_tab, ActiveTab::Shares);
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_add_device_virtual_keyboard_is_hidden_until_requested() {
+    let dir = temp_test_dir("virtual-keyboard");
+    let repo = ConfigRepository::new(&dir);
+    let mut state = AppState::new(Vec::new(), Vec::new(), &dir);
+    state.active_tab = ActiveTab::Settings;
+
+    // Triangle on Settings opens the modal (with the system keyboard) and no virtual keypad
+    assert_eq!(
+        press(&mut state, &repo, BTN_TRIANGLE),
+        UserCommand::OpenSystemKeyboard
+    );
+    assert!(!state.fallback_keypad_visible);
+
+    // While hidden, D-pad / Cross do not type on the keypad
+    press(&mut state, &repo, BTN_RIGHT);
+    press(&mut state, &repo, BTN_CROSS);
+    assert!(state.device_id_input.is_empty());
+    assert_eq!(
+        state.modal,
+        ModalDialog::AddDeviceById {
+            return_share_idx: None,
+            keypad_idx: 0,
+        }
+    );
+
+    // Triangle (Virtual Keyboard) shows the keypad, which then types keys
+    assert_eq!(press(&mut state, &repo, BTN_TRIANGLE), UserCommand::None);
+    assert!(state.fallback_keypad_visible);
+    press(&mut state, &repo, BTN_RIGHT);
+    press(&mut state, &repo, BTN_CROSS);
+    assert_eq!(state.device_id_input, "B");
+
+    // Triangle again hides it; reopening the modal starts hidden
+    press(&mut state, &repo, BTN_TRIANGLE);
+    assert!(!state.fallback_keypad_visible);
+    press(&mut state, &repo, BTN_TRIANGLE);
+    press(&mut state, &repo, BTN_CIRCLE);
+    assert_eq!(state.modal, ModalDialog::None);
+    press(&mut state, &repo, BTN_TRIANGLE);
+    assert!(!state.fallback_keypad_visible);
 
     let _ = std::fs::remove_dir_all(&dir);
 }

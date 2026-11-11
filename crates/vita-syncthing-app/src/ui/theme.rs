@@ -15,6 +15,17 @@ pub const BROWSER_TOP: i32 = 134;
 pub const BROWSER_STEP: i32 = 42;
 /// Touch width of the "Open" chip at the right of a directory row in the `Files` browser.
 pub const OPEN_CHIP_W: i32 = 120;
+/// Touch width of the `Virtual Keyboard` button inside the `AddDeviceById` text box.
+pub const VIRTUAL_KEYBOARD_BTN_W: usize = 200;
+
+/// Height of the `AddDeviceById` modal, which grows when the fallback keypad is shown.
+pub const fn add_device_modal_height(keypad_visible: bool) -> i32 {
+    if keypad_visible {
+        424
+    } else {
+        256
+    }
+}
 
 pub const C_GOOD: Color = rgb(102, 187, 106);
 pub const C_WARN: Color = rgb(255, 193, 77);
