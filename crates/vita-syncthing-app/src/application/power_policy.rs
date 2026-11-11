@@ -24,22 +24,3 @@ pub fn should_block_standby(
     }
     charging || since_last_transfer.is_some_and(|d| d <= TRANSFER_GRACE)
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn standby_policy() {
-        let recent = Some(Duration::from_secs(10));
-        let old = Some(Duration::from_secs(600));
-        // No sync running: never block.
-        assert!(!should_block_standby(false, true, recent));
-        // Charging: always block while syncing.
-        assert!(should_block_standby(true, true, None));
-        // On battery: only during transfers and the grace period after them.
-        assert!(should_block_standby(true, false, recent));
-        assert!(!should_block_standby(true, false, old));
-        assert!(!should_block_standby(true, false, None));
-    }
-}

@@ -37,8 +37,10 @@ syncthing-vita
     │   └── tests/                    # Integration tests, one file per module (+ common/ helpers)
     └── vita-syncthing-app/           # Native PlayStation Vita GUI application (Title ID: SYNCTHING, Clean Architecture)
         ├── assets/fonts/             # Embedded Poppins TrueType fonts (Regular, Medium, Bold — SIL OFL 1.1)
+        ├── tests/                    # Integration tests, one file per use case / component (+ common/ helpers)
         └── src/
-            ├── main.rs               # Composition root, 60 FPS event loop, and PS Vita kernel symbols
+            ├── lib.rs                # Library target: declares the four layers ONLY (no logic, no tests)
+            ├── main.rs               # Composition root (binary), 60 FPS event loop, and PS Vita kernel symbols
             ├── domain/               # Layer 1: Pure Domain Entities, Value Objects & Application State
             │   ├── mod.rs
             │   ├── models.rs         # KnownDevice, ShareConfigEntry, PickerItem, ActiveTab, PickerMode, ModalDialog, ThemeMode
@@ -149,6 +151,11 @@ Dependencies strictly point **inward**. Inner layers never import or depend on o
 5. **Composition Root (`crates/vita-syncthing-app/src/main.rs`)**
    - **Responsibility**: Initializes subsystems, wires dependencies, executes the 60 FPS event loop, and exports required VitaSDK entrypoint symbols (`_newlib_heap_size_user`, `sceUserMainThreadStackSize`).
    - Must remain concise and free of monolithic rendering or business logic.
+   - Imports the layers from the crate's library (`use vita_syncthing_app::...`). `src/lib.rs` only declares `domain`, `application`, `infrastructure` and `ui`; the VitaSDK entrypoint symbols stay in `main.rs`.
+
+6. **Tests (`crates/vita-syncthing-app/tests/`)**
+   - **No `#[cfg(test)] mod tests` inside `src/`** (neither in `main.rs` nor in layer modules). Tests are host integration tests against the library's public API, one file per use case / component (`share_service.rs`, `input_controller.rs`, `power_policy.rs`), with shared helpers in `tests/common/mod.rs` (e.g. `temp_test_dir`).
+   - Test domain and application logic through public functions; never through Vita hardware drivers (`sce*` code is `#[cfg(target_os = "vita")]` and absent on host).
 
 ---
 
@@ -287,6 +294,11 @@ cargo test --workspace
 - `local_db.rs`: persistent folder database text format roundtrip
 - `folder_sync.rs`: version convergence across peers, local deletions become tombstones
 - `version_vector.rs`: version vector ordering / merge / bump
+
+`vita-syncthing-app` tests live in `crates/vita-syncthing-app/tests/` (`cargo test -p vita-syncthing-app`):
+- `share_service.rs`: share creation, device linking, paused discovered folders, `ConfigRepository` roundtrip, manual LAN pairing
+- `input_controller.rs`: `START` quit dialog, theme toggle, add-device-by-short-ID via system keyboard
+- `power_policy.rs`: standby blocking while syncing (charging / battery / transfer grace period)
 
 ### Cross-Check for PS Vita (`armv7-sony-vita-newlibeabihf`)
 ```bash
