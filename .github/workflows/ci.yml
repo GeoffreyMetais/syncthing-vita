@@ -1,0 +1,88 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  test-host:
+    name: Host Tests (x86_64)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo dependencies and build artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run all workspace unit and integration tests
+        env:
+          RUSTFLAGS: "-D warnings"
+        run: cargo test --workspace
+
+      - name: Check ui-script feature compilation
+        env:
+          RUSTFLAGS: "-D warnings"
+        run: cargo check -p vita-syncthing-app --features ui-script
+
+  build-vita:
+    name: PS Vita Build & Symbol Audit
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust nightly toolchain with rust-src
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rust-src
+
+      - name: Cache Cargo dependencies and build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: vita-nightly
+
+      - name: Install VitaSDK
+        env:
+          VITASDK: ${{ runner.temp }}/vitasdk
+        run: |
+          ./scripts/setup_env.sh --install-vitasdk
+          echo "VITASDK=${VITASDK}" >> "$GITHUB_ENV"
+          echo "${VITASDK}/bin" >> "$GITHUB_PATH"
+
+      - name: Build PS Vita release VPK
+        run: ./scripts/build_vpk.sh
+
+      - name: Audit hardware-critical ELF symbols
+        run: |
+          ELF_PATH="target/armv7-sony-vita-newlibeabihf/release/vita-syncthing-app.elf"
+          SYMBOLS="$(arm-vita-eabi-nm -n "${ELF_PATH}")"
+          grep -q "R _newlib_heap_size_user" <<< "${SYMBOLS}" || {
+            echo "ERROR: _newlib_heap_size_user is missing or weak in ${ELF_PATH}!" >&2
+            exit 1
+          }
+          grep -q "R sceUserMainThreadStackSize" <<< "${SYMBOLS}" || {
+            echo "ERROR: sceUserMainThreadStackSize is missing in ${ELF_PATH}!" >&2
+            exit 1
+          }
+          grep -E "_newlib_heap_size_user|sceUserMainThread" <<< "${SYMBOLS}"
+
+      - name: Upload SYNCTHING.vpk artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SYNCTHING-vpk
+          path: target/armv7-sony-vita-newlibeabihf/release/SYNCTHING.vpk
+          if-no-files-found: error
