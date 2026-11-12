@@ -3,12 +3,11 @@
 
 mod common;
 
-use common::{draw, press, tap, temp_test_dir};
+use common::{draw, press, rect_of, tap, tap_rect, temp_test_dir};
 use syncthing_core::DeviceId;
 use vita_syncthing_app::application::{InputController, ShareService};
 use vita_syncthing_app::domain::{
-    ActiveTab, AppState, FocusSlot, Language, LanguagePreference, ModalDialog, PickerMode, Rect,
-    UiAction,
+    ActiveTab, AppState, FocusSlot, Language, LanguagePreference, ModalDialog, PickerMode, UiAction,
 };
 use vita_syncthing_app::infrastructure::{
     ConfigRepository, InputFrame, BTN_CIRCLE, BTN_CROSS, BTN_DOWN, BTN_RIGHT, BTN_SQUARE,
@@ -34,26 +33,6 @@ fn setup(name: &str, count: usize) -> (String, ConfigRepository, AppState) {
     (dir, repo, state)
 }
 
-/// Rectangle of the element that triggers `action` in the drawn frame.
-fn rect_of(state: &AppState, action: UiAction) -> Rect {
-    state
-        .hit_map
-        .hotspots()
-        .iter()
-        .find(|h| h.action == action)
-        .unwrap_or_else(|| panic!("{action:?} is not on screen"))
-        .rect
-}
-
-fn tap_center(state: &mut AppState, repo: &ConfigRepository, rect: Rect) {
-    tap(
-        state,
-        repo,
-        (rect.x + rect.w / 2) as usize,
-        (rect.y + rect.h / 2) as usize,
-    );
-}
-
 #[test]
 fn test_touch_targets_follow_the_drawn_buttons_in_every_language() {
     let (dir, repo, mut state) = setup("shares-touch-languages", 2);
@@ -67,9 +46,9 @@ fn test_touch_targets_follow_the_drawn_buttons_in_every_language() {
     ] {
         state.set_language_preference(pref);
         draw(&mut state);
-        let delete = rect_of(&state, UiAction::DeleteShare(1));
+        let delete = rect_of(&mut state, UiAction::DeleteShare(1));
         delete_positions.push(delete.x);
-        tap_center(&mut state, &repo, delete);
+        tap_rect(&mut state, &repo, delete);
         assert_eq!(
             state.modal,
             ModalDialog::ConfirmDeleteShare { share_idx: 1 }
@@ -78,8 +57,8 @@ fn test_touch_targets_follow_the_drawn_buttons_in_every_language() {
         state.modal = ModalDialog::None;
 
         draw(&mut state);
-        let devices = rect_of(&state, UiAction::ManageDevices(0));
-        tap_center(&mut state, &repo, devices);
+        let devices = rect_of(&mut state, UiAction::ManageDevices(0));
+        tap_rect(&mut state, &repo, devices);
         assert_eq!(
             state.modal,
             ModalDialog::ManageDevices {
@@ -100,7 +79,7 @@ fn test_touch_targets_follow_the_drawn_buttons_in_every_language() {
 fn test_tapping_a_card_selects_it_and_new_share_opens_the_dialog() {
     let (dir, repo, mut state) = setup("shares-touch-card", 2);
     draw(&mut state);
-    let card = rect_of(&state, UiAction::SelectShare(1));
+    let card = rect_of(&mut state, UiAction::SelectShare(1));
     // Left part of the card: away from the row's buttons.
     tap(
         &mut state,
@@ -112,8 +91,8 @@ fn test_tapping_a_card_selects_it_and_new_share_opens_the_dialog() {
     assert_eq!(state.modal, ModalDialog::None);
 
     draw(&mut state);
-    let new_share = rect_of(&state, UiAction::NewShare);
-    tap_center(&mut state, &repo, new_share);
+    let new_share = rect_of(&mut state, UiAction::NewShare);
+    tap_rect(&mut state, &repo, new_share);
     assert_eq!(state.modal, ModalDialog::CreateShare { selected_idx: 0 });
     let _ = std::fs::remove_dir_all(&dir);
 }
@@ -167,7 +146,7 @@ fn test_cross_activates_the_focused_element() {
 fn test_element_of_a_share_removed_since_the_frame_is_ignored() {
     let (dir, repo, mut state) = setup("shares-stale-frame", 1);
     draw(&mut state);
-    let delete = rect_of(&state, UiAction::DeleteShare(0));
+    let delete = rect_of(&mut state, UiAction::DeleteShare(0));
     // The share disappears (e.g. sync event) before the next frame is drawn.
     state.shares.clear();
     InputController::handle_input(

@@ -3,14 +3,15 @@
 
 mod common;
 
-use common::{press, temp_test_dir};
+use common::{press, tap_action, temp_test_dir};
 use syncthing_core::DeviceId;
-use vita_syncthing_app::application::{FolderOfferService, InputController, ShareService};
-use vita_syncthing_app::domain::{ActiveTab, AppState, ModalDialog, SETTINGS_ROW_DECLINED};
-use vita_syncthing_app::infrastructure::{
-    ConfigRepository, InputFrame, BTN_CIRCLE, BTN_CROSS, BTN_DOWN, BTN_SQUARE,
+use vita_syncthing_app::application::{FolderOfferService, ShareService};
+use vita_syncthing_app::domain::{
+    ActiveTab, AppState, ModalDialog, UiAction, SETTINGS_ROW_DECLINED,
 };
-use vita_syncthing_app::ui::theme::{SETTINGS_DECLINED_B, SETTINGS_DECLINED_Y};
+use vita_syncthing_app::infrastructure::{
+    ConfigRepository, BTN_CIRCLE, BTN_CROSS, BTN_DOWN, BTN_SQUARE,
+};
 
 const PEER: DeviceId = DeviceId([0x42; 32]);
 
@@ -172,18 +173,7 @@ fn test_settings_clear_declined_by_touch() {
     FolderOfferService::decline(&mut state, &repo, 0);
     state.active_tab = ActiveTab::Settings;
 
-    InputController::handle_input(
-        &mut state,
-        &repo,
-        InputFrame {
-            touch_tap: Some((
-                860,
-                (SETTINGS_DECLINED_Y + SETTINGS_DECLINED_B) as usize / 2,
-            )),
-            any_activity: true,
-            ..Default::default()
-        },
-    );
+    tap_action(&mut state, &repo, UiAction::ClearDeclinedFolders);
     assert!(state.ignored_folders.is_empty());
 
     let _ = std::fs::remove_dir_all(&dir);

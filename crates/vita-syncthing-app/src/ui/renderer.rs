@@ -68,18 +68,22 @@ pub fn draw_frame(gfx: &mut Gfx, state: &mut AppState) {
         return;
     }
 
-    draw_chrome(gfx, &th, state);
+    draw_chrome(gfx, &th, state, &mut hits);
 
     match state.active_tab {
-        ActiveTab::Dashboard => render_dashboard_tab(gfx, &th, state),
+        ActiveTab::Dashboard => render_dashboard_tab(gfx, &th, state, &mut hits),
         ActiveTab::Shares => render_shares_tab(gfx, &th, state, &mut hits),
         ActiveTab::FolderPicker => {
-            render_folder_picker_tab(gfx, &th, state);
+            render_folder_picker_tab(gfx, &th, state, &mut hits);
         }
-        ActiveTab::Settings => render_settings_tab(gfx, &th, state),
+        ActiveTab::Settings => render_settings_tab(gfx, &th, state, &mut hits),
     }
 
-    // Draw active modal dialog on top of dimmed screen
+    // Draw active modal dialog on top of dimmed screen. Nothing of the page behind it is
+    // interactive while it is open.
+    if state.modal != ModalDialog::None {
+        hits.clear();
+    }
     match state.modal {
         ModalDialog::None => {}
         ModalDialog::CreateShare { selected_idx } => {

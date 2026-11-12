@@ -2,8 +2,8 @@
 
 mod common;
 
-use common::{press, tap, temp_test_dir};
-use vita_syncthing_app::domain::{ActiveTab, AppState, NavFocus, ThemeMode};
+use common::{press, rect_of, tap, tap_action, temp_test_dir};
+use vita_syncthing_app::domain::{ActiveTab, AppState, NavFocus, ThemeMode, UiAction};
 use vita_syncthing_app::infrastructure::{ConfigRepository, BTN_CROSS, BTN_SQUARE};
 
 #[test]
@@ -53,7 +53,14 @@ fn test_theme_persistence_roundtrip_and_touch() {
     state.active_tab = ActiveTab::Settings;
 
     // 1. Touch on Settings display card toggles to Dark and persists
-    tap(&mut state, &repo, 300, 120); // Inside the Display & Theme card (x >= 236, y 86..=204)
+    // Inside the Display & Theme card, away from its buttons
+    let card = rect_of(&mut state, UiAction::ToggleTheme);
+    tap(
+        &mut state,
+        &repo,
+        (card.x + 60) as usize,
+        (card.y + card.h - 12) as usize,
+    );
     assert_eq!(state.theme_mode, ThemeMode::Dark);
     assert_eq!(repo.load_theme(), ThemeMode::Dark);
 
@@ -62,8 +69,8 @@ fn test_theme_persistence_roundtrip_and_touch() {
     assert_eq!(state.theme_mode, ThemeMode::Oled);
     assert_eq!(repo.load_theme(), ThemeMode::Oled);
 
-    // 3. Touch on bottom bar (tx < 230, ty >= 490) toggles to Dark and persists
-    tap(&mut state, &repo, 100, 500);
+    // 3. Touch on the `Switch Theme` button toggles to Dark and persists
+    tap_action(&mut state, &repo, UiAction::ToggleTheme);
     assert_eq!(state.theme_mode, ThemeMode::Dark);
     assert_eq!(repo.load_theme(), ThemeMode::Dark);
 

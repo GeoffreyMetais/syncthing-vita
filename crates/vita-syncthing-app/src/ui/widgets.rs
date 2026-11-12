@@ -9,7 +9,7 @@ use crate::ui::gfx::{
 };
 use crate::ui::strings::{self, Strings};
 use crate::ui::theme::{
-    UiTheme, ACTION_TOUCH_H, CONTENT_R, CONTENT_W, CONTENT_X, C_GOOD, C_WARN, HINT_Y, SIDEBAR_W,
+    UiTheme, ACTION_TOUCH_H, HINT_TOUCH_MARGIN, CONTENT_R, CONTENT_W, CONTENT_X, C_GOOD, C_WARN, HINT_Y, SIDEBAR_W,
 };
 
 pub fn draw_card(gfx: &mut Gfx, th: &UiTheme, x: i32, y: i32, w: i32, h: i32, focused: bool) {
@@ -88,12 +88,7 @@ pub fn draw_action_hotspot(
     if focused {
         draw_focus_ring(gfx, th, x, cy, w);
     }
-    let shortcut = match btn {
-        PadButton::Circle => Some(ShortcutKey::Circle),
-        PadButton::Square => Some(ShortcutKey::Square),
-        PadButton::Triangle => Some(ShortcutKey::Triangle),
-        _ => None,
-    };
+    let shortcut = shortcut_of(btn);
     hits.add(Hotspot {
         rect: Rect::new(x, cy - ACTION_TOUCH_H / 2, w, ACTION_TOUCH_H),
         action,
@@ -174,7 +169,9 @@ pub fn draw_page_title(gfx: &mut Gfx, th: &UiTheme, title: &str, right: Option<&
     }
 }
 
-pub fn draw_chrome(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
+/// Draws the screen background, the sidebar (tabs, transfer card, status) and declares the
+/// sidebar's interactive elements.
+pub fn draw_chrome(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut HitMap) {
     let s = strings::strings(state.language);
     let tabs = [
         (s.tab_overview, Icon::Vita, ActiveTab::Dashboard),
@@ -208,6 +205,12 @@ pub fn draw_chrome(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
     for (i, &(name, icon, tab)) in tabs.iter().enumerate() {
         let y = 90 + (i as i32) * 50;
         let on = state.active_tab == tab;
+        hits.add(Hotspot {
+            rect: Rect::new(0, y - 3, SIDEBAR_W, 50),
+            action: UiAction::SwitchTab(tab),
+            focus: None,
+            shortcut: None,
+        });
         if on {
             gfx.rrect(12, y, SIDEBAR_W - 24, 44, 12, th.accent_bg);
             // A thicker, brighter outline shows the sidebar has D-pad focus
@@ -226,6 +229,13 @@ pub fn draw_chrome(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
     // Sidebar mini transfer card (like VitaSend xfer card)
     let card_y = HINT_Y - 150;
     gfx.rrect(12, card_y, SIDEBAR_W - 24, 82, 12, th.card);
+    // Touching the transfer card starts a sync.
+    hits.add(Hotspot {
+        rect: Rect::new(12, card_y, SIDEBAR_W - 24, 82),
+        action: UiAction::StartSync,
+        focus: None,
+        shortcut: None,
+    });
     gfx.rrect_outline(12, card_y, SIDEBAR_W - 24, 82, 12, 1, th.border);
     let xfer_title = if state.sync_in_progress {
         s.sidebar_syncing
@@ -300,7 +310,52 @@ pub fn draw_chrome(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
     );
 }
 
-pub fn draw_hints(gfx: &mut Gfx, th: &UiTheme, items: &[(PadButton, Option<PadButton>, &str)]) {
+/// One entry of the bottom hint bar: the button(s) it shows, what they do, and optionally the
+/// action triggered by that button and by touching the hint.
+#[derive(Debug, Clone, Copy)]
+pub struct Hint<'a> {
+    pub button: PadButton,
+    pub second: Option<PadButton>,
+    pub label: &'a str,
+    pub action: Option<UiAction>,
+}
+
+impl<'a> Hint<'a> {
+    /// A purely informative hint (navigation, tabs, ...).
+    pub const fn info(button: PadButton, second: Option<PadButton>, label: &'a str) -> Self {
+        Self {
+            button,
+            second,
+            label,
+            action: None,
+        }
+    }
+
+    /// A hint whose button triggers `action`; touching the hint does the same.
+    pub const fn action(button: PadButton, label: &'a str, action: UiAction) -> Self {
+        Self {
+            button,
+            second: None,
+            label,
+            action: Some(action),
+        }
+    }
+}
+
+/// Face button an element displaying `button` declares as its shortcut (`Cross` is reserved
+/// for the focused element, the other buttons are handled globally).
+fn shortcut_of(button: PadButton) -> Option<ShortcutKey> {
+    match button {
+        PadButton::Circle => Some(ShortcutKey::Circle),
+        PadButton::Square => Some(ShortcutKey::Square),
+        PadButton::Triangle => Some(ShortcutKey::Triangle),
+        _ => None,
+    }
+}
+
+/// Draws the bottom hint bar and declares its actionable hints in the frame's `HitMap`:
+/// touching a hint, or pressing the face button it shows, triggers its action.
+pub fn draw_hint_bar(gfx: &mut Gfx, th: &UiTheme, hits: &mut HitMap, items: &[Hint]) {
     gfx.rect(0, HINT_Y, GFX_W, GFX_H - HINT_Y, th.sidebar);
     if th.divider {
         gfx.rect(0, HINT_Y, GFX_W, 1, th.border);
@@ -308,11 +363,12 @@ pub fn draw_hints(gfx: &mut Gfx, th: &UiTheme, items: &[(PadButton, Option<PadBu
     let cy = HINT_Y + 22;
     let size = 24;
     let mut x = 22;
-    for &(b1, b2, label) in items {
-        let w1 = Gfx::pad_button_width(b1, size);
-        gfx.pad_button(b1, x + w1 / 2, cy, size);
+    for hint in items {
+        let start_x = x;
+        let w1 = Gfx::pad_button_width(hint.button, size);
+        gfx.pad_button(hint.button, x + w1 / 2, cy, size);
         x += w1 + 4;
-        if let Some(sec) = b2 {
+        if let Some(sec) = hint.second {
             let w2 = Gfx::pad_button_width(sec, size);
             gfx.pad_button(sec, x + w2 / 2, cy, size);
             x += w2 + 4;
@@ -325,9 +381,32 @@ pub fn draw_hints(gfx: &mut Gfx, th: &UiTheme, items: &[(PadButton, Option<PadBu
             FontWeight::Medium,
             rgb(176, 186, 198),
             Align::Left,
-            label,
-        ) + 22;
+            hint.label,
+        );
+        if let Some(action) = hint.action {
+            hits.add(Hotspot {
+                rect: Rect::new(
+                    start_x - HINT_TOUCH_MARGIN,
+                    HINT_Y,
+                    x - start_x + 2 * HINT_TOUCH_MARGIN,
+                    GFX_H - HINT_Y,
+                ),
+                action,
+                focus: None,
+                shortcut: shortcut_of(hint.button),
+            });
+        }
+        x += 22;
     }
+}
+
+/// Draws a purely informative hint bar (no hint is actionable).
+pub fn draw_hints(gfx: &mut Gfx, th: &UiTheme, items: &[(PadButton, Option<PadButton>, &str)]) {
+    let hints: Vec<Hint> = items
+        .iter()
+        .map(|&(button, second, label)| Hint::info(button, second, label))
+        .collect();
+    draw_hint_bar(gfx, th, &mut HitMap::default(), &hints);
 }
 
 pub fn draw_toast(gfx: &mut Gfx, th: &UiTheme, s: &Strings, toast_msg: Option<&(UiText, u32)>) {

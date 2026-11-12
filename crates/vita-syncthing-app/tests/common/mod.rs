@@ -14,7 +14,7 @@ pub fn temp_test_dir(suffix: &str) -> String {
 }
 
 use vita_syncthing_app::application::{InputController, UserCommand};
-use vita_syncthing_app::domain::AppState;
+use vita_syncthing_app::domain::{AppState, Rect, UiAction};
 use vita_syncthing_app::infrastructure::{ConfigRepository, InputFrame};
 use vita_syncthing_app::ui::gfx::Gfx;
 use vita_syncthing_app::ui::renderer::draw_frame;
@@ -60,4 +60,43 @@ pub fn tap(state: &mut AppState, repo: &ConfigRepository, x: usize, y: usize) ->
             ..Default::default()
         },
     )
+}
+
+/// Rectangles of the elements that trigger `action` in the frame drawn for `state`, in
+/// drawing order (a card first, then the buttons on top of it).
+pub fn rects_of(state: &mut AppState, action: UiAction) -> Vec<Rect> {
+    draw(state);
+    state
+        .hit_map
+        .hotspots()
+        .iter()
+        .filter(|h| h.action == action)
+        .map(|h| h.rect)
+        .collect()
+}
+
+/// Rectangle of the first element that triggers `action`; panics if it is not on screen.
+pub fn rect_of(state: &mut AppState, action: UiAction) -> Rect {
+    *rects_of(state, action)
+        .first()
+        .unwrap_or_else(|| panic!("{action:?} is not on screen"))
+}
+
+/// Taps the centre of `rect`.
+pub fn tap_rect(state: &mut AppState, repo: &ConfigRepository, rect: Rect) -> UserCommand {
+    tap(
+        state,
+        repo,
+        (rect.x + rect.w / 2) as usize,
+        (rect.y + rect.h / 2) as usize,
+    )
+}
+
+/// Taps the element of the current frame that triggers `action` (the topmost one when
+/// several do, e.g. a button drawn on a card with the same action).
+pub fn tap_action(state: &mut AppState, repo: &ConfigRepository, action: UiAction) -> UserCommand {
+    let rect = *rects_of(state, action)
+        .last()
+        .unwrap_or_else(|| panic!("{action:?} is not on screen"));
+    tap_rect(state, repo, rect)
 }

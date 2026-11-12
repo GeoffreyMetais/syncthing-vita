@@ -4,12 +4,12 @@
 //! Every interactive element is declared in the frame's `HitMap` where it is drawn; input is
 //! handled from these declarations by `application::SharesController`.
 
-use crate::domain::{ActiveTab, AppState, FocusSlot, HitMap, Hotspot, Rect, UiAction};
+use crate::domain::{AppState, FocusSlot, HitMap, Hotspot, Rect, UiAction};
 use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton};
 use crate::ui::strings;
 use crate::ui::theme::{UiTheme, CONTENT_R, CONTENT_W, CONTENT_X, CONTENT_Y, C_GOOD, C_WARN};
 use crate::ui::widgets::{
-    action_width, draw_action_hotspot, draw_card, draw_chip, draw_hints, draw_page_title,
+    action_width, draw_action_hotspot, draw_card, draw_chip, draw_hint_bar, draw_page_title, Hint,
 };
 
 /// Shares visible on the page (the list does not scroll yet).
@@ -37,7 +37,7 @@ pub fn render_shares_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &m
         s.action_new_share,
         UiAction::NewShare,
         FocusSlot::Header,
-        state.is_header_focused(ActiveTab::Shares),
+        state.is_focused(FocusSlot::Header),
     );
 
     if state.shares.is_empty() {
@@ -103,9 +103,6 @@ pub fn render_shares_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &m
             let bx_devs = bx_toggle - 8 - w_devs;
 
             // Left to right: the column order is the D-pad order within the row.
-            let focused_col = state
-                .focused_action(ActiveTab::Shares)
-                .filter(|_| is_sel);
             let buttons = [
                 (bx_devs, PadButton::Cross, s.action_devices, UiAction::ManageDevices(i)),
                 (bx_toggle, PadButton::Square, s.action_delete, UiAction::DeleteShare(i)),
@@ -122,7 +119,7 @@ pub fn render_shares_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &m
                     label,
                     action,
                     FocusSlot::RowAction { row: i, col },
-                    focused_col == Some(col),
+                    state.is_focused(FocusSlot::RowAction { row: i, col }),
                 );
             }
 
@@ -173,15 +170,25 @@ pub fn render_shares_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &m
         }
     }
 
-    draw_hints(
+    let selected = state.selected_share_idx;
+    let has_selection = selected < state.shares.len();
+    let row_action = |action: UiAction| has_selection.then_some(action);
+    draw_hint_bar(
         gfx,
         th,
+        hits,
         &[
-            (PadButton::Dpad, Some(PadButton::Cross), s.hint_navigate),
-            (PadButton::Circle, None, s.action_new_share),
-            (PadButton::Square, None, s.action_delete),
-            (PadButton::Triangle, None, s.hint_folder_path),
-            (PadButton::L, Some(PadButton::R), s.hint_tabs),
+            Hint::info(PadButton::Dpad, Some(PadButton::Cross), s.hint_navigate),
+            Hint::action(PadButton::Circle, s.action_new_share, UiAction::NewShare),
+            Hint {
+                action: row_action(UiAction::DeleteShare(selected)),
+                ..Hint::info(PadButton::Square, None, s.action_delete)
+            },
+            Hint {
+                action: row_action(UiAction::ChangeShareFolder(selected)),
+                ..Hint::info(PadButton::Triangle, None, s.hint_folder_path)
+            },
+            Hint::info(PadButton::L, Some(PadButton::R), s.hint_tabs),
         ],
     );
 }

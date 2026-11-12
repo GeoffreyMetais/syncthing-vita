@@ -6,6 +6,8 @@
 //! from that single declaration, so input can never drift from what is displayed (button
 //! positions depend on the label widths of the current language).
 
+use crate::domain::models::ActiveTab;
+
 /// Screen rectangle in pixels.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Rect {
@@ -28,6 +30,25 @@ impl Rect {
 /// What activating an interactive element does. Executed by the screen's controller.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UiAction {
+    // --- Any page ---
+    /// Activate a sidebar tab.
+    SwitchTab(ActiveTab),
+    /// Start a sync (or rescan over the running sessions).
+    StartSync,
+    /// Show this device's ID and QR code.
+    ShowDeviceId,
+    /// Open the add-device-by-ID dialog.
+    AddDevice,
+    /// Start the OLED screensaver.
+    StartScreensaver,
+    /// Ask for confirmation before quitting.
+    ConfirmQuit,
+    /// Pause / enable the selected share.
+    ToggleSelectedShare,
+    /// Browse for another target folder of the selected share.
+    ChangeSelectedShareFolder,
+
+    // --- `Shares` ---
     /// `Shares`: open the share creation dialog.
     NewShare,
     /// `Shares`: select the share row.
@@ -38,6 +59,22 @@ pub enum UiAction {
     DeleteShare(usize),
     /// `Shares`: browse for another target folder of the share.
     ChangeShareFolder(usize),
+
+    // --- `Files` ---
+    /// `Files`: go to the parent folder (or leave the browser at the root).
+    PickerUp,
+    /// `Files`: choose the folder of the row (share it / use it as target).
+    PickerSelect(usize),
+    /// `Files`: enter the folder of the row.
+    PickerOpen(usize),
+
+    // --- `Settings` ---
+    /// `Settings`: switch between the Dark and OLED themes.
+    ToggleTheme,
+    /// `Settings`: cycle the UI language.
+    CycleLanguage,
+    /// `Settings`: forget every declined folder offer.
+    ClearDeclinedFolders,
 }
 
 /// D-pad focus position an element holds on its page.

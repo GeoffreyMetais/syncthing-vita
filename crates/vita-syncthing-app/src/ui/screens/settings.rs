@@ -3,8 +3,8 @@
 //! protocol event log.
 
 use crate::domain::{
-    ActiveTab, AppState, LanguagePreference, ThemeMode, SETTINGS_ROW_DECLINED,
-    SETTINGS_ROW_DISPLAY, SETTINGS_ROW_LANGUAGE,
+    AppState, FocusSlot, HitMap, Hotspot, LanguagePreference, Rect, ShortcutKey, ThemeMode,
+    UiAction, SETTINGS_ROW_DECLINED, SETTINGS_ROW_DISPLAY, SETTINGS_ROW_LANGUAGE,
 };
 use crate::ui::gfx::{Align, FontWeight, Gfx, PadButton};
 use crate::ui::strings;
@@ -13,20 +13,30 @@ use crate::ui::theme::{
     SETTINGS_DECLINED_B, SETTINGS_DECLINED_Y, SETTINGS_LANGUAGE_B, SETTINGS_LANGUAGE_Y,
 };
 use crate::ui::widgets::{
-    action_width, draw_action, draw_card, draw_focus_ring, draw_hints, draw_page_title,
+    action_width, draw_action_hotspot, draw_card, draw_hint_bar, draw_page_title, Hint,
 };
+
+/// Height of the display & theme card.
+const DISPLAY_CARD_H: i32 = 118;
 
 /// Vertical centre of the theme card actions: beside the short "Colour Theme"
 /// label, between the section header and the full-width description line.
 const THEME_ACTIONS_Y: i32 = CONTENT_Y + 48;
 
 /// Renders Tab 4: **Settings & Log** (`Settings`).
-pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
+pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut HitMap) {
     let s = strings::strings(state.language);
     draw_page_title(gfx, th, s.settings_title, Some(s.settings_subtitle));
 
     // 1. Display & Theme Settings Card
-    draw_card(gfx, th, CONTENT_X, CONTENT_Y, CONTENT_W, 118, true);
+    draw_card(gfx, th, CONTENT_X, CONTENT_Y, CONTENT_W, DISPLAY_CARD_H, true);
+    // Touching the card (outside its buttons) or pressing `Square` switches the theme.
+    hits.add(Hotspot {
+        rect: Rect::new(CONTENT_X, CONTENT_Y, CONTENT_W, DISPLAY_CARD_H),
+        action: UiAction::ToggleTheme,
+        focus: None,
+        shortcut: Some(ShortcutKey::Square),
+    });
     let lx = CONTENT_X + 24;
     gfx.text(
         lx,
@@ -69,38 +79,28 @@ pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         Align::Left,
         theme_desc,
     );
-    draw_action(
-        gfx,
-        th,
-        bx_add,
-        THEME_ACTIONS_Y,
-        PadButton::Triangle,
-        s.action_add_device,
-    );
-    draw_action(
-        gfx,
-        th,
-        bx_qr,
-        THEME_ACTIONS_Y,
-        PadButton::Circle,
-        s.action_qr_id,
-    );
-    draw_action(
-        gfx,
-        th,
-        bx_theme,
-        THEME_ACTIONS_Y,
-        PadButton::Cross,
-        s.action_switch_theme,
-    );
-    let display_focus = state
-        .focused_action(ActiveTab::Settings)
-        .filter(|_| state.is_settings_row_focused(SETTINGS_ROW_DISPLAY));
-    match display_focus {
-        Some(0) => draw_focus_ring(gfx, th, bx_add, THEME_ACTIONS_Y, w_add),
-        Some(1) => draw_focus_ring(gfx, th, bx_qr, THEME_ACTIONS_Y, w_qr),
-        Some(_) => draw_focus_ring(gfx, th, bx_theme, THEME_ACTIONS_Y, w_theme),
-        None => {}
+    let buttons = [
+        (bx_add, PadButton::Triangle, s.action_add_device, UiAction::AddDevice),
+        (bx_qr, PadButton::Circle, s.action_qr_id, UiAction::ShowDeviceId),
+        (bx_theme, PadButton::Cross, s.action_switch_theme, UiAction::ToggleTheme),
+    ];
+    for (col, (bx, pad, label, action)) in buttons.into_iter().enumerate() {
+        let slot = FocusSlot::RowAction {
+            row: SETTINGS_ROW_DISPLAY,
+            col,
+        };
+        draw_action_hotspot(
+            gfx,
+            th,
+            hits,
+            bx,
+            THEME_ACTIONS_Y,
+            pad,
+            label,
+            action,
+            slot,
+            state.is_focused(slot),
+        );
     }
 
     gfx.text(
@@ -114,10 +114,10 @@ pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
     );
 
     // 2. UI Language Card
-    render_language(gfx, th, state);
+    render_language(gfx, th, state, hits);
 
     // 3. Declined Folder Offers Card
-    render_declined_folders(gfx, th, state);
+    render_declined_folders(gfx, th, state, hits);
 
     // 4. Full Protocol Event Log Card
     let ly = SETTINGS_DECLINED_B + 10;
@@ -159,25 +159,33 @@ pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         );
     }
 
-    draw_hints(
+    draw_hint_bar(
         gfx,
         th,
+        hits,
         &[
-            (PadButton::Dpad, Some(PadButton::Cross), s.hint_navigate),
-            (PadButton::Circle, None, s.action_qr_id),
-            (PadButton::Triangle, None, s.action_add_device_id),
-            (PadButton::Select, None, s.hint_screensaver),
-            (PadButton::Start, None, s.action_quit),
+            Hint::info(PadButton::Dpad, Some(PadButton::Cross), s.hint_navigate),
+            Hint::action(PadButton::Circle, s.action_qr_id, UiAction::ShowDeviceId),
+            Hint::action(PadButton::Triangle, s.action_add_device_id, UiAction::AddDevice),
+            Hint::action(PadButton::Select, s.hint_screensaver, UiAction::StartScreensaver),
+            Hint::action(PadButton::Start, s.action_quit, UiAction::ConfirmQuit),
         ],
     );
 }
 
 /// Card showing the UI language (system default or a fixed one) with a `Change Language` button.
-fn render_language(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
+fn render_language(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut HitMap) {
     let s = strings::strings(state.language);
     let y = SETTINGS_LANGUAGE_Y;
     let h = SETTINGS_LANGUAGE_B - SETTINGS_LANGUAGE_Y;
     draw_card(gfx, th, CONTENT_X, y, CONTENT_W, h, false);
+    // Touching the card anywhere cycles the language.
+    hits.add(Hotspot {
+        rect: Rect::new(CONTENT_X, y, CONTENT_W, h),
+        action: UiAction::CycleLanguage,
+        focus: None,
+        shortcut: None,
+    });
     let lx = CONTENT_X + 24;
     gfx.text(
         lx,
@@ -208,14 +216,26 @@ fn render_language(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         Align::Left,
         &value,
     );
-    draw_action(gfx, th, bx, cy, PadButton::Cross, label);
-    if state.is_settings_row_focused(SETTINGS_ROW_LANGUAGE) {
-        draw_focus_ring(gfx, th, bx, cy, w_btn);
-    }
+    let slot = FocusSlot::RowAction {
+        row: SETTINGS_ROW_LANGUAGE,
+        col: 0,
+    };
+    draw_action_hotspot(
+        gfx,
+        th,
+        hits,
+        bx,
+        cy,
+        PadButton::Cross,
+        label,
+        UiAction::CycleLanguage,
+        slot,
+        state.is_focused(slot),
+    );
 }
 
 /// Card listing folder offers declined in the `FolderOffer` modal, with a `Clear Declined` button.
-fn render_declined_folders(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
+fn render_declined_folders(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut HitMap) {
     let s = strings::strings(state.language);
     let y = SETTINGS_DECLINED_Y;
     let h = SETTINGS_DECLINED_B - SETTINGS_DECLINED_Y;
@@ -259,8 +279,20 @@ fn render_declined_folders(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         Align::Left,
         &summary,
     );
-    draw_action(gfx, th, bx, cy, PadButton::Cross, label);
-    if state.is_settings_row_focused(SETTINGS_ROW_DECLINED) {
-        draw_focus_ring(gfx, th, bx, cy, w_clear);
-    }
+    let slot = FocusSlot::RowAction {
+        row: SETTINGS_ROW_DECLINED,
+        col: 0,
+    };
+    draw_action_hotspot(
+        gfx,
+        th,
+        hits,
+        bx,
+        cy,
+        PadButton::Cross,
+        label,
+        UiAction::ClearDeclinedFolders,
+        slot,
+        state.is_focused(slot),
+    );
 }

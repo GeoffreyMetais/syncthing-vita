@@ -1,18 +1,30 @@
 //! Tab 3 (`Files` / `FolderPicker`): Interactive `ux0:` directory browser and folder presets.
 
-use crate::domain::{ActiveTab, AppState, PickerMode, BROWSER_ROWS};
+use crate::domain::{
+    AppState, FocusSlot, HitMap, Hotspot, PickerMode, Rect, UiAction, BROWSER_ROWS,
+};
 use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton};
 use crate::ui::strings;
 use crate::ui::theme::{
     UiTheme, BROWSER_STEP, BROWSER_TOP, CONTENT_R, CONTENT_W, CONTENT_X, C_GOOD,
 };
 use crate::ui::widgets::{
-    action_width, draw_action, draw_card, draw_chip, draw_focus_ring, draw_hints, draw_page_title,
-    draw_scrollbar,
+    action_width, draw_action_hotspot, draw_card, draw_chip, draw_hint_bar, draw_page_title,
+    draw_scrollbar, Hint,
 };
 
+/// Height of a folder row (rows are `BROWSER_STEP` apart).
+const BROWSER_ROW_H: i32 = 38;
+/// Horizontal margin added left of a row's `Open` chip to form its touch target.
+const CHIP_TOUCH_MARGIN: i32 = 16;
+
 /// Renders Tab 3: **Files** (`FolderPicker`).
-pub fn render_folder_picker_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
+pub fn render_folder_picker_tab(
+    gfx: &mut Gfx,
+    th: &UiTheme,
+    state: &AppState,
+    hits: &mut HitMap,
+) {
     let s = strings::strings(state.language);
     let (page_title, share_name) = if state.picker_mode == PickerMode::CreateNewShare {
         (
@@ -41,10 +53,18 @@ pub fn render_folder_picker_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
     );
 
     let uw = action_width(gfx, PadButton::Circle, s.action_up);
-    draw_action(gfx, th, CONTENT_R - 10 - uw, 101, PadButton::Circle, s.action_up);
-    if state.is_header_focused(ActiveTab::FolderPicker) {
-        draw_focus_ring(gfx, th, CONTENT_R - 10 - uw, 101, uw);
-    }
+    draw_action_hotspot(
+        gfx,
+        th,
+        hits,
+        CONTENT_R - 10 - uw,
+        101,
+        PadButton::Circle,
+        s.action_up,
+        UiAction::PickerUp,
+        FocusSlot::Header,
+        state.is_focused(FocusSlot::Header),
+    );
     let mut right = CONTENT_R - 18 - uw;
 
     if !state.picker_items.is_empty() {
@@ -88,7 +108,7 @@ pub fn render_folder_picker_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         let cur = idx == state.selected_picker_idx;
 
         if cur {
-            gfx.rrect(CONTENT_X, y, CONTENT_W - 14, 38, 10, th.accent_bg);
+            gfx.rrect(CONTENT_X, y, CONTENT_W - 14, BROWSER_ROW_H, 10, th.accent_bg);
             gfx.rrect(CONTENT_X, y + 8, 4, 22, 2, th.accent);
         }
 
@@ -115,7 +135,23 @@ pub fn render_folder_picker_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         } else {
             s.action_open
         };
+        // The row chooses the folder; its `Open` chip enters it instead.
+        hits.add(Hotspot {
+            rect: Rect::new(CONTENT_X, y, CONTENT_W - 14, BROWSER_ROW_H),
+            action: UiAction::PickerSelect(idx),
+            focus: Some(FocusSlot::RowAction { row: idx, col: 0 }),
+            shortcut: None,
+        });
         let bw = draw_chip(gfx, CONTENT_R - 26, cy, badge, ic_col);
+        if !item.is_shared && !item.is_preset {
+            let chip_x = CONTENT_R - 26 - bw - CHIP_TOUCH_MARGIN;
+            hits.add(Hotspot {
+                rect: Rect::new(chip_x, y, CONTENT_R - 14 - chip_x, BROWSER_ROW_H),
+                action: UiAction::PickerOpen(idx),
+                focus: None,
+                shortcut: None,
+            });
+        }
 
         gfx.text_fit(
             tx + 34,
@@ -144,12 +180,15 @@ pub fn render_folder_picker_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         total,
     );
 
-    draw_hints(
+    let selected = state.selected_picker_idx;
+    let open_action = (selected < total).then_some(UiAction::PickerOpen(selected));
+    draw_hint_bar(
         gfx,
         th,
+        hits,
         &[
-            (PadButton::Dpad, None, s.hint_move),
-            (
+            Hint::info(PadButton::Dpad, None, s.hint_move),
+            Hint::info(
                 PadButton::Cross,
                 None,
                 if state.picker_mode == PickerMode::CreateNewShare {
@@ -158,9 +197,12 @@ pub fn render_folder_picker_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
                     s.hint_select_target
                 },
             ),
-            (PadButton::Triangle, None, s.hint_open_subfolder),
-            (PadButton::Circle, None, s.hint_up_back),
-            (PadButton::L, Some(PadButton::R), s.hint_tabs),
+            Hint {
+                action: open_action,
+                ..Hint::info(PadButton::Triangle, None, s.hint_open_subfolder)
+            },
+            Hint::action(PadButton::Circle, s.hint_up_back, UiAction::PickerUp),
+            Hint::info(PadButton::L, Some(PadButton::R), s.hint_tabs),
         ],
     );
 }

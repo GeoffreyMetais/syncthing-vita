@@ -9,7 +9,7 @@ use crate::domain::models::{
     BROWSER_ROWS,
 };
 use crate::domain::initial_sync::InitialSyncPeers;
-use crate::domain::interaction::HitMap;
+use crate::domain::interaction::{FocusSlot, HitMap};
 use crate::domain::navigation::{default_col, NavFocus, NavState};
 use crate::domain::ui_text::UiText;
 
@@ -211,6 +211,36 @@ impl AppState {
         self.nav.col = default_col(self.active_tab);
         self.nav.header = false;
         self.nav.row = 0;
+    }
+
+    /// D-pad focus position on the current page (meaningful while the page has focus).
+    pub fn focus_slot(&self) -> FocusSlot {
+        match self.active_tab {
+            ActiveTab::Dashboard => FocusSlot::RowAction {
+                row: 0,
+                col: self.nav.col,
+            },
+            ActiveTab::Shares if self.nav.header => FocusSlot::Header,
+            ActiveTab::Shares => FocusSlot::RowAction {
+                row: self.selected_share_idx,
+                col: self.nav.col,
+            },
+            ActiveTab::FolderPicker if self.nav.header => FocusSlot::Header,
+            ActiveTab::FolderPicker => FocusSlot::RowAction {
+                row: self.selected_picker_idx,
+                col: 0,
+            },
+            // Only the first Settings card has several buttons.
+            ActiveTab::Settings => FocusSlot::RowAction {
+                row: self.nav.row,
+                col: if self.nav.row == 0 { self.nav.col } else { 0 },
+            },
+        }
+    }
+
+    /// True when the element holding `slot` on the current page has D-pad focus.
+    pub fn is_focused(&self, slot: FocusSlot) -> bool {
+        self.nav.focus == NavFocus::Content && self.focus_slot() == slot
     }
 
     /// Focused action button of `tab`'s current row, if the page (not the sidebar) has focus.
