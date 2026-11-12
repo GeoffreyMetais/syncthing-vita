@@ -3,15 +3,24 @@
 use syncthing_core::DeviceId;
 
 use super::fallback_keyboard::draw_fallback_keypad;
+use crate::domain::interaction::{HitMap, PadKey, UiAction};
 use crate::domain::AppState;
 use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton, GFX_W};
 use crate::ui::i18n::messages::fill;
 use crate::ui::strings;
 use crate::ui::theme::{add_device_modal_height, UiTheme, C_GOOD, C_WARN, HINT_Y};
-use crate::ui::widgets::{action_width, draw_action, draw_hints};
+use crate::ui::widgets::{
+    action_width, declare_modal, declare_touch, draw_press_button, draw_press_hints,
+};
 
 /// Modal Dialog 2b: Add a remote Syncthing device by entering its Short ID (7+ chars) or Full ID (56 chars).
-pub fn render_add_device_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, keypad_idx: usize) {
+pub fn render_add_device_modal(
+    gfx: &mut Gfx,
+    th: &UiTheme,
+    state: &AppState,
+    keypad_idx: usize,
+    hits: &mut HitMap,
+) {
     let s = strings::strings(state.language);
     gfx.dim(180);
     let keypad = state.fallback_keypad_visible;
@@ -22,6 +31,7 @@ pub fn render_add_device_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, ke
 
     gfx.shadow(dx, dy, w, h, 18);
     gfx.rrect(dx, dy, w, h, 18, th.card);
+    declare_modal(hits, (dx, dy, w, h), Some(PadKey::Circle), None);
     gfx.rrect_outline(dx, dy, w, h, 18, 1, th.border);
 
     let lx = dx + 28;
@@ -75,6 +85,9 @@ pub fn render_add_device_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, ke
     };
 
     gfx.rrect(lx, box_y, content_w, box_h, 10, th.bg);
+    // Touching the text box opens the system keyboard (its `Virtual Keyboard` button,
+    // declared below, sits on top of it).
+    declare_touch(hits, lx, box_y, content_w, box_h, UiAction::OpenKeyboard);
     gfx.rrect_outline(lx, box_y, content_w, box_h, 10, 1, border_col);
 
     let kbd_lbl = if keypad {
@@ -83,9 +96,10 @@ pub fn render_add_device_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, ke
         s.action_virtual_keyboard
     };
     let w_kbd = action_width(gfx, PadButton::Triangle, kbd_lbl);
-    draw_action(
+    draw_press_button(
         gfx,
         th,
+        hits,
         lx + content_w - 10 - w_kbd,
         box_y + box_h / 2,
         PadButton::Triangle,
@@ -120,10 +134,7 @@ pub fn render_add_device_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, ke
 
     // Live Validation & LAN Peer Resolution Status Line
     let (status_txt, status_col) = if state.device_id_input.trim().is_empty() {
-        (
-            s.modal_add_device_tip.to_owned(),
-            th.dim,
-        )
+        (s.modal_add_device_tip.to_owned(), th.dim)
     } else {
         match parse_res {
             Ok(parsed_id) => {
@@ -178,7 +189,7 @@ pub fn render_add_device_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, ke
 
     // Render the dedicated fallback Base32 keypad component (`Virtual Keyboard`) on demand
     if keypad {
-        draw_fallback_keypad(gfx, th, lx, dy + 162, keypad_idx, state.ime_active);
+        draw_fallback_keypad(gfx, th, hits, lx, dy + 162, keypad_idx, state.ime_active);
     }
 
     // Bottom modal action buttons
@@ -189,24 +200,47 @@ pub fn render_add_device_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, ke
     let bx_bksp = bx_cancel - 10 - w_bksp;
     let bx_confirm = bx_bksp - 10 - w_confirm;
 
-    draw_action(
+    draw_press_button(
         gfx,
         th,
+        hits,
         bx_confirm,
         dy + h - 28,
         PadButton::Start,
         s.modal_add_device_confirm,
     );
-    draw_action(
+    draw_press_button(
         gfx,
         th,
+        hits,
         bx_bksp,
         dy + h - 28,
         PadButton::Square,
         s.action_backspace,
     );
-    draw_action(gfx, th, bx_cancel, dy + h - 28, PadButton::Circle, s.action_cancel);
-    draw_action(gfx, th, lx, dy + h - 28, PadButton::R, s.action_scan_qr);
+    draw_press_button(
+        gfx,
+        th,
+        hits,
+        bx_cancel,
+        dy + h - 28,
+        PadButton::Circle,
+        s.action_cancel,
+    );
+    // With long labels the row has no room for `Scan QR`: it stays available with `R`
+    // and in the hint bar instead of covering the confirm button.
+    let w_scan = action_width(gfx, PadButton::R, s.action_scan_qr);
+    if lx + w_scan + 10 <= bx_confirm {
+        draw_press_button(
+            gfx,
+            th,
+            hits,
+            lx,
+            dy + h - 28,
+            PadButton::R,
+            s.action_scan_qr,
+        );
+    }
 
     let mut hints = vec![
         (PadButton::Triangle, None, kbd_lbl),
@@ -218,5 +252,5 @@ pub fn render_add_device_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, ke
     }
     hints.push((PadButton::Square, None, s.action_backspace));
     hints.push((PadButton::Circle, None, s.action_cancel));
-    draw_hints(gfx, th, &hints);
+    draw_press_hints(gfx, th, hits, &hints);
 }

@@ -8,6 +8,7 @@ use sha2::{Digest, Sha256};
 
 use super::context::SessionContext;
 use super::events::SyncEvent;
+use super::keepalive::send_keepalive_if_due;
 use super::upload::serve_block_request;
 use crate::bep::{
     read_bep_message, write_bep_message, BepBlockInfo, BepFileInfo, BepMessageType, BepRequest,
@@ -30,7 +31,11 @@ pub fn download_folder(
     files: &[BepFileInfo],
     count_up_to_date: bool,
 ) -> io::Result<bool> {
-    if ctx.storage.is_folder_paused(folder_id) {
+    if ctx.storage.is_folder_paused(folder_id)
+        || !ctx
+            .storage
+            .is_folder_shared_with(folder_id, &ctx.peer_device_id)
+    {
         return Ok(false);
     }
 
@@ -50,7 +55,12 @@ fn apply_pull_plan(
     files: &[BepFileInfo],
     count_up_to_date: bool,
 ) -> io::Result<bool> {
-    let plan = match ctx.storage.plan_pull(folder_id, ctx.own_id(), files) {
+    let storage = ctx.storage;
+    let own_id = ctx.own_id();
+    let planned = storage.plan_pull_with_progress(folder_id, own_id, files, &mut || {
+        send_keepalive_if_due(stream, ctx)
+    });
+    let plan = match planned {
         Ok(p) => p,
         Err(e) => {
             // Local folder problem (missing / unreadable root): skip this folder only, the
@@ -112,6 +122,13 @@ fn download_file(
     let mut file_bytes = 0usize;
     let mut file_blocks = 0usize;
     for block in &outdated_blocks {
+        if ctx.is_stop_requested() {
+            storage.abort_download(folder_id, &file.name);
+            return Err(io::Error::new(
+                io::ErrorKind::Interrupted,
+                "stopped locally during a download",
+            ));
+        }
         match fetch_block(stream, ctx, folder_id, file, block) {
             Ok(Some(len)) => {
                 file_blocks += 1;
@@ -177,12 +194,29 @@ fn fetch_block(
             }
             BepMessageType::Request => serve_block_request(stream, ctx, &payload)?,
             BepMessageType::Ping => write_bep_message(stream, BepMessageType::Ping, &[])?,
+            // Index changes, a new `ClusterConfig` or `Close` cannot be applied in the middle
+            // of a file: keep them for the session loop instead of losing them.
+            BepMessageType::Index
+            | BepMessageType::IndexUpdate
+            | BepMessageType::ClusterConfig
+            | BepMessageType::Close => ctx.defer_message(mtype, payload),
             _ => {}
         }
     };
 
     if resp.code != 0 {
         return Ok(None);
+    }
+    if resp.data.len() != block.size.max(0) as usize {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!(
+                "Block of {} bytes received for {} ({} expected)",
+                resp.data.len(),
+                file.name,
+                block.size
+            ),
+        ));
     }
     if block.hash.len() == 32 && Sha256::digest(&resp.data).as_slice() != block.hash.as_slice() {
         return Err(io::Error::new(

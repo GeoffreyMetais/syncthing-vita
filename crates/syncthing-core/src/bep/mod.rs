@@ -38,6 +38,10 @@ pub const BEP_DEFAULT_PORT: u16 = 22000;
 /// Standard block size for Syncthing BEP (128 KiB)
 pub const BEP_BLOCK_SIZE: usize = 128 * 1024;
 
+/// Largest block a peer may announce or request (Syncthing's maximum block size, 16 MiB).
+/// Sizes come from the network: anything larger is rejected before allocating memory for it.
+pub const BEP_MAX_BLOCK_SIZE: usize = 16 * 1024 * 1024;
+
 /// Default number of parallel BEP connections advertised to Syncthing v2.0+ peers
 /// (`1` primary metadata connection + `2` secondary data connections = `1+2`).
 pub const BEP_DEFAULT_NUM_CONNECTIONS: i32 = 3;

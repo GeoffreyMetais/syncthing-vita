@@ -3,13 +3,12 @@
 
 mod common;
 
-use common::{press, temp_test_dir};
-use vita_syncthing_app::application::InputController;
+use common::{press, rect_of, tap, temp_test_dir};
 use vita_syncthing_app::domain::{
-    ActiveTab, AppState, Language, LanguagePreference, NavFocus, UiText, SETTINGS_ROW_LANGUAGE,
+    ActiveTab, AppState, Language, LanguagePreference, NavFocus, UiAction, UiText,
+    SETTINGS_ROW_LANGUAGE,
 };
-use vita_syncthing_app::infrastructure::{ConfigRepository, InputFrame, BTN_CROSS, BTN_DOWN};
-use vita_syncthing_app::ui::theme::{SETTINGS_LANGUAGE_B, SETTINGS_LANGUAGE_Y};
+use vita_syncthing_app::infrastructure::{ConfigRepository, BTN_CROSS, BTN_DOWN};
 
 fn settings_state(dir: &str) -> AppState {
     let mut state = AppState::new(Vec::new(), Vec::new(), dir);
@@ -126,15 +125,13 @@ fn test_settings_touch_on_language_card_cycles_language() {
     let repo = ConfigRepository::new(&dir);
     let mut state = settings_state(&dir);
 
-    let y = ((SETTINGS_LANGUAGE_Y + SETTINGS_LANGUAGE_B) / 2) as usize;
-    InputController::handle_input(
+    // Anywhere on the language card (here its left part, away from the button).
+    let card = rect_of(&mut state, UiAction::CycleLanguage);
+    tap(
         &mut state,
         &repo,
-        InputFrame {
-            touch_tap: Some((400, y)),
-            any_activity: true,
-            ..Default::default()
-        },
+        (card.x + 40) as usize,
+        (card.y + card.h / 2) as usize,
     );
     assert_eq!(state.language, Language::English);
     assert_eq!(

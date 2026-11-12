@@ -6,11 +6,12 @@ use crate::infrastructure::{
     ConfigRepository, InputFrame, BTN_CIRCLE, BTN_CROSS, BTN_DOWN, BTN_UP,
 };
 
-/// Handles input in the `CreateShare` modal.
+/// Handles input in the `CreateShare` modal; `row` is the template touched, if any.
 pub fn handle(
     state: &mut AppState,
     repo: &ConfigRepository,
     input: InputFrame,
+    row: Option<usize>,
     mut selected_idx: usize,
 ) -> UserCommand {
     let count = NEW_SHARE_TEMPLATES.len();
@@ -28,25 +29,10 @@ pub fn handle(
     }
 
     let mut confirm = (input.pressed & BTN_CROSS) != 0;
-    if let Some((tx, ty)) = input.touch_tap {
-        let w = 680usize;
-        let h = 408usize;
-        let dx = (960 - w) / 2;
-        let dy = (500 - h) / 2;
-        if tx >= dx && tx <= dx + w && ty >= dy && ty <= dy + h {
-            for i in 0..count {
-                let ry = dy + 90 + i * 50;
-                if ty >= ry && ty <= ry + 44 {
-                    selected_idx = i;
-                    state.modal = ModalDialog::CreateShare { selected_idx };
-                    confirm = true;
-                    break;
-                }
-            }
-        } else {
-            state.modal = ModalDialog::None;
-            return UserCommand::None;
-        }
+    if let Some(idx) = row.filter(|&idx| idx < count) {
+        selected_idx = idx;
+        state.modal = ModalDialog::CreateShare { selected_idx };
+        confirm = true;
     }
 
     if confirm {

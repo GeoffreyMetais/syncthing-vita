@@ -1,14 +1,21 @@
 //! Modal Dialog: a remote device offers to share a folder (`FolderOffer`), asking for consent.
 
+use crate::domain::interaction::HitMap;
 use crate::domain::AppState;
 use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton};
 use crate::ui::i18n::messages::fill;
 use crate::ui::strings;
 use crate::ui::theme::{folder_offer_modal_rect, folder_offer_slot_x, UiTheme};
-use crate::ui::widgets::{draw_action, draw_hints};
+use crate::ui::widgets::{declare_modal, draw_press_button, draw_press_hints};
 
 /// Renders the `FolderOffer` modal for `state.folder_offers[offer_idx]`.
-pub fn render_folder_offer_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, offer_idx: usize) {
+pub fn render_folder_offer_modal(
+    gfx: &mut Gfx,
+    th: &UiTheme,
+    state: &AppState,
+    offer_idx: usize,
+    hits: &mut HitMap,
+) {
     let Some(offer) = state.folder_offers.get(offer_idx) else {
         return;
     };
@@ -19,6 +26,7 @@ pub fn render_folder_offer_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, 
 
     gfx.shadow(dx, dy, w, h, 18);
     gfx.rrect(dx, dy, w, h, 18, th.card);
+    declare_modal(hits, (dx, dy, w, h), None, None);
     gfx.rrect_outline(dx, dy, w, h, 18, 1, th.border);
 
     let lx = dx + 28;
@@ -106,34 +114,38 @@ pub fn render_folder_offer_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, 
     }
 
     let cy = dy + h - 34;
-    draw_action(
+    draw_press_button(
         gfx,
         th,
+        hits,
         folder_offer_slot_x(0) as i32,
         cy,
         PadButton::Square,
         s.action_decline,
     );
-    draw_action(
+    draw_press_button(
         gfx,
         th,
+        hits,
         folder_offer_slot_x(1) as i32,
         cy,
         PadButton::Circle,
         s.action_later,
     );
-    draw_action(
+    draw_press_button(
         gfx,
         th,
+        hits,
         folder_offer_slot_x(2) as i32,
         cy,
         PadButton::Cross,
         s.action_accept,
     );
 
-    draw_hints(
+    draw_press_hints(
         gfx,
         th,
+        hits,
         &[
             (PadButton::Cross, None, s.hint_accept_share),
             (PadButton::Square, None, s.action_decline),

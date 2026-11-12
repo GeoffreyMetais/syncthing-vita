@@ -35,3 +35,17 @@ fn test_lz4_decompression() {
     let decompressed = decompress_bep_lz4(&payload).expect("LZ4 decompression failed");
     assert_eq!(&decompressed, b"VITA_BEPVITA");
 }
+
+#[test]
+fn test_lz4_output_is_bounded_by_announced_size() {
+    // 16 bytes announced, but the match length extension expands to about 1 MiB.
+    let mut bomb = vec![0, 0, 0, 16, 0x1F, b'A', 1, 0];
+    bomb.extend(std::iter::repeat_n(255u8, 4000));
+    bomb.push(0);
+    assert!(decompress_bep_lz4(&bomb).is_err());
+
+    // Literals longer than the announced size are rejected too.
+    let mut literals = vec![0, 0, 0, 2, 0x40];
+    literals.extend_from_slice(b"VITA");
+    assert!(decompress_bep_lz4(&literals).is_err());
+}

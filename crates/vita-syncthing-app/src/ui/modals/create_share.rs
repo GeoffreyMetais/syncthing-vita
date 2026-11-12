@@ -1,10 +1,14 @@
 //! Modal Dialog: Create a new share on PS Vita (from template or custom `ux0:` folder).
 
+use crate::domain::interaction::{HitMap, PadKey, UiAction};
 use crate::domain::{AppState, NEW_SHARE_TEMPLATES};
 use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton, GFX_W};
 use crate::ui::strings;
 use crate::ui::theme::{UiTheme, C_GOOD, HINT_Y};
-use crate::ui::widgets::draw_hints;
+use crate::ui::widgets::{declare_modal, declare_touch, draw_press_hints};
+
+/// Height of the touch target of a template row.
+const TEMPLATE_ROW_H: i32 = 44;
 
 /// Modal Dialog 1: Create a new share on PS Vita (from template or custom `ux0:` folder).
 pub fn render_create_share_modal(
@@ -12,6 +16,7 @@ pub fn render_create_share_modal(
     th: &UiTheme,
     state: &AppState,
     selected_idx: usize,
+    hits: &mut HitMap,
 ) {
     let s = strings::strings(state.language);
     gfx.dim(175);
@@ -22,6 +27,7 @@ pub fn render_create_share_modal(
 
     gfx.shadow(dx, dy, w, h, 18);
     gfx.rrect(dx, dy, w, h, 18, th.card);
+    declare_modal(hits, (dx, dy, w, h), Some(PadKey::Circle), None);
     gfx.rrect_outline(dx, dy, w, h, 18, 1, th.border);
 
     let lx = dx + 28;
@@ -63,6 +69,8 @@ pub fn render_create_share_modal(
     for (i, &(fid, label, path)) in NEW_SHARE_TEMPLATES.iter().enumerate() {
         let ry = dy + 90 + (i as i32) * 50;
         let cy = ry + 21;
+        // Touching a template picks it.
+        declare_touch(hits, dx, ry, w, TEMPLATE_ROW_H, UiAction::ModalRow(i));
         let is_sel = i == selected_idx;
 
         if is_sel {
@@ -113,9 +121,10 @@ pub fn render_create_share_modal(
         );
     }
 
-    draw_hints(
+    draw_press_hints(
         gfx,
         th,
+        hits,
         &[
             (PadButton::DpadUd, None, s.hint_select),
             (PadButton::Cross, None, s.hint_create_pick_devices),

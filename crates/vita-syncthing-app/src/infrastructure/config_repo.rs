@@ -3,9 +3,12 @@
 
 use std::fs::{self, OpenOptions};
 use std::io::Write;
+use std::path::Path;
 
+use syncthing_core::storage::atomic::{recover_replaced_file, replace_file, write_file_synced};
 use syncthing_core::DeviceId;
 
+use super::config_fields::{escape_field, unescape_field};
 use crate::domain::{
     IgnoredFolder, KnownDevice, LanguagePreference, ShareConfigEntry, ThemeMode,
     NEW_SHARE_TEMPLATES,
@@ -57,15 +60,15 @@ impl ConfigRepository {
     pub fn load_devices(&self) -> Vec<KnownDevice> {
         let cfg_path = format!("{}/devices.cfg", self.base_data_dir);
         let mut out = Vec::new();
-        if let Ok(content) = fs::read_to_string(&cfg_path) {
+        if let Ok(content) = read_recovering(&cfg_path) {
             for line in content.lines() {
                 let parts: Vec<&str> = line.split('|').collect();
                 if parts.len() >= 3 {
                     if let Some(device_id) = DeviceId::from_hex(parts[0]) {
                         out.push(KnownDevice {
                             device_id,
-                            name: parts[1].to_owned(),
-                            address: parts[2].to_owned(),
+                            name: unescape_field(parts[1]),
+                            address: unescape_field(parts[2]),
                         });
                     }
                 }
@@ -83,8 +86,8 @@ impl ConfigRepository {
             out.push_str(&format!(
                 "{}|{}|{}\n",
                 d.device_id.to_hex(),
-                d.name,
-                d.address
+                escape_field(&d.name),
+                escape_field(&d.address)
             ));
         }
         write_replacing(&cfg_path, &out);
@@ -95,7 +98,7 @@ impl ConfigRepository {
         let cfg_path = format!("{}/shares.cfg", self.base_data_dir);
         let mut entries = Vec::new();
         let mut needs_save = false;
-        if let Ok(content) = fs::read_to_string(&cfg_path) {
+        if let Ok(content) = read_recovering(&cfg_path) {
             for line in content.lines() {
                 let parts: Vec<&str> = line.split('|').collect();
                 if parts.len() >= 4 {
@@ -103,13 +106,13 @@ impl ConfigRepository {
                         parts[4]
                             .split(',')
                             .map(|s| s.trim().to_owned())
-                            .filter(|s| !s.is_empty())
+                            .filter(|s| DeviceId::from_hex(s).is_some())
                             .collect()
                     } else {
                         Vec::new()
                     };
-                    let folder_id = parts[0].to_owned();
-                    let mut target_path = parts[2].to_owned();
+                    let folder_id = unescape_field(parts[0]);
+                    let mut target_path = unescape_field(parts[2]);
                     let default_sync_path = format!("{}/sync/{}", self.base_data_dir, folder_id);
                     if target_path == default_sync_path {
                         if let Some(&(_, _, tpl_path)) = NEW_SHARE_TEMPLATES
@@ -122,7 +125,7 @@ impl ConfigRepository {
                     }
                     entries.push(ShareConfigEntry {
                         folder_id,
-                        label: parts[1].to_owned(),
+                        label: unescape_field(parts[1]),
                         target_path,
                         enabled: parts[3] != "0",
                         shared_devices,
@@ -145,9 +148,9 @@ impl ConfigRepository {
             let devs = s.shared_devices.join(",");
             out.push_str(&format!(
                 "{}|{}|{}|{}|{}\n",
-                s.folder_id,
-                s.label,
-                s.target_path,
+                escape_field(&s.folder_id),
+                escape_field(&s.label),
+                escape_field(&s.target_path),
                 if s.enabled { "1" } else { "0" },
                 devs
             ));
@@ -158,7 +161,7 @@ impl ConfigRepository {
     /// Loads declined folder offers from `<base_data_dir>/ignored_folders.cfg`.
     pub fn load_ignored_folders(&self) -> Vec<IgnoredFolder> {
         let cfg_path = format!("{}/ignored_folders.cfg", self.base_data_dir);
-        let Ok(content) = fs::read_to_string(&cfg_path) else {
+        let Ok(content) = read_recovering(&cfg_path) else {
             return Vec::new();
         };
         content
@@ -166,7 +169,7 @@ impl ConfigRepository {
             .filter_map(|line| {
                 let (folder_id, dev_hex) = line.split_once('|')?;
                 Some(IgnoredFolder {
-                    folder_id: folder_id.to_owned(),
+                    folder_id: unescape_field(folder_id),
                     device_id: DeviceId::from_hex(dev_hex.trim())?,
                 })
             })
@@ -179,7 +182,7 @@ impl ConfigRepository {
         let cfg_path = format!("{}/ignored_folders.cfg", self.base_data_dir);
         let out: String = ignored
             .iter()
-            .map(|f| format!("{}|{}\n", f.folder_id, f.device_id.to_hex()))
+            .map(|f| format!("{}|{}\n", escape_field(&f.folder_id), f.device_id.to_hex()))
             .collect();
         write_replacing(&cfg_path, &out);
     }
@@ -188,7 +191,7 @@ impl ConfigRepository {
     /// Defaults to `ThemeMode::Oled` if the file does not exist or contains invalid data.
     pub fn load_theme(&self) -> ThemeMode {
         let cfg_path = format!("{}/theme.cfg", self.base_data_dir);
-        let Ok(content) = fs::read_to_string(&cfg_path) else {
+        let Ok(content) = read_recovering(&cfg_path) else {
             return ThemeMode::Oled;
         };
         ThemeMode::parse(&content).unwrap_or(ThemeMode::Oled)
@@ -206,7 +209,7 @@ impl ConfigRepository {
     /// Defaults to `LanguagePreference::System` if the file is missing or invalid.
     pub fn load_language(&self) -> LanguagePreference {
         let cfg_path = format!("{}/language.cfg", self.base_data_dir);
-        let Ok(content) = fs::read_to_string(&cfg_path) else {
+        let Ok(content) = read_recovering(&cfg_path) else {
             return LanguagePreference::System;
         };
         LanguagePreference::parse(&content).unwrap_or_default()
@@ -246,13 +249,25 @@ impl ConfigRepository {
     }
 }
 
-/// Replaces `path` with `content` via a fresh temp file + rename.
-/// `sceIo` does not reliably honor `O_TRUNC`, so a shorter rewrite would keep the old file's tail.
+/// Replaces `path` with `content` through a temp file, keeping the previous version as
+/// `<path>.bak` until the new one is in place (see `syncthing_core::storage::atomic`).
 fn write_replacing(path: &str, content: &str) {
     let tmp = format!("{}.tmp", path);
-    let _ = fs::remove_file(&tmp);
-    if fs::write(&tmp, content).is_ok() {
-        let _ = fs::remove_file(path);
-        let _ = fs::rename(&tmp, path);
+    if write_file_synced(Path::new(&tmp), content.as_bytes()).is_ok() {
+        let _ = replace_file(
+            Path::new(&tmp),
+            Path::new(path),
+            Path::new(&backup_path(path)),
+        );
     }
+}
+
+/// Reads `path`, first restoring it from its backup if a replacement was interrupted.
+fn read_recovering(path: &str) -> std::io::Result<String> {
+    recover_replaced_file(Path::new(path), Path::new(&backup_path(path)));
+    fs::read_to_string(path)
+}
+
+fn backup_path(path: &str) -> String {
+    format!("{}.bak", path)
 }

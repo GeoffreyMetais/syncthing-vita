@@ -3,6 +3,8 @@
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::Arc;
 
+use super::tuning::SyncTuning;
+
 /// Thread-safe control handle allowing the UI thread to request an immediate local folder rescan
 /// or a clean shutdown of a persistent BEP/1.0 session.
 #[derive(Debug, Default)]
@@ -10,11 +12,25 @@ pub struct SyncControl {
     stop_requested: AtomicBool,
     rescan_requested: AtomicBool,
     rescan_epoch: AtomicU64,
+    tuning: SyncTuning,
 }
 
 impl SyncControl {
     pub fn new() -> Arc<Self> {
         Arc::new(Self::default())
+    }
+
+    /// Creates a control handle for sessions running with `tuning`.
+    pub fn with_tuning(tuning: SyncTuning) -> Arc<Self> {
+        Arc::new(Self {
+            tuning,
+            ..Self::default()
+        })
+    }
+
+    /// Timings of the sessions driven by this handle.
+    pub fn tuning(&self) -> SyncTuning {
+        self.tuning
     }
 
     pub fn request_stop(&self) {

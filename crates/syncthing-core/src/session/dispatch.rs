@@ -1,12 +1,14 @@
 //! Dispatch of messages received on the primary connection once the session is established.
 
 use std::io;
+use std::time::Duration;
 
 use super::context::SessionContext;
 use super::folders::FolderSyncState;
 use super::index_exchange::{handle_runtime_cluster_config, handle_runtime_index};
 use super::upload::serve_block_request;
 use crate::bep::{write_bep_message, BepClose, BepMessageType};
+use crate::tls::polling::try_read_bep_message;
 use crate::tls::BepTlsStream;
 
 /// What a dispatched primary-connection message resulted in.
@@ -17,6 +19,19 @@ pub enum Dispatched {
     IndexApplied,
     /// The peer sent `Close` with this reason.
     Closed(String),
+}
+
+/// Next primary-connection message to handle: one deferred during a download first, then
+/// whatever arrives on the stream within `poll_timeout` (`Ok(None)` if nothing does).
+pub fn next_primary_message(
+    stream: &mut BepTlsStream,
+    ctx: &mut SessionContext<'_>,
+    poll_timeout: Duration,
+) -> io::Result<Option<(BepMessageType, Vec<u8>)>> {
+    if let Some(deferred) = ctx.take_deferred_message() {
+        return Ok(Some(deferred));
+    }
+    try_read_bep_message(stream, poll_timeout)
 }
 
 /// Handles one message of an established session (`ClusterConfig`, `Index` / `IndexUpdate`,

@@ -1,15 +1,16 @@
 //! Modal Dialog: rear-camera viewfinder to scan a remote device's Syncthing Device ID QR code.
 
+use crate::domain::interaction::{HitMap, PadKey};
 use crate::domain::AppState;
 use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton};
-use crate::ui::image::draw_gray_image;
 use crate::ui::i18n::messages::fill;
+use crate::ui::image::draw_gray_image;
 use crate::ui::strings;
 use crate::ui::theme::{scan_qr_modal_rect, UiTheme, C_WARN, SCAN_QR_VIEW_H, SCAN_QR_VIEW_W};
-use crate::ui::widgets::{action_width, draw_action, draw_hints};
+use crate::ui::widgets::{action_width, declare_modal, draw_press_button, draw_press_hints};
 
 /// Renders the `ScanDeviceQr` modal: live camera preview with a viewfinder frame.
-pub fn render_scan_qr_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
+pub fn render_scan_qr_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut HitMap) {
     let s = strings::strings(state.language);
     gfx.dim(180);
     let (dx, dy, w, h) = scan_qr_modal_rect();
@@ -17,6 +18,7 @@ pub fn render_scan_qr_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
 
     gfx.shadow(dx, dy, w, h, 18);
     gfx.rrect(dx, dy, w, h, 18, th.card);
+    declare_modal(hits, (dx, dy, w, h), Some(PadKey::Circle), None);
     gfx.rrect_outline(dx, dy, w, h, 18, 1, th.border);
 
     let lx = dx + 28;
@@ -53,16 +55,22 @@ pub fn render_scan_qr_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
     draw_viewfinder(gfx, th, state, vx, vy);
 
     let w_back = action_width(gfx, PadButton::Circle, s.action_back);
-    draw_action(
+    draw_press_button(
         gfx,
         th,
+        hits,
         dx + w - 28 - w_back,
         dy + h - 28,
         PadButton::Circle,
         s.action_back,
     );
 
-    draw_hints(gfx, th, &[(PadButton::Circle, None, s.hint_back_to_device_id)]);
+    draw_press_hints(
+        gfx,
+        th,
+        hits,
+        &[(PadButton::Circle, None, s.hint_back_to_device_id)],
+    );
 }
 
 /// Camera frame (or status text) with corner brackets marking where to place the QR code.

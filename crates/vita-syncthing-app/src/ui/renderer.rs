@@ -1,7 +1,7 @@
 //! Top-level UI Renderer (`VitaUiRenderer`) owning `Gfx` and `VitaFramebuffer`.
 //! Dispatches rendering of `&AppState` across tabs, modals, toast notifications, and OLED screensaver.
 
-use crate::application::frame_pacing::ANIMATION_INTERVAL;
+use crate::domain::defaults::ANIMATION_INTERVAL;
 use crate::domain::{ActiveTab, AppState, ModalDialog};
 use crate::infrastructure::VitaFramebuffer;
 use crate::ui::gfx::{Gfx, GFX_H, GFX_W};
@@ -36,62 +36,11 @@ impl VitaUiRenderer {
     /// `elapsed_vblanks` is the number of display VBlanks since the previous frame; it keeps
     /// animations at the same speed whatever the rendering frame rate (see `FramePacer`).
     pub fn render(&mut self, state: &mut AppState, elapsed_vblanks: u32) {
-        let th = UiTheme::for_mode(state.theme_mode);
-
         if state.oled_saver_active {
             let steps = elapsed_vblanks.min(ANIMATION_INTERVAL);
             state.step_screensaver(GFX_W as f32, GFX_H as f32, SAVER_W, SAVER_H, steps);
-            render_oled_screensaver(&mut self.gfx, &th, state);
-            self.fb.present(&self.gfx.pixels);
-            return;
         }
-
-        draw_chrome(&mut self.gfx, &th, state);
-
-        match state.active_tab {
-            ActiveTab::Dashboard => render_dashboard_tab(&mut self.gfx, &th, state),
-            ActiveTab::Shares => render_shares_tab(&mut self.gfx, &th, state),
-            ActiveTab::FolderPicker => {
-                state.clamp_picker_scroll();
-                render_folder_picker_tab(&mut self.gfx, &th, state);
-            }
-            ActiveTab::Settings => render_settings_tab(&mut self.gfx, &th, state),
-        }
-
-        // Draw active modal dialog on top of dimmed screen
-        match state.modal {
-            ModalDialog::None => {}
-            ModalDialog::CreateShare { selected_idx } => {
-                render_create_share_modal(&mut self.gfx, &th, state, selected_idx);
-            }
-            ModalDialog::ManageDevices {
-                share_idx,
-                selected_dev_idx,
-            } => {
-                render_manage_devices_modal(&mut self.gfx, &th, state, share_idx, selected_dev_idx);
-            }
-            ModalDialog::AddDeviceById { keypad_idx, .. } => {
-                render_add_device_modal(&mut self.gfx, &th, state, keypad_idx);
-            }
-            ModalDialog::ScanDeviceQr { .. } => {
-                render_scan_qr_modal(&mut self.gfx, &th, state);
-            }
-            ModalDialog::ShowDeviceId => {
-                render_device_id_modal(&mut self.gfx, &th, state);
-            }
-            ModalDialog::ConfirmQuit => {
-                render_confirm_quit_modal(&mut self.gfx, &th, state);
-            }
-            ModalDialog::ConfirmDeleteShare { share_idx } => {
-                render_confirm_delete_share_modal(&mut self.gfx, &th, state, share_idx);
-            }
-            ModalDialog::FolderOffer { offer_idx } => {
-                render_folder_offer_modal(&mut self.gfx, &th, state, offer_idx);
-            }
-        }
-
-        let s = strings::strings(state.language);
-        draw_toast(&mut self.gfx, &th, s, state.toast_msg.as_ref());
+        draw_frame(&mut self.gfx, state);
         self.fb.present(&self.gfx.pixels);
     }
 
@@ -99,4 +48,74 @@ impl VitaUiRenderer {
     pub fn idle(&mut self) {
         self.fb.wait_vblank();
     }
+}
+
+/// Draws the frame for `state` into `gfx` (no display access, so it also runs in host tests)
+/// and records its interactive elements in `state.hit_map`.
+pub fn draw_frame(gfx: &mut Gfx, state: &mut AppState) {
+    let th = UiTheme::for_mode(state.theme_mode);
+    // The elements declared by this frame replace those of the previous one.
+    let mut hits = std::mem::take(&mut state.hit_map);
+    hits.clear();
+    if state.active_tab == ActiveTab::FolderPicker {
+        state.clamp_picker_scroll();
+    }
+
+
+    if state.oled_saver_active {
+        render_oled_screensaver(gfx, &th, state);
+        state.hit_map = hits;
+        return;
+    }
+
+    draw_chrome(gfx, &th, state, &mut hits);
+
+    match state.active_tab {
+        ActiveTab::Dashboard => render_dashboard_tab(gfx, &th, state, &mut hits),
+        ActiveTab::Shares => render_shares_tab(gfx, &th, state, &mut hits),
+        ActiveTab::FolderPicker => {
+            render_folder_picker_tab(gfx, &th, state, &mut hits);
+        }
+        ActiveTab::Settings => render_settings_tab(gfx, &th, state, &mut hits),
+    }
+
+    // Draw active modal dialog on top of dimmed screen. Nothing of the page behind it is
+    // interactive while it is open.
+    if state.modal != ModalDialog::None {
+        hits.clear();
+    }
+    match state.modal {
+        ModalDialog::None => {}
+        ModalDialog::CreateShare { selected_idx } => {
+            render_create_share_modal(gfx, &th, state, selected_idx, &mut hits);
+        }
+        ModalDialog::ManageDevices {
+            share_idx,
+            selected_dev_idx,
+        } => {
+            render_manage_devices_modal(gfx, &th, state, share_idx, selected_dev_idx, &mut hits);
+        }
+        ModalDialog::AddDeviceById { keypad_idx, .. } => {
+            render_add_device_modal(gfx, &th, state, keypad_idx, &mut hits);
+        }
+        ModalDialog::ScanDeviceQr { .. } => {
+            render_scan_qr_modal(gfx, &th, state, &mut hits);
+        }
+        ModalDialog::ShowDeviceId => {
+            render_device_id_modal(gfx, &th, state, &mut hits);
+        }
+        ModalDialog::ConfirmQuit => {
+            render_confirm_quit_modal(gfx, &th, state, &mut hits);
+        }
+        ModalDialog::ConfirmDeleteShare { share_idx } => {
+            render_confirm_delete_share_modal(gfx, &th, state, share_idx, &mut hits);
+        }
+        ModalDialog::FolderOffer { offer_idx } => {
+            render_folder_offer_modal(gfx, &th, state, offer_idx, &mut hits);
+        }
+    }
+
+    let s = strings::strings(state.language);
+    draw_toast(gfx, &th, s, state.toast_msg.as_ref());
+    state.hit_map = hits;
 }

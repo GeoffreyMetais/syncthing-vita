@@ -1,7 +1,13 @@
 //! Per-session context shared by every phase of a BEP session: who we are, who the peer is,
 //! where files live, transfer statistics and the event sink.
 
+use std::collections::VecDeque;
+use std::time::Instant;
+
+use super::control::SyncControl;
 use super::events::SyncEvent;
+use super::tuning::SyncTuning;
+use crate::bep::BepMessageType;
 use crate::cert::VitaIdentity;
 use crate::device_id::DeviceId;
 use crate::storage::FsSyncStorage;
@@ -42,6 +48,14 @@ pub struct SessionContext<'a> {
     pub storage: &'a FsSyncStorage,
     pub peer_device_id: DeviceId,
     pub stats: SyncStats,
+    /// Control handle of a persistent session (`None` for a single-cycle one).
+    pub control: Option<&'a SyncControl>,
+    /// Session timings (the control handle's, or the defaults for a single-cycle session).
+    pub tuning: SyncTuning,
+    /// Primary-connection messages received while waiting for a block `Response`; they are
+    /// handled by the session loops once the download is over.
+    deferred: VecDeque<(BepMessageType, Vec<u8>)>,
+    last_keepalive: Instant,
     next_request_id: i32,
     on_event: &'a mut dyn FnMut(SyncEvent),
 }
@@ -58,6 +72,10 @@ impl<'a> SessionContext<'a> {
             storage,
             peer_device_id,
             stats: SyncStats::default(),
+            control: None,
+            tuning: SyncTuning::default(),
+            deferred: VecDeque::new(),
+            last_keepalive: Instant::now(),
             next_request_id: 1,
             on_event,
         }
@@ -66,6 +84,38 @@ impl<'a> SessionContext<'a> {
     /// Our own `DeviceId`.
     pub fn own_id(&self) -> DeviceId {
         self.identity.device_id
+    }
+
+    /// Returns `true` if a local stop was requested: long operations (downloads) must end
+    /// promptly so a replaced or closing session never keeps writing in the background.
+    pub fn is_stop_requested(&self) -> bool {
+        self.control.is_some_and(|c| c.is_stop_requested())
+    }
+
+    /// Attaches the control handle of a persistent session (stop requests and timings).
+    pub fn set_control(&mut self, control: &'a SyncControl) {
+        self.tuning = control.tuning();
+        self.control = Some(control);
+    }
+
+    /// Keeps a message that cannot be handled right now (received in the middle of a
+    /// download) for the session loop.
+    pub fn defer_message(&mut self, msg_type: BepMessageType, payload: Vec<u8>) {
+        self.deferred.push_back((msg_type, payload));
+    }
+
+    /// Takes the oldest deferred message, if any.
+    pub fn take_deferred_message(&mut self) -> Option<(BepMessageType, Vec<u8>)> {
+        self.deferred.pop_front()
+    }
+
+    /// Returns `true` (and restarts the interval) when a keepalive `Ping` must be sent.
+    pub fn keepalive_due(&mut self) -> bool {
+        if self.last_keepalive.elapsed() < self.tuning.keepalive_interval {
+            return false;
+        }
+        self.last_keepalive = Instant::now();
+        true
     }
 
     /// Forwards `event` to the session's event sink.

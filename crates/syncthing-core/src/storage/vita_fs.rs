@@ -47,17 +47,45 @@ pub(crate) fn ensure_dir_exists(dir: &Path) -> io::Result<()> {
     }
 }
 
-/// Recursively lists `(relative path, is_dir)` under `base`, skipping Syncthing-internal files.
+/// What a directory entry found by [`collect_files_recursive`] is.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum DiskEntryKind {
+    Dir,
+    File,
+    /// The entry exists but cannot be inspected right now (`stat()` failed). It must never be
+    /// mistaken for a deleted file.
+    Unreadable,
+}
+
+/// One entry of a folder, with its path relative to the folder root.
+#[derive(Debug)]
+pub(crate) struct DiskEntry {
+    pub rel: String,
+    pub kind: DiskEntryKind,
+}
+
+/// Result of a recursive folder listing.
+#[derive(Debug, Default)]
+pub(crate) struct DiskListing {
+    pub entries: Vec<DiskEntry>,
+    /// Backups left by an interrupted download commit (see `storage::download`).
+    pub download_backups: Vec<PathBuf>,
+}
+
+/// Recursively lists the entries under `base`, skipping Syncthing-internal files.
 pub(crate) fn collect_files_recursive(
     base: &Path,
     prefix: &str,
-    out: &mut Vec<(String, bool)>,
+    out: &mut DiskListing,
 ) -> io::Result<()> {
     for entry_res in fs::read_dir(base)? {
         let entry = entry_res?;
         let name = entry.file_name().to_string_lossy().into_owned();
         // Internal files only: download temp files, local databases and Syncthing markers.
         if name.starts_with(".syncthing") || name.starts_with(".st") {
+            if super::download::is_download_backup_name(&name) {
+                out.download_backups.push(entry.path());
+            }
             continue;
         }
         let rel = if prefix.is_empty() {
@@ -66,11 +94,29 @@ pub(crate) fn collect_files_recursive(
             format!("{}/{}", prefix, name)
         };
         let path = entry.path();
-        if path.is_dir() {
-            out.push((rel.clone(), true));
-            collect_files_recursive(&path, &rel, out)?;
-        } else if path.is_file() {
-            out.push((rel, false));
+        // The directory entry type needs no extra `stat()`; fall back to one for links and
+        // for platforms that do not report it.
+        let file_type = match entry.file_type() {
+            Ok(ft) if ft.is_dir() || ft.is_file() => Ok(ft),
+            _ => fs::metadata(&path).map(|m| m.file_type()),
+        };
+        match file_type {
+            Ok(ft) if ft.is_dir() => {
+                out.entries.push(DiskEntry {
+                    rel: rel.clone(),
+                    kind: DiskEntryKind::Dir,
+                });
+                collect_files_recursive(&path, &rel, out)?;
+            }
+            Ok(ft) if ft.is_file() => out.entries.push(DiskEntry {
+                rel,
+                kind: DiskEntryKind::File,
+            }),
+            Ok(_) => {}
+            Err(_) => out.entries.push(DiskEntry {
+                rel,
+                kind: DiskEntryKind::Unreadable,
+            }),
         }
     }
     Ok(())

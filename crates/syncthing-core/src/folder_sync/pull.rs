@@ -24,6 +24,18 @@ impl FsSyncStorage {
         own_id: DeviceId,
         remote: &[BepFileInfo],
     ) -> io::Result<PullPlan> {
+        self.plan_pull_with_progress(folder_id, own_id, remote, &mut || {})
+    }
+
+    /// Same as [`Self::plan_pull`]; `on_progress` is called regularly while scanning and
+    /// planning so a session can keep its connection alive.
+    pub fn plan_pull_with_progress(
+        &self,
+        folder_id: &str,
+        own_id: DeviceId,
+        remote: &[BepFileInfo],
+        on_progress: &mut dyn FnMut(),
+    ) -> io::Result<PullPlan> {
         let short_id = short_device_id(own_id);
         // Parents before children for creations; children before parents for deletions.
         let mut ordered: Vec<&BepFileInfo> = remote
@@ -38,9 +50,10 @@ impl FsSyncStorage {
         });
 
         with_folder_db(&self.db_path(folder_id), folder_id, own_id, |db| {
-            self.scan_into_db(folder_id, short_id, db)?;
+            self.scan_into_db(folder_id, short_id, db, on_progress)?;
             let mut plan = PullPlan::default();
             for rf in ordered {
+                on_progress();
                 self.plan_entry(folder_id, short_id, db, rf, &mut plan);
             }
             Ok(plan)
@@ -163,7 +176,9 @@ impl FsSyncStorage {
 
         // Regular file: the content may still match when the peer uses another block size.
         match self.find_outdated_blocks(folder_id, rf) {
-            Ok(outdated) if outdated.is_empty() && path.is_file() => {
+            // A local file with the right blocks but another length (trailing data) goes
+            // through a download too: it is fixed in the temp file, never in place.
+            Ok(outdated) if outdated.is_empty() && has_len(&path, rf.size) => {
                 Self::put_file_from_remote(db, rf, &path, merged);
                 plan.up_to_date.push(rf.clone());
             }
@@ -203,6 +218,11 @@ impl FsSyncStorage {
             Self::put_file_from_remote(db, rf, &path, version_merge(&prev, &rf.versions));
         });
     }
+}
+
+/// Returns `true` if `path` is a regular file of exactly `size` bytes.
+fn has_len(path: &Path, size: i64) -> bool {
+    fs::metadata(path).is_ok_and(|m| m.is_file() && m.len() == size.max(0) as u64)
 }
 
 /// `save.bin` -> `save.sync-conflict-<unix secs>-<device>.bin` (Syncthing-style conflict name).

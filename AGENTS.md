@@ -29,7 +29,7 @@ syncthing-vita
     │   │   ├── version_vector.rs     # Version vector arithmetic (ge / merge / bump, short device ID)
     │   │   ├── bep/                  # BEP/1.0 pure codecs: header, framing, lz4, hello, cluster_config, index, request, close
     │   │   ├── discovery/            # announce.rs (codec), addresses.rs, local_ip.rs, udp.rs (broadcast cycle), lan_scan.rs (TCP 22000 + TLS probe)
-    │   │   ├── storage/              # FsSyncStorage: mod.rs (folder registry & paths), blocks.rs, download.rs (temp file assembly), vita_fs.rs (sceIo quirks)
+    │   │   ├── storage/              # FsSyncStorage: mod.rs (folder registry & paths), blocks.rs, download.rs (temp file assembly), atomic.rs (crash-safe replacement), vita_fs.rs (sceIo quirks)
     │   │   ├── local_db/             # Persistent folder DB: mod.rs (LocalEntry, FolderDb), codec.rs (text format), cache.rs (process-wide cache)
     │   │   ├── folder_sync/          # Reconciliation: scan.rs (disk scan -> local Index), pull.rs (pull planning, conflicts, deletions)
     │   │   ├── tls/                  # TLS 1.3 transport only: verifier.rs, client.rs (BEP streams, ID probe), polling.rs
@@ -46,22 +46,27 @@ syncthing-vita
             │   ├── navigation.rs     # NavFocus / NavState (D-pad focus), tab order, buttons per row
             │   ├── models.rs         # KnownDevice, ShareConfigEntry, PickerItem, ActiveTab, PickerMode, ModalDialog, ThemeMode
             │   ├── app_state.rs      # AppState (pure state & view-model queries, zero I/O or rendering dependencies)
+            │   ├── interaction.rs    # HitMap / Hotspot / UiAction / FocusSlot: interactive elements declared by the frame on screen
+            │   ├── defaults.rs       # Every tunable value of the app: sync / discovery / power / display timings, limits, share presets
             │   ├── initial_sync.rs   # InitialSyncPeers (peers in their initial sync phase; full CPU speed meanwhile)
             │   └── ui_text.rs        # UiText: translatable messages (status line, labels, toasts) chosen by inner layers
             ├── application/          # Layer 2: Use Cases, Input Controller & Sync Event Coordinator
             │   ├── mod.rs
             │   ├── share_service.rs  # ShareService (create_share, upsert_device, toggle_device_for_share, refresh_picker_items)
+            │   ├── dashboard_controller.rs / shares_controller.rs / files_controller.rs / settings_controller.rs # One controller per page: D-pad focus movement, execution of the page's UiActions
             │   ├── share_creation.rs # ShareCreation (new share kept only once a device is linked)
             │   ├── folder_offers.rs  # FolderOfferService (folders offered by peers need consent: accept / decline / later)
             │   ├── frame_pacing.rs   # FramePacer (dynamic frame rate: render only when the screen changes)
             │   ├── dpad_navigation.rs # DpadNavigation (sidebar <-> page focus, Cross on focused element)
             │   ├── qr_scan.rs        # QrScanFlow (scanner events -> AddDeviceById confirmation), extract_device_id
             │   ├── sync_coordinator.rs # SyncCoordinator (maps WorkerMsg & SyncEvent into AppState & ShareService)
-            │   ├── input_controller.rs # InputController (main-screen InputFrame -> AppState + ShareService -> UserCommand)
-            │   └── modal_input/      # ModalInput: one input handler per modal (create_share, manage_devices, add_device, scan_qr, dialogs)
+            │   ├── input_controller.rs # InputController (resolves touch / Cross / shortcuts against the frame's HitMap, executes UiActions)
+            │   └── modal_input/      # ModalInput: resolves touches on the open modal, one key / row handler per modal (create_share, manage_devices, add_device, scan_qr, dialogs)
             ├── infrastructure/       # Layer 3: Persistence, OS Filesystem, PS Vita Hardware & BEP Worker Thread
             │   ├── mod.rs
             │   ├── config_repo.rs    # ConfigRepository (devices.cfg, shares.cfg, ignored_folders.cfg, theme.cfg, language.cfg, syncthing.log, ux0: directory listing)
+            │   ├── config_fields.rs  # escape_field / unescape_field (peer-supplied text can never forge `.cfg` fields or lines)
+            │   ├── worker_slot.rs    # spawn_after_previous / wait_for_worker (a new sync worker starts only once the previous one ended)
             │   ├── identity_store.rs # IdentityStore (sceKernelGetRandomNumber, device_seed.bin, cert.der)
             │   ├── vita_system.rs    # init_vita_network (SceSysmodule + SceSysmem + SceNet + SceNetCtl) & detect_system_language (SceAppUtil)
             │   ├── ui_script.rs      # Opt-in `ui-script` feature: scripted input replay + frame dumps for Vita3K
@@ -154,6 +159,8 @@ Dependencies strictly point **inward**. Inner layers never import or depend on o
      - `input_controller.rs`: Translates main-screen button/touch inputs into actions, modal triggers, and commands.
      - `modal_input/`: Input handling for open modals, one file per modal (mirrors `ui/modals/`).
      - `dpad_navigation.rs`: D-pad focus between the sidebar and the page elements.
+     - `dashboard_controller.rs`, `shares_controller.rs`, `files_controller.rs`, `settings_controller.rs`: one controller per page (see §3.4).
+     - **No screen coordinate and no `crate::ui` import in this layer**: what is interactive, and where, is declared by the views (§3.4).
      - `frame_pacing.rs`: `FramePacer` dynamic frame rate (see §7).
      - `power_policy.rs`: automatic standby blocking and CPU clock level (`cpu_clock`: 333 MHz during the initial sync phase (`domain::InitialSyncPeers`, from `PeerConnected` to that peer's first `SyncCycleCompleted` / `SessionEnded`) and transfers + 10 s, 222 MHz for 3 s after input or while scanning a QR code, 111 MHz otherwise; applied by `set_cpu_clock_mhz` in `vita_system.rs`).
    - **Strict Rule**: No UI rendering code or direct hardware drivers.
@@ -162,10 +169,12 @@ Dependencies strictly point **inward**. Inner layers never import or depend on o
    - **Responsibility**: Hardware drivers, OS filesystem persistence, background threads, and Vita system modules.
    - **Key Modules**:
      - `config_repo.rs`: Disk persistence (`devices.cfg`, `shares.cfg`, `ignored_folders.cfg`, `theme.cfg`, `language.cfg`, `syncthing.log`) and `ux0:` browsing.
+     - `config_fields.rs`: Percent-escaping of every text field of the `.cfg` files (see §5).
      - `identity_store.rs`: Device seed PRNG (`sceKernelGetRandomNumber`) and X.509 certificate persistence.
      - `framebuffer.rs`: PS Vita hardware framebuffer management (`SceDisplay`, `SceSysmem`).
      - `input.rs`: Controller & touchscreen hardware drivers (`SceCtrl`, `SceTouch`).
      - `sync_worker.rs`: Background sync thread (UDP discovery, BEP protocol, TLS 1.3).
+     - `worker_slot.rs`: Sequential hand-over between sync workers. Never spawn a sync worker thread directly: two generations of sessions must not write the same files concurrently.
      - `vita_system.rs`: Network stack, sysmodule initialization, and automatic system language detection (`detect_system_language` via `SceAppUtil` on Vita and `LANG`/`LC_ALL` on host).
    - **Strict Rule**: All platform-specific `#[cfg(target_os = "vita")]` hardware syscalls (`sce*`) must be encapsulated here. Never leak them into UI or Domain.
 
@@ -212,6 +221,24 @@ These size and SRP rules apply to **both crates** (`vita-syncthing-app` and `syn
 
 ---
 
+### 3.4 Input Pattern: Elements Declared by the Screen (`HitMap`)
+
+An interactive element is declared **once, where it is drawn**. Never hit-test with pixel coordinates in the application layer: button positions depend on the label widths of the current language.
+
+- **Declaration (UI)**: the view declares the element where it draws it; `ui::renderer::draw_frame` records the frame's elements in `AppState::hit_map` (the one piece of state the renderer writes).
+  - *Pages*: `widgets::draw_action_hotspot` (or `HitMap::add`) with a `UiAction`, a D-pad `FocusSlot` and, through the `PadButton` it displays, a face-button shortcut. The sidebar (`draw_chrome`) declares the tabs and the transfer card.
+  - *Hint bar*: `widgets::draw_hint_bar` with `Hint::action(button, label, action)`: touching the hint, or pressing the button it shows, triggers the action (`Hint::info` for purely informative entries). A hint that does not fit on the bar is left out, never cut off.
+  - *Modals*: `declare_modal` right after the card (what a touch outside / inside does), `draw_press_button` and `draw_press_hints` (touching them is the same as pressing the pad button they show: `UiAction::Press`), `declare_touch` with `UiAction::ModalRow(idx)` for list rows and keypad keys. Page elements are not interactive while a modal is open.
+- **Resolution (application)**: `InputController` resolves touch (`HitMap::action_at`), `Cross` on the focused element (`HitMap::focused_action(state.focus_slot())`) and face buttons (`HitMap::shortcut_action`), then `InputController::execute` runs the `UiAction` (global ones itself, page ones through the page's controller). `ModalInput` turns a touch into the pad button or the row it stands for, so modal handlers only know buttons and rows. Executing an action must tolerate a stale frame (the state may have changed since it was drawn): validate indexes.
+- **Adding an element**: add a `UiAction` variant if needed, declare the element in the view, execute the action in the page's controller. Never add a coordinate to the application layer.
+- **Tests** draw the frame before feeding input (`tests/common`: `draw`, `press`, `tap`, `feed`) and locate elements through the hit map (`rect_of`, `rects_of`, `tap_action`, `tap_rect`), never with literal coordinates. `main_screens.rs` and `modal_touch.rs` check in all five languages that every element is on screen and that hints / buttons do not overlap: run them after any layout or label change.
+
+### 3.5 Tunable Values (`domain/defaults.rs`)
+
+Timings, limits and presets that govern the app's behaviour (rescan interval, retry delays, discovery period, maximum concurrent devices, power grace periods, frame rates, screensaver timeouts, share presets) live in `domain/defaults.rs`. Never write such a value inline in `sync_worker.rs`, `main.rs` or a policy: add a documented constant there. The values `syncthing-core` lets an application tune are passed through `SyncTuning` (`SyncControl::with_tuning`); purely internal protocol timings stay as named constants in the file that uses them.
+
+---
+
 ### 3.3 `syncthing-core` Library Architecture
 
 `syncthing-core` is the platform-independent protocol library. It must stay as clean as the app: one responsibility per file, strict inward dependencies, no Vita syscalls.
@@ -234,7 +261,11 @@ These size and SRP rules apply to **both crates** (`vita-syncthing-app` and `syn
 - **`bep/`**: one file per BEP message family (`header`, `framing`, `lz4`, `hello`, `cluster_config`, `index`, `request`, `close`). Encode/decode only — never read files or sockets beyond the generic `Read`/`Write` in `framing.rs` / `hello.rs`.
 - **`device_id/`**: `DeviceId` value object; parsing of user input (`parse.rs`) and Base32/Luhn primitives (`base32.rs`) are separate.
 - **`discovery/`**: `Announce` codec, address ordering, local IP detection, UDP broadcast cycle, LAN TCP-scan fallback — one file each.
+- **Folder authorization**: `FsSyncStorage::is_folder_shared_with(folder_id, peer)` is the single gate of every session. A folder is only announced, indexed, downloaded or served for the devices declared with `set_folder_devices`; a folder a peer merely announces in its `ClusterConfig` is reported through `SyncEvent::ClusterConfigReceived` (so the app can ask for consent) but never synchronized. Any new message handler in `session/` must check `FolderSyncState::is_shared_folder` or `is_folder_shared_with` before touching a folder.
 - **`storage/`**: `FsSyncStorage` split by concern — registry & paths (`mod.rs`), block hashing / delta / block reads (`blocks.rs`), crash-safe download temp files (`download.rs`), `sceIo` path quirks (`vita_fs.rs`). Extend `FsSyncStorage` with a new `impl` block in the file owning that concern instead of growing `mod.rs`.
+- **Crash-safe writes**: a file is never deleted before its replacement is in place. Use `storage::atomic::{write_file_synced, replace_file, recover_replaced_file}` (temp file, previous version kept as a backup, recovery on the next load); downloads, folder databases and the app's `.cfg` files all go through them.
+- **Scans never turn an error into a deletion**: an entry that exists but cannot be inspected (`DiskEntryKind::Unreadable`, failing `stat()`) keeps its database entry, as does everything below it. Only an entry absent from a successful directory listing becomes a tombstone.
+- **Sizes from the network are bounded before allocating**: block sizes above `BEP_MAX_BLOCK_SIZE`, negative sizes / offsets and LZ4 output beyond the announced length are rejected.
 - **`local_db/`**: in-memory model (`mod.rs`), on-disk text format (`codec.rs`), process-wide cache + atomic save (`cache.rs`). Version arithmetic lives in `version_vector.rs`.
 - **`folder_sync/`**: disk scan → local `Index` (`scan.rs`) vs. pull planning, conflicts and deletions (`pull.rs`).
 - **`tls/`**: TLS transport only — certificate verifier, client connection setup / ID probe, frame polling. Nothing about sync.
@@ -247,7 +278,12 @@ These size and SRP rules apply to **both crates** (`vita-syncthing-app` and `syn
   - `dispatch.rs` — routing of primary-connection messages in an established session
   - `index_exchange.rs` — local index publication and runtime `ClusterConfig` / `Index` handling
   - `download.rs` / `upload.rs` — block transfers (pull / serve)
-  - `folders.rs` — per-session folder state (pure); `context.rs` — `SessionContext` (identity, storage, stats, event sink); `control.rs`, `events.rs`, `outcome.rs` — public API types
+  - `folders.rs` — per-session folder state (pure); `context.rs` — `SessionContext` (identity, storage, stats, event sink, deferred messages); `control.rs`, `events.rs`, `outcome.rs` — public API types
+  - `keepalive.rs` — `Ping` when the keepalive interval elapsed; `tuning.rs` — `SyncTuning` (rescan / keepalive intervals chosen by the app, passed through `SyncControl::with_tuning`)
+- **Session invariants** (covered by `tests/session.rs` with the fake peer):
+  - *No message is dropped during a download*: while waiting for a block `Response`, `Index` / `IndexUpdate` / `ClusterConfig` / `Close` are deferred (`SessionContext::defer_message`) and the session loops read through `dispatch::next_primary_message`, never `try_read_bep_message` directly.
+  - *Index publication is incremental*: always publish through `index_exchange::publish_index` (`FolderSyncState::take_unpublished`): one full `Index` per folder and session, then `IndexUpdate`s holding only entries with a newer sequence, in batches of `INDEX_BATCH_FILES`.
+  - *Long local work keeps the connection alive*: scan through `index_exchange::scan_local_index` / `plan_pull_with_progress`, whose progress callback sends keepalive `Ping`s. After a pull, publish from `local_index_snapshot` (no second scan).
 
 #### Rules for new code
 
@@ -257,8 +293,9 @@ These size and SRP rules apply to **both crates** (`vita-syncthing-app` and `syn
 
 #### Tests
 
-- **No `#[cfg(test)] mod tests` inside `src/`.** All `syncthing-core` tests live in `crates/syncthing-core/tests/`, one file per module (`bep_codec.rs`, `device_id.rs`, `discovery.rs`, `identity.rs`, `storage.rs`, `local_db.rs`, `folder_sync.rs`, `version_vector.rs`), with shared helpers in `tests/common/mod.rs` (e.g. `fresh_temp_dir`).
+- **No `#[cfg(test)] mod tests` inside `src/`.** All `syncthing-core` tests live in `crates/syncthing-core/tests/`, one file per module (`bep_codec.rs`, `device_id.rs`, `discovery.rs`, `identity.rs`, `storage.rs`, `local_db.rs`, `folder_sync.rs`, `version_vector.rs`, `session.rs`), with shared helpers in `tests/common/mod.rs` (e.g. `fresh_temp_dir`).
 - Tests exercise the public API. If something important can only be tested through a private item, it is usually a sign the item deserves its own module with a small public surface (as `storage::vita_fs::with_device_root_slash` or `FolderDb::{serialize, parse}`).
+- Session tests run against `tests/common/fake_peer.rs`: a scriptable local TLS 1.3 + BEP/1.0 server (`FakePeer::spawn(seed, |conn| ...)`) that announces folders, sends indexes, serves blocks and records every message received. Use it for any change in `session/`.
 - Filesystem tests use a unique `common::fresh_temp_dir("<name>")` per test so test binaries can run in parallel.
 
 ---
@@ -295,13 +332,16 @@ Emulators like Vita3K are permissive HLE environments that run with host PC RAM 
 5. **Unique Per-Installation Cryptographic Identity (`main.rs`)**:
    - Never hardcode the contents of `ux0:data/syncthing/device_seed.bin`.
    - On a clean installation (when `device_seed.bin` does not exist), generate 32 random bytes via `sceKernelGetRandomNumber` (`SceLibKernel_stub`) so every PS Vita gets a unique Syncthing `DeviceId`.
+   - Consent is enforced by `syncthing-core`, not only by the UI: `spawn_sync_worker` declares each share's linked devices with `FsSyncStorage::set_folder_devices`, and sessions ignore every other folder (see §3.3 **Folder authorization**).
    - Remote folders received via `ClusterConfig` never become shares on their own: `FolderOfferService::receive` queues them as `FolderOffer`s and the `FolderOffer` modal asks for consent. An accepted folder defaults to `enabled: false` (**Paused**) until the user selects a target folder and enables it in the **Shares** tab; a declined one is saved in `ignored_folders.cfg`.
 
 ---
 
 ## 5. Runtime Configuration Files on PS Vita (`ux0:data/syncthing/`)
 
-All persistent application state lives in `ux0:data/syncthing/` (or `/tmp/syncthing-vita` on host builds):
+All persistent application state lives in `ux0:data/syncthing/` (or `/tmp/syncthing-vita` on host builds).
+
+Text fields of the `.cfg` files (device names, addresses, folder IDs, labels, paths) are written with `config_fields::escape_field` (`%` -> `%25`, `|` -> `%7C`, line breaks -> `%0A` / `%0D`) and read with `unescape_field`: names, folder IDs and labels come from remote peers and must never be written verbatim. Always go through these helpers when adding a field or a file.
 
 | File | Purpose | Format |
 | :--- | :--- | :--- |
@@ -332,12 +372,16 @@ cargo test --workspace
 - `local_db.rs`: persistent folder database text format roundtrip
 - `folder_sync.rs`: version convergence across peers, local deletions become tombstones
 - `version_vector.rs`: version vector ordering / merge / bump
+- `bep_codec.rs` / `storage.rs` / `folder_sync.rs` also cover the hardening rules: bounded LZ4 output, bounded block sizes, interrupted download commit recovery, unreadable entries never recorded as deleted
+- `session.rs`: folder authorization (per-device sharing gate, block requests refused for unlinked peers, unconfigured or paused folders) and end-to-end sessions against the fake peer (only shared folders are announced / pulled, an `IndexUpdate` received during a download is applied, a local change is published as an incremental `IndexUpdate`, batched publication, scan progress for keepalives)
 
 `vita-syncthing-app` tests live in `crates/vita-syncthing-app/tests/` (`cargo test -p vita-syncthing-app`):
 - `share_creation.rs`: a new share without a linked device is discarded, a linked one is kept, `Files` tab folder selection, already-shared folders are not selectable
-- `folder_offers.rs`: offered folders need consent, accept / decline / later, declined offers persisted, deleted shares are declined and do not come back, `Settings` · `Clear Declined` (D-pad and touch)
+- `folder_offers.rs`: offered folders need consent, accept / decline / later, a crafted folder label cannot inject a share, declined offers persisted, deleted shares are declined and do not come back, `Settings` · `Clear Declined` (D-pad and touch)
 - `share_service.rs`: share deletion, share creation, device linking, paused accepted folders, `ConfigRepository` roundtrip, manual LAN pairing
 - `input_controller.rs`: global routing — an active screensaver swallows input and wakes on a button press or touch only
+- `main_screens.rs`: sidebar tabs and transfer card, `Overview` card / buttons / hints, `Files` rows and `Open` chip, `Settings` hints; geometry of every page in all 5 languages (elements on screen, hints not overlapping)
+- `modal_touch.rs`: modal touch resolved from declared elements (template rows, device rows, pause / done buttons, text box -> system keyboard, keypad keys, folder offer buttons, outside / inside touches); geometry of every modal in all 5 languages (on screen, hints and buttons not overlapping)
 - `dialogs.rs`: `START` -> `ConfirmQuit` -> `Cross` quits, `ConfirmQuit` touch targets, `ConfirmDeleteShare` (`Square` on Shares, cancel / confirm)
 - `add_device.rs`: add-device-by-short-ID via system keyboard (placeholder upgraded on discovery), virtual keyboard hidden until requested
 - `theme_settings.rs`: theme toggle (D-pad `Cross`, `Square`, touch) and `theme.cfg` persistence
@@ -346,7 +390,10 @@ cargo test --workspace
 - `qr_scan.rs`: Device ID extraction from QR payloads, `quircs` decoding of a rendered QR code, scanner modal navigation, adding the scanned device
 - `power_policy.rs`: standby blocking while syncing (charging / battery / transfer grace period), CPU clock level (full speed only during the initial sync phase and transfers), initial sync phase tracked per peer from `SyncEvent`s
 - `ui_text.rs`: every `UiText` message renders in all 5 languages with its placeholders filled, translated Device ID errors
+- `shares_screen.rs`: `Shares` page input resolved from the drawn frame (touch targets in all 5 languages, card selection, face-button shortcuts, `Cross` on the focused element, stale element ignored, nothing declared behind the screensaver)
 - `frame_pacing.rs`: dynamic frame rate (input -> next VBlank, animations 30 FPS, background updates 10 FPS, static 1 FPS), toast expiry and screensaver speed independent of the frame rate
+- `worker_slot.rs`: a new worker starts only after the previous one ended, bounded wait on quit
+- `config_fields.rs`: interrupted `.cfg` replacement restored from its backup, `.cfg` field escaping roundtrip, legacy `%` text kept, hostile names / labels through `devices.cfg` / `shares.cfg` / `ignored_folders.cfg`, invalid linked-device entries dropped
 - `language_settings.rs`: language preference codec / cycle, `language.cfg` persistence (defaults to the system language), `Settings` language card (D-pad and touch)
 
 ### Cross-Check for PS Vita (`armv7-sony-vita-newlibeabihf`)

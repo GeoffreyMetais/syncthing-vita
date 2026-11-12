@@ -29,7 +29,7 @@ pub use bep::{
     decompress_bep_lz4, read_bep_message, write_bep_message, BepBlockInfo, BepClose,
     BepClusterConfig, BepCompression, BepFileInfo, BepFolder, BepHeader, BepHello, BepIndex,
     BepMessageType, BepRequest, BepResponse, BepVersionCounter, FolderIndexState, BEP_BLOCK_SIZE,
-    BEP_DEFAULT_NUM_CONNECTIONS, BEP_DEFAULT_PORT, BEP_MAGIC,
+    BEP_DEFAULT_NUM_CONNECTIONS, BEP_DEFAULT_PORT, BEP_MAGIC, BEP_MAX_BLOCK_SIZE,
 };
 pub use cert::VitaIdentity;
 pub use device_id::{DeviceId, DeviceIdParseError};
@@ -40,7 +40,7 @@ pub use discovery::{
 pub use folder_sync::PullPlan;
 pub use session::{
     connect_and_sync, connect_and_sync_with_control, PeerHandshakeResult, SyncControl, SyncEvent,
-    SyncSessionStatus,
+    SyncSessionStatus, SyncTuning,
 };
 pub use storage::FsSyncStorage;
 pub use tls::{probe_bep_peer_device_id, BEP_ALPN};

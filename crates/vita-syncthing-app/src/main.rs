@@ -6,7 +6,9 @@
 
 use std::sync::mpsc::Receiver;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+#[cfg(not(target_os = "vita"))]
+use std::time::Duration;
+use std::time::Instant;
 
 use syncthing_core::SyncControl;
 use vita_syncthing_app::application::power_policy::{cpu_clock, should_block_standby, CpuClock};
@@ -14,11 +16,15 @@ use vita_syncthing_app::application::{
     FolderOfferService, FramePacer, FrameSignals, InputController, QrScanFlow, ShareService,
     SyncCoordinator, UserCommand,
 };
+use vita_syncthing_app::domain::defaults::{
+    AUTO_RECONNECT_DELAY, POWER_TICK_INTERVAL, QUIT_WORKER_WAIT, SCREENSAVER_TIMEOUT_IDLE,
+    SCREENSAVER_TIMEOUT_SYNCING,
+};
 use vita_syncthing_app::domain::{AppState, ModalDialog, UiText};
 use vita_syncthing_app::infrastructure::{
     detect_system_language, init_vita_network, is_on_external_power, keep_system_awake,
-    set_cpu_clock_mhz, spawn_sync_worker, ConfigRepository, IdentityStore, QrScanner, VitaInput,
-    WorkerMsg,
+    set_cpu_clock_mhz, spawn_sync_worker, wait_for_worker, ConfigRepository, IdentityStore,
+    QrScanner, VitaInput, WorkerMsg,
 };
 use vita_syncthing_app::ui::VitaUiRenderer;
 
@@ -45,6 +51,10 @@ pub static sceUserMainThreadName: [u8; 16] = *b"vita_syncthing\0\0";
 const BASE_DATA_DIR: &str = "ux0:data/syncthing";
 #[cfg(not(target_os = "vita"))]
 const BASE_DATA_DIR: &str = "/tmp/syncthing-vita";
+
+/// Host builds have no VBlank to wait for: sleep one 60 Hz frame per loop iteration.
+#[cfg(not(target_os = "vita"))]
+const HOST_FRAME_SLEEP: Duration = Duration::from_millis(16);
 
 fn main() {
     let identity_res = IdentityStore::load_or_create(BASE_DATA_DIR);
@@ -127,7 +137,8 @@ fn main() {
 
     let mut last_activity = Instant::now();
     let mut last_sync_finished = Instant::now();
-    let mut last_power_tick = Instant::now() - Duration::from_secs(60);
+    // Apply the power policy on the first iteration.
+    let mut last_power_tick = Instant::now() - POWER_TICK_INTERVAL;
     let mut seen_transfer_activity = state.transfer_activity;
     let mut last_transfer_at: Option<Instant> = None;
     let mut pacer = FramePacer::new();
@@ -212,6 +223,8 @@ fn main() {
                     ctl.request_stop();
                 }
                 ShareService::log_event(&mut state, &repo, "Exit requested by user [START].");
+                // Let the sessions close and save their state before the process exits.
+                wait_for_worker(QUIT_WORKER_WAIT);
                 set_cpu_clock_mhz(CpuClock::Full.mhz());
                 break;
             }
@@ -259,7 +272,7 @@ fn main() {
         if worker_rx.is_none()
             && state.auto_reconnect_enabled
             && state.has_configured_peers()
-            && last_sync_finished.elapsed() >= Duration::from_secs(2)
+            && last_sync_finished.elapsed() >= AUTO_RECONNECT_DELAY
         {
             signals.background_change = true;
             state.sync_in_progress = true;
@@ -293,7 +306,7 @@ fn main() {
             set_cpu_clock_mhz(cpu.mhz());
         }
 
-        if last_power_tick.elapsed() >= Duration::from_secs(10) {
+        if last_power_tick.elapsed() >= POWER_TICK_INTERVAL {
             last_power_tick = Instant::now();
             // The system may reset the clock after standby: re-apply it periodically.
             set_cpu_clock_mhz(cpu.mhz());
@@ -311,9 +324,9 @@ fn main() {
         // - After 12 seconds of inactivity while synchronization is in progress
         // - After 45 seconds of inactivity when idle (or press SELECT anytime)
         let oled_timeout = if state.sync_in_progress {
-            Duration::from_secs(12)
+            SCREENSAVER_TIMEOUT_SYNCING
         } else {
-            Duration::from_secs(45)
+            SCREENSAVER_TIMEOUT_IDLE
         };
         if !state.oled_saver_active && !state.ime_active && last_activity.elapsed() >= oled_timeout
         {
@@ -338,6 +351,6 @@ fn main() {
             None => renderer.idle(),
         }
         #[cfg(not(target_os = "vita"))]
-        std::thread::sleep(Duration::from_millis(16));
+        std::thread::sleep(HOST_FRAME_SLEEP);
     }
 }

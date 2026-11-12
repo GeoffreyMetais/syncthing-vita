@@ -9,7 +9,10 @@ use crate::bep::{BepFileInfo, BepIndex, FolderIndexState};
 use crate::device_id::DeviceId;
 use crate::local_db::{with_folder_db, FolderDb, LocalEntry};
 use crate::storage::blocks::hash_file_blocks;
-use crate::storage::vita_fs::{collect_files_recursive, ensure_dir_exists};
+use crate::storage::download::recover_interrupted_commits;
+use crate::storage::vita_fs::{
+    collect_files_recursive, ensure_dir_exists, DiskEntryKind, DiskListing,
+};
 use crate::storage::FsSyncStorage;
 use crate::version_vector::{short_device_id, version_bump, version_ge, version_merge};
 
@@ -21,17 +24,33 @@ impl FsSyncStorage {
         folder_id: &str,
         short_id: u64,
         db: &mut FolderDb,
+        on_progress: &mut dyn FnMut(),
     ) -> io::Result<()> {
         let root = self.folder_root(folder_id);
         ensure_dir_exists(&root)?;
-        let mut on_disk = Vec::new();
-        collect_files_recursive(&root, "", &mut on_disk)?;
-        on_disk.sort_by(|a, b| a.0.cmp(&b.0));
+        let mut listing = DiskListing::default();
+        collect_files_recursive(&root, "", &mut listing)?;
+        if recover_interrupted_commits(&listing.download_backups) {
+            // A file was restored from its backup: list again so it is seen.
+            listing = DiskListing::default();
+            collect_files_recursive(&root, "", &mut listing)?;
+        }
+        listing.entries.sort_by(|a, b| a.rel.cmp(&b.rel));
 
         let mut seen = HashSet::new();
-        for (name, is_dir) in on_disk {
-            // Skip entries that cannot be inspected instead of aborting the whole scan.
+        // Entries that exist but cannot be inspected: they (and anything below them) are left
+        // untouched in the database instead of being recorded as deleted.
+        let mut unreadable: Vec<String> = Vec::new();
+        for entry in listing.entries {
+            on_progress();
+            let name = entry.rel;
+            if entry.kind == DiskEntryKind::Unreadable {
+                unreadable.push(name);
+                continue;
+            }
+            let is_dir = entry.kind == DiskEntryKind::Dir;
             let Ok(meta) = fs::metadata(root.join(&name)) else {
+                unreadable.push(name);
                 continue;
             };
             let mtime = mtime_secs(&meta);
@@ -64,7 +83,7 @@ impl FsSyncStorage {
                 continue;
             }
 
-            let Ok(blocks) = hash_file_blocks(&root.join(&name)) else {
+            let Ok(blocks) = hash_file_blocks(&root.join(&name), on_progress) else {
                 continue;
             };
             if let Some(e) = &prev {
@@ -102,6 +121,7 @@ impl FsSyncStorage {
             .entries
             .values()
             .filter(|e| !e.deleted && !seen.contains(&e.name))
+            .filter(|e| !is_under_any(&e.name, &unreadable))
             .cloned()
             .collect();
         for e in gone {
@@ -161,11 +181,47 @@ impl FsSyncStorage {
         own_id: DeviceId,
         remote_files: &[BepFileInfo],
     ) -> io::Result<(BepIndex, FolderIndexState)> {
+        self.build_local_index_with_progress(folder_id, own_id, remote_files, &mut || {})
+    }
+
+    /// Same as [`Self::build_local_index`]; `on_progress` is called regularly during the scan
+    /// (per entry and per hashed block) so a session can keep its connection alive.
+    pub fn build_local_index_with_progress(
+        &self,
+        folder_id: &str,
+        own_id: DeviceId,
+        remote_files: &[BepFileInfo],
+        on_progress: &mut dyn FnMut(),
+    ) -> io::Result<(BepIndex, FolderIndexState)> {
         let short_id = short_device_id(own_id);
         with_folder_db(&self.db_path(folder_id), folder_id, own_id, |db| {
-            self.scan_into_db(folder_id, short_id, db)?;
+            self.scan_into_db(folder_id, short_id, db, on_progress)?;
             Self::merge_equal_remote_versions(db, remote_files);
             Ok(Self::index_from_db(folder_id, db))
         })
     }
+
+    /// Returns the Vita's `Index` from the database as it is, without scanning the disk
+    /// (for use right after an operation that already scanned the folder).
+    pub fn local_index_snapshot(
+        &self,
+        folder_id: &str,
+        own_id: DeviceId,
+        remote_files: &[BepFileInfo],
+    ) -> (BepIndex, FolderIndexState) {
+        with_folder_db(&self.db_path(folder_id), folder_id, own_id, |db| {
+            Self::merge_equal_remote_versions(db, remote_files);
+            Self::index_from_db(folder_id, db)
+        })
+    }
+}
+
+/// Returns `true` if `name` is one of `parents` or lies below one of them.
+fn is_under_any(name: &str, parents: &[String]) -> bool {
+    parents.iter().any(|p| {
+        name == p
+            || name
+                .strip_prefix(p.as_str())
+                .is_some_and(|rest| rest.starts_with('/'))
+    })
 }

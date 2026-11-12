@@ -1,25 +1,35 @@
 //! Tab 1 (`Overview` / `Dashboard`): Device status hero card, `QR / ID` & `Sync Now` actions,
 //! transfer statistics, and recent synchronization activity feed.
 
-use crate::domain::{fmt_size, ActiveTab, AppState, UiText};
+use crate::domain::{fmt_size, AppState, FocusSlot, HitMap, Hotspot, Rect, UiAction, UiText};
 use crate::ui::gfx::{rgba, Align, FontWeight, Gfx, Icon, PadButton};
 use crate::ui::strings;
 use crate::ui::theme::{
     UiTheme, CONTENT_B, CONTENT_R, CONTENT_W, CONTENT_X, CONTENT_Y, C_BAD, C_GOOD, C_WARN,
 };
 use crate::ui::widgets::{
-    action_width, draw_action, draw_card, draw_chip, draw_focus_ring, draw_hints, draw_page_title,
+    action_width, draw_action_hotspot, draw_card, draw_chip, draw_hint_bar, draw_page_title, Hint,
 };
 
+/// Height of the "This device" hero card.
+const HERO_CARD_H: i32 = 152;
+
 /// Renders Tab 1: **Overview** (`Dashboard`).
-pub fn render_dashboard_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
+pub fn render_dashboard_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut HitMap) {
     let s = strings::strings(state.language);
     let active_count = state.shares.iter().filter(|s| s.enabled).count();
     let subtitle = s.fmt_active_shares_devices(active_count, state.devices.len());
     draw_page_title(gfx, th, s.dashboard_title, Some(&subtitle));
 
     // 1. "This device" hero card
-    draw_card(gfx, th, CONTENT_X, CONTENT_Y, CONTENT_W, 152, true);
+    draw_card(gfx, th, CONTENT_X, CONTENT_Y, CONTENT_W, HERO_CARD_H, true);
+    // Touching the device card shows its ID; the buttons declared below sit on top of it.
+    hits.add(Hotspot {
+        rect: Rect::new(CONTENT_X, CONTENT_Y, CONTENT_W, HERO_CARD_H),
+        action: UiAction::ShowDeviceId,
+        focus: None,
+        shortcut: None,
+    });
     let lx = CONTENT_X + 24;
     gfx.rrect(lx, CONTENT_Y + 24, 76, 76, 20, th.accent_bg);
     gfx.icon(
@@ -112,26 +122,24 @@ pub fn render_dashboard_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         &state.vita_device_id,
     );
 
-    draw_action(
-        gfx,
-        th,
-        bx_qr,
-        CONTENT_Y + 128,
-        PadButton::Circle,
-        s.action_qr_id,
-    );
-    draw_action(
-        gfx,
-        th,
-        bx_sync,
-        CONTENT_Y + 128,
-        PadButton::Cross,
-        s.action_sync_now,
-    );
-    match state.focused_action(ActiveTab::Dashboard) {
-        Some(0) => draw_focus_ring(gfx, th, bx_qr, CONTENT_Y + 128, act_qr_w),
-        Some(_) => draw_focus_ring(gfx, th, bx_sync, CONTENT_Y + 128, act_sync_w),
-        None => {}
+    let buttons = [
+        (bx_qr, PadButton::Circle, s.action_qr_id, UiAction::ShowDeviceId),
+        (bx_sync, PadButton::Cross, s.action_sync_now, UiAction::StartSync),
+    ];
+    for (col, (bx, pad, label, action)) in buttons.into_iter().enumerate() {
+        let slot = FocusSlot::RowAction { row: 0, col };
+        draw_action_hotspot(
+            gfx,
+            th,
+            hits,
+            bx,
+            CONTENT_Y + 128,
+            pad,
+            label,
+            action,
+            slot,
+            state.is_focused(slot),
+        );
     }
 
     // 2. "Recent activity & Statistics" card
@@ -200,16 +208,21 @@ pub fn render_dashboard_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         }
     }
 
-    draw_hints(
+    draw_hint_bar(
         gfx,
         th,
+        hits,
         &[
-            (PadButton::Dpad, Some(PadButton::Cross), s.hint_navigate),
-            (PadButton::Circle, None, s.action_qr_id),
-            (PadButton::Square, None, s.action_pause),
-            (PadButton::Triangle, None, s.hint_folder),
-            (PadButton::L, Some(PadButton::R), s.hint_tabs),
-            (PadButton::Select, None, s.hint_screensaver),
+            Hint::info(PadButton::Dpad, Some(PadButton::Cross), s.hint_navigate),
+            Hint::action(PadButton::Circle, s.action_qr_id, UiAction::ShowDeviceId),
+            Hint::action(PadButton::Square, s.action_pause, UiAction::ToggleSelectedShare),
+            Hint::action(
+                PadButton::Triangle,
+                s.hint_folder,
+                UiAction::ChangeSelectedShareFolder,
+            ),
+            Hint::info(PadButton::L, Some(PadButton::R), s.hint_tabs),
+            Hint::action(PadButton::Select, s.hint_screensaver, UiAction::StartScreensaver),
         ],
     );
 }

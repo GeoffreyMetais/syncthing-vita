@@ -6,7 +6,7 @@ use std::time::{Duration, Instant};
 
 use super::context::SessionContext;
 use super::control::SyncControl;
-use super::dispatch::{dispatch_primary_message, Dispatched};
+use super::dispatch::{dispatch_primary_message, next_primary_message, Dispatched};
 use super::events::SyncEvent;
 use super::folders::FolderSyncState;
 use super::index_exchange::rescan_and_publish;
@@ -14,14 +14,11 @@ use super::secondary::{
     open_secondary_bep_stream, ping_all_secondaries, poll_all_secondaries, SecondaryBepConn,
 };
 use crate::bep::{write_bep_message, BepClose, BepHello, BepMessageType};
-use crate::tls::polling::try_read_bep_message;
 use crate::tls::BepTlsStream;
 
 const PRIMARY_POLL: Duration = Duration::from_millis(150);
 const SECONDARY_RETRY_INTERVAL: Duration = Duration::from_secs(15);
 const SECONDARY_RETRY_TIMEOUT: Duration = Duration::from_millis(1500);
-const KEEPALIVE_INTERVAL: Duration = Duration::from_secs(20);
-const RESCAN_INTERVAL: Duration = Duration::from_secs(12);
 
 /// Connections and peer information owned by the persistent loop.
 pub struct PersistentLinks<'h> {
@@ -74,7 +71,6 @@ fn session_loop(
     links: &mut PersistentLinks<'_>,
     control: &SyncControl,
 ) -> Result<(), String> {
-    let mut last_ping = Instant::now();
     let mut last_local_scan = Instant::now();
     let mut last_secondary_retry = Instant::now();
     let mut seen_rescan_epoch = control.rescan_epoch();
@@ -104,8 +100,7 @@ fn session_loop(
         }
 
         // D. Periodic `Ping` keepalives on all connections
-        if last_ping.elapsed() >= KEEPALIVE_INTERVAL {
-            last_ping = Instant::now();
+        if ctx.keepalive_due() {
             write_bep_message(stream, BepMessageType::Ping, &[])
                 .map_err(|e| format!("keepalive ping failed: {e}"))?;
             ping_all_secondaries(&mut links.secondaries);
@@ -115,7 +110,7 @@ fn session_loop(
         let cur_epoch = control.rescan_epoch();
         let manual_rescan = cur_epoch != seen_rescan_epoch || control.take_rescan_request();
         seen_rescan_epoch = cur_epoch;
-        if manual_rescan || last_local_scan.elapsed() >= RESCAN_INTERVAL {
+        if manual_rescan || last_local_scan.elapsed() >= ctx.tuning.rescan_interval {
             last_local_scan = Instant::now();
             let published = rescan_and_publish(stream, ctx, folders, manual_rescan)
                 .map_err(|e| format!("index update send failed: {e}"))?;
@@ -139,7 +134,7 @@ fn poll_primary(
         if control.is_stop_requested() {
             return Ok(true);
         }
-        let (msg_type, payload) = match try_read_bep_message(stream, PRIMARY_POLL) {
+        let (msg_type, payload) = match next_primary_message(stream, ctx, PRIMARY_POLL) {
             Ok(None) => return Ok(false),
             Ok(Some(msg)) => msg,
             Err(e) => return Err(format!("primary connection lost: {e}")),

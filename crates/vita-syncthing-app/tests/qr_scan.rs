@@ -3,15 +3,13 @@
 
 mod common;
 
-use common::{press, temp_test_dir};
+use common::{press, rects_of, tap_rect, temp_test_dir};
 use qrcodegen::{QrCode, QrCodeEcc};
 use syncthing_core::DeviceId;
-use vita_syncthing_app::application::{
-    extract_device_id, InputController, QrScanFlow, UserCommand,
-};
-use vita_syncthing_app::domain::{AppState, ModalDialog};
+use vita_syncthing_app::application::{extract_device_id, QrScanFlow, UserCommand};
+use vita_syncthing_app::domain::{AppState, ModalDialog, PadKey, UiAction};
 use vita_syncthing_app::infrastructure::{
-    ConfigRepository, InputFrame, QrDecoder, QrScanEvent, BTN_CIRCLE, BTN_R, CAMERA_H, CAMERA_W,
+    ConfigRepository, QrDecoder, QrScanEvent, BTN_CIRCLE, BTN_R, CAMERA_H, CAMERA_W,
 };
 
 fn sample_device_id() -> String {
@@ -163,17 +161,6 @@ fn test_scan_qr_action_in_manage_devices_modal() {
         share_idx: 0,
         selected_dev_idx: 0,
     };
-    let tap = |state: &mut AppState, x: usize, y: usize| {
-        InputController::handle_input(
-            state,
-            &repo,
-            InputFrame {
-                touch_tap: Some((x, y)),
-                any_activity: true,
-                ..Default::default()
-            },
-        )
-    };
     let scanning_share_0 = ModalDialog::ScanDeviceQr {
         return_share_idx: Some(0),
     };
@@ -183,18 +170,19 @@ fn test_scan_qr_action_in_manage_devices_modal() {
     press(&mut state, &repo, BTN_R);
     assert_eq!(state.modal, scanning_share_0);
 
-    // `R · Scan QR` button next to `+ Add by ID` at the bottom of the modal
+    // `R · Scan QR` button at the bottom of the modal, and its hint in the bottom bar
     state.modal = manage;
-    tap(&mut state, 350, 413);
-    assert_eq!(state.modal, scanning_share_0);
+    let scan = rects_of(&mut state, UiAction::Press(PadKey::R));
+    assert_eq!(scan.len(), 2, "the dialog button and the hint");
+    for rect in scan {
+        state.modal = manage;
+        tap_rect(&mut state, &repo, rect);
+        assert_eq!(state.modal, scanning_share_0);
+    }
 
-    // `+ Add by ID` button right of it still opens the ID form
+    // `+ Add by ID` button next to it still opens the ID form
     state.modal = manage;
-    tap(&mut state, 480, 413);
+    let add = rects_of(&mut state, UiAction::Press(PadKey::Square))[0];
+    tap_rect(&mut state, &repo, add);
     assert!(matches!(state.modal, ModalDialog::AddDeviceById { .. }));
-
-    // `R Scan QR` hint in the bottom bar
-    state.modal = manage;
-    tap(&mut state, 640, 520);
-    assert_eq!(state.modal, scanning_share_0);
 }

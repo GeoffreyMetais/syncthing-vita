@@ -4,10 +4,12 @@
 //! - this file: folder registry (custom roots, paused state, advertised folders) and path resolution
 //! - [`blocks`] — block hashing, delta comparison and block reads served to peers
 //! - [`download`] — crash-safe download assembly (temp file, streaming writes, commit / abort)
+//! - [`atomic`] — crash-safe file replacement (backup kept until the new file is in place)
 //! - [`vita_fs`] — PS Vita filesystem quirks (`device:` roots, `mkdir`, recursive listing)
 //!
 //! Folder reconciliation (scans, pull planning) lives in [`crate::folder_sync`].
 
+pub mod atomic;
 pub mod blocks;
 pub mod download;
 pub mod vita_fs;
@@ -18,6 +20,7 @@ use std::path::{Path, PathBuf};
 use sha2::{Digest, Sha256};
 
 use crate::bep::BepFolder;
+use crate::device_id::DeviceId;
 use vita_fs::accessible_root;
 
 /// Local filesystem storage manager (`ux0:data/syncthing/sync` or custom paths).
@@ -28,6 +31,9 @@ pub struct FsSyncStorage {
     custom_folder_paths: HashMap<String, PathBuf>,
     /// Folders paused by user
     paused_folders: HashSet<String>,
+    /// Devices each configured folder is shared with. A folder missing here is not shared with
+    /// anyone: it is never announced, indexed, downloaded or served.
+    folder_devices: HashMap<String, Vec<DeviceId>>,
     /// Locally configured folders to advertise in `ClusterConfig`
     local_folders: Vec<BepFolder>,
 }
@@ -38,6 +44,7 @@ impl FsSyncStorage {
             default_root_dir: default_root_dir.into(),
             custom_folder_paths: HashMap::new(),
             paused_folders: HashSet::new(),
+            folder_devices: HashMap::new(),
             local_folders: Vec::new(),
         }
     }
@@ -87,6 +94,20 @@ impl FsSyncStorage {
 
     pub fn is_folder_paused(&self, folder_id: &str) -> bool {
         self.paused_folders.contains(folder_id)
+    }
+
+    /// Declares the devices `folder_id` is shared with (replacing any previous list).
+    pub fn set_folder_devices(&mut self, folder_id: &str, devices: Vec<DeviceId>) {
+        self.folder_devices.insert(folder_id.to_owned(), devices);
+    }
+
+    /// Returns `true` if `folder_id` is a configured folder shared with `peer`. This is the
+    /// authorization gate of every session: a folder a peer merely announces is not shared
+    /// until the user linked that peer to it.
+    pub fn is_folder_shared_with(&self, folder_id: &str, peer: &DeviceId) -> bool {
+        self.folder_devices
+            .get(folder_id)
+            .is_some_and(|devices| devices.iter().any(|id| id.matches_peer(peer)))
     }
 
     /// Safely resolves (without `..`) the local path of a file inside a shared folder.
