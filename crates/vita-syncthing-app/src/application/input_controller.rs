@@ -46,9 +46,9 @@ impl InputController {
         repo: &ConfigRepository,
         input: InputFrame,
     ) -> UserCommand {
-        // 0. If OLED screensaver is active, any button or touch contact wakes the display
+        // 0. If OLED screensaver is active, any button press or touch contact wakes the display
         if state.oled_saver_active {
-            if input.any_activity {
+            if input.pressed != 0 || input.touch_pos.is_some() || input.touch_tap.is_some() {
                 state.oled_saver_active = false;
                 ShareService::log_event(state, repo, "Exited OLED screensaver mode.");
             }

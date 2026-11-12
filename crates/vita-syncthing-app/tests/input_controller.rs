@@ -7,8 +7,8 @@ use common::temp_test_dir;
 use vita_syncthing_app::application::{InputController, ShareService, UserCommand};
 use vita_syncthing_app::domain::{ActiveTab, AppState, ModalDialog, NavFocus, ThemeMode};
 use vita_syncthing_app::infrastructure::{
-    ConfigRepository, InputFrame, BTN_CIRCLE, BTN_CROSS, BTN_RIGHT, BTN_SQUARE, BTN_START,
-    BTN_TRIANGLE,
+    ConfigRepository, InputFrame, BTN_CIRCLE, BTN_CROSS, BTN_RIGHT, BTN_SELECT, BTN_SQUARE,
+    BTN_START, BTN_TRIANGLE,
 };
 use vita_syncthing_app::ui::theme::{CONFIRM_QUIT_H, CONFIRM_QUIT_W};
 
@@ -369,4 +369,33 @@ fn test_confirm_quit_touch_targets_follow_dialog_size() {
     state.modal = ModalDialog::ConfirmQuit;
     assert_eq!(tap(&mut state, &repo, 480, dy + 60), UserCommand::None);
     assert_eq!(state.modal, ModalDialog::None);
+}
+
+#[test]
+fn test_screensaver_wakes_on_press_or_touch_only() {
+    let dir = temp_test_dir("saver-wake");
+    let repo = ConfigRepository::new(&dir);
+    let mut state = AppState::new(Vec::new(), Vec::new(), "ux0:");
+
+    press(&mut state, &repo, BTN_SELECT);
+    assert!(state.oled_saver_active);
+    // Activity without a press or touch contact (scripted `wait` frames) keeps it running.
+    let idle = InputFrame {
+        any_activity: true,
+        ..Default::default()
+    };
+    InputController::handle_input(&mut state, &repo, idle);
+    assert!(state.oled_saver_active);
+    // Resting a finger on the screen wakes it.
+    let touch = InputFrame {
+        touch_pos: Some((100, 100)),
+        any_activity: true,
+        ..Default::default()
+    };
+    InputController::handle_input(&mut state, &repo, touch);
+    assert!(!state.oled_saver_active);
+    // So does any button.
+    press(&mut state, &repo, BTN_SELECT);
+    press(&mut state, &repo, BTN_CIRCLE);
+    assert!(!state.oled_saver_active);
 }

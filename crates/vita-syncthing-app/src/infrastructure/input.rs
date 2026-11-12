@@ -189,7 +189,6 @@ pub struct InputFrame {
     /// Screen coordinates (`0..960`, `0..544`) of a new touch tap on this frame.
     pub touch_tap: Option<(usize, usize)>,
     /// Screen coordinates (`0..960`, `0..544`) of active touch contact.
-    #[allow(dead_code)]
     pub touch_pos: Option<(usize, usize)>,
     /// Updated text from the native PS Vita System Keyboard (`SceIme`), if active.
     pub ime_text: Option<String>,

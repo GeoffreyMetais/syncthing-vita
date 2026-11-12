@@ -27,7 +27,7 @@ restore() {
 }
 trap restore EXIT
 
-mkdir -p "$DATA" "$OUT_DIR"
+mkdir -p "$DATA" "$OUT_DIR" "$UX0/app"
 rm -rf "$DATA/shots"
 cp "$SCRIPT" "$DATA/ui_script.txt"
 unzip -qo "$VPK" -d "$UX0/app/SYNCTHING"
