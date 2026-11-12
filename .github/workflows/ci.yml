@@ -41,8 +41,6 @@ jobs:
   build-vita:
     name: PS Vita Build & Symbol Audit
     runs-on: ubuntu-latest
-    env:
-      VITASDK: ${{ runner.temp }}/vitasdk
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -58,8 +56,11 @@ jobs:
           key: vita-nightly
 
       - name: Install VitaSDK
+        env:
+          VITASDK: ${{ runner.temp }}/vitasdk
         run: |
           ./scripts/setup_env.sh --install-vitasdk
+          echo "VITASDK=${VITASDK}" >> "$GITHUB_ENV"
           echo "${VITASDK}/bin" >> "$GITHUB_PATH"
 
       - name: Build PS Vita release VPK
