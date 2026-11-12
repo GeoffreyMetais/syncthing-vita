@@ -106,13 +106,13 @@ check_tools() {
         echo "ℹ️  Vita3K storage not created yet: ${VITA3K_PREF}/ux0 (run: $0 --prepare-vita3k, or created on first run)"
     fi
 
-    # 7. Display: Vita3K needs an X display, or xvfb-run to create a virtual one
-    if [[ -n "${DISPLAY:-}" ]]; then
-        echo "✅ X display available: ${DISPLAY}"
+    # 7. Display: Vita3K can run on X11, Wayland, or headless via xvfb-run
+    if [[ -n "${DISPLAY:-}" || -n "${WAYLAND_DISPLAY:-}" ]]; then
+        echo "✅ Graphical display available: ${DISPLAY:-$WAYLAND_DISPLAY}"
     elif command -v xvfb-run >/dev/null 2>&1; then
         echo "✅ No display: Vita3K runs headless via xvfb-run (scripts/vita3k_launch.sh)"
     else
-        echo "❌ No X display and xvfb-run missing (install the xvfb package)"
+        echo "ℹ️  No active display in current shell (scripts/vita3k_launch.sh will auto-detect desktop session, or install xvfb)"
     fi
 
     # 8. Sony firmware: optional (the app only uses HLE modules and embeds its fonts)
