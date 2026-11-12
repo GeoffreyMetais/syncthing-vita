@@ -282,24 +282,40 @@ impl AppState {
         self.show_toast(UiText::LanguageChanged(self.language));
     }
 
-    /// Displays a transient toast notification for ~1.8 seconds (110 frames at 60 FPS).
+    /// Displays a transient toast notification for ~1.8 seconds (110 display VBlanks at 60 Hz).
     pub fn show_toast(&mut self, msg: UiText) {
         self.toast_msg = Some((msg, 110));
     }
 
-    /// Decrements the toast timer by one frame.
-    pub fn tick_toast(&mut self) {
+    /// Decrements the toast timer by one display VBlank (1/60 s).
+    /// Returns `true` if the toast just expired (the screen must be redrawn).
+    pub fn tick_toast(&mut self) -> bool {
         if let Some((_, ref mut ticks)) = self.toast_msg {
             if *ticks <= 1 {
                 self.toast_msg = None;
-            } else {
-                *ticks -= 1;
+                return true;
             }
+            *ticks -= 1;
+        }
+        false
+    }
+
+    /// Advances the bouncing DVD-style OLED screensaver position within the given screen bounds
+    /// by `frames` display VBlanks (the speed is the same whatever the rendering frame rate).
+    pub fn step_screensaver(
+        &mut self,
+        screen_w: f32,
+        screen_h: f32,
+        box_w: f32,
+        box_h: f32,
+        frames: u32,
+    ) {
+        for _ in 0..frames {
+            self.step_screensaver_once(screen_w, screen_h, box_w, box_h);
         }
     }
 
-    /// Advances the bouncing DVD-style OLED screensaver position within the given screen bounds.
-    pub fn step_screensaver(&mut self, screen_w: f32, screen_h: f32, box_w: f32, box_h: f32) {
+    fn step_screensaver_once(&mut self, screen_w: f32, screen_h: f32, box_w: f32, box_h: f32) {
         self.saver_x += self.saver_vx;
         self.saver_y += self.saver_vy;
         let max_x = screen_w - box_w - 12.0;

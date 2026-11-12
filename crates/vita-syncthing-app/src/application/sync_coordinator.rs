@@ -12,15 +12,18 @@ pub struct SyncCoordinator;
 
 impl SyncCoordinator {
     /// Drains all pending messages from `worker_rx`, updating `AppState` and persisting discovered
-    /// devices/folders via `ShareService`.
+    /// devices/folders via `ShareService`. Returns `true` if at least one message was received
+    /// (the screen must be redrawn).
     pub fn process_worker_messages(
         state: &mut AppState,
         repo: &ConfigRepository,
         worker_rx: &mut Option<Receiver<WorkerMsg>>,
-    ) {
+    ) -> bool {
         let mut disconnected = false;
+        let mut received = false;
         if let Some(rx) = worker_rx.as_ref() {
             while let Ok(msg) = rx.try_recv() {
+                received = true;
                 match msg {
                     WorkerMsg::Log(line) => ShareService::log_event(state, repo, &line),
                     WorkerMsg::Progress { pct, status, file } => {
@@ -56,6 +59,7 @@ impl SyncCoordinator {
         if disconnected {
             *worker_rx = None;
         }
+        received
     }
 
     fn handle_sync_event(state: &mut AppState, repo: &ConfigRepository, event: SyncEvent) {

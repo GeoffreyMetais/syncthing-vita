@@ -40,7 +40,7 @@ syncthing-vita
         ├── tests/                    # Integration tests, one file per use case / component (+ common/ helpers)
         └── src/
             ├── lib.rs                # Library target: declares the four layers ONLY (no logic, no tests)
-            ├── main.rs               # Composition root (binary), 60 FPS event loop, and PS Vita kernel symbols
+            ├── main.rs               # Composition root (binary), VBlank-paced event loop, and PS Vita kernel symbols
             ├── domain/               # Layer 1: Pure Domain Entities, Value Objects & Application State
             │   ├── mod.rs
             │   ├── navigation.rs     # NavFocus / NavState (D-pad focus), tab order, buttons per row
@@ -52,6 +52,7 @@ syncthing-vita
             │   ├── share_service.rs  # ShareService (create_share, upsert_device, toggle_device_for_share, refresh_picker_items)
             │   ├── share_creation.rs # ShareCreation (new share kept only once a device is linked)
             │   ├── folder_offers.rs  # FolderOfferService (folders offered by peers need consent: accept / decline / later)
+            │   ├── frame_pacing.rs   # FramePacer (dynamic frame rate: render only when the screen changes)
             │   ├── dpad_navigation.rs # DpadNavigation (sidebar <-> page focus, Cross on focused element)
             │   ├── qr_scan.rs        # QrScanFlow (scanner events -> AddDeviceById confirmation), extract_device_id
             │   ├── sync_coordinator.rs # SyncCoordinator (maps WorkerMsg & SyncEvent into AppState & ShareService)
@@ -152,6 +153,7 @@ Dependencies strictly point **inward**. Inner layers never import or depend on o
      - `input_controller.rs`: Translates main-screen button/touch inputs into actions, modal triggers, and commands.
      - `modal_input/`: Input handling for open modals, one file per modal (mirrors `ui/modals/`).
      - `dpad_navigation.rs`: D-pad focus between the sidebar and the page elements.
+     - `frame_pacing.rs`: `FramePacer` dynamic frame rate (see §7).
    - **Strict Rule**: No UI rendering code or direct hardware drivers.
 
 3. **Layer 3: Infrastructure Layer (`crates/vita-syncthing-app/src/infrastructure/`)**
@@ -178,7 +180,7 @@ Dependencies strictly point **inward**. Inner layers never import or depend on o
    - **Strict Rule**: Pure read-only view. Receives `&AppState` and visual context. **Never mutate domain state directly, and never perform disk I/O or network calls.**
 
 5. **Composition Root (`crates/vita-syncthing-app/src/main.rs`)**
-   - **Responsibility**: Initializes subsystems, wires dependencies, executes the 60 FPS event loop, and exports required VitaSDK entrypoint symbols (`_newlib_heap_size_user`, `sceUserMainThreadStackSize`).
+   - **Responsibility**: Initializes subsystems, wires dependencies, executes the VBlank-paced event loop, and exports required VitaSDK entrypoint symbols (`_newlib_heap_size_user`, `sceUserMainThreadStackSize`).
    - Must remain concise and free of monolithic rendering or business logic.
    - Imports the layers from the crate's library (`use vita_syncthing_app::...`). `src/lib.rs` only declares `domain`, `application`, `infrastructure` and `ui`; the VitaSDK entrypoint symbols stay in `main.rs`.
 
@@ -338,6 +340,7 @@ cargo test --workspace
 - `qr_scan.rs`: Device ID extraction from QR payloads, `quircs` decoding of a rendered QR code, scanner modal navigation, adding the scanned device
 - `power_policy.rs`: standby blocking while syncing (charging / battery / transfer grace period)
 - `ui_text.rs`: every `UiText` message renders in all 5 languages with its placeholders filled, translated Device ID errors
+- `frame_pacing.rs`: dynamic frame rate (input -> next VBlank, animations 30 FPS, background updates 10 FPS, static 1 FPS), toast expiry and screensaver speed independent of the frame rate
 - `language_settings.rs`: language preference codec / cycle, `language.cfg` persistence (defaults to the system language), `Settings` language card (D-pad and touch)
 
 ### Cross-Check for PS Vita (`armv7-sony-vita-newlibeabihf`)
@@ -378,8 +381,9 @@ PNGs land in `target/ui-shots/`; the Vita3K app data directory is backed up and 
 
 ## 7. UI Layout & Controls Reference (`VitaSend` Design System)
 
-The UI (`gfx.rs` + `ui/screens/*` + `ui/modals/*` + `ui/renderer.rs`) renders at native `960x544` @ 60 FPS with a `212px` left sidebar (`SIDEBAR_W = 212`), main content area (`x = 236..936`, `y = 86..488`), and bottom button hint bar (`y = 500..544`):
+The UI (`gfx.rs` + `ui/screens/*` + `ui/modals/*` + `ui/renderer.rs`) renders at native `960x544` with a `212px` left sidebar (`SIDEBAR_W = 212`), main content area (`x = 236..936`, `y = 86..488`), and bottom button hint bar (`y = 500..544`):
 
+- **Dynamic frame rate** (`application/frame_pacing.rs`): the main loop wakes up on every display VBlank (60 Hz) to poll input, but a frame is only rendered when needed — on the next VBlank after user input (press, tap, IME, dialog, toast expiry), at 30 FPS for animations (OLED screensaver, QR viewfinder), at most 10 FPS for background updates (sync progress, logs), and once per second when static. When adding a time-based animation, set `FrameSignals::animating` in `main.rs` and scale its motion by the elapsed VBlanks passed to `VitaUiRenderer::render`; never count time in rendered frames.
 - **D-pad focus** (`domain/navigation.rs` + `application/dpad_navigation.rs`): focus is on the sidebar or on the page. Sidebar: `Up`/`Down` switch tabs, `Right`/`Cross` enter the page. Page: `Up`/`Down` move between rows (including the top `+ New Share` / `Up` button), `Left`/`Right` between a row's buttons, `Left` on the first one returns to the sidebar, `Cross` activates the focused element (drawn with `draw_focus_ring`). On `Files`, `Right` opens the folder. Face buttons remain direct shortcuts.
 - **Left Sidebar Tabs** (`L` / `R` shoulder buttons, D-pad from the sidebar, or touch tap):
   1. `Overview` (`ActiveTab::Dashboard`): Device status card, `QR / ID` modal button (`Circle`), `Sync Now` button (`Cross`), transfer statistics, and recent activity feed.

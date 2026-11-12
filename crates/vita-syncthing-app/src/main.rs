@@ -1,7 +1,8 @@
 //! PS Vita executable (`vita-syncthing-app`) — Clean Architecture Composition Root.
 //!
 //! The layers (`domain`, `application`, `infrastructure`, `ui`) live in the crate's library
-//! (`lib.rs`); this file only wires them together and runs the 60 FPS event loop.
+//! (`lib.rs`); this file only wires them together and runs the event loop, which wakes up on every
+//! display VBlank (60 Hz) but only renders a frame when needed (`FramePacer`).
 
 use std::sync::mpsc::Receiver;
 use std::sync::Arc;
@@ -10,7 +11,8 @@ use std::time::{Duration, Instant};
 use syncthing_core::SyncControl;
 use vita_syncthing_app::application::power_policy::should_block_standby;
 use vita_syncthing_app::application::{
-    FolderOfferService, InputController, QrScanFlow, ShareService, SyncCoordinator, UserCommand,
+    FolderOfferService, FramePacer, FrameSignals, InputController, QrScanFlow, ShareService,
+    SyncCoordinator, UserCommand,
 };
 use vita_syncthing_app::domain::{AppState, ModalDialog, UiText};
 use vita_syncthing_app::infrastructure::{
@@ -64,7 +66,7 @@ fn main() {
     ShareService::refresh_picker_items(&mut state, &repo);
 
     let mut renderer = Box::new(VitaUiRenderer::new());
-    renderer.render(&mut state);
+    renderer.render(&mut state, 1);
 
     let mut input_ctl = VitaInput::new();
     let mut qr_scanner = QrScanner::new();
@@ -127,13 +129,19 @@ fn main() {
     let mut last_power_tick = Instant::now() - Duration::from_secs(60);
     let mut seen_transfer_activity = state.transfer_activity;
     let mut last_transfer_at: Option<Instant> = None;
+    let mut pacer = FramePacer::new();
 
-    // Main interactive 60 FPS loop (Gamepad SceCtrl + Touch SceTouch + OLED Saver)
+    // Main interactive loop (Gamepad SceCtrl + Touch SceTouch + OLED Saver), one iteration per
+    // display VBlank. Frames are only rendered when the screen changes (dynamic frame rate).
     loop {
+        let mut signals = FrameSignals::default();
         let frame_input = input_ctl.poll();
         if frame_input.any_activity {
             last_activity = Instant::now();
         }
+        signals.user_change |= frame_input.changes_view();
+        let modal_before = state.modal;
+        let saver_before = state.oled_saver_active;
 
         let mut command = InputController::handle_input(&mut state, &repo, frame_input);
 
@@ -141,7 +149,9 @@ fn main() {
         qr_scanner.set_active(state.is_scanning_qr());
         if state.is_scanning_qr() {
             last_activity = Instant::now();
+            signals.animating = true;
             if let Some(event) = qr_scanner.poll(&mut state.qr_preview) {
+                signals.user_change = true;
                 let scan_cmd = QrScanFlow::handle_event(&mut state, &repo, event);
                 if scan_cmd != UserCommand::None {
                     command = scan_cmd;
@@ -149,6 +159,7 @@ fn main() {
             }
         }
 
+        signals.user_change |= command != UserCommand::None;
         match command {
             UserCommand::None => {}
             UserCommand::OpenSystemKeyboard => {
@@ -201,10 +212,13 @@ fn main() {
                 break;
             }
         }
-        state.ime_active = input_ctl.is_ime_open();
+        let ime_open = input_ctl.is_ime_open();
+        signals.user_change |= ime_open != state.ime_active;
+        state.ime_active = ime_open;
 
         // Reload persistent worker if share/device configuration was changed and modals are closed
         if state.config_dirty && state.modal == ModalDialog::None {
+            signals.background_change = true;
             state.config_dirty = false;
             if let Some(ref ctl) = worker_ctl {
                 ctl.request_stop();
@@ -228,7 +242,8 @@ fn main() {
         }
 
         let was_running = worker_rx.is_some();
-        SyncCoordinator::process_worker_messages(&mut state, &repo, &mut worker_rx);
+        signals.background_change |=
+            SyncCoordinator::process_worker_messages(&mut state, &repo, &mut worker_rx);
         FolderOfferService::prompt_next(&mut state);
         if was_running && worker_rx.is_none() {
             worker_ctl = None;
@@ -241,6 +256,7 @@ fn main() {
             && state.has_configured_peers()
             && last_sync_finished.elapsed() >= Duration::from_secs(2)
         {
+            signals.background_change = true;
             state.sync_in_progress = true;
             let offered = std::mem::take(&mut state.pending_folder_offers);
             let (rx, ctl) = spawn_sync_worker(
@@ -286,8 +302,22 @@ fn main() {
             repo.write_log("Automatic OLED screensaver activation (#000000).");
         }
 
-        // On PS Vita, `render` blocks on VBlank (double-buffered flip), which paces the loop at 60 FPS.
-        renderer.render(&mut state);
+        // Toast lifetime is counted in VBlanks, whether or not frames are rendered.
+        signals.user_change |= state.tick_toast();
+        signals.user_change |= state.modal != modal_before;
+        signals.user_change |= state.oled_saver_active != saver_before;
+        signals.animating |= state.oled_saver_active;
+        #[cfg(feature = "ui-script")]
+        {
+            signals.user_change |= vita_syncthing_app::infrastructure::ui_script::shot_pending();
+        }
+
+        // On PS Vita, both `render` (double-buffered flip) and `idle` block on the next VBlank,
+        // which paces the loop at 60 iterations per second.
+        match pacer.tick(signals) {
+            Some(elapsed_vblanks) => renderer.render(&mut state, elapsed_vblanks),
+            None => renderer.idle(),
+        }
         #[cfg(not(target_os = "vita"))]
         std::thread::sleep(Duration::from_millis(16));
     }

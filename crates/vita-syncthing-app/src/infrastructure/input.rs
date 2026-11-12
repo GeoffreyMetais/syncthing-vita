@@ -201,6 +201,18 @@ pub struct InputFrame {
     pub any_activity: bool,
 }
 
+impl InputFrame {
+    /// True if this input can change what is displayed (a press, a tap or system keyboard
+    /// events). A held button or a resting finger keeps `any_activity` set but changes nothing.
+    pub fn changes_view(&self) -> bool {
+        self.pressed != 0
+            || self.touch_tap.is_some()
+            || self.ime_text.is_some()
+            || self.ime_submitted
+            || self.ime_canceled
+    }
+}
+
 #[cfg(target_os = "vita")]
 struct ImeRuntimeState {
     work_buf: Vec<u32>,

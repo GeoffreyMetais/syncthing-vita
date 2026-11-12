@@ -178,6 +178,14 @@ impl VitaFramebuffer {
         #[cfg(not(target_os = "vita"))]
         let _ = pixels;
     }
+
+    /// Waits for the next VBlank without presenting a new frame (the current one stays on screen).
+    pub fn wait_vblank(&mut self) {
+        #[cfg(target_os = "vita")]
+        unsafe {
+            let _ = display_ffi::sceDisplayWaitVblankStart();
+        }
+    }
 }
 
 impl Drop for VitaFramebuffer {
