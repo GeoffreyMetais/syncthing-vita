@@ -156,10 +156,9 @@ Dependencies strictly point **inward**. Inner layers never import or depend on o
      - `share_creation.rs`: Share creation workflow — a new share is discarded if `ManageDevices` closes with no linked device.
      - `folder_offers.rs`: Consent for folders offered by peers (`FolderOffer` modal); declined offers persisted.
      - `sync_coordinator.rs`: Maps background `WorkerMsg` protocol events into `AppState` updates.
-     - `input_controller.rs`: Translates main-screen button/touch inputs into actions, modal triggers, and commands.
+     - `controllers/`: `input.rs` (`InputController`: translates main-screen button/touch inputs into actions, modal triggers, and commands) and one controller per page (`dashboard.rs`, `shares.rs`, `files.rs`, `settings.rs`; see §3.4).
      - `modal_input/`: Input handling for open modals, one file per modal (mirrors `ui/modals/`).
      - `dpad_navigation.rs`: D-pad focus between the sidebar and the page elements.
-     - `dashboard_controller.rs`, `shares_controller.rs`, `files_controller.rs`, `settings_controller.rs`: one controller per page (see §3.4).
      - **No screen coordinate and no `crate::ui` import in this layer**: what is interactive, and where, is declared by the views (§3.4).
      - `frame_pacing.rs`: `FramePacer` dynamic frame rate (see §7).
      - `power_policy.rs`: automatic standby blocking and CPU clock level (`cpu_clock`: 333 MHz during the initial sync phase (`domain::InitialSyncPeers`, from `PeerConnected` to that peer's first `SyncCycleCompleted` / `SessionEnded`) and transfers + 10 s, 222 MHz for 3 s after input or while scanning a QR code, 111 MHz otherwise; applied by `set_cpu_clock_mhz` in `vita_system.rs`).
