@@ -11,7 +11,11 @@ use syncthing_core::{
     SyncSessionStatus, VitaIdentity, BEP_DEFAULT_PORT, DISCOVERY_BROADCAST_ADDR,
 };
 
+use super::worker_slot::spawn_after_previous;
 use crate::domain::{KnownDevice, ShareConfigEntry, UiText};
+
+/// Stack size of the worker and peer session threads.
+const WORKER_STACK_SIZE: usize = 1536 * 1024;
 
 static PROCESS_INSTANCE_ID: OnceLock<i64> = OnceLock::new();
 
@@ -215,11 +219,18 @@ pub fn spawn_sync_worker(
     let worker_control = Arc::clone(&control);
     let sync_root = format!("{}/sync", base_data_dir);
 
-    let builder = std::thread::Builder::new()
-        .name("bep_worker".to_owned())
-        .stack_size(1536 * 1024);
+    let wait_tx = tx.clone();
+    let on_wait = move || {
+        let _ = wait_tx.send(WorkerMsg::Log(
+            "Waiting for the previous sync session to stop...".to_owned(),
+        ));
+    };
 
-    let _ = builder.spawn(move || {
+    // The worker only starts once the previous one has fully stopped (see `worker_slot`).
+    let _ = spawn_after_previous("bep_worker", WORKER_STACK_SIZE, on_wait, move || {
+        if worker_control.is_stop_requested() {
+            return;
+        }
         let mut storage = FsSyncStorage::new(&sync_root);
         for s in &shares_snapshot {
             storage.set_folder_path(&s.folder_id, &s.target_path);
@@ -337,7 +348,7 @@ pub fn spawn_sync_worker(
 
             let peer_builder = std::thread::Builder::new()
                 .name(format!("bep_peer_{}", idx))
-                .stack_size(1536 * 1024);
+                .stack_size(WORKER_STACK_SIZE);
 
             match peer_builder.spawn(move || {
                 run_peer_session_loop(

@@ -116,6 +116,13 @@ fn download_file(
     let mut file_bytes = 0usize;
     let mut file_blocks = 0usize;
     for block in &outdated_blocks {
+        if ctx.is_stop_requested() {
+            storage.abort_download(folder_id, &file.name);
+            return Err(io::Error::new(
+                io::ErrorKind::Interrupted,
+                "stopped locally during a download",
+            ));
+        }
         match fetch_block(stream, ctx, folder_id, file, block) {
             Ok(Some(len)) => {
                 file_blocks += 1;
@@ -187,6 +194,17 @@ fn fetch_block(
 
     if resp.code != 0 {
         return Ok(None);
+    }
+    if resp.data.len() != block.size.max(0) as usize {
+        return Err(io::Error::new(
+            io::ErrorKind::InvalidData,
+            format!(
+                "Block of {} bytes received for {} ({} expected)",
+                resp.data.len(),
+                file.name,
+                block.size
+            ),
+        ));
     }
     if block.hash.len() == 32 && Sha256::digest(&resp.data).as_slice() != block.hash.as_slice() {
         return Err(io::Error::new(

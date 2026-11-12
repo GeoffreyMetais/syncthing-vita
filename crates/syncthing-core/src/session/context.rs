@@ -1,6 +1,7 @@
 //! Per-session context shared by every phase of a BEP session: who we are, who the peer is,
 //! where files live, transfer statistics and the event sink.
 
+use super::control::SyncControl;
 use super::events::SyncEvent;
 use crate::cert::VitaIdentity;
 use crate::device_id::DeviceId;
@@ -42,6 +43,8 @@ pub struct SessionContext<'a> {
     pub storage: &'a FsSyncStorage,
     pub peer_device_id: DeviceId,
     pub stats: SyncStats,
+    /// Control handle of a persistent session (`None` for a single-cycle one).
+    pub control: Option<&'a SyncControl>,
     next_request_id: i32,
     on_event: &'a mut dyn FnMut(SyncEvent),
 }
@@ -58,6 +61,7 @@ impl<'a> SessionContext<'a> {
             storage,
             peer_device_id,
             stats: SyncStats::default(),
+            control: None,
             next_request_id: 1,
             on_event,
         }
@@ -66,6 +70,12 @@ impl<'a> SessionContext<'a> {
     /// Our own `DeviceId`.
     pub fn own_id(&self) -> DeviceId {
         self.identity.device_id
+    }
+
+    /// Returns `true` if a local stop was requested: long operations (downloads) must end
+    /// promptly so a replaced or closing session never keeps writing in the background.
+    pub fn is_stop_requested(&self) -> bool {
+        self.control.is_some_and(|c| c.is_stop_requested())
     }
 
     /// Forwards `event` to the session's event sink.

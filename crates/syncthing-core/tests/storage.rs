@@ -74,3 +74,76 @@ fn test_device_root_slash_variant() {
     assert_eq!(with_device_root_slash(Path::new("/tmp/a:b")), None);
     assert_eq!(with_device_root_slash(Path::new("relative/dir")), None);
 }
+
+#[test]
+fn test_peer_supplied_block_sizes_are_bounded() {
+    use syncthing_core::{BepBlockInfo, BepFileInfo, BepVersionCounter, BEP_MAX_BLOCK_SIZE};
+
+    let tmp_dir = common::fresh_temp_dir("block_size_bounds");
+    let storage = FsSyncStorage::new(&tmp_dir);
+    let dir = storage.folder_root("f");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("a.bin"), b"data").unwrap();
+
+    // A block request larger than the BEP maximum is refused before any allocation.
+    assert!(storage
+        .read_block_for_peer("f", "a.bin", 0, BEP_MAX_BLOCK_SIZE + 1)
+        .is_err());
+    assert_eq!(
+        storage.read_block_for_peer("f", "a.bin", 0, 4).unwrap(),
+        b"data"
+    );
+
+    // So is an index announcing an oversized or negative block.
+    for size in [i32::MAX, -1] {
+        let remote = BepFileInfo {
+            name: "a.bin".to_owned(),
+            is_dir: false,
+            size: 4,
+            modified_s: 1,
+            deleted: false,
+            invalid: false,
+            sequence: 1,
+            versions: vec![BepVersionCounter {
+                short_device_id: 1,
+                value: 1,
+            }],
+            blocks: vec![BepBlockInfo {
+                offset: 0,
+                size,
+                hash: vec![0; 32],
+            }],
+        };
+        assert!(storage.find_outdated_blocks("f", &remote).is_err());
+    }
+}
+
+#[test]
+fn test_interrupted_commit_restores_the_previous_file() {
+    let tmp_dir = common::fresh_temp_dir("commit_recovery");
+    let storage = FsSyncStorage::new(&tmp_dir);
+    let dev_id = DeviceId([0x11; 32]);
+    let dir = storage.folder_root("f");
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("save.bin"), b"version 1").unwrap();
+    let (index, _) = storage.build_local_index("f", dev_id, &[]).unwrap();
+    assert!(index
+        .files
+        .iter()
+        .any(|f| f.name == "save.bin" && !f.deleted));
+
+    // State left by a commit interrupted after the old file was set aside.
+    std::fs::rename(
+        dir.join("save.bin"),
+        storage.download_backup_path("f", "save.bin"),
+    )
+    .unwrap();
+
+    let (index, _) = storage.build_local_index("f", dev_id, &[]).unwrap();
+    assert!(index
+        .files
+        .iter()
+        .any(|f| f.name == "save.bin" && !f.deleted));
+    assert_eq!(std::fs::read(dir.join("save.bin")).unwrap(), b"version 1");
+    assert!(!storage.download_backup_path("f", "save.bin").exists());
+}

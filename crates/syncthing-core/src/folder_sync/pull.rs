@@ -163,7 +163,9 @@ impl FsSyncStorage {
 
         // Regular file: the content may still match when the peer uses another block size.
         match self.find_outdated_blocks(folder_id, rf) {
-            Ok(outdated) if outdated.is_empty() && path.is_file() => {
+            // A local file with the right blocks but another length (trailing data) goes
+            // through a download too: it is fixed in the temp file, never in place.
+            Ok(outdated) if outdated.is_empty() && has_len(&path, rf.size) => {
                 Self::put_file_from_remote(db, rf, &path, merged);
                 plan.up_to_date.push(rf.clone());
             }
@@ -203,6 +205,11 @@ impl FsSyncStorage {
             Self::put_file_from_remote(db, rf, &path, version_merge(&prev, &rf.versions));
         });
     }
+}
+
+/// Returns `true` if `path` is a regular file of exactly `size` bytes.
+fn has_len(path: &Path, size: i64) -> bool {
+    fs::metadata(path).is_ok_and(|m| m.is_file() && m.len() == size.max(0) as u64)
 }
 
 /// `save.bin` -> `save.sync-conflict-<unix secs>-<device>.bin` (Syncthing-style conflict name).

@@ -77,3 +77,26 @@ fn test_invalid_linked_device_entries_are_dropped_on_load() {
     assert_eq!(repo.load_shares()[0].shared_devices, vec![PEER.to_hex()]);
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn test_interrupted_config_replacement_restores_the_backup() {
+    let dir = temp_test_dir("cfg-interrupted");
+    let repo = ConfigRepository::new(&dir);
+    // State left by a replacement interrupted after the old file was set aside.
+    std::fs::write(
+        format!("{}/shares.cfg.bak", dir),
+        format!("docs|Docs|ux0:docs|1|{}\n", PEER.to_hex()),
+    )
+    .unwrap();
+    std::fs::write(format!("{}/shares.cfg.tmp", dir), "").unwrap();
+
+    let shares = repo.load_shares();
+    assert_eq!(shares.len(), 1);
+    assert_eq!(shares[0].folder_id, "docs");
+
+    // A normal save leaves no backup behind.
+    repo.save_shares(&shares);
+    assert!(!std::path::Path::new(&format!("{}/shares.cfg.bak", dir)).exists());
+    assert_eq!(repo.load_shares().len(), 1);
+    let _ = std::fs::remove_dir_all(&dir);
+}

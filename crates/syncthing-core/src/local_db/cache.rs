@@ -1,5 +1,5 @@
 //! Process-wide cache of folder databases shared by all concurrent peer sessions,
-//! with load-on-first-use and atomic (`tmp` + rename) persistence.
+//! with load-on-first-use and crash-safe (`tmp` + backup + rename) persistence.
 
 use std::collections::HashMap;
 use std::fs;
@@ -9,6 +9,7 @@ use std::sync::{Mutex, OnceLock};
 
 use super::FolderDb;
 use crate::device_id::DeviceId;
+use crate::storage::atomic::{recover_replaced_file, replace_file, write_file_synced};
 
 fn db_cache() -> &'static Mutex<HashMap<PathBuf, FolderDb>> {
     static CACHE: OnceLock<Mutex<HashMap<PathBuf, FolderDb>>> = OnceLock::new();
@@ -25,6 +26,7 @@ pub fn with_folder_db<R>(
 ) -> R {
     let mut cache = db_cache().lock().unwrap_or_else(|p| p.into_inner());
     let db = cache.entry(db_path.to_path_buf()).or_insert_with(|| {
+        recover_replaced_file(db_path, &db_path.with_extension("bak"));
         fs::read_to_string(db_path)
             .ok()
             .and_then(|t| FolderDb::parse(&t))
@@ -42,7 +44,6 @@ fn save_db(db_path: &Path, db: &FolderDb) -> io::Result<()> {
         let _ = fs::create_dir_all(parent);
     }
     let tmp = db_path.with_extension("tmp");
-    fs::write(&tmp, db.serialize())?;
-    let _ = fs::remove_file(db_path);
-    fs::rename(&tmp, db_path)
+    write_file_synced(&tmp, db.serialize().as_bytes())?;
+    replace_file(&tmp, db_path, &db_path.with_extension("bak"))
 }

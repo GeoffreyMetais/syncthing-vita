@@ -135,6 +135,7 @@ where
     };
 
     let mut ctx = SessionContext::new(identity, storage, result.peer_device_id, &mut on_event);
+    ctx.control = control.as_deref();
     let mut folders = FolderSyncState::default();
 
     // 2. `ClusterConfig` exchange and initial remote `Index`
@@ -177,14 +178,14 @@ where
     }
 
     // 5. Persistent session loop
-    if let Some(ctrl) = control {
+    if let Some(ctrl) = control.as_deref() {
         let links = PersistentLinks {
             peer_addr,
             our_hello,
             secondaries,
             desired_secondary,
         };
-        run_persistent_session(&mut stream, &mut ctx, &mut folders, links, &ctrl);
+        run_persistent_session(&mut stream, &mut ctx, &mut folders, links, ctrl);
     }
 
     let stats = ctx.stats;

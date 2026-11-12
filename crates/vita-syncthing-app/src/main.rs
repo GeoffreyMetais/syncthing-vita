@@ -17,8 +17,8 @@ use vita_syncthing_app::application::{
 use vita_syncthing_app::domain::{AppState, ModalDialog, UiText};
 use vita_syncthing_app::infrastructure::{
     detect_system_language, init_vita_network, is_on_external_power, keep_system_awake,
-    set_cpu_clock_mhz, spawn_sync_worker, ConfigRepository, IdentityStore, QrScanner, VitaInput,
-    WorkerMsg,
+    set_cpu_clock_mhz, spawn_sync_worker, wait_for_worker, ConfigRepository, IdentityStore,
+    QrScanner, VitaInput, WorkerMsg,
 };
 use vita_syncthing_app::ui::VitaUiRenderer;
 
@@ -45,6 +45,9 @@ pub static sceUserMainThreadName: [u8; 16] = *b"vita_syncthing\0\0";
 const BASE_DATA_DIR: &str = "ux0:data/syncthing";
 #[cfg(not(target_os = "vita"))]
 const BASE_DATA_DIR: &str = "/tmp/syncthing-vita";
+
+/// How long quitting waits for the sync worker to stop cleanly.
+const QUIT_WORKER_WAIT: Duration = Duration::from_secs(3);
 
 fn main() {
     let identity_res = IdentityStore::load_or_create(BASE_DATA_DIR);
@@ -212,6 +215,8 @@ fn main() {
                     ctl.request_stop();
                 }
                 ShareService::log_event(&mut state, &repo, "Exit requested by user [START].");
+                // Let the sessions close and save their state before the process exits.
+                wait_for_worker(QUIT_WORKER_WAIT);
                 set_cpu_clock_mhz(CpuClock::Full.mhz());
                 break;
             }

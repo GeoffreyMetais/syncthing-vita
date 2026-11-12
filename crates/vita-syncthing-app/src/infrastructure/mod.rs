@@ -12,6 +12,7 @@ pub mod sync_worker;
 #[cfg(feature = "ui-script")]
 pub mod ui_script;
 pub mod vita_system;
+pub mod worker_slot;
 
 pub use config_repo::ConfigRepository;
 pub use framebuffer::VitaFramebuffer;
@@ -27,3 +28,4 @@ pub use vita_system::{
     detect_system_language, init_vita_network, is_on_external_power, keep_system_awake,
     set_cpu_clock_mhz,
 };
+pub use worker_slot::wait_for_worker;

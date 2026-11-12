@@ -1,29 +1,43 @@
 //! Block-level file access: SHA-256 block hashing, delta comparison against a remote file and
 //! block reads served to peers. Uses a fixed 128 KiB buffer (never the whole file in RAM).
 
-use std::fs::{self, File, OpenOptions};
+use std::fs::{self, File};
 use std::io::{self, Read, Seek, SeekFrom};
 use std::path::Path;
 
 use sha2::{Digest, Sha256};
 
 use super::FsSyncStorage;
-use crate::bep::{BepBlockInfo, BepFileInfo, BEP_BLOCK_SIZE};
+use crate::bep::{BepBlockInfo, BepFileInfo, BEP_BLOCK_SIZE, BEP_MAX_BLOCK_SIZE};
 
 impl FsSyncStorage {
     /// **Step 1 (Delta Sync)**:
     /// Inspects the local file block by block (fixed 128 KiB buffer in RAM) and returns
     /// only the list of blocks that are missing or have a differing SHA-256 compared to the remote `Index`.
+    /// Read-only: the local file is never modified here. Block sizes come from the peer and
+    /// are rejected when negative or above [`BEP_MAX_BLOCK_SIZE`].
     pub fn find_outdated_blocks(
         &self,
         folder_id: &str,
         remote_file: &BepFileInfo,
     ) -> io::Result<Vec<BepBlockInfo>> {
         let full_path = self.resolve_safe_path(folder_id, &remote_file.name);
-        let meta = match fs::metadata(&full_path) {
-            Ok(m) => m,
-            Err(_) => return Ok(remote_file.blocks.clone()),
-        };
+        if let Some(bad) = remote_file
+            .blocks
+            .iter()
+            .find(|b| b.size < 0 || b.size as usize > BEP_MAX_BLOCK_SIZE || b.offset < 0)
+        {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!(
+                    "invalid block (offset {}, size {}) announced for {}",
+                    bad.offset, bad.size, remote_file.name
+                ),
+            ));
+        }
+        if fs::metadata(&full_path).is_err() {
+            return Ok(remote_file.blocks.clone());
+        }
 
         let mut file = match File::open(&full_path) {
             Ok(f) => f,
@@ -60,12 +74,6 @@ impl FsSyncStorage {
             }
         }
 
-        if outdated.is_empty() && meta.len() != (remote_file.size.max(0) as u64) {
-            if let Ok(wfile) = OpenOptions::new().write(true).open(&full_path) {
-                let _ = wfile.set_len(remote_file.size.max(0) as u64);
-            }
-        }
-
         Ok(outdated)
     }
 
@@ -78,6 +86,12 @@ impl FsSyncStorage {
         offset: u64,
         size: usize,
     ) -> io::Result<Vec<u8>> {
+        if size > BEP_MAX_BLOCK_SIZE {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidInput,
+                format!("requested block of {size} bytes exceeds the BEP maximum"),
+            ));
+        }
         let full_path = self.resolve_safe_path(folder_id, rel_path);
         let mut file = File::open(&full_path)?;
         file.seek(SeekFrom::Start(offset))?;

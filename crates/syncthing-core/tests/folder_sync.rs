@@ -114,3 +114,37 @@ fn test_local_deletion_becomes_tombstone() {
 
     let _ = std::fs::remove_dir_all(&tmp_dir);
 }
+
+/// An entry that exists but cannot be inspected (here a dangling link, on PS Vita a failing
+/// `stat()`) must not be advertised as deleted, nor anything below it.
+#[cfg(unix)]
+#[test]
+fn test_unreadable_entry_is_not_recorded_as_deleted() {
+    use syncthing_core::{DeviceId, FsSyncStorage};
+
+    let tmp_dir = common::fresh_temp_dir("unreadable_entry");
+    let storage = FsSyncStorage::new(&tmp_dir);
+    let dev_id = DeviceId([0x11; 32]);
+    let dir = storage.folder_root("f");
+    std::fs::create_dir_all(dir.join("album")).unwrap();
+    std::fs::write(dir.join("save.bin"), b"precious").unwrap();
+    std::fs::write(dir.join("album/track.mp3"), b"music").unwrap();
+    std::fs::write(dir.join("gone.bin"), b"really deleted").unwrap();
+    std::fs::write(dir.join("kept.bin"), b"untouched").unwrap();
+    storage.build_local_index("f", dev_id, &[]).unwrap();
+
+    // `save.bin` and `album` become uninspectable; `gone.bin` is really deleted.
+    std::fs::remove_file(dir.join("save.bin")).unwrap();
+    std::os::unix::fs::symlink(dir.join("missing-target"), dir.join("save.bin")).unwrap();
+    std::fs::rename(dir.join("album"), tmp_dir.join("album-aside")).unwrap();
+    std::os::unix::fs::symlink(dir.join("missing-target"), dir.join("album")).unwrap();
+    std::fs::remove_file(dir.join("gone.bin")).unwrap();
+
+    let (index, _) = storage.build_local_index("f", dev_id, &[]).unwrap();
+    let deleted = |name: &str| index.files.iter().find(|f| f.name == name).unwrap().deleted;
+    assert!(!deleted("save.bin"));
+    assert!(!deleted("album"));
+    assert!(!deleted("album/track.mp3"));
+    assert!(!deleted("kept.bin"));
+    assert!(deleted("gone.bin"));
+}

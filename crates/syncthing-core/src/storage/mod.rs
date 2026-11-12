@@ -4,10 +4,12 @@
 //! - this file: folder registry (custom roots, paused state, advertised folders) and path resolution
 //! - [`blocks`] — block hashing, delta comparison and block reads served to peers
 //! - [`download`] — crash-safe download assembly (temp file, streaming writes, commit / abort)
+//! - [`atomic`] — crash-safe file replacement (backup kept until the new file is in place)
 //! - [`vita_fs`] — PS Vita filesystem quirks (`device:` roots, `mkdir`, recursive listing)
 //!
 //! Folder reconciliation (scans, pull planning) lives in [`crate::folder_sync`].
 
+pub mod atomic;
 pub mod blocks;
 pub mod download;
 pub mod vita_fs;
