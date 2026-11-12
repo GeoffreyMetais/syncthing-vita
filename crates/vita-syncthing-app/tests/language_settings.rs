@@ -3,25 +3,13 @@
 
 mod common;
 
-use common::temp_test_dir;
-use vita_syncthing_app::application::{InputController, UserCommand};
+use common::{press, temp_test_dir};
+use vita_syncthing_app::application::InputController;
 use vita_syncthing_app::domain::{
     ActiveTab, AppState, Language, LanguagePreference, NavFocus, UiText, SETTINGS_ROW_LANGUAGE,
 };
 use vita_syncthing_app::infrastructure::{ConfigRepository, InputFrame, BTN_CROSS, BTN_DOWN};
 use vita_syncthing_app::ui::theme::{SETTINGS_LANGUAGE_B, SETTINGS_LANGUAGE_Y};
-
-fn press(state: &mut AppState, repo: &ConfigRepository, buttons: u32) -> UserCommand {
-    InputController::handle_input(
-        state,
-        repo,
-        InputFrame {
-            pressed: buttons,
-            any_activity: true,
-            ..Default::default()
-        },
-    )
-}
 
 fn settings_state(dir: &str) -> AppState {
     let mut state = AppState::new(Vec::new(), Vec::new(), dir);

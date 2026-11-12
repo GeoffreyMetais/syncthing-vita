@@ -2,24 +2,12 @@
 
 mod common;
 
-use common::temp_test_dir;
-use vita_syncthing_app::application::{InputController, ShareService, UserCommand};
+use common::{press, temp_test_dir};
+use vita_syncthing_app::application::{ShareService, UserCommand};
 use vita_syncthing_app::domain::{ActiveTab, AppState, ModalDialog, NavFocus};
 use vita_syncthing_app::infrastructure::{
-    ConfigRepository, InputFrame, BTN_CROSS, BTN_DOWN, BTN_LEFT, BTN_RIGHT, BTN_UP,
+    ConfigRepository, BTN_CROSS, BTN_DOWN, BTN_LEFT, BTN_RIGHT, BTN_UP,
 };
-
-fn press(state: &mut AppState, repo: &ConfigRepository, buttons: u32) -> UserCommand {
-    InputController::handle_input(
-        state,
-        repo,
-        InputFrame {
-            pressed: buttons,
-            any_activity: true,
-            ..Default::default()
-        },
-    )
-}
 
 fn setup(name: &str) -> (String, ConfigRepository, AppState) {
     let dir = temp_test_dir(name);

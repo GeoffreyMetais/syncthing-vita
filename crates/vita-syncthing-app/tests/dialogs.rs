@@ -1,0 +1,80 @@
+//! Simple dialogs (`modal_input/dialogs.rs`): `ConfirmQuit` (buttons and touch targets) and
+//! `ConfirmDeleteShare`.
+
+mod common;
+
+use common::{press, tap, temp_test_dir};
+use vita_syncthing_app::application::{ShareService, UserCommand};
+use vita_syncthing_app::domain::{ActiveTab, AppState, ModalDialog};
+use vita_syncthing_app::infrastructure::{
+    ConfigRepository, BTN_CIRCLE, BTN_CROSS, BTN_SQUARE, BTN_START,
+};
+use vita_syncthing_app::ui::theme::{CONFIRM_QUIT_H, CONFIRM_QUIT_W};
+
+#[test]
+fn test_start_opens_quit_dialog_and_cross_quits() {
+    let dir = temp_test_dir("confirm-quit");
+    let repo = ConfigRepository::new(&dir);
+    let mut state = AppState::new(Vec::new(), Vec::new(), &dir);
+
+    // Pressing START opens ConfirmQuit modal instead of quitting immediately
+    assert_eq!(press(&mut state, &repo, BTN_START), UserCommand::None);
+    assert_eq!(state.modal, ModalDialog::ConfirmQuit);
+
+    // Pressing CROSS inside ConfirmQuit returns UserCommand::QuitApp
+    assert_eq!(press(&mut state, &repo, BTN_CROSS), UserCommand::QuitApp);
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_confirm_quit_touch_targets_follow_dialog_size() {
+    let dir = temp_test_dir("input-ctl-quit-touch");
+    let repo = ConfigRepository::new(&dir);
+    let mut state = AppState::new(Vec::new(), Vec::new(), &dir);
+
+    // The `Quit App` action sits at the bottom right of the (720x236) dialog.
+    let dx = (960 - CONFIRM_QUIT_W as usize) / 2;
+    let dy = (500 - CONFIRM_QUIT_H as usize) / 2;
+    let quit_x = dx + CONFIRM_QUIT_W as usize - 80;
+    let quit_y = dy + CONFIRM_QUIT_H as usize - 34;
+
+    state.modal = ModalDialog::ConfirmQuit;
+    assert_eq!(tap(&mut state, &repo, quit_x, quit_y), UserCommand::QuitApp);
+
+    // Tapping the dialog body cancels instead of quitting.
+    state.modal = ModalDialog::ConfirmQuit;
+    assert_eq!(tap(&mut state, &repo, 480, dy + 60), UserCommand::None);
+    assert_eq!(state.modal, ModalDialog::None);
+}
+
+#[test]
+fn test_square_on_shares_tab_asks_confirmation_before_deleting() {
+    let dir = temp_test_dir("delete-share-input");
+    let repo = ConfigRepository::new(&dir);
+    let mut state = AppState::new(Vec::new(), Vec::new(), &dir);
+    ShareService::create_share(&mut state, &repo, "a", "Share A", &format!("{}/a", dir));
+    state.active_tab = ActiveTab::Shares;
+
+    // Square opens the confirmation; Circle cancels without deleting
+    press(&mut state, &repo, BTN_SQUARE);
+    assert_eq!(
+        state.modal,
+        ModalDialog::ConfirmDeleteShare { share_idx: 0 }
+    );
+    press(&mut state, &repo, BTN_CIRCLE);
+    assert_eq!(state.modal, ModalDialog::None);
+    assert_eq!(state.shares.len(), 1);
+
+    // Square then Cross deletes the share
+    press(&mut state, &repo, BTN_SQUARE);
+    press(&mut state, &repo, BTN_CROSS);
+    assert_eq!(state.modal, ModalDialog::None);
+    assert!(state.shares.is_empty());
+
+    // Square with no share does nothing
+    press(&mut state, &repo, BTN_SQUARE);
+    assert_eq!(state.modal, ModalDialog::None);
+
+    let _ = std::fs::remove_dir_all(&dir);
+}

@@ -3,7 +3,7 @@
 
 mod common;
 
-use common::temp_test_dir;
+use common::{press, temp_test_dir};
 use qrcodegen::{QrCode, QrCodeEcc};
 use syncthing_core::DeviceId;
 use vita_syncthing_app::application::{
@@ -16,18 +16,6 @@ use vita_syncthing_app::infrastructure::{
 
 fn sample_device_id() -> String {
     DeviceId([7u8; 32]).to_syncthing_string()
-}
-
-fn press(state: &mut AppState, repo: &ConfigRepository, buttons: u32) -> UserCommand {
-    InputController::handle_input(
-        state,
-        repo,
-        InputFrame {
-            pressed: buttons,
-            any_activity: true,
-            ..Default::default()
-        },
-    )
 }
 
 /// Renders `text` as a QR code (4 px per module) centred on a white camera-sized frame.

@@ -187,7 +187,7 @@ Dependencies strictly point **inward**. Inner layers never import or depend on o
    - Imports the layers from the crate's library (`use vita_syncthing_app::...`). `src/lib.rs` only declares `domain`, `application`, `infrastructure` and `ui`; the VitaSDK entrypoint symbols stay in `main.rs`.
 
 6. **Tests (`crates/vita-syncthing-app/tests/`)**
-   - **No `#[cfg(test)] mod tests` inside `src/`** (neither in `main.rs` nor in layer modules). Tests are host integration tests against the library's public API, one file per use case / component (`share_service.rs`, `input_controller.rs`, `power_policy.rs`), with shared helpers in `tests/common/mod.rs` (e.g. `temp_test_dir`).
+   - **No `#[cfg(test)] mod tests` inside `src/`** (neither in `main.rs` nor in layer modules). Tests are host integration tests against the library's public API, one file per use case / component (`share_service.rs`, `input_controller.rs`, `power_policy.rs`), with shared helpers in `tests/common/mod.rs` (`temp_test_dir`, `press`, `tap`). A test belongs to the file of the component it exercises, not to `input_controller.rs` just because it goes through `InputController::handle_input`.
    - Test domain and application logic through public functions; never through Vita hardware drivers (`sce*` code is `#[cfg(target_os = "vita")]` and absent on host).
 
 ---
@@ -337,7 +337,11 @@ cargo test --workspace
 - `share_creation.rs`: a new share without a linked device is discarded, a linked one is kept, `Files` tab folder selection, already-shared folders are not selectable
 - `folder_offers.rs`: offered folders need consent, accept / decline / later, declined offers persisted, deleted shares are declined and do not come back, `Settings` · `Clear Declined` (D-pad and touch)
 - `share_service.rs`: share deletion, share creation, device linking, paused accepted folders, `ConfigRepository` roundtrip, manual LAN pairing
-- `input_controller.rs`: `START` quit dialog, screensaver wakes on press / touch only, theme toggle, add-device-by-short-ID via system keyboard, share deletion confirmation, `Files` up navigation, virtual keyboard toggle
+- `input_controller.rs`: global routing — an active screensaver swallows input and wakes on a button press or touch only
+- `dialogs.rs`: `START` -> `ConfirmQuit` -> `Cross` quits, `ConfirmQuit` touch targets, `ConfirmDeleteShare` (`Square` on Shares, cancel / confirm)
+- `add_device.rs`: add-device-by-short-ID via system keyboard (placeholder upgraded on discovery), virtual keyboard hidden until requested
+- `theme_settings.rs`: theme toggle (D-pad `Cross`, `Square`, touch) and `theme.cfg` persistence
+- `folder_picker.rs`: `Files` tab `Circle` walks up device-root paths, then leaves the tab
 - `dpad_navigation.rs`: sidebar <-> page focus, Shares rows / buttons / header, Files rows / Up button
 - `qr_scan.rs`: Device ID extraction from QR payloads, `quircs` decoding of a rendered QR code, scanner modal navigation, adding the scanned device
 - `power_policy.rs`: standby blocking while syncing (charging / battery / transfer grace period), CPU clock level (full speed only during the initial sync phase and transfers), initial sync phase tracked per peer from `SyncEvent`s

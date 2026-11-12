@@ -2,25 +2,11 @@
 
 mod common;
 
-use common::temp_test_dir;
+use common::{press, temp_test_dir};
 use syncthing_core::DeviceId;
-use vita_syncthing_app::application::{InputController, ShareCreation, ShareService, UserCommand};
+use vita_syncthing_app::application::{ShareCreation, ShareService, UserCommand};
 use vita_syncthing_app::domain::{AppState, ModalDialog};
-use vita_syncthing_app::infrastructure::{
-    ConfigRepository, InputFrame, BTN_CIRCLE, BTN_CROSS, BTN_TRIANGLE,
-};
-
-fn press(state: &mut AppState, repo: &ConfigRepository, buttons: u32) -> UserCommand {
-    InputController::handle_input(
-        state,
-        repo,
-        InputFrame {
-            pressed: buttons,
-            any_activity: true,
-            ..Default::default()
-        },
-    )
-}
+use vita_syncthing_app::infrastructure::{ConfigRepository, BTN_CIRCLE, BTN_CROSS, BTN_TRIANGLE};
 
 #[test]
 fn test_share_without_linked_device_is_discarded() {
