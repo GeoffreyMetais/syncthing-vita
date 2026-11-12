@@ -6,6 +6,7 @@ use crate::domain::{AppState, ModalDialog};
 use crate::infrastructure::{
     ConfigRepository, InputFrame, BTN_CIRCLE, BTN_CROSS, BTN_SQUARE, BTN_START, BTN_TRIANGLE,
 };
+use crate::ui::theme::{CONFIRM_QUIT_H, CONFIRM_QUIT_W};
 
 /// Handles input in the `ShowDeviceId` modal.
 pub fn show_device_id(state: &mut AppState, input: InputFrame) -> UserCommand {
@@ -74,8 +75,8 @@ pub fn confirm_quit(state: &mut AppState, input: InputFrame) -> UserCommand {
         return UserCommand::None;
     }
     if let Some((tx, ty)) = input.touch_tap {
-        let w = 520usize;
-        let h = 236usize;
+        let w = CONFIRM_QUIT_W as usize;
+        let h = CONFIRM_QUIT_H as usize;
         let dx = (960 - w) / 2;
         let dy = (500 - h) / 2;
         // Check if user tapped "Quit App" button at bottom-right of modal

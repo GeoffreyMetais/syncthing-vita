@@ -10,6 +10,7 @@ use vita_syncthing_app::infrastructure::{
     ConfigRepository, InputFrame, BTN_CIRCLE, BTN_CROSS, BTN_RIGHT, BTN_SQUARE, BTN_START,
     BTN_TRIANGLE,
 };
+use vita_syncthing_app::ui::theme::{CONFIRM_QUIT_H, CONFIRM_QUIT_W};
 
 fn press(state: &mut AppState, repo: &ConfigRepository, buttons: u32) -> UserCommand {
     InputController::handle_input(
@@ -335,4 +336,37 @@ fn test_theme_persistence_roundtrip_and_touch() {
     assert_eq!(new_session.theme_mode, ThemeMode::Dark);
 
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+fn tap(state: &mut AppState, repo: &ConfigRepository, x: usize, y: usize) -> UserCommand {
+    InputController::handle_input(
+        state,
+        repo,
+        InputFrame {
+            touch_tap: Some((x, y)),
+            any_activity: true,
+            ..Default::default()
+        },
+    )
+}
+
+#[test]
+fn test_confirm_quit_touch_targets_follow_dialog_size() {
+    let dir = temp_test_dir("input-ctl-quit-touch");
+    let repo = ConfigRepository::new(&dir);
+    let mut state = AppState::new(Vec::new(), Vec::new(), &dir);
+
+    // The `Quit App` action sits at the bottom right of the (720x236) dialog.
+    let dx = (960 - CONFIRM_QUIT_W as usize) / 2;
+    let dy = (500 - CONFIRM_QUIT_H as usize) / 2;
+    let quit_x = dx + CONFIRM_QUIT_W as usize - 80;
+    let quit_y = dy + CONFIRM_QUIT_H as usize - 34;
+
+    state.modal = ModalDialog::ConfirmQuit;
+    assert_eq!(tap(&mut state, &repo, quit_x, quit_y), UserCommand::QuitApp);
+
+    // Tapping the dialog body cancels instead of quitting.
+    state.modal = ModalDialog::ConfirmQuit;
+    assert_eq!(tap(&mut state, &repo, 480, dy + 60), UserCommand::None);
+    assert_eq!(state.modal, ModalDialog::None);
 }

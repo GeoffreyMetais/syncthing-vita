@@ -28,6 +28,10 @@ pub const SETTINGS_CLEAR_BTN_X: i32 = CONTENT_R - 220;
 pub const MANAGE_DEVICES_W: i32 = 780;
 pub const MANAGE_DEVICES_H: i32 = 390;
 
+/// Size of the `ConfirmQuit` modal (wide enough for the longest translated line).
+pub const CONFIRM_QUIT_W: i32 = 720;
+pub const CONFIRM_QUIT_H: i32 = 236;
+
 /// Touch width of the `R · Scan QR` action at the bottom left of the `AddDeviceById` modal.
 pub const SCAN_QR_BTN_W: usize = 150;
 
