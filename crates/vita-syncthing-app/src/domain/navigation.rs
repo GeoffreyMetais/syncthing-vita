@@ -44,30 +44,41 @@ pub const TAB_ORDER: [ActiveTab; 4] = [
 
 /// Number of focusable action buttons per row, left to right:
 /// Dashboard `[QR / ID, Sync Now]`, Shares `[Devices, Delete, Folder]`, Settings
-/// `[+ Add Device, QR / ID, Switch Theme]`. Files rows have no buttons (the row is the target).
+/// `[Switch Theme]` on Display (row 0) and `[QR / ID, + Add Device]` on Devices (row 1).
+/// Files rows have no buttons (the row is the target).
 pub const fn action_count(tab: ActiveTab) -> usize {
     match tab {
         ActiveTab::Dashboard => 2,
         ActiveTab::Shares => 3,
         ActiveTab::FolderPicker => 0,
-        ActiveTab::Settings => 3,
+        ActiveTab::Settings => 1,
     }
 }
 
-/// Settings card with the display buttons (`+ Add Device`, `QR / ID`, `Switch Theme`).
+/// Number of focusable action buttons on each Settings card.
+pub const fn settings_row_action_count(row: usize) -> usize {
+    match row {
+        SETTINGS_ROW_DEVICES => 2,
+        _ => 1,
+    }
+}
+
+/// Settings card with the display button (`Switch Theme`).
 pub const SETTINGS_ROW_DISPLAY: usize = 0;
+/// Settings card with the device pairing buttons (`+ Add Device`, `QR / ID`).
+pub const SETTINGS_ROW_DEVICES: usize = 1;
 /// Settings card with the `Change Language` button.
-pub const SETTINGS_ROW_LANGUAGE: usize = 1;
+pub const SETTINGS_ROW_LANGUAGE: usize = 2;
 /// Settings card with the `Clear Declined` button.
-pub const SETTINGS_ROW_DECLINED: usize = 2;
+pub const SETTINGS_ROW_DECLINED: usize = 3;
 /// Number of focusable cards on the Settings page.
-pub const SETTINGS_ROWS: usize = 3;
+pub const SETTINGS_ROWS: usize = 4;
 
 /// Button focused when entering a tab: the one `Cross` triggered before D-pad navigation.
 pub const fn default_col(tab: ActiveTab) -> usize {
     match tab {
         ActiveTab::Dashboard => 0,
-        ActiveTab::Settings => 2,
+        ActiveTab::Settings => 0,
         ActiveTab::Shares | ActiveTab::FolderPicker => 0,
     }
 }

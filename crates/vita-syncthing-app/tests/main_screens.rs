@@ -211,3 +211,68 @@ fn test_settings_hints_trigger_their_actions() {
     assert!(matches!(state.modal, ModalDialog::AddDeviceById { .. }));
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn test_settings_devices_card_is_separate_from_theme_card() {
+    use vita_syncthing_app::domain::{NavFocus, SETTINGS_ROW_DEVICES};
+    use vita_syncthing_app::infrastructure::{BTN_CROSS, BTN_DOWN, BTN_LEFT, BTN_RIGHT};
+
+    let (dir, repo, mut state) = setup("screens-settings-devices");
+    tap_action(&mut state, &repo, UiAction::SwitchTab(ActiveTab::Settings));
+    draw(&mut state);
+
+    // The Display & Theme card hotspot must not contain the AddDevice or ShowDeviceId buttons.
+    let theme_card = state
+        .hit_map
+        .hotspots()
+        .iter()
+        .find(|h| h.action == UiAction::ToggleTheme && h.focus.is_none())
+        .expect("theme card hotspot")
+        .rect;
+    let add_btn = state
+        .hit_map
+        .hotspots()
+        .iter()
+        .find(|h| h.action == UiAction::AddDevice && h.focus.is_some())
+        .expect("add device button")
+        .rect;
+    let qr_btn = state
+        .hit_map
+        .hotspots()
+        .iter()
+        .find(|h| h.action == UiAction::ShowDeviceId && h.focus.is_some())
+        .expect("qr/id button")
+        .rect;
+    assert!(
+        !overlap(&theme_card, &add_btn),
+        "Add device button should be outside the Colour Theme card"
+    );
+    assert!(
+        !overlap(&theme_card, &qr_btn),
+        "QR / ID button should be outside the Colour Theme card"
+    );
+
+    // D-pad Down from Display reaches the Devices card; col 0 is QR / ID, Right moves to Add device.
+    state.nav.focus = NavFocus::Content;
+    press(&mut state, &repo, BTN_DOWN);
+    assert!(state.is_settings_row_focused(SETTINGS_ROW_DEVICES));
+    assert_eq!(state.focused_action(ActiveTab::Settings), Some(0));
+
+    press(&mut state, &repo, BTN_CROSS);
+    assert_eq!(state.modal, ModalDialog::ShowDeviceId);
+    state.modal = ModalDialog::None;
+
+    press(&mut state, &repo, BTN_RIGHT);
+    assert_eq!(state.focused_action(ActiveTab::Settings), Some(1));
+    assert_eq!(
+        press(&mut state, &repo, BTN_CROSS),
+        UserCommand::OpenSystemKeyboard
+    );
+    assert!(matches!(state.modal, ModalDialog::AddDeviceById { .. }));
+    state.modal = ModalDialog::None;
+
+    press(&mut state, &repo, BTN_LEFT);
+    assert_eq!(state.focused_action(ActiveTab::Settings), Some(0));
+
+    let _ = std::fs::remove_dir_all(&dir);
+}

@@ -234,10 +234,11 @@ impl AppState {
                 row: self.selected_picker_idx,
                 col: 0,
             },
-            // Only the first Settings card has several buttons.
             ActiveTab::Settings => FocusSlot::RowAction {
                 row: self.nav.row,
-                col: if self.nav.row == 0 { self.nav.col } else { 0 },
+                col: self.nav.col.min(
+                    crate::domain::settings_row_action_count(self.nav.row).saturating_sub(1),
+                ),
             },
         }
     }

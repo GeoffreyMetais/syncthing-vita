@@ -4,24 +4,26 @@
 
 use crate::domain::{
     AppState, FocusSlot, HitMap, Hotspot, LanguagePreference, Rect, ShortcutKey, ThemeMode,
-    UiAction, SETTINGS_ROW_DECLINED, SETTINGS_ROW_DISPLAY, SETTINGS_ROW_LANGUAGE,
+    UiAction, SETTINGS_ROW_DECLINED, SETTINGS_ROW_DEVICES, SETTINGS_ROW_DISPLAY,
+    SETTINGS_ROW_LANGUAGE,
 };
 use crate::ui::gfx::{Align, FontWeight, Gfx, PadButton};
 use crate::ui::strings;
 use crate::ui::theme::{
     UiTheme, CONTENT_B, CONTENT_R, CONTENT_W, CONTENT_X, CONTENT_Y, C_BAD, C_GOOD,
-    SETTINGS_DECLINED_B, SETTINGS_DECLINED_Y, SETTINGS_LANGUAGE_B, SETTINGS_LANGUAGE_Y,
+    SETTINGS_DECLINED_B, SETTINGS_DECLINED_Y, SETTINGS_DEVICES_B, SETTINGS_DEVICES_Y,
+    SETTINGS_LANGUAGE_B, SETTINGS_LANGUAGE_Y,
 };
 use crate::ui::widgets::{
     action_width, draw_action_hotspot, draw_card, draw_hint_bar, draw_page_title, Hint,
 };
 
 /// Height of the display & theme card.
-const DISPLAY_CARD_H: i32 = 118;
+const DISPLAY_CARD_H: i32 = 110;
 
-/// Vertical centre of the theme card actions: beside the short "Colour Theme"
+/// Vertical centre of the theme card action: beside the short "Colour Theme"
 /// label, between the section header and the full-width description line.
-const THEME_ACTIONS_Y: i32 = CONTENT_Y + 48;
+const THEME_ACTIONS_Y: i32 = CONTENT_Y + 42;
 
 /// Renders Tab 4: **Settings & Log** (`Settings`).
 pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut HitMap) {
@@ -30,7 +32,7 @@ pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: 
 
     // 1. Display & Theme Settings Card
     draw_card(gfx, th, CONTENT_X, CONTENT_Y, CONTENT_W, DISPLAY_CARD_H, true);
-    // Touching the card (outside its buttons) or pressing `Square` switches the theme.
+    // Touching the card (outside its button) or pressing `Square` switches the theme.
     hits.add(Hotspot {
         rect: Rect::new(CONTENT_X, CONTENT_Y, CONTENT_W, DISPLAY_CARD_H),
         action: UiAction::ToggleTheme,
@@ -40,7 +42,7 @@ pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: 
     let lx = CONTENT_X + 24;
     gfx.text(
         lx,
-        CONTENT_Y + 22,
+        CONTENT_Y + 18,
         12,
         FontWeight::Bold,
         th.accent_hi,
@@ -54,7 +56,7 @@ pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: 
     };
     gfx.text(
         lx,
-        CONTENT_Y + 52,
+        CONTENT_Y + 46,
         16,
         FontWeight::Medium,
         th.text,
@@ -62,16 +64,12 @@ pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: 
         s.settings_label_colour_theme,
     );
     let w_theme = action_width(gfx, PadButton::Cross, s.action_switch_theme);
-    let w_qr = action_width(gfx, PadButton::Circle, s.action_qr_id);
-    let w_add = action_width(gfx, PadButton::Triangle, s.action_add_device);
     let bx_theme = CONTENT_R - 20 - w_theme;
-    let bx_qr = bx_theme - 8 - w_qr;
-    let bx_add = bx_qr - 8 - w_add;
 
-    // The actions end above this line, so the description gets the full card width.
+    // The action ends above this line, so the description gets the full card width.
     gfx.text_fit(
         lx,
-        CONTENT_Y + 76,
+        CONTENT_Y + 72,
         CONTENT_R - 24 - lx,
         14,
         FontWeight::Regular,
@@ -79,33 +77,26 @@ pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: 
         Align::Left,
         theme_desc,
     );
-    let buttons = [
-        (bx_add, PadButton::Triangle, s.action_add_device, UiAction::AddDevice),
-        (bx_qr, PadButton::Circle, s.action_qr_id, UiAction::ShowDeviceId),
-        (bx_theme, PadButton::Cross, s.action_switch_theme, UiAction::ToggleTheme),
-    ];
-    for (col, (bx, pad, label, action)) in buttons.into_iter().enumerate() {
-        let slot = FocusSlot::RowAction {
-            row: SETTINGS_ROW_DISPLAY,
-            col,
-        };
-        draw_action_hotspot(
-            gfx,
-            th,
-            hits,
-            bx,
-            THEME_ACTIONS_Y,
-            pad,
-            label,
-            action,
-            slot,
-            state.is_focused(slot),
-        );
-    }
+    let display_slot = FocusSlot::RowAction {
+        row: SETTINGS_ROW_DISPLAY,
+        col: 0,
+    };
+    draw_action_hotspot(
+        gfx,
+        th,
+        hits,
+        bx_theme,
+        THEME_ACTIONS_Y,
+        PadButton::Cross,
+        s.action_switch_theme,
+        UiAction::ToggleTheme,
+        display_slot,
+        state.is_focused(display_slot),
+    );
 
     gfx.text(
         lx,
-        CONTENT_Y + 102,
+        CONTENT_Y + 94,
         13,
         FontWeight::Regular,
         th.faint,
@@ -113,14 +104,17 @@ pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: 
         s.settings_saver_auto_hint,
     );
 
-    // 2. UI Language Card
+    // 2. Devices & Pairing Card
+    render_devices(gfx, th, state, hits);
+
+    // 3. UI Language Card
     render_language(gfx, th, state, hits);
 
-    // 3. Declined Folder Offers Card
+    // 4. Declined Folder Offers Card
     render_declined_folders(gfx, th, state, hits);
 
-    // 4. Full Protocol Event Log Card
-    let ly = SETTINGS_DECLINED_B + 10;
+    // 5. Full Protocol Event Log Card
+    let ly = SETTINGS_DECLINED_B + 8;
     let lh = CONTENT_B - ly;
     draw_card(gfx, th, CONTENT_X, ly, CONTENT_W, lh, false);
     gfx.text(
@@ -171,6 +165,69 @@ pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: 
             Hint::action(PadButton::Start, s.action_quit, UiAction::ConfirmQuit),
         ],
     );
+}
+
+/// Dedicated card for device pairing (`Add device`) and viewing this PS Vita's `QR / ID`.
+fn render_devices(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut HitMap) {
+    let s = strings::strings(state.language);
+    let y = SETTINGS_DEVICES_Y;
+    let h = SETTINGS_DEVICES_B - SETTINGS_DEVICES_Y;
+    draw_card(gfx, th, CONTENT_X, y, CONTENT_W, h, false);
+    let lx = CONTENT_X + 24;
+    gfx.text(
+        lx,
+        y + 18,
+        12,
+        FontWeight::Bold,
+        th.accent_hi,
+        Align::Left,
+        s.settings_sec_devices,
+    );
+
+    let w_qr = action_width(gfx, PadButton::Cross, s.action_qr_id);
+    let w_add = action_width(gfx, PadButton::Triangle, s.action_add_device);
+    let bx_add = CONTENT_R - 20 - w_add;
+    let bx_qr = bx_add - 8 - w_qr;
+    let cy = y + h / 2;
+
+    gfx.text_fit(
+        lx,
+        y + 37,
+        bx_qr - lx - 16,
+        14,
+        FontWeight::Regular,
+        th.dim,
+        Align::Left,
+        s.settings_desc_devices,
+    );
+
+    let buttons = [
+        (bx_qr, PadButton::Cross, s.action_qr_id, UiAction::ShowDeviceId),
+        (
+            bx_add,
+            PadButton::Triangle,
+            s.action_add_device,
+            UiAction::AddDevice,
+        ),
+    ];
+    for (col, (bx, pad, label, action)) in buttons.into_iter().enumerate() {
+        let slot = FocusSlot::RowAction {
+            row: SETTINGS_ROW_DEVICES,
+            col,
+        };
+        draw_action_hotspot(
+            gfx,
+            th,
+            hits,
+            bx,
+            cy,
+            pad,
+            label,
+            action,
+            slot,
+            state.is_focused(slot),
+        );
+    }
 }
 
 /// Card showing the UI language (system default or a fixed one) with a `Change Language` button.
