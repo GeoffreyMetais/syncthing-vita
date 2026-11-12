@@ -43,6 +43,7 @@ verify:
     ./.agents/skills/vita-vpk-verify/scripts/verify_and_deploy.sh
 
 # Download and install official Sony firmware into Vita3K
+setup-firmware:
     ./scripts/setup_env.sh --install-firmware
 
 # Build .vpk, deploy to ux0:app/SYNCTHING and run inside Vita3K with log streaming

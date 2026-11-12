@@ -135,6 +135,9 @@ install_vitasdk() {
         echo "✅ VitaSDK already installed at: ${VITASDK_DIR}"
         return
     fi
+
+    # Check write permissions or create directory
+    if [[ ! -d "${VITASDK_DIR}" ]]; then
         if mkdir -p "${VITASDK_DIR}" 2>/dev/null; then
             :
         elif command -v sudo >/dev/null 2>&1; then
