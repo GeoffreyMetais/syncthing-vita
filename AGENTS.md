@@ -46,11 +46,14 @@ syncthing-vita
             │   ├── navigation.rs     # NavFocus / NavState (D-pad focus), tab order, buttons per row
             │   ├── models.rs         # KnownDevice, ShareConfigEntry, PickerItem, ActiveTab, PickerMode, ModalDialog, ThemeMode
             │   ├── app_state.rs      # AppState (pure state & view-model queries, zero I/O or rendering dependencies)
+            │   ├── interaction.rs    # HitMap / Hotspot / UiAction / FocusSlot: interactive elements declared by the frame on screen
+            │   ├── defaults.rs       # Every tunable value of the app: sync / discovery / power / display timings, limits, share presets
             │   ├── initial_sync.rs   # InitialSyncPeers (peers in their initial sync phase; full CPU speed meanwhile)
             │   └── ui_text.rs        # UiText: translatable messages (status line, labels, toasts) chosen by inner layers
             ├── application/          # Layer 2: Use Cases, Input Controller & Sync Event Coordinator
             │   ├── mod.rs
             │   ├── share_service.rs  # ShareService (create_share, upsert_device, toggle_device_for_share, refresh_picker_items)
+            │   ├── shares_controller.rs # SharesController (Shares page: D-pad focus, executes the UiActions declared by the screen)
             │   ├── share_creation.rs # ShareCreation (new share kept only once a device is linked)
             │   ├── folder_offers.rs  # FolderOfferService (folders offered by peers need consent: accept / decline / later)
             │   ├── frame_pacing.rs   # FramePacer (dynamic frame rate: render only when the screen changes)
@@ -156,6 +159,7 @@ Dependencies strictly point **inward**. Inner layers never import or depend on o
      - `input_controller.rs`: Translates main-screen button/touch inputs into actions, modal triggers, and commands.
      - `modal_input/`: Input handling for open modals, one file per modal (mirrors `ui/modals/`).
      - `dpad_navigation.rs`: D-pad focus between the sidebar and the page elements.
+     - `shares_controller.rs`: `Shares` page controller, the reference for the per-screen input pattern (see §3.4).
      - `frame_pacing.rs`: `FramePacer` dynamic frame rate (see §7).
      - `power_policy.rs`: automatic standby blocking and CPU clock level (`cpu_clock`: 333 MHz during the initial sync phase (`domain::InitialSyncPeers`, from `PeerConnected` to that peer's first `SyncCycleCompleted` / `SessionEnded`) and transfers + 10 s, 222 MHz for 3 s after input or while scanning a QR code, 111 MHz otherwise; applied by `set_cpu_clock_mhz` in `vita_system.rs`).
    - **Strict Rule**: No UI rendering code or direct hardware drivers.
@@ -213,6 +217,21 @@ To prevent code degradation into large, unmaintainable files:
   - **Avoid "Omnibus" Files**: Never create catch-all files like `display.rs` or `utils.rs`. Group code by specific domain responsibility.
 
 These size and SRP rules apply to **both crates** (`vita-syncthing-app` and `syncthing-core`).
+
+---
+
+### 3.4 Input Pattern: Elements Declared by the Screen (`HitMap`)
+
+An interactive element is declared **once, where it is drawn**. Never hit-test with pixel coordinates in the application layer: button positions depend on the label widths of the current language.
+
+- **Declaration (UI)**: the screen draws the element with `widgets::draw_action_hotspot` (or `HitMap::add`) and gives it a `UiAction`, its D-pad `FocusSlot` and, through the `PadButton` it displays, its face-button shortcut. `ui::renderer::draw_frame` records the frame's elements in `AppState::hit_map`.
+- **Resolution (application)**: the screen's controller resolves touch (`HitMap::action_at`), `Cross` on the focused element (`HitMap::focused_action`) and face buttons (`HitMap::shortcut_action`) from these declarations, then executes the `UiAction`. It must tolerate a stale action (the state may have changed since the frame was drawn): validate indexes.
+- **Status**: the `Shares` page is converted (`ui/screens/shares.rs` + `application/shares_controller.rs`). The sidebar, the bottom hint bar, the other pages and the modals still use fixed coordinates in `input_controller.rs` / `modal_input/`; convert a screen by adding its `UiAction` variants and a `<screen>_controller.rs`, and delete its coordinates from `input_controller.rs`.
+- **Tests** draw the frame before feeding input (`tests/common`: `draw`, `press`, `tap`, `feed`) and locate elements through `state.hit_map`, never with literal coordinates.
+
+### 3.5 Tunable Values (`domain/defaults.rs`)
+
+Timings, limits and presets that govern the app's behaviour (rescan interval, retry delays, discovery period, maximum concurrent devices, power grace periods, frame rates, screensaver timeouts, share presets) live in `domain/defaults.rs`. Never write such a value inline in `sync_worker.rs`, `main.rs` or a policy: add a documented constant there. The values `syncthing-core` lets an application tune are passed through `SyncTuning` (`SyncControl::with_tuning`); purely internal protocol timings stay as named constants in the file that uses them.
 
 ---
 
@@ -365,6 +384,7 @@ cargo test --workspace
 - `qr_scan.rs`: Device ID extraction from QR payloads, `quircs` decoding of a rendered QR code, scanner modal navigation, adding the scanned device
 - `power_policy.rs`: standby blocking while syncing (charging / battery / transfer grace period), CPU clock level (full speed only during the initial sync phase and transfers), initial sync phase tracked per peer from `SyncEvent`s
 - `ui_text.rs`: every `UiText` message renders in all 5 languages with its placeholders filled, translated Device ID errors
+- `shares_screen.rs`: `Shares` page input resolved from the drawn frame (touch targets in all 5 languages, card selection, face-button shortcuts, `Cross` on the focused element, stale element ignored, nothing declared behind the screensaver)
 - `frame_pacing.rs`: dynamic frame rate (input -> next VBlank, animations 30 FPS, background updates 10 FPS, static 1 FPS), toast expiry and screensaver speed independent of the frame rate
 - `worker_slot.rs`: a new worker starts only after the previous one ended, bounded wait on quit
 - `config_fields.rs`: interrupted `.cfg` replacement restored from its backup, `.cfg` field escaping roundtrip, legacy `%` text kept, hostile names / labels through `devices.cfg` / `shares.cfg` / `ignored_folders.cfg`, invalid linked-device entries dropped

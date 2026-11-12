@@ -1,32 +1,44 @@
 //! Tab 2 (`Shared Folders` / `Shares`): List of configured Syncthing shares, `+ New Share` button,
 //! and per-share actions (`Devices`, `Delete`, `Folder`).
+//!
+//! Every interactive element is declared in the frame's `HitMap` where it is drawn; input is
+//! handled from these declarations by `application::SharesController`.
 
-use crate::domain::{ActiveTab, AppState};
+use crate::domain::{ActiveTab, AppState, FocusSlot, HitMap, Hotspot, Rect, UiAction};
 use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton};
 use crate::ui::strings;
 use crate::ui::theme::{UiTheme, CONTENT_R, CONTENT_W, CONTENT_X, CONTENT_Y, C_GOOD, C_WARN};
 use crate::ui::widgets::{
-    action_width, draw_action, draw_card, draw_chip, draw_focus_ring, draw_hints, draw_page_title,
+    action_width, draw_action_hotspot, draw_card, draw_chip, draw_hints, draw_page_title,
 };
 
+/// Shares visible on the page (the list does not scroll yet).
+const VISIBLE_SHARES: usize = 4;
+/// Height of a share card and vertical distance between two cards.
+const SHARE_CARD_H: i32 = 90;
+const SHARE_CARD_STEP: i32 = 98;
+/// Vertical centre of the `+ New Share` button.
+const NEW_SHARE_CY: i32 = 46;
+
 /// Renders Tab 2: **Shared Folders** (`Shares`).
-pub fn render_shares_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
+pub fn render_shares_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut HitMap) {
     let s = strings::strings(state.language);
     draw_page_title(gfx, th, s.shares_title, None);
 
     // Top-right "+ New Share" action button (Circle)
     let w_new = action_width(gfx, PadButton::Circle, s.action_new_share);
-    draw_action(
+    draw_action_hotspot(
         gfx,
         th,
+        hits,
         CONTENT_R - w_new,
-        46,
+        NEW_SHARE_CY,
         PadButton::Circle,
         s.action_new_share,
+        UiAction::NewShare,
+        FocusSlot::Header,
+        state.is_header_focused(ActiveTab::Shares),
     );
-    if state.is_header_focused(ActiveTab::Shares) {
-        draw_focus_ring(gfx, th, CONTENT_R - w_new, 46, w_new);
-    }
 
     if state.shares.is_empty() {
         draw_card(gfx, th, CONTENT_X, CONTENT_Y, CONTENT_W, 150, false);
@@ -58,12 +70,18 @@ pub fn render_shares_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
             s.msg_no_shares_hint_2,
         );
     } else {
-        for (i, share) in state.shares.iter().take(4).enumerate() {
-            let ry = CONTENT_Y + (i as i32) * 98;
+        for (i, share) in state.shares.iter().take(VISIBLE_SHARES).enumerate() {
+            let ry = CONTENT_Y + (i as i32) * SHARE_CARD_STEP;
             let is_sel = i == state.selected_share_idx;
             let devs_summary = state.share_devices_summary(share);
 
-            draw_card(gfx, th, CONTENT_X, ry, CONTENT_W, 90, is_sel);
+            draw_card(gfx, th, CONTENT_X, ry, CONTENT_W, SHARE_CARD_H, is_sel);
+            hits.add(Hotspot {
+                rect: Rect::new(CONTENT_X, ry, CONTENT_W, SHARE_CARD_H),
+                action: UiAction::SelectShare(i),
+                focus: None,
+                shortcut: None,
+            });
 
             let lx = CONTENT_X + 18;
             gfx.rrect(lx, ry + 19, 52, 52, 14, th.accent_bg);
@@ -84,16 +102,28 @@ pub fn render_shares_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
             let bx_toggle = bx_folder - 8 - w_toggle;
             let bx_devs = bx_toggle - 8 - w_devs;
 
-            draw_action(gfx, th, bx_devs, ry + 56, PadButton::Cross, s.action_devices);
-            draw_action(gfx, th, bx_toggle, ry + 56, PadButton::Square, s.action_delete);
-            draw_action(gfx, th, bx_folder, ry + 56, PadButton::Triangle, s.action_folder);
-            if is_sel {
-                match state.focused_action(ActiveTab::Shares) {
-                    Some(0) => draw_focus_ring(gfx, th, bx_devs, ry + 56, w_devs),
-                    Some(1) => draw_focus_ring(gfx, th, bx_toggle, ry + 56, w_toggle),
-                    Some(_) => draw_focus_ring(gfx, th, bx_folder, ry + 56, w_folder),
-                    None => {}
-                }
+            // Left to right: the column order is the D-pad order within the row.
+            let focused_col = state
+                .focused_action(ActiveTab::Shares)
+                .filter(|_| is_sel);
+            let buttons = [
+                (bx_devs, PadButton::Cross, s.action_devices, UiAction::ManageDevices(i)),
+                (bx_toggle, PadButton::Square, s.action_delete, UiAction::DeleteShare(i)),
+                (bx_folder, PadButton::Triangle, s.action_folder, UiAction::ChangeShareFolder(i)),
+            ];
+            for (col, (bx, pad, label, action)) in buttons.into_iter().enumerate() {
+                draw_action_hotspot(
+                    gfx,
+                    th,
+                    hits,
+                    bx,
+                    ry + 56,
+                    pad,
+                    label,
+                    action,
+                    FocusSlot::RowAction { row: i, col },
+                    focused_col == Some(col),
+                );
             }
 
             let status_col = if share.enabled { C_GOOD } else { C_WARN };

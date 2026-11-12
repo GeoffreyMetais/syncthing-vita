@@ -1,9 +1,10 @@
 //! D-pad navigation on the main screen (`DpadNavigation`): moves the focus between the sidebar
 //! tabs and the current page's elements, and turns `Cross` into the focused element's action.
 
+use crate::application::SharesController;
 use crate::domain::{
     action_count, default_col, ActiveTab, AppState, NavFocus, SETTINGS_ROWS,
-    SETTINGS_ROW_DISPLAY, SETTINGS_ROW_LANGUAGE, TAB_ORDER,
+    SETTINGS_ROW_DISPLAY, SETTINGS_ROW_LANGUAGE, TAB_ORDER, UiAction,
 };
 use crate::infrastructure::{BTN_CROSS, BTN_DOWN, BTN_LEFT, BTN_RIGHT, BTN_UP};
 
@@ -17,10 +18,8 @@ pub enum PageAction {
     ToggleTheme,
     CycleLanguage,
     AddDevice,
-    NewShare,
-    ManageDevices,
-    DeleteShare,
-    ChangeFolder,
+    /// An element declared in the frame's `HitMap` was activated.
+    Ui(UiAction),
     PickerSelect,
     PickerOpen,
     PickerUp,
@@ -43,7 +42,8 @@ impl DpadNavigation {
         match state.nav.focus {
             NavFocus::Sidebar => Self::sidebar(state, buttons),
             NavFocus::Content => match state.active_tab {
-                ActiveTab::Shares => Self::shares(state, buttons),
+                ActiveTab::Shares => SharesController::dpad(state, buttons)
+                    .map_or(PageAction::None, PageAction::Ui),
                 ActiveTab::FolderPicker => Self::files(state, buttons),
                 ActiveTab::Settings => Self::settings(state, buttons),
                 tab => Self::action_row(state, tab, buttons),
@@ -121,40 +121,6 @@ impl DpadNavigation {
             PageAction::CycleLanguage
         } else {
             PageAction::ClearDeclinedFolders
-        }
-    }
-
-    /// Shares: `+ New Share` header, then one row per share with `[Devices, Delete, Folder]`.
-    fn shares(state: &mut AppState, buttons: u32) -> PageAction {
-        let count = state.shares.len();
-        if count == 0 {
-            state.nav.header = true;
-        }
-        if buttons & BTN_UP != 0 && !state.nav.header {
-            if state.selected_share_idx == 0 {
-                state.nav.header = true;
-            } else {
-                state.selected_share_idx -= 1;
-            }
-        }
-        if buttons & BTN_DOWN != 0 {
-            if state.nav.header {
-                state.nav.header = count == 0;
-            } else if state.selected_share_idx + 1 < count {
-                state.selected_share_idx += 1;
-            }
-        }
-        Self::move_in_row(state, ActiveTab::Shares, buttons);
-        if buttons & BTN_CROSS == 0 {
-            return PageAction::None;
-        }
-        if state.nav.header {
-            return PageAction::NewShare;
-        }
-        match state.nav.col {
-            0 => PageAction::ManageDevices,
-            1 => PageAction::DeleteShare,
-            _ => PageAction::ChangeFolder,
         }
     }
 

@@ -2,13 +2,16 @@
 //! Zero dependencies on filesystem I/O, network sockets, PS Vita FFI, or 2D rendering.
 
 pub mod app_state;
+pub mod defaults;
 pub mod initial_sync;
+pub mod interaction;
 pub mod models;
 pub mod navigation;
 pub mod ui_text;
 
 pub use app_state::AppState;
 pub use initial_sync::InitialSyncPeers;
+pub use interaction::{FocusSlot, HitMap, Hotspot, Rect, ShortcutKey, UiAction};
 pub use ui_text::UiText;
 pub use models::{
     fmt_size, ActiveTab, CameraPreview, FolderOffer, IgnoredFolder, KnownDevice, Language,

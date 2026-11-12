@@ -9,6 +9,7 @@ use crate::domain::models::{
     BROWSER_ROWS,
 };
 use crate::domain::initial_sync::InitialSyncPeers;
+use crate::domain::interaction::HitMap;
 use crate::domain::navigation::{default_col, NavFocus, NavState};
 use crate::domain::ui_text::UiText;
 
@@ -25,6 +26,8 @@ pub struct AppState {
     pub active_tab: ActiveTab,
     /// D-pad focus (sidebar or page element).
     pub nav: NavState,
+    /// Interactive elements of the frame on screen, declared by the UI while drawing it.
+    pub hit_map: HitMap,
     pub picker_mode: PickerMode,
     pub modal: ModalDialog,
     pub oled_saver_active: bool,
@@ -100,6 +103,7 @@ impl AppState {
             system_language: Language::English,
             active_tab: ActiveTab::Dashboard,
             nav: NavState::new(ActiveTab::Dashboard),
+            hit_map: HitMap::default(),
             picker_mode: PickerMode::ChangeShareTarget,
             modal: ModalDialog::None,
             oled_saver_active: false,

@@ -8,14 +8,21 @@ use std::time::Duration;
 use syncthing_core::{
     connect_and_sync_with_control, resolve_peer_tcp_addrs, run_discovery_cycle, scan_lan_bep_peers,
     Announce, BepFolder, BepHello, DeviceId, FsSyncStorage, SyncControl, SyncEvent,
-    SyncSessionStatus, VitaIdentity, BEP_DEFAULT_PORT, DISCOVERY_BROADCAST_ADDR,
+    SyncSessionStatus, SyncTuning, VitaIdentity, BEP_DEFAULT_PORT, DISCOVERY_BROADCAST_ADDR,
 };
 
 use super::worker_slot::spawn_after_previous;
+use crate::domain::defaults::{
+    CONNECT_TIMEOUT, DISCOVERY_INTERVAL, DISCOVERY_LISTEN, DISCOVERY_SCAN_LISTEN,
+    KEEPALIVE_INTERVAL, MAX_PEER_SESSIONS, NO_ADDRESS_POLL, RESCAN_INTERVAL, RETRY_AFTER_ERROR,
+    RETRY_AFTER_SESSION, RETRY_AWAITING_PAIRING,
+};
 use crate::domain::{KnownDevice, ShareConfigEntry, UiText};
 
 /// Stack size of the worker and peer session threads.
 const WORKER_STACK_SIZE: usize = 1536 * 1024;
+/// Granularity at which a sleeping worker notices a stop request.
+const STOP_CHECK_STEP: Duration = Duration::from_millis(200);
 
 static PROCESS_INSTANCE_ID: OnceLock<i64> = OnceLock::new();
 
@@ -51,7 +58,7 @@ pub enum WorkerMsg {
 type SharedDiscoveredAddrs = Arc<Mutex<Vec<(DeviceId, Vec<SocketAddr>)>>>;
 
 fn sleep_interruptible(control: &SyncControl, duration: Duration) -> bool {
-    let step = Duration::from_millis(200);
+    let step = STOP_CHECK_STEP;
     let mut elapsed = Duration::ZERO;
     while elapsed < duration {
         if control.is_stop_requested() {
@@ -110,7 +117,7 @@ fn run_peer_session_loop(
                     kd.name, kd.address
                 )));
             }
-            if !sleep_interruptible(&control, Duration::from_millis(300)) {
+            if !sleep_interruptible(&control, NO_ADDRESS_POLL) {
                 break;
             }
             continue;
@@ -138,7 +145,7 @@ fn run_peer_session_loop(
                 Some(target_id),
                 &our_hello,
                 &storage,
-                Duration::from_secs(4),
+                CONNECT_TIMEOUT,
                 Some(Arc::clone(&control)),
                 move |event| {
                     let _ = tx_ev.send(WorkerMsg::SyncEvent(event));
@@ -192,11 +199,11 @@ fn run_peer_session_loop(
         }
 
         let retry_delay = if connected_once {
-            Duration::from_secs(2)
+            RETRY_AFTER_SESSION
         } else if awaiting_pairing {
-            Duration::from_secs(5)
+            RETRY_AWAITING_PAIRING
         } else {
-            Duration::from_secs(3)
+            RETRY_AFTER_ERROR
         };
         if !sleep_interruptible(&control, retry_delay) {
             break;
@@ -215,7 +222,10 @@ pub fn spawn_sync_worker(
     offered_folder_ids: Vec<String>,
 ) -> (Receiver<WorkerMsg>, Arc<SyncControl>) {
     let (tx, rx): (Sender<WorkerMsg>, Receiver<WorkerMsg>) = mpsc::channel();
-    let control = SyncControl::new();
+    let control = SyncControl::with_tuning(SyncTuning {
+        rescan_interval: RESCAN_INTERVAL,
+        keepalive_interval: KEEPALIVE_INTERVAL,
+    });
     let worker_control = Arc::clone(&control);
     let sync_root = format!("{}/sync", base_data_dir);
 
@@ -273,7 +283,7 @@ pub fn spawn_sync_worker(
                 status: UiText::ScanningLan,
                 file: UiText::raw("-"),
             });
-            match run_discovery_cycle(&announce, DISCOVERY_BROADCAST_ADDR, Duration::from_secs(2)) {
+            match run_discovery_cycle(&announce, DISCOVERY_BROADCAST_ADDR, DISCOVERY_SCAN_LISTEN) {
                 Ok(res) => {
                     let mut count = 0usize;
                     let mut seen_ids = Vec::new();
@@ -328,7 +338,7 @@ pub fn spawn_sync_worker(
 
         let peer_list: Vec<String> = approved_devices
             .iter()
-            .take(4)
+            .take(MAX_PEER_SESSIONS)
             .map(|kd| format!("{} [{}] @ {}", kd.name, kd.device_id.short(), kd.address))
             .collect();
         let _ = tx.send(WorkerMsg::Log(format!(
@@ -336,8 +346,16 @@ pub fn spawn_sync_worker(
             peer_list.join(", ")
         )));
 
-        // Spawn a concurrent persistent `1+2` session worker for each user-approved device (up to 4)
-        for (idx, kd) in approved_devices.iter().take(4).cloned().enumerate() {
+        if approved_devices.len() > MAX_PEER_SESSIONS {
+            let _ = tx.send(WorkerMsg::Log(format!(
+                "{} devices are linked: only the first {} are synchronized.",
+                approved_devices.len(),
+                MAX_PEER_SESSIONS
+            )));
+        }
+
+        // Spawn a concurrent persistent `1+2` session worker for each user-approved device (up to `MAX_PEER_SESSIONS`)
+        for (idx, kd) in approved_devices.iter().take(MAX_PEER_SESSIONS).cloned().enumerate() {
             let peer_name = kd.name.clone();
             let peer_id_clone = identity.clone();
             let peer_hello_clone = our_hello.clone();
@@ -380,7 +398,7 @@ pub fn spawn_sync_worker(
             if let Ok(mut res) = run_discovery_cycle(
                 &announce,
                 DISCOVERY_BROADCAST_ADDR,
-                Duration::from_millis(1500),
+                DISCOVERY_LISTEN,
             ) {
                 let needs_dynamic_resolution = approved_devices
                     .iter()
@@ -419,7 +437,7 @@ pub fn spawn_sync_worker(
             }
             first_pass = false;
 
-            if !sleep_interruptible(&worker_control, Duration::from_secs(20)) {
+            if !sleep_interruptible(&worker_control, DISCOVERY_INTERVAL) {
                 break;
             }
         }

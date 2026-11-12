@@ -4,7 +4,7 @@
 
 use crate::application::dpad_navigation::{DpadNavigation, PageAction};
 use crate::application::modal_input::{open_add_device_modal, ModalInput};
-use crate::application::{FolderOfferService, ShareService};
+use crate::application::{FolderOfferService, ShareService, SharesController};
 use crate::domain::{ActiveTab, AppState, ModalDialog, PickerMode, BROWSER_ROWS, TAB_ORDER};
 use crate::infrastructure::{
     ConfigRepository, InputFrame, BTN_CIRCLE, BTN_L, BTN_R, BTN_SELECT, BTN_SQUARE, BTN_START,
@@ -141,29 +141,9 @@ impl InputController {
                         }
                     }
                     ActiveTab::Shares => {
-                        // Top-right "+ New Share" button (y in 24..68, x >= 760)
-                        if (24..=68).contains(&ty) && tx >= 760 {
-                            state.modal = ModalDialog::CreateShare { selected_idx: 0 };
-                        } else {
-                            for i in 0..state.shares.len().min(4) {
-                                let ry = 86 + i * 98;
-                                if ty >= ry && ty <= ry + 90 {
-                                    state.selected_share_idx = i;
-                                    if ty >= ry + 42 && ty <= ry + 78 {
-                                        if (580..=695).contains(&tx) {
-                                            state.modal = ModalDialog::ManageDevices {
-                                                share_idx: i,
-                                                selected_dev_idx: 0,
-                                            };
-                                        } else if (696..=810).contains(&tx) {
-                                            delete_share = true;
-                                        } else if (811..=936).contains(&tx) {
-                                            open_picker = true;
-                                        }
-                                    }
-                                    break;
-                                }
-                            }
+                        // The page's elements are declared by the screen itself (`HitMap`).
+                        if let Some(action) = SharesController::tap(state, tx, ty) {
+                            SharesController::apply(state, repo, action);
                         }
                     }
                     ActiveTab::FolderPicker => {
@@ -243,17 +223,7 @@ impl InputController {
             PageAction::ToggleTheme => Self::toggle_theme(state, repo),
             PageAction::CycleLanguage => Self::cycle_language(state, repo),
             PageAction::AddDevice => return open_add_device_modal(state, None),
-            PageAction::NewShare => state.modal = ModalDialog::CreateShare { selected_idx: 0 },
-            PageAction::ManageDevices => {
-                if state.selected_share_idx < state.shares.len() {
-                    state.modal = ModalDialog::ManageDevices {
-                        share_idx: state.selected_share_idx,
-                        selected_dev_idx: 0,
-                    };
-                }
-            }
-            PageAction::DeleteShare => delete_share = true,
-            PageAction::ChangeFolder => open_picker = true,
+            PageAction::Ui(action) => SharesController::apply(state, repo, action),
             PageAction::PickerSelect => ShareService::apply_picker_selection(state, repo, false),
             PageAction::PickerOpen => ShareService::apply_picker_selection(state, repo, true),
             PageAction::PickerUp => ShareService::navigate_picker_up(state, repo),
@@ -276,14 +246,9 @@ impl InputController {
                 }
             }
             ActiveTab::Shares => {
-                if (pressed & BTN_CIRCLE) != 0 {
-                    state.modal = ModalDialog::CreateShare { selected_idx: 0 };
-                }
-                if (pressed & BTN_SQUARE) != 0 {
-                    delete_share = true;
-                }
-                if (pressed & BTN_TRIANGLE) != 0 {
-                    open_picker = true;
+                // Face buttons trigger the element that displays them.
+                if let Some(action) = SharesController::shortcut(state, pressed) {
+                    SharesController::apply(state, repo, action);
                 }
             }
             ActiveTab::FolderPicker => {

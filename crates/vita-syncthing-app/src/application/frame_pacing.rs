@@ -14,14 +14,10 @@
 //! The main loop still wakes up on every VBlank (60 Hz) to poll input, which is cheap compared
 //! to rendering a frame.
 
-/// Display refresh rate of the PS Vita screen (VBlanks per second).
-pub const VBLANK_HZ: u32 = 60;
-/// VBlanks between frames of a continuous animation (30 FPS).
-pub const ANIMATION_INTERVAL: u32 = 2;
-/// Minimum VBlanks between frames triggered by background state changes (10 FPS).
-pub const BACKGROUND_INTERVAL: u32 = 6;
-/// VBlanks between safety refreshes of a static screen (1 FPS).
-pub const IDLE_REFRESH_INTERVAL: u32 = VBLANK_HZ;
+
+pub use crate::domain::defaults::{
+    ANIMATION_INTERVAL, BACKGROUND_INTERVAL, IDLE_REFRESH_INTERVAL, VBLANK_HZ,
+};
 
 /// What happened since the previous VBlank.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]

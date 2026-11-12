@@ -9,8 +9,8 @@
 
 use std::time::Duration;
 
-/// How long standby stays blocked after the last transfer activity.
-pub const TRANSFER_GRACE: Duration = Duration::from_secs(120);
+pub use crate::domain::defaults::{CPU_INTERACTIVE_GRACE, CPU_TRANSFER_GRACE, TRANSFER_GRACE};
+
 
 /// Returns `true` if automatic standby should be blocked right now.
 ///
@@ -28,11 +28,6 @@ pub fn should_block_standby(
     charging || since_last_transfer.is_some_and(|d| d <= TRANSFER_GRACE)
 }
 
-/// How long the CPU stays at full speed after the last transfer activity. Covers the short
-/// pauses between files (index exchange, block requests) so the clock does not oscillate.
-pub const CPU_TRANSFER_GRACE: Duration = Duration::from_secs(10);
-/// How long the CPU stays at medium speed after the last user input (smooth navigation).
-pub const CPU_INTERACTIVE_GRACE: Duration = Duration::from_secs(3);
 
 /// ARM CPU clock level of the PS Vita.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

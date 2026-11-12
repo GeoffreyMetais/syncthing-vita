@@ -1,13 +1,15 @@
 //! Reusable VitaSend-style UI widgets (`draw_card`, `draw_chip`, `draw_action`, `draw_row_tick`,
 //! `draw_progress`, `draw_scrollbar`, `draw_page_title`, `draw_chrome`, `draw_hints`, `draw_toast`).
 
-use crate::domain::{ActiveTab, AppState, NavFocus, UiText};
+use crate::domain::{
+    ActiveTab, AppState, FocusSlot, HitMap, Hotspot, NavFocus, Rect, ShortcutKey, UiAction, UiText,
+};
 use crate::ui::gfx::{
     rgb, with_alpha, Align, Color, FontWeight, Gfx, Icon, PadButton, GFX_H, GFX_W,
 };
 use crate::ui::strings::{self, Strings};
 use crate::ui::theme::{
-    UiTheme, CONTENT_R, CONTENT_W, CONTENT_X, C_GOOD, C_WARN, HINT_Y, SIDEBAR_W,
+    UiTheme, ACTION_TOUCH_H, CONTENT_R, CONTENT_W, CONTENT_X, C_GOOD, C_WARN, HINT_Y, SIDEBAR_W,
 };
 
 pub fn draw_card(gfx: &mut Gfx, th: &UiTheme, x: i32, y: i32, w: i32, h: i32, focused: bool) {
@@ -62,6 +64,42 @@ pub fn draw_action(
         Align::Left,
         label,
     );
+    w
+}
+
+/// Draws an action pill like [`draw_action`] and declares it in the frame's `HitMap`: touching
+/// it, pressing `Cross` while it holds D-pad focus `focus`, or pressing its face button `btn`
+/// (`Cross` excepted) all trigger `action`. The focus ring is drawn when `focused`.
+/// Returns the pill width.
+#[allow(clippy::too_many_arguments)]
+pub fn draw_action_hotspot(
+    gfx: &mut Gfx,
+    th: &UiTheme,
+    hits: &mut HitMap,
+    x: i32,
+    cy: i32,
+    btn: PadButton,
+    label: &str,
+    action: UiAction,
+    focus: FocusSlot,
+    focused: bool,
+) -> i32 {
+    let w = draw_action(gfx, th, x, cy, btn, label);
+    if focused {
+        draw_focus_ring(gfx, th, x, cy, w);
+    }
+    let shortcut = match btn {
+        PadButton::Circle => Some(ShortcutKey::Circle),
+        PadButton::Square => Some(ShortcutKey::Square),
+        PadButton::Triangle => Some(ShortcutKey::Triangle),
+        _ => None,
+    };
+    hits.add(Hotspot {
+        rect: Rect::new(x, cy - ACTION_TOUCH_H / 2, w, ACTION_TOUCH_H),
+        action,
+        focus: Some(focus),
+        shortcut,
+    });
     w
 }
 

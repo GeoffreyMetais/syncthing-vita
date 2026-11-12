@@ -260,31 +260,7 @@ pub struct PickerItem {
     pub is_shared: bool,
 }
 
-/// Templates offered in the `Create New Share` modal dialog.
-pub const NEW_SHARE_TEMPLATES: &[(&str, &str, &str)] = &[
-    ("vita-savedata", "Vita Save Data", "ux0:user/00/savedata"),
-    (
-        "vita-pictures",
-        "Vita Screenshots & Pictures",
-        "ux0:picture",
-    ),
-    ("vita-music", "Vita Music Library", "ux0:music"),
-    (
-        "retroarch-saves",
-        "RetroArch Savefiles",
-        "ux0:data/retroarch/savefiles",
-    ),
-    (
-        "vita-shared",
-        "Vita Shared Folder",
-        "ux0:data/syncthing/shared",
-    ),
-    (
-        "__browse__",
-        "Browse ux0: to pick any custom folder...",
-        "ux0:",
-    ),
-];
+pub use crate::domain::defaults::NEW_SHARE_TEMPLATES;
 
 /// 36-key (9x4) Base32 quick-keypad for `ModalDialog::AddDeviceById`.
 pub const ADD_DEVICE_KEYPAD: &[&str; 36] = &[

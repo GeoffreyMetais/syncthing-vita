@@ -75,6 +75,9 @@ pub const fn add_device_modal_height(keypad_visible: bool) -> i32 {
     }
 }
 
+/// Height of the touch target of an action pill (the pill itself is 34 px tall).
+pub const ACTION_TOUCH_H: i32 = 40;
+
 pub const C_GOOD: Color = rgb(102, 187, 106);
 pub const C_WARN: Color = rgb(255, 193, 77);
 pub const C_BAD: Color = rgb(239, 83, 80);
