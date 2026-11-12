@@ -17,9 +17,14 @@ pub struct SyncStats {
 }
 
 impl SyncStats {
-    /// Builds the `SyncCycleCompleted` event reporting these statistics.
-    pub fn cycle_completed(&self, active_connections: usize) -> SyncEvent {
+    /// Builds the `SyncCycleCompleted` event reporting these statistics for `peer_device_id`.
+    pub fn cycle_completed(
+        &self,
+        peer_device_id: DeviceId,
+        active_connections: usize,
+    ) -> SyncEvent {
         SyncEvent::SyncCycleCompleted {
+            peer_device_id,
             active_connections,
             files_up_to_date: self.files_up_to_date,
             files_downloaded: self.files_downloaded,
@@ -70,7 +75,9 @@ impl<'a> SessionContext<'a> {
 
     /// Emits a `SyncCycleCompleted` event with the current statistics.
     pub fn emit_cycle_completed(&mut self, active_connections: usize) {
-        let event = self.stats.cycle_completed(active_connections);
+        let event = self
+            .stats
+            .cycle_completed(self.peer_device_id, active_connections);
         self.emit(event);
     }
 

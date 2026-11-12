@@ -4,7 +4,7 @@
 //! show the Vita as disconnected and it reconnects on wake-up), but it aborts transfers in
 //! progress. Blocking standby costs battery, so it is only done when it is useful.
 //!
-//! The CPU runs at full speed only while transferring; the UI renders frames on demand
+//! The CPU runs at full speed only during the initial sync phase and transfers; the UI renders frames on demand
 //! (`frame_pacing`), so idle screens and waiting sessions run at a lower clock.
 
 use std::time::Duration;
@@ -41,7 +41,8 @@ pub enum CpuClock {
     Low,
     /// 222 MHz: user interaction (frames rendered on input) and QR code decoding.
     Medium,
-    /// 333 MHz (system default): transfers (TLS decryption, SHA-256 block hashing, disk I/O).
+    /// 333 MHz (system default): initial sync phase (index exchange, local scan and hashing)
+    /// and transfers (TLS decryption, SHA-256 block hashing, disk I/O).
     Full,
 }
 
@@ -56,17 +57,20 @@ impl CpuClock {
     }
 }
 
-/// Chooses the CPU clock: full speed only during transfers, lower otherwise.
+/// Chooses the CPU clock: full speed only during the initial sync phase and transfers,
+/// lower otherwise.
 ///
+/// - `initial_sync`: a peer session is in its initial phase (see `domain::InitialSyncPeers`).
 /// - `since_last_transfer`: time since the last download / upload / applied change, if any.
 /// - `since_last_input`: time since the last button press, touch or keyboard input.
 /// - `camera_active`: the QR scanner is decoding camera frames.
 pub fn cpu_clock(
+    initial_sync: bool,
     since_last_transfer: Option<Duration>,
     since_last_input: Duration,
     camera_active: bool,
 ) -> CpuClock {
-    if since_last_transfer.is_some_and(|d| d <= CPU_TRANSFER_GRACE) {
+    if initial_sync || since_last_transfer.is_some_and(|d| d <= CPU_TRANSFER_GRACE) {
         CpuClock::Full
     } else if camera_active || since_last_input <= CPU_INTERACTIVE_GRACE {
         CpuClock::Medium

@@ -8,6 +8,7 @@ use crate::domain::models::{
     LanguagePreference, ModalDialog, PickerItem, PickerMode, ShareConfigEntry, ThemeMode,
     BROWSER_ROWS,
 };
+use crate::domain::initial_sync::InitialSyncPeers;
 use crate::domain::navigation::{default_col, NavFocus, NavState};
 use crate::domain::ui_text::UiText;
 
@@ -48,6 +49,8 @@ pub struct AppState {
     pub unpaired_lan_peers: Vec<DeviceId>,
     /// True while a persistent `1+2` BEP/1.0 connection is active in the background.
     pub session_connected: bool,
+    /// Peers in their initial sync phase (the CPU runs at full speed meanwhile).
+    pub initial_sync: InitialSyncPeers,
     /// True when automatic background reconnection is permitted (disabled when a peer is awaiting manual pairing).
     pub auto_reconnect_enabled: bool,
     /// Incremented on every data transfer or applied remote change (downloads, uploads, deletions).
@@ -119,6 +122,7 @@ impl AppState {
             devices,
             unpaired_lan_peers: Vec::new(),
             session_connected: false,
+            initial_sync: InitialSyncPeers::default(),
             auto_reconnect_enabled: true,
             transfer_activity: 0,
             config_dirty: false,

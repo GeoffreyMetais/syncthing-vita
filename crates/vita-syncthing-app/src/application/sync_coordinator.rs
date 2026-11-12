@@ -47,6 +47,7 @@ impl SyncCoordinator {
                     } => {
                         state.sync_in_progress = false;
                         state.session_connected = false;
+                        state.initial_sync.clear();
                         state.auto_reconnect_enabled = allow_auto_reconnect;
                         state.progress_pct = 100;
                         state.current_file = UiText::SyncFinished;
@@ -82,6 +83,7 @@ impl SyncCoordinator {
                     &name,
                     &peer_addr.to_string(),
                 );
+                state.initial_sync.begin(peer_device_id);
                 state.peer_label =
                     UiText::Raw(format!("{} @ {} ({})", name, peer_addr, client_version));
                 state.status_line = UiText::ExchangingIndex;
@@ -193,6 +195,7 @@ impl SyncCoordinator {
                 );
             }
             SyncEvent::SyncCycleCompleted {
+                peer_device_id,
                 active_connections,
                 files_up_to_date,
                 files_downloaded,
@@ -200,6 +203,7 @@ impl SyncCoordinator {
                 blocks_uploaded,
                 bytes_uploaded,
             } => {
+                state.initial_sync.end(peer_device_id);
                 state.sync_in_progress = false;
                 state.session_connected = true;
                 state.auto_reconnect_enabled = true;
@@ -263,6 +267,7 @@ impl SyncCoordinator {
                 peer_device_id,
                 reason,
             } => {
+                state.initial_sync.end(peer_device_id);
                 ShareService::log_event(
                     state,
                     repo,

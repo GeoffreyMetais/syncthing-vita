@@ -187,6 +187,7 @@ fn main() {
                     }
                     state.config_dirty = false;
                     state.session_connected = false;
+                    state.initial_sync.clear();
                     state.prepare_manual_sync();
                     ShareService::log_event(
                         &mut state,
@@ -229,6 +230,7 @@ fn main() {
             worker_rx = None;
             worker_ctl = None;
             state.session_connected = false;
+            state.initial_sync.clear();
             if state.has_configured_peers() {
                 state.sync_in_progress = true;
                 let offered = std::mem::take(&mut state.pending_folder_offers);
@@ -279,8 +281,9 @@ fn main() {
             seen_transfer_activity = state.transfer_activity;
             last_transfer_at = Some(Instant::now());
         }
-        // Full CPU speed only while transferring (see `power_policy::cpu_clock`).
+        // Full CPU speed only during the initial sync phase and transfers (see `power_policy::cpu_clock`).
         let cpu_target = cpu_clock(
+            state.initial_sync.is_active(),
             last_transfer_at.map(|t| t.elapsed()),
             last_activity.elapsed(),
             state.is_scanning_qr(),
