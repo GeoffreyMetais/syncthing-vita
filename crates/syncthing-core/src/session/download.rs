@@ -30,7 +30,11 @@ pub fn download_folder(
     files: &[BepFileInfo],
     count_up_to_date: bool,
 ) -> io::Result<bool> {
-    if ctx.storage.is_folder_paused(folder_id) {
+    if ctx.storage.is_folder_paused(folder_id)
+        || !ctx
+            .storage
+            .is_folder_shared_with(folder_id, &ctx.peer_device_id)
+    {
         return Ok(false);
     }
 

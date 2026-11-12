@@ -6,6 +6,7 @@ use std::io::Write;
 
 use syncthing_core::DeviceId;
 
+use super::config_fields::{escape_field, unescape_field};
 use crate::domain::{
     IgnoredFolder, KnownDevice, LanguagePreference, ShareConfigEntry, ThemeMode,
     NEW_SHARE_TEMPLATES,
@@ -64,8 +65,8 @@ impl ConfigRepository {
                     if let Some(device_id) = DeviceId::from_hex(parts[0]) {
                         out.push(KnownDevice {
                             device_id,
-                            name: parts[1].to_owned(),
-                            address: parts[2].to_owned(),
+                            name: unescape_field(parts[1]),
+                            address: unescape_field(parts[2]),
                         });
                     }
                 }
@@ -83,8 +84,8 @@ impl ConfigRepository {
             out.push_str(&format!(
                 "{}|{}|{}\n",
                 d.device_id.to_hex(),
-                d.name,
-                d.address
+                escape_field(&d.name),
+                escape_field(&d.address)
             ));
         }
         write_replacing(&cfg_path, &out);
@@ -103,13 +104,13 @@ impl ConfigRepository {
                         parts[4]
                             .split(',')
                             .map(|s| s.trim().to_owned())
-                            .filter(|s| !s.is_empty())
+                            .filter(|s| DeviceId::from_hex(s).is_some())
                             .collect()
                     } else {
                         Vec::new()
                     };
-                    let folder_id = parts[0].to_owned();
-                    let mut target_path = parts[2].to_owned();
+                    let folder_id = unescape_field(parts[0]);
+                    let mut target_path = unescape_field(parts[2]);
                     let default_sync_path = format!("{}/sync/{}", self.base_data_dir, folder_id);
                     if target_path == default_sync_path {
                         if let Some(&(_, _, tpl_path)) = NEW_SHARE_TEMPLATES
@@ -122,7 +123,7 @@ impl ConfigRepository {
                     }
                     entries.push(ShareConfigEntry {
                         folder_id,
-                        label: parts[1].to_owned(),
+                        label: unescape_field(parts[1]),
                         target_path,
                         enabled: parts[3] != "0",
                         shared_devices,
@@ -145,9 +146,9 @@ impl ConfigRepository {
             let devs = s.shared_devices.join(",");
             out.push_str(&format!(
                 "{}|{}|{}|{}|{}\n",
-                s.folder_id,
-                s.label,
-                s.target_path,
+                escape_field(&s.folder_id),
+                escape_field(&s.label),
+                escape_field(&s.target_path),
                 if s.enabled { "1" } else { "0" },
                 devs
             ));
@@ -166,7 +167,7 @@ impl ConfigRepository {
             .filter_map(|line| {
                 let (folder_id, dev_hex) = line.split_once('|')?;
                 Some(IgnoredFolder {
-                    folder_id: folder_id.to_owned(),
+                    folder_id: unescape_field(folder_id),
                     device_id: DeviceId::from_hex(dev_hex.trim())?,
                 })
             })
@@ -179,7 +180,7 @@ impl ConfigRepository {
         let cfg_path = format!("{}/ignored_folders.cfg", self.base_data_dir);
         let out: String = ignored
             .iter()
-            .map(|f| format!("{}|{}\n", f.folder_id, f.device_id.to_hex()))
+            .map(|f| format!("{}|{}\n", escape_field(&f.folder_id), f.device_id.to_hex()))
             .collect();
         write_replacing(&cfg_path, &out);
     }

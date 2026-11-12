@@ -8,9 +8,10 @@ use crate::bep::{BepFileInfo, BepFolder, BepIndex, BepMessageType};
 /// Folder state of one peer session.
 #[derive(Debug, Default)]
 pub struct FolderSyncState {
-    /// Folders shared with the peer (announced by it or configured locally for it).
+    /// Folders shared with the peer: only folders the local configuration links to this peer
+    /// (announced by it or offered by us), never a folder the peer merely announces.
     pub shared_folders: Vec<BepFolder>,
-    /// Folder IDs the peer announced in its `ClusterConfig` (only those receive our `Index`).
+    /// Shared folder IDs the peer announced in its `ClusterConfig` (only those receive our `Index`).
     pub peer_folder_ids: Vec<String>,
     /// Accumulated remote file list per folder (from `Index` + `IndexUpdate`).
     pub remote_files_by_folder: HashMap<String, Vec<BepFileInfo>>,
@@ -44,6 +45,12 @@ impl FolderSyncState {
             .get(folder)
             .map(|v| v.as_slice())
             .unwrap_or(&[])
+    }
+
+    /// Returns `true` if `folder` is shared with the peer in this session (authorized by the
+    /// local configuration). Messages about any other folder are ignored.
+    pub fn is_shared_folder(&self, folder: &str) -> bool {
+        self.shared_folders.iter().any(|f| f.id == folder)
     }
 
     /// Returns `true` if the peer announced `folder` in its `ClusterConfig`.

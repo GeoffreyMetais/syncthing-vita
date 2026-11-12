@@ -66,8 +66,8 @@ pub fn publish_initial_indexes(
     Ok(())
 }
 
-/// Applies a `ClusterConfig` received after the initial exchange: newly announced folders are
-/// added and immediately receive our local `Index`.
+/// Applies a `ClusterConfig` received after the initial exchange: newly announced folders that
+/// are shared with this peer are added and immediately receive our local `Index`.
 pub fn handle_runtime_cluster_config(
     stream: &mut BepTlsStream,
     ctx: &mut SessionContext<'_>,
@@ -81,6 +81,12 @@ pub fn handle_runtime_cluster_config(
         return;
     }
     for f in &cfg.folders {
+        if !ctx
+            .storage
+            .is_folder_shared_with(&f.id, &ctx.peer_device_id)
+        {
+            continue;
+        }
         if !folders.shared_folders.iter().any(|sf| sf.id == f.id) {
             folders.shared_folders.push(f.clone());
         }
@@ -121,6 +127,9 @@ pub fn handle_runtime_index(
     let Ok(idx) = BepIndex::decode(payload) else {
         return Ok(false);
     };
+    if !folders.is_shared_folder(&idx.folder) {
+        return Ok(false);
+    }
     folders.merge_remote_index(&idx.folder, &idx.files);
     if ctx.storage.is_folder_paused(&idx.folder) {
         return Ok(false);

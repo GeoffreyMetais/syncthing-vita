@@ -224,22 +224,22 @@ pub fn spawn_sync_worker(
         for s in &shares_snapshot {
             storage.set_folder_path(&s.folder_id, &s.target_path);
             storage.set_folder_paused(&s.folder_id, !s.enabled);
+            // Authorization: a folder is only synchronized with the devices linked to its share.
+            let device_ids: Vec<DeviceId> = s
+                .shared_devices
+                .iter()
+                .filter_map(|hex| DeviceId::from_hex(hex))
+                .collect();
+            storage.set_folder_devices(&s.folder_id, device_ids.clone());
             if s.enabled
-                && !s.shared_devices.is_empty()
+                && !device_ids.is_empty()
                 && offered_folder_ids.iter().any(|fid| fid == &s.folder_id)
             {
-                let device_ids: Vec<DeviceId> = s
-                    .shared_devices
-                    .iter()
-                    .filter_map(|hex| DeviceId::from_hex(hex))
-                    .collect();
-                if !device_ids.is_empty() {
-                    storage.add_local_folder(BepFolder {
-                        id: s.folder_id.clone(),
-                        label: s.label.clone(),
-                        device_ids,
-                    });
-                }
+                storage.add_local_folder(BepFolder {
+                    id: s.folder_id.clone(),
+                    label: s.label.clone(),
+                    device_ids,
+                });
             }
         }
 

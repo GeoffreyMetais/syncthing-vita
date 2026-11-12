@@ -1,6 +1,7 @@
 //! Infrastructure Layer: Persistence, OS filesystem, PS Vita hardware drivers (`SceSysmodule`,
 //! `SceNet`, `SceDisplay`, `SceCtrl`, `SceTouch`, `SceCamera`, `SceLibKernel`), and background BEP worker thread.
 
+pub mod config_fields;
 pub mod config_repo;
 pub mod framebuffer;
 pub mod identity_store;

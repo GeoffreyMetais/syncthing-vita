@@ -62,6 +62,7 @@ syncthing-vita
             ├── infrastructure/       # Layer 3: Persistence, OS Filesystem, PS Vita Hardware & BEP Worker Thread
             │   ├── mod.rs
             │   ├── config_repo.rs    # ConfigRepository (devices.cfg, shares.cfg, ignored_folders.cfg, theme.cfg, language.cfg, syncthing.log, ux0: directory listing)
+            │   ├── config_fields.rs  # escape_field / unescape_field (peer-supplied text can never forge `.cfg` fields or lines)
             │   ├── identity_store.rs # IdentityStore (sceKernelGetRandomNumber, device_seed.bin, cert.der)
             │   ├── vita_system.rs    # init_vita_network (SceSysmodule + SceSysmem + SceNet + SceNetCtl) & detect_system_language (SceAppUtil)
             │   ├── ui_script.rs      # Opt-in `ui-script` feature: scripted input replay + frame dumps for Vita3K
@@ -162,6 +163,7 @@ Dependencies strictly point **inward**. Inner layers never import or depend on o
    - **Responsibility**: Hardware drivers, OS filesystem persistence, background threads, and Vita system modules.
    - **Key Modules**:
      - `config_repo.rs`: Disk persistence (`devices.cfg`, `shares.cfg`, `ignored_folders.cfg`, `theme.cfg`, `language.cfg`, `syncthing.log`) and `ux0:` browsing.
+     - `config_fields.rs`: Percent-escaping of every text field of the `.cfg` files (see §5).
      - `identity_store.rs`: Device seed PRNG (`sceKernelGetRandomNumber`) and X.509 certificate persistence.
      - `framebuffer.rs`: PS Vita hardware framebuffer management (`SceDisplay`, `SceSysmem`).
      - `input.rs`: Controller & touchscreen hardware drivers (`SceCtrl`, `SceTouch`).
@@ -234,6 +236,7 @@ These size and SRP rules apply to **both crates** (`vita-syncthing-app` and `syn
 - **`bep/`**: one file per BEP message family (`header`, `framing`, `lz4`, `hello`, `cluster_config`, `index`, `request`, `close`). Encode/decode only — never read files or sockets beyond the generic `Read`/`Write` in `framing.rs` / `hello.rs`.
 - **`device_id/`**: `DeviceId` value object; parsing of user input (`parse.rs`) and Base32/Luhn primitives (`base32.rs`) are separate.
 - **`discovery/`**: `Announce` codec, address ordering, local IP detection, UDP broadcast cycle, LAN TCP-scan fallback — one file each.
+- **Folder authorization**: `FsSyncStorage::is_folder_shared_with(folder_id, peer)` is the single gate of every session. A folder is only announced, indexed, downloaded or served for the devices declared with `set_folder_devices`; a folder a peer merely announces in its `ClusterConfig` is reported through `SyncEvent::ClusterConfigReceived` (so the app can ask for consent) but never synchronized. Any new message handler in `session/` must check `FolderSyncState::is_shared_folder` or `is_folder_shared_with` before touching a folder.
 - **`storage/`**: `FsSyncStorage` split by concern — registry & paths (`mod.rs`), block hashing / delta / block reads (`blocks.rs`), crash-safe download temp files (`download.rs`), `sceIo` path quirks (`vita_fs.rs`). Extend `FsSyncStorage` with a new `impl` block in the file owning that concern instead of growing `mod.rs`.
 - **`local_db/`**: in-memory model (`mod.rs`), on-disk text format (`codec.rs`), process-wide cache + atomic save (`cache.rs`). Version arithmetic lives in `version_vector.rs`.
 - **`folder_sync/`**: disk scan → local `Index` (`scan.rs`) vs. pull planning, conflicts and deletions (`pull.rs`).
@@ -257,7 +260,7 @@ These size and SRP rules apply to **both crates** (`vita-syncthing-app` and `syn
 
 #### Tests
 
-- **No `#[cfg(test)] mod tests` inside `src/`.** All `syncthing-core` tests live in `crates/syncthing-core/tests/`, one file per module (`bep_codec.rs`, `device_id.rs`, `discovery.rs`, `identity.rs`, `storage.rs`, `local_db.rs`, `folder_sync.rs`, `version_vector.rs`), with shared helpers in `tests/common/mod.rs` (e.g. `fresh_temp_dir`).
+- **No `#[cfg(test)] mod tests` inside `src/`.** All `syncthing-core` tests live in `crates/syncthing-core/tests/`, one file per module (`bep_codec.rs`, `device_id.rs`, `discovery.rs`, `identity.rs`, `storage.rs`, `local_db.rs`, `folder_sync.rs`, `version_vector.rs`, `session.rs`), with shared helpers in `tests/common/mod.rs` (e.g. `fresh_temp_dir`).
 - Tests exercise the public API. If something important can only be tested through a private item, it is usually a sign the item deserves its own module with a small public surface (as `storage::vita_fs::with_device_root_slash` or `FolderDb::{serialize, parse}`).
 - Filesystem tests use a unique `common::fresh_temp_dir("<name>")` per test so test binaries can run in parallel.
 
@@ -295,13 +298,16 @@ Emulators like Vita3K are permissive HLE environments that run with host PC RAM 
 5. **Unique Per-Installation Cryptographic Identity (`main.rs`)**:
    - Never hardcode the contents of `ux0:data/syncthing/device_seed.bin`.
    - On a clean installation (when `device_seed.bin` does not exist), generate 32 random bytes via `sceKernelGetRandomNumber` (`SceLibKernel_stub`) so every PS Vita gets a unique Syncthing `DeviceId`.
+   - Consent is enforced by `syncthing-core`, not only by the UI: `spawn_sync_worker` declares each share's linked devices with `FsSyncStorage::set_folder_devices`, and sessions ignore every other folder (see §3.3 **Folder authorization**).
    - Remote folders received via `ClusterConfig` never become shares on their own: `FolderOfferService::receive` queues them as `FolderOffer`s and the `FolderOffer` modal asks for consent. An accepted folder defaults to `enabled: false` (**Paused**) until the user selects a target folder and enables it in the **Shares** tab; a declined one is saved in `ignored_folders.cfg`.
 
 ---
 
 ## 5. Runtime Configuration Files on PS Vita (`ux0:data/syncthing/`)
 
-All persistent application state lives in `ux0:data/syncthing/` (or `/tmp/syncthing-vita` on host builds):
+All persistent application state lives in `ux0:data/syncthing/` (or `/tmp/syncthing-vita` on host builds).
+
+Text fields of the `.cfg` files (device names, addresses, folder IDs, labels, paths) are written with `config_fields::escape_field` (`%` -> `%25`, `|` -> `%7C`, line breaks -> `%0A` / `%0D`) and read with `unescape_field`: names, folder IDs and labels come from remote peers and must never be written verbatim. Always go through these helpers when adding a field or a file.
 
 | File | Purpose | Format |
 | :--- | :--- | :--- |
@@ -332,10 +338,11 @@ cargo test --workspace
 - `local_db.rs`: persistent folder database text format roundtrip
 - `folder_sync.rs`: version convergence across peers, local deletions become tombstones
 - `version_vector.rs`: version vector ordering / merge / bump
+- `session.rs`: folder authorization (per-device sharing gate, block requests refused for unlinked peers, unconfigured or paused folders)
 
 `vita-syncthing-app` tests live in `crates/vita-syncthing-app/tests/` (`cargo test -p vita-syncthing-app`):
 - `share_creation.rs`: a new share without a linked device is discarded, a linked one is kept, `Files` tab folder selection, already-shared folders are not selectable
-- `folder_offers.rs`: offered folders need consent, accept / decline / later, declined offers persisted, deleted shares are declined and do not come back, `Settings` · `Clear Declined` (D-pad and touch)
+- `folder_offers.rs`: offered folders need consent, accept / decline / later, a crafted folder label cannot inject a share, declined offers persisted, deleted shares are declined and do not come back, `Settings` · `Clear Declined` (D-pad and touch)
 - `share_service.rs`: share deletion, share creation, device linking, paused accepted folders, `ConfigRepository` roundtrip, manual LAN pairing
 - `input_controller.rs`: global routing — an active screensaver swallows input and wakes on a button press or touch only
 - `dialogs.rs`: `START` -> `ConfirmQuit` -> `Cross` quits, `ConfirmQuit` touch targets, `ConfirmDeleteShare` (`Square` on Shares, cancel / confirm)
@@ -347,6 +354,7 @@ cargo test --workspace
 - `power_policy.rs`: standby blocking while syncing (charging / battery / transfer grace period), CPU clock level (full speed only during the initial sync phase and transfers), initial sync phase tracked per peer from `SyncEvent`s
 - `ui_text.rs`: every `UiText` message renders in all 5 languages with its placeholders filled, translated Device ID errors
 - `frame_pacing.rs`: dynamic frame rate (input -> next VBlank, animations 30 FPS, background updates 10 FPS, static 1 FPS), toast expiry and screensaver speed independent of the frame rate
+- `config_fields.rs`: `.cfg` field escaping roundtrip, legacy `%` text kept, hostile names / labels through `devices.cfg` / `shares.cfg` / `ignored_folders.cfg`, invalid linked-device entries dropped
 - `language_settings.rs`: language preference codec / cycle, `language.cfg` persistence (defaults to the system language), `Settings` language card (D-pad and touch)
 
 ### Cross-Check for PS Vita (`armv7-sony-vita-newlibeabihf`)

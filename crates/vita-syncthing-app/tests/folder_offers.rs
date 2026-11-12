@@ -188,3 +188,23 @@ fn test_settings_clear_declined_by_touch() {
 
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn test_crafted_folder_label_cannot_inject_a_share() {
+    let (dir, repo, mut state) = setup("offer-label-injection");
+    FolderOfferService::receive(&mut state, &repo, PEER, "docs", "Docs");
+    FolderOfferService::accept(&mut state, &repo, 0);
+
+    // The paired peer later renames the folder with a label forging a second `shares.cfg` line.
+    let crafted = format!("Docs|x|0|\nevil|Evil|ux0:tai|1|{}", PEER.to_hex());
+    FolderOfferService::receive(&mut state, &repo, PEER, "docs", &crafted);
+
+    let shares = repo.load_shares();
+    assert_eq!(shares.len(), 1);
+    assert_eq!(shares[0].folder_id, "docs");
+    assert_eq!(shares[0].label, crafted);
+    assert!(!shares[0].enabled);
+    assert_eq!(shares[0].shared_devices, vec![PEER.to_hex()]);
+
+    let _ = std::fs::remove_dir_all(&dir);
+}

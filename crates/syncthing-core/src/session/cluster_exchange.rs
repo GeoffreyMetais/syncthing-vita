@@ -77,7 +77,9 @@ pub fn exchange_cluster_config(
             }
             Ok(Some((BepMessageType::Index | BepMessageType::IndexUpdate, payload))) => {
                 let idx = BepIndex::decode(&payload)?;
-                folders.merge_remote_index(&idx.folder, &idx.files);
+                if folders.is_shared_folder(&idx.folder) {
+                    folders.merge_remote_index(&idx.folder, &idx.files);
+                }
             }
             Ok(Some((BepMessageType::Request, payload))) => {
                 serve_block_request(stream, ctx, &payload)?;
@@ -101,15 +103,23 @@ pub fn exchange_cluster_config(
     })
 }
 
-/// Records the peer's folders, then adds local shares explicitly shared with this peer.
+/// Records the peer's folders that the local configuration shares with it, then adds local
+/// shares explicitly shared with this peer. Every announced folder is still reported through
+/// `ClusterConfigReceived` so the application can ask the user for consent.
 fn accept_peer_cluster_config(
     ctx: &mut SessionContext<'_>,
     folders: &mut FolderSyncState,
     cfg: BepClusterConfig,
 ) {
-    folders.peer_folder_ids = cfg.folders.iter().map(|f| f.id.clone()).collect();
-    folders.shared_folders = cfg.folders.clone();
     let peer_device_id = ctx.peer_device_id;
+    let accepted: Vec<BepFolder> = cfg
+        .folders
+        .iter()
+        .filter(|f| ctx.storage.is_folder_shared_with(&f.id, &peer_device_id))
+        .cloned()
+        .collect();
+    folders.peer_folder_ids = accepted.iter().map(|f| f.id.clone()).collect();
+    folders.shared_folders = accepted;
     ctx.emit(SyncEvent::ClusterConfigReceived {
         peer_device_id,
         folders: cfg.folders,
