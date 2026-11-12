@@ -24,6 +24,18 @@ impl FsSyncStorage {
         own_id: DeviceId,
         remote: &[BepFileInfo],
     ) -> io::Result<PullPlan> {
+        self.plan_pull_with_progress(folder_id, own_id, remote, &mut || {})
+    }
+
+    /// Same as [`Self::plan_pull`]; `on_progress` is called regularly while scanning and
+    /// planning so a session can keep its connection alive.
+    pub fn plan_pull_with_progress(
+        &self,
+        folder_id: &str,
+        own_id: DeviceId,
+        remote: &[BepFileInfo],
+        on_progress: &mut dyn FnMut(),
+    ) -> io::Result<PullPlan> {
         let short_id = short_device_id(own_id);
         // Parents before children for creations; children before parents for deletions.
         let mut ordered: Vec<&BepFileInfo> = remote
@@ -38,9 +50,10 @@ impl FsSyncStorage {
         });
 
         with_folder_db(&self.db_path(folder_id), folder_id, own_id, |db| {
-            self.scan_into_db(folder_id, short_id, db)?;
+            self.scan_into_db(folder_id, short_id, db, on_progress)?;
             let mut plan = PullPlan::default();
             for rf in ordered {
+                on_progress();
                 self.plan_entry(folder_id, short_id, db, rf, &mut plan);
             }
             Ok(plan)

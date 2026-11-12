@@ -5,12 +5,11 @@ use std::io;
 use std::time::{Duration, Instant};
 
 use super::context::SessionContext;
-use super::dispatch::{dispatch_primary_message, with_context, Dispatched};
+use super::dispatch::{dispatch_primary_message, next_primary_message, with_context, Dispatched};
 use super::download::download_folder;
 use super::folders::FolderSyncState;
 use super::index_exchange::{build_initial_local_indexes, publish_initial_indexes};
 use super::secondary::{poll_all_secondaries, wait_for_promotion, SecondaryBepConn};
-use crate::tls::polling::try_read_bep_message;
 use crate::tls::BepTlsStream;
 
 /// Drain window when a persistent session follows (it keeps serving requests afterwards).
@@ -39,7 +38,7 @@ pub fn run_initial_sync(
 ) -> io::Result<InitialSync> {
     initial_download(stream, ctx, folders)?;
 
-    build_initial_local_indexes(ctx, folders);
+    build_initial_local_indexes(stream, ctx, folders);
     wait_for_promotion(secondaries, secondaries_opened_at, ctx);
     publish_initial_indexes(stream, ctx, folders)?;
 
@@ -50,7 +49,7 @@ pub fn run_initial_sync(
     };
     let drain_start = Instant::now();
     while drain_start.elapsed() < drain_window {
-        match try_read_bep_message(stream, DRAIN_POLL) {
+        match next_primary_message(stream, ctx, DRAIN_POLL) {
             Ok(None) => {}
             Ok(Some((msg_type, payload))) => {
                 match dispatch_primary_message(stream, ctx, folders, msg_type, &payload, true)? {
@@ -73,7 +72,7 @@ fn initial_download(
     ctx: &mut SessionContext<'_>,
     folders: &FolderSyncState,
 ) -> io::Result<()> {
-    for (folder_id, files) in &folders.remote_files_by_folder {
+    for (folder_id, files) in folders.remote_folders() {
         if ctx.storage.is_folder_paused(folder_id) {
             continue;
         }

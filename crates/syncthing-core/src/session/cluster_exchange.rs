@@ -8,6 +8,7 @@ use std::time::{Duration, Instant};
 use super::context::SessionContext;
 use super::events::SyncEvent;
 use super::folders::FolderSyncState;
+use super::index_exchange::scan_local_index;
 use super::upload::serve_block_request;
 use crate::bep::{
     write_bep_message, BepClose, BepClusterConfig, BepFolder, BepHello, BepIndex, BepMessageType,
@@ -68,11 +69,9 @@ pub fn exchange_cluster_config(
                     });
                 }
                 accept_peer_cluster_config(ctx, folders, cfg);
-                let reply = BepClusterConfig::encode_for_peers(
-                    &initial_folder_states(ctx, &folders.shared_folders),
-                    ctx.own_id(),
-                    ctx.peer_device_id,
-                );
+                let states = initial_folder_states(stream, ctx, folders);
+                let reply =
+                    BepClusterConfig::encode_for_peers(&states, ctx.own_id(), ctx.peer_device_id);
                 write_bep_message(stream, BepMessageType::ClusterConfig, &reply)?;
             }
             Ok(Some((BepMessageType::Index | BepMessageType::IndexUpdate, payload))) => {
@@ -139,10 +138,12 @@ fn accept_peer_cluster_config(
 /// Local index state of each shared folder, so our single `ClusterConfig` advertises accurate
 /// `index_id` and `max_sequence` values.
 fn initial_folder_states(
-    ctx: &SessionContext<'_>,
-    shared_folders: &[BepFolder],
+    stream: &mut BepTlsStream,
+    ctx: &mut SessionContext<'_>,
+    folders: &FolderSyncState,
 ) -> Vec<(BepFolder, FolderIndexState)> {
-    shared_folders
+    folders
+        .shared_folders
         .iter()
         .map(|f| {
             let state = if ctx.storage.is_folder_paused(&f.id) {
@@ -152,8 +153,7 @@ fn initial_folder_states(
                     paused: true,
                 }
             } else {
-                ctx.storage
-                    .build_local_index(&f.id, ctx.own_id(), &[])
+                scan_local_index(stream, ctx, folders, &f.id)
                     .map(|(_, st)| st)
                     .unwrap_or_default()
             };

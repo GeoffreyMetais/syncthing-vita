@@ -255,7 +255,12 @@ These size and SRP rules apply to **both crates** (`vita-syncthing-app` and `syn
   - `dispatch.rs` — routing of primary-connection messages in an established session
   - `index_exchange.rs` — local index publication and runtime `ClusterConfig` / `Index` handling
   - `download.rs` / `upload.rs` — block transfers (pull / serve)
-  - `folders.rs` — per-session folder state (pure); `context.rs` — `SessionContext` (identity, storage, stats, event sink); `control.rs`, `events.rs`, `outcome.rs` — public API types
+  - `folders.rs` — per-session folder state (pure); `context.rs` — `SessionContext` (identity, storage, stats, event sink, deferred messages); `control.rs`, `events.rs`, `outcome.rs` — public API types
+  - `keepalive.rs` — `Ping` when the keepalive interval elapsed; `tuning.rs` — `SyncTuning` (rescan / keepalive intervals chosen by the app, passed through `SyncControl::with_tuning`)
+- **Session invariants** (covered by `tests/session.rs` with the fake peer):
+  - *No message is dropped during a download*: while waiting for a block `Response`, `Index` / `IndexUpdate` / `ClusterConfig` / `Close` are deferred (`SessionContext::defer_message`) and the session loops read through `dispatch::next_primary_message`, never `try_read_bep_message` directly.
+  - *Index publication is incremental*: always publish through `index_exchange::publish_index` (`FolderSyncState::take_unpublished`): one full `Index` per folder and session, then `IndexUpdate`s holding only entries with a newer sequence, in batches of `INDEX_BATCH_FILES`.
+  - *Long local work keeps the connection alive*: scan through `index_exchange::scan_local_index` / `plan_pull_with_progress`, whose progress callback sends keepalive `Ping`s. After a pull, publish from `local_index_snapshot` (no second scan).
 
 #### Rules for new code
 
@@ -267,6 +272,7 @@ These size and SRP rules apply to **both crates** (`vita-syncthing-app` and `syn
 
 - **No `#[cfg(test)] mod tests` inside `src/`.** All `syncthing-core` tests live in `crates/syncthing-core/tests/`, one file per module (`bep_codec.rs`, `device_id.rs`, `discovery.rs`, `identity.rs`, `storage.rs`, `local_db.rs`, `folder_sync.rs`, `version_vector.rs`, `session.rs`), with shared helpers in `tests/common/mod.rs` (e.g. `fresh_temp_dir`).
 - Tests exercise the public API. If something important can only be tested through a private item, it is usually a sign the item deserves its own module with a small public surface (as `storage::vita_fs::with_device_root_slash` or `FolderDb::{serialize, parse}`).
+- Session tests run against `tests/common/fake_peer.rs`: a scriptable local TLS 1.3 + BEP/1.0 server (`FakePeer::spawn(seed, |conn| ...)`) that announces folders, sends indexes, serves blocks and records every message received. Use it for any change in `session/`.
 - Filesystem tests use a unique `common::fresh_temp_dir("<name>")` per test so test binaries can run in parallel.
 
 ---
@@ -344,7 +350,7 @@ cargo test --workspace
 - `folder_sync.rs`: version convergence across peers, local deletions become tombstones
 - `version_vector.rs`: version vector ordering / merge / bump
 - `bep_codec.rs` / `storage.rs` / `folder_sync.rs` also cover the hardening rules: bounded LZ4 output, bounded block sizes, interrupted download commit recovery, unreadable entries never recorded as deleted
-- `session.rs`: folder authorization (per-device sharing gate, block requests refused for unlinked peers, unconfigured or paused folders)
+- `session.rs`: folder authorization (per-device sharing gate, block requests refused for unlinked peers, unconfigured or paused folders) and end-to-end sessions against the fake peer (only shared folders are announced / pulled, an `IndexUpdate` received during a download is applied, a local change is published as an incremental `IndexUpdate`, batched publication, scan progress for keepalives)
 
 `vita-syncthing-app` tests live in `crates/vita-syncthing-app/tests/` (`cargo test -p vita-syncthing-app`):
 - `share_creation.rs`: a new share without a linked device is discarded, a linked one is kept, `Files` tab folder selection, already-shared folders are not selectable

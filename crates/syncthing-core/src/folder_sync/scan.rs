@@ -24,6 +24,7 @@ impl FsSyncStorage {
         folder_id: &str,
         short_id: u64,
         db: &mut FolderDb,
+        on_progress: &mut dyn FnMut(),
     ) -> io::Result<()> {
         let root = self.folder_root(folder_id);
         ensure_dir_exists(&root)?;
@@ -41,6 +42,7 @@ impl FsSyncStorage {
         // untouched in the database instead of being recorded as deleted.
         let mut unreadable: Vec<String> = Vec::new();
         for entry in listing.entries {
+            on_progress();
             let name = entry.rel;
             if entry.kind == DiskEntryKind::Unreadable {
                 unreadable.push(name);
@@ -81,7 +83,7 @@ impl FsSyncStorage {
                 continue;
             }
 
-            let Ok(blocks) = hash_file_blocks(&root.join(&name)) else {
+            let Ok(blocks) = hash_file_blocks(&root.join(&name), on_progress) else {
                 continue;
             };
             if let Some(e) = &prev {
@@ -179,11 +181,37 @@ impl FsSyncStorage {
         own_id: DeviceId,
         remote_files: &[BepFileInfo],
     ) -> io::Result<(BepIndex, FolderIndexState)> {
+        self.build_local_index_with_progress(folder_id, own_id, remote_files, &mut || {})
+    }
+
+    /// Same as [`Self::build_local_index`]; `on_progress` is called regularly during the scan
+    /// (per entry and per hashed block) so a session can keep its connection alive.
+    pub fn build_local_index_with_progress(
+        &self,
+        folder_id: &str,
+        own_id: DeviceId,
+        remote_files: &[BepFileInfo],
+        on_progress: &mut dyn FnMut(),
+    ) -> io::Result<(BepIndex, FolderIndexState)> {
         let short_id = short_device_id(own_id);
         with_folder_db(&self.db_path(folder_id), folder_id, own_id, |db| {
-            self.scan_into_db(folder_id, short_id, db)?;
+            self.scan_into_db(folder_id, short_id, db, on_progress)?;
             Self::merge_equal_remote_versions(db, remote_files);
             Ok(Self::index_from_db(folder_id, db))
+        })
+    }
+
+    /// Returns the Vita's `Index` from the database as it is, without scanning the disk
+    /// (for use right after an operation that already scanned the folder).
+    pub fn local_index_snapshot(
+        &self,
+        folder_id: &str,
+        own_id: DeviceId,
+        remote_files: &[BepFileInfo],
+    ) -> (BepIndex, FolderIndexState) {
+        with_folder_db(&self.db_path(folder_id), folder_id, own_id, |db| {
+            Self::merge_equal_remote_versions(db, remote_files);
+            Self::index_from_db(folder_id, db)
         })
     }
 }

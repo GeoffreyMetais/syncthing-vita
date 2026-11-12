@@ -102,7 +102,11 @@ impl FsSyncStorage {
 }
 
 /// Splits a file into 128 KiB blocks and returns their offsets, sizes and SHA-256 hashes.
-pub(crate) fn hash_file_blocks(path: &Path) -> io::Result<Vec<BepBlockInfo>> {
+/// `on_progress` is called after each block (hashing a large file takes a while).
+pub(crate) fn hash_file_blocks(
+    path: &Path,
+    on_progress: &mut dyn FnMut(),
+) -> io::Result<Vec<BepBlockInfo>> {
     let mut file = File::open(path)?;
     let mut blocks = Vec::new();
     let mut buf = vec![0u8; BEP_BLOCK_SIZE];
@@ -138,6 +142,7 @@ pub(crate) fn hash_file_blocks(path: &Path) -> io::Result<Vec<BepBlockInfo>> {
             hash,
         });
         offset += read_total as i64;
+        on_progress();
     }
 
     Ok(blocks)

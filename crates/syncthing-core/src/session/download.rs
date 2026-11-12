@@ -8,6 +8,7 @@ use sha2::{Digest, Sha256};
 
 use super::context::SessionContext;
 use super::events::SyncEvent;
+use super::keepalive::send_keepalive_if_due;
 use super::upload::serve_block_request;
 use crate::bep::{
     read_bep_message, write_bep_message, BepBlockInfo, BepFileInfo, BepMessageType, BepRequest,
@@ -54,7 +55,12 @@ fn apply_pull_plan(
     files: &[BepFileInfo],
     count_up_to_date: bool,
 ) -> io::Result<bool> {
-    let plan = match ctx.storage.plan_pull(folder_id, ctx.own_id(), files) {
+    let storage = ctx.storage;
+    let own_id = ctx.own_id();
+    let planned = storage.plan_pull_with_progress(folder_id, own_id, files, &mut || {
+        send_keepalive_if_due(stream, ctx)
+    });
+    let plan = match planned {
         Ok(p) => p,
         Err(e) => {
             // Local folder problem (missing / unreadable root): skip this folder only, the
@@ -188,6 +194,12 @@ fn fetch_block(
             }
             BepMessageType::Request => serve_block_request(stream, ctx, &payload)?,
             BepMessageType::Ping => write_bep_message(stream, BepMessageType::Ping, &[])?,
+            // Index changes, a new `ClusterConfig` or `Close` cannot be applied in the middle
+            // of a file: keep them for the session loop instead of losing them.
+            BepMessageType::Index
+            | BepMessageType::IndexUpdate
+            | BepMessageType::ClusterConfig
+            | BepMessageType::Close => ctx.defer_message(mtype, payload),
             _ => {}
         }
     };

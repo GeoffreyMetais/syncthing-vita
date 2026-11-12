@@ -1,9 +1,39 @@
 //! Per-session folder bookkeeping: which folders are shared with the peer, the peer's known
-//! files, and the local indexes we have published (pure state, no I/O).
+//! files, and what we already published of our local indexes (pure state, no I/O).
 
 use std::collections::HashMap;
 
 use crate::bep::{BepFileInfo, BepFolder, BepIndex, BepMessageType};
+
+/// Maximum number of files per `Index` / `IndexUpdate` message (as Syncthing does), so a large
+/// folder is never encoded as one huge message.
+pub const INDEX_BATCH_FILES: usize = 1000;
+
+/// The peer's known files of one folder (from `Index` + `IndexUpdate`), with a name lookup.
+#[derive(Debug, Default)]
+pub struct RemoteFiles {
+    files: Vec<BepFileInfo>,
+    positions: HashMap<String, usize>,
+}
+
+impl RemoteFiles {
+    /// Inserts or replaces the entries of `incoming`.
+    fn merge(&mut self, incoming: &[BepFileInfo]) {
+        for file in incoming {
+            match self.positions.get(&file.name) {
+                Some(&pos) => self.files[pos] = file.clone(),
+                None => {
+                    self.positions.insert(file.name.clone(), self.files.len());
+                    self.files.push(file.clone());
+                }
+            }
+        }
+    }
+
+    pub fn files(&self) -> &[BepFileInfo] {
+        &self.files
+    }
+}
 
 /// Folder state of one peer session.
 #[derive(Debug, Default)]
@@ -13,38 +43,37 @@ pub struct FolderSyncState {
     pub shared_folders: Vec<BepFolder>,
     /// Shared folder IDs the peer announced in its `ClusterConfig` (only those receive our `Index`).
     pub peer_folder_ids: Vec<String>,
-    /// Accumulated remote file list per folder (from `Index` + `IndexUpdate`).
-    pub remote_files_by_folder: HashMap<String, Vec<BepFileInfo>>,
+    /// Accumulated remote file list per folder.
+    remote_files_by_folder: HashMap<String, RemoteFiles>,
     /// Our latest local index per folder.
     pub local_indexes: Vec<BepIndex>,
-    /// `max_sequence` of the last local index built per folder.
-    pub last_published_seq: HashMap<String, i64>,
-    /// Folders for which a full `Index` was already sent (later ones are `IndexUpdate`s).
-    index_sent_folders: Vec<String>,
+    /// Highest local sequence already sent to the peer per folder. A folder is present once
+    /// its full `Index` was sent; later publications are `IndexUpdate`s of newer entries only.
+    published_seq: HashMap<String, i64>,
 }
 
 impl FolderSyncState {
     /// Merges an incoming remote `Index` / `IndexUpdate` into the known remote files.
     pub fn merge_remote_index(&mut self, folder: &str, incoming: &[BepFileInfo]) {
-        let existing = self
-            .remote_files_by_folder
+        self.remote_files_by_folder
             .entry(folder.to_owned())
-            .or_default();
-        for file in incoming {
-            if let Some(slot) = existing.iter_mut().find(|f| f.name == file.name) {
-                *slot = file.clone();
-            } else {
-                existing.push(file.clone());
-            }
-        }
+            .or_default()
+            .merge(incoming);
     }
 
     /// Known remote files of `folder` (empty if none yet).
     pub fn remote_files(&self, folder: &str) -> &[BepFileInfo] {
         self.remote_files_by_folder
             .get(folder)
-            .map(|v| v.as_slice())
+            .map(|r| r.files())
             .unwrap_or(&[])
+    }
+
+    /// Every folder the peer sent files for, with its known remote files.
+    pub fn remote_folders(&self) -> impl Iterator<Item = (&str, &[BepFileInfo])> {
+        self.remote_files_by_folder
+            .iter()
+            .map(|(id, remote)| (id.as_str(), remote.files()))
     }
 
     /// Returns `true` if `folder` is shared with the peer in this session (authorized by the
@@ -76,22 +105,45 @@ impl FolderSyncState {
         self.local_indexes.iter().find(|idx| idx.folder == folder)
     }
 
-    /// Marks that a full `Index` was sent for `folder`.
-    pub fn mark_index_sent(&mut self, folder: &str) {
-        if !self.index_sent_folders.iter().any(|f| f == folder) {
-            self.index_sent_folders.push(folder.to_owned());
-        }
-    }
+    /// Messages to send so the peer knows `index`, and marks them as published.
+    ///
+    /// The first publication of a folder is a full `Index`; later ones are `IndexUpdate`s
+    /// holding only the entries whose sequence is newer than what was already sent (none if
+    /// nothing changed). Entries are split into batches of [`INDEX_BATCH_FILES`].
+    pub fn take_unpublished(&mut self, index: &BepIndex) -> Vec<(BepMessageType, BepIndex)> {
+        let already_sent = self.published_seq.get(&index.folder).copied();
+        let pending: Vec<&BepFileInfo> = index
+            .files
+            .iter()
+            .filter(|f| already_sent.is_none_or(|seq| f.sequence > seq))
+            .collect();
+        let newest = index
+            .files
+            .iter()
+            .map(|f| f.sequence)
+            .max()
+            .unwrap_or(0)
+            .max(already_sent.unwrap_or(0));
+        self.published_seq.insert(index.folder.clone(), newest);
 
-    /// Message type for the next publication of `folder`: a full `Index` the first time,
-    /// `IndexUpdate` afterwards. Marks the folder as sent.
-    pub fn next_index_message_type(&mut self, folder: &str) -> BepMessageType {
-        if self.index_sent_folders.iter().any(|f| f == folder) {
-            BepMessageType::IndexUpdate
-        } else {
-            self.mark_index_sent(folder);
-            BepMessageType::Index
+        let batch = |files: &[&BepFileInfo]| BepIndex {
+            folder: index.folder.clone(),
+            files: files.iter().map(|f| (*f).clone()).collect(),
+        };
+        let mut messages = Vec::new();
+        if already_sent.is_none() && pending.is_empty() {
+            // An empty folder still announces itself with an (empty) full `Index`.
+            messages.push((BepMessageType::Index, batch(&[])));
         }
+        for chunk in pending.chunks(INDEX_BATCH_FILES) {
+            let msg_type = if already_sent.is_none() && messages.is_empty() {
+                BepMessageType::Index
+            } else {
+                BepMessageType::IndexUpdate
+            };
+            messages.push((msg_type, batch(chunk)));
+        }
+        messages
     }
 }
 

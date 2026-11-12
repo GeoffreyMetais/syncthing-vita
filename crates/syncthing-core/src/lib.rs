@@ -40,7 +40,7 @@ pub use discovery::{
 pub use folder_sync::PullPlan;
 pub use session::{
     connect_and_sync, connect_and_sync_with_control, PeerHandshakeResult, SyncControl, SyncEvent,
-    SyncSessionStatus,
+    SyncSessionStatus, SyncTuning,
 };
 pub use storage::FsSyncStorage;
 pub use tls::{probe_bep_peer_device_id, BEP_ALPN};

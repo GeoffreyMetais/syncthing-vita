@@ -9,7 +9,8 @@
 //! 5. [`persistent`]: persistent loop (when a [`SyncControl`] is given)
 //!
 //! Shared building blocks: [`context`] (identity, storage, stats, event sink), [`folders`]
-//! (per-session folder state), [`download`] / [`upload`] (block transfers),
+//! (per-session folder state), [`download`] / [`upload`] (block transfers), [`keepalive`],
+//! [`tuning`] (timings chosen by the application),
 //! [`index_exchange`] (local index publication, runtime `ClusterConfig` / `Index`) and
 //! [`dispatch`] (primary-connection message routing).
 
@@ -22,9 +23,11 @@ pub mod events;
 pub mod folders;
 pub mod index_exchange;
 pub mod initial_sync;
+pub mod keepalive;
 pub mod outcome;
 pub mod persistent;
 pub mod secondary;
+pub mod tuning;
 pub mod upload;
 
 use std::io;
@@ -35,6 +38,7 @@ use std::time::{Duration, Instant};
 pub use control::SyncControl;
 pub use events::SyncEvent;
 pub use outcome::{PeerHandshakeResult, SyncSessionStatus};
+pub use tuning::SyncTuning;
 
 use cluster_exchange::{exchange_cluster_config, ClusterExchange};
 use context::SessionContext;
@@ -135,7 +139,9 @@ where
     };
 
     let mut ctx = SessionContext::new(identity, storage, result.peer_device_id, &mut on_event);
-    ctx.control = control.as_deref();
+    if let Some(ctrl) = control.as_deref() {
+        ctx.set_control(ctrl);
+    }
     let mut folders = FolderSyncState::default();
 
     // 2. `ClusterConfig` exchange and initial remote `Index`

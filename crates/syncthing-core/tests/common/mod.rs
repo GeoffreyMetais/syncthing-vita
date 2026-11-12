@@ -1,4 +1,7 @@
-//! Shared helpers for `syncthing-core` integration tests.
+//! Shared helpers for `syncthing-core` integration tests (each test binary uses a subset).
+#![allow(dead_code)]
+
+pub mod fake_peer;
 
 use std::path::PathBuf;
 
