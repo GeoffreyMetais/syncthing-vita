@@ -8,9 +8,19 @@ TARGET="armv7-sony-vita-newlibeabihf"
 PROFILE="${PROFILE:-release}"
 
 if [[ -z "${VITASDK:-}" ]]; then
-    echo "Error: VITASDK environment variable is not set." >&2
-    exit 1
+    if [[ -d "${HOME}/vitasdk" ]]; then
+        export VITASDK="${HOME}/vitasdk"
+    elif [[ -d "/usr/local/vitasdk" ]]; then
+        export VITASDK="/usr/local/vitasdk"
+    elif command -v arm-vita-eabi-gcc >/dev/null 2>&1; then
+        export VITASDK="$(dirname "$(dirname "$(command -v arm-vita-eabi-gcc)")")"
+    else
+        echo "Error: VITASDK environment variable is not set." >&2
+        echo "Please install VitaSDK with ./scripts/setup_env.sh --install-vitasdk or export VITASDK=/path/to/vitasdk" >&2
+        exit 1
+    fi
 fi
+export PATH="${VITASDK}/bin:${PATH}"
 
 BUILD_DIR="target/${TARGET}/${PROFILE}"
 PKG_DIR="${BUILD_DIR}/pkg"
