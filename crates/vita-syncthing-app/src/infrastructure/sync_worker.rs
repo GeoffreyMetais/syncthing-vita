@@ -11,7 +11,7 @@ use syncthing_core::{
     SyncSessionStatus, VitaIdentity, BEP_DEFAULT_PORT, DISCOVERY_BROADCAST_ADDR,
 };
 
-use crate::domain::{KnownDevice, ShareConfigEntry};
+use crate::domain::{KnownDevice, ShareConfigEntry, UiText};
 
 static PROCESS_INSTANCE_ID: OnceLock<i64> = OnceLock::new();
 
@@ -29,8 +29,8 @@ pub enum WorkerMsg {
     Log(String),
     Progress {
         pct: u32,
-        status: String,
-        file: String,
+        status: UiText,
+        file: UiText,
     },
     DeviceDiscovered {
         device_id: DeviceId,
@@ -39,7 +39,7 @@ pub enum WorkerMsg {
     },
     SyncEvent(SyncEvent),
     Finished {
-        summary: String,
+        summary: UiText,
         allow_auto_reconnect: bool,
     },
 }
@@ -121,8 +121,11 @@ fn run_peer_session_loop(
             }
             let _ = tx.send(WorkerMsg::Progress {
                 pct: 25,
-                status: format!("Connecting TLS 1.3 (1+2) to {} ({})...", kd.name, tcp_addr),
-                file: "-".to_owned(),
+                status: UiText::ConnectingTo {
+                    name: kd.name.clone(),
+                    addr: tcp_addr.to_string(),
+                },
+                file: UiText::raw("-"),
             });
             let tx_ev = tx.clone();
             match connect_and_sync_with_control(
@@ -256,8 +259,8 @@ pub fn spawn_sync_worker(
         if approved_devices.is_empty() {
             let _ = tx.send(WorkerMsg::Progress {
                 pct: 20,
-                status: "Scanning LAN (UDP 21027) for available Syncthing peers...".to_owned(),
-                file: "-".to_owned(),
+                status: UiText::ScanningLan,
+                file: UiText::raw("-"),
             });
             match run_discovery_cycle(&announce, DISCOVERY_BROADCAST_ADDR, Duration::from_secs(2)) {
                 Ok(res) => {
@@ -279,22 +282,29 @@ pub fn spawn_sync_worker(
                             address: best_tcp.to_string(),
                         });
                     }
-                    let summary = if count > 0 {
-                        format!(
-                            "Found {} LAN peer(s). Select a device in Shares -> Devices to connect.",
-                            count
+                    let (summary, log) = if count > 0 {
+                        (
+                            UiText::FoundLanPeers { count },
+                            format!("Found {} LAN peer(s).", count),
                         )
                     } else {
-                        "No peer linked. Add a device in Shares -> Devices or Settings.".to_owned()
+                        (
+                            UiText::NoPeerAddDevice,
+                            "No LAN peer found and no device linked.".to_owned(),
+                        )
                     };
+                    let _ = tx.send(WorkerMsg::Log(log));
                     let _ = tx.send(WorkerMsg::Finished {
                         summary,
                         allow_auto_reconnect: false,
                     });
                 }
                 Err(e) => {
+                    let _ = tx.send(WorkerMsg::Log(format!("UDP discovery error: {}", e)));
                     let _ = tx.send(WorkerMsg::Finished {
-                        summary: format!("UDP discovery error: {}", e),
+                        summary: UiText::DiscoveryError {
+                            error: e.to_string(),
+                        },
                         allow_auto_reconnect: false,
                     });
                 }
@@ -310,7 +320,10 @@ pub fn spawn_sync_worker(
             .take(4)
             .map(|kd| format!("{} [{}] @ {}", kd.name, kd.device_id.short(), kd.address))
             .collect();
-        let _ = tx.send(WorkerMsg::Log(format!("Linked peers: {}", peer_list.join(", "))));
+        let _ = tx.send(WorkerMsg::Log(format!(
+            "Linked peers: {}",
+            peer_list.join(", ")
+        )));
 
         // Spawn a concurrent persistent `1+2` session worker for each user-approved device (up to 4)
         for (idx, kd) in approved_devices.iter().take(4).cloned().enumerate() {
@@ -353,9 +366,11 @@ pub fn spawn_sync_worker(
         // 3. New LAN peers appear in the `Shares -> Devices` modal even while connected to another peer.
         let mut first_pass = true;
         while !worker_control.is_stop_requested() {
-            if let Ok(mut res) =
-                run_discovery_cycle(&announce, DISCOVERY_BROADCAST_ADDR, Duration::from_millis(1500))
-            {
+            if let Ok(mut res) = run_discovery_cycle(
+                &announce,
+                DISCOVERY_BROADCAST_ADDR,
+                Duration::from_millis(1500),
+            ) {
                 let needs_dynamic_resolution = approved_devices
                     .iter()
                     .any(|kd| kd.address == "dynamic" || kd.device_id.is_short_placeholder());

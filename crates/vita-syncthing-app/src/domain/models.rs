@@ -2,6 +2,8 @@
 
 use syncthing_core::DeviceId;
 
+use crate::domain::ui_text::UiText;
+
 /// Number of visible rows in the `ux0:` directory browser.
 pub const BROWSER_ROWS: usize = 8;
 
@@ -251,7 +253,7 @@ impl CameraPreview {
 /// Item in the target folder picker (`ux0:`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PickerItem {
-    pub label: String,
+    pub label: UiText,
     pub path: String,
     pub is_preset: bool,
     /// True if another share already targets this folder: shown greyed out and not selectable.

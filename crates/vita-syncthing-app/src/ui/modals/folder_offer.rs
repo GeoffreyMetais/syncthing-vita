@@ -2,6 +2,7 @@
 
 use crate::domain::AppState;
 use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton};
+use crate::ui::i18n::messages::fill;
 use crate::ui::strings;
 use crate::ui::theme::{folder_offer_modal_rect, folder_offer_slot_x, UiTheme};
 use crate::ui::widgets::{draw_action, draw_hints};
@@ -43,7 +44,12 @@ pub fn render_folder_offer_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, 
         .iter()
         .find(|d| d.device_id.matches_peer(&offer.device_id))
         .map(|d| format!("{} ({})", d.name, d.device_id.short()))
-        .unwrap_or_else(|| format!("Device {}", offer.device_id.short()));
+        .unwrap_or_else(|| {
+            fill(
+                s.messages.unknown_device,
+                &[("short", &offer.device_id.short())],
+            )
+        });
     let requester_sub = s.fmt_folder_offer_sub(&device);
     gfx.text_fit(
         lx + 52,

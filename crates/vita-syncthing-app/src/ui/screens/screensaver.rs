@@ -37,9 +37,9 @@ pub fn render_oled_screensaver(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
 
     let pct = state.progress_pct.min(100);
     let status_line = if state.sync_in_progress {
-        s.fmt_saver_syncing(pct, &state.current_file)
+        s.fmt_saver_syncing(pct, &s.text(&state.current_file))
     } else {
-        s.fmt_saver_idle(pct, &state.status_line)
+        s.fmt_saver_idle(pct, &s.text(&state.status_line))
     };
     gfx.text_fit(
         bx + 2,

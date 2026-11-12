@@ -5,6 +5,7 @@ use syncthing_core::DeviceId;
 use super::fallback_keyboard::draw_fallback_keypad;
 use crate::domain::AppState;
 use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton, GFX_W};
+use crate::ui::i18n::messages::fill;
 use crate::ui::strings;
 use crate::ui::theme::{add_device_modal_height, UiTheme, C_GOOD, C_WARN, HINT_Y};
 use crate::ui::widgets::{action_width, draw_action, draw_hints};
@@ -130,34 +131,38 @@ pub fn render_add_device_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, ke
                     d.device_id.matches_peer(&parsed_id) && !d.device_id.is_short_placeholder()
                 }) {
                     (
-                        format!(
-                            "Matches discovered LAN peer: {} ({} @ {}) · Ready to link!",
-                            peer.name,
-                            peer.device_id.short(),
-                            peer.address
+                        fill(
+                            s.messages.add_device_matches_peer,
+                            &[
+                                ("name", &peer.name),
+                                ("short", &peer.device_id.short()),
+                                ("addr", &peer.address),
+                            ],
                         ),
                         C_GOOD,
                     )
                 } else if parsed_id.is_short_placeholder() {
                     (
-                        format!(
-                            "Valid Short ID ({} chars: {}) · Will auto-pair with matching peer on LAN",
-                            parsed_id.syncthing_prefix().len(),
-                            parsed_id.short()
+                        fill(
+                            s.messages.add_device_valid_short,
+                            &[
+                                ("len", &parsed_id.syncthing_prefix().len()),
+                                ("short", &parsed_id.short()),
+                            ],
                         ),
                         C_GOOD,
                     )
                 } else {
                     (
-                        format!(
-                            "Valid Full 56-character Syncthing Device ID ({})",
-                            parsed_id.short()
+                        fill(
+                            s.messages.add_device_valid_full,
+                            &[("short", &parsed_id.short())],
                         ),
                         C_GOOD,
                     )
                 }
             }
-            Err(err) => (err, C_WARN),
+            Err(err) => (s.device_id_error(err), C_WARN),
         }
     };
     gfx.text_fit(

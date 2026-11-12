@@ -138,7 +138,7 @@ pub fn render_shares_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
                 FontWeight::Regular,
                 dev_col,
                 Align::Left,
-                &devs_summary,
+                &s.text(&devs_summary),
             );
         }
     }

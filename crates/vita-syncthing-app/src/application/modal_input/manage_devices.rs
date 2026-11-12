@@ -2,7 +2,7 @@
 
 use super::open_add_device_modal;
 use crate::application::{QrScanFlow, ShareCreation, ShareService, UserCommand};
-use crate::domain::{AppState, ModalDialog};
+use crate::domain::{AppState, ModalDialog, UiText};
 use crate::infrastructure::{
     ConfigRepository, InputFrame, BTN_CIRCLE, BTN_CROSS, BTN_DOWN, BTN_R, BTN_SELECT, BTN_SQUARE,
     BTN_TRIANGLE, BTN_UP,
@@ -108,7 +108,17 @@ pub fn handle(
             let action_str = if added { "Added" } else { "Removed" };
             let prep = if added { "to" } else { "from" };
             let msg = format!("{} {} {} '{}'", action_str, dev_name, prep, folder_lbl);
-            state.show_toast(&msg);
+            state.show_toast(if added {
+                UiText::DeviceLinked {
+                    device: dev_name,
+                    share: folder_lbl,
+                }
+            } else {
+                UiText::DeviceUnlinked {
+                    device: dev_name,
+                    share: folder_lbl,
+                }
+            });
             ShareService::log_event(state, repo, &msg);
         }
     }
@@ -125,7 +135,7 @@ fn close_manage_devices(state: &mut AppState, repo: &ConfigRepository) {
 /// With no known device yet, keeps the modal open while the LAN is scanned.
 fn apply_and_sync(state: &mut AppState, repo: &ConfigRepository, share_idx: usize) -> UserCommand {
     if state.is_share_creation_incomplete(share_idx) && !state.devices.is_empty() {
-        state.show_toast("Link at least one device to create this share");
+        state.show_toast(UiText::LinkDeviceFirst);
         return UserCommand::None;
     }
     if let Some(share) = state.shares.get(share_idx) {

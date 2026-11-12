@@ -2,7 +2,7 @@
 
 use super::open_add_device_modal;
 use crate::application::{ShareService, UserCommand};
-use crate::domain::{AppState, ModalDialog};
+use crate::domain::{AppState, ModalDialog, UiText};
 use crate::infrastructure::{
     ConfigRepository, InputFrame, BTN_CIRCLE, BTN_CROSS, BTN_SQUARE, BTN_START, BTN_TRIANGLE,
 };
@@ -57,7 +57,7 @@ pub fn confirm_delete_share(
     if confirm {
         state.modal = ModalDialog::None;
         if let Some(label) = ShareService::delete_share(state, repo, share_idx) {
-            state.show_toast(&format!("Deleted share '{}'", label));
+            state.show_toast(UiText::ShareDeleted { label });
         }
     } else if cancel {
         state.modal = ModalDialog::None;

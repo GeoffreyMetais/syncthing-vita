@@ -6,7 +6,7 @@ mod common;
 use common::temp_test_dir;
 use vita_syncthing_app::application::{InputController, UserCommand};
 use vita_syncthing_app::domain::{
-    ActiveTab, AppState, Language, LanguagePreference, NavFocus, SETTINGS_ROW_LANGUAGE,
+    ActiveTab, AppState, Language, LanguagePreference, NavFocus, UiText, SETTINGS_ROW_LANGUAGE,
 };
 use vita_syncthing_app::infrastructure::{ConfigRepository, InputFrame, BTN_CROSS, BTN_DOWN};
 use vita_syncthing_app::ui::theme::{SETTINGS_LANGUAGE_B, SETTINGS_LANGUAGE_Y};
@@ -109,7 +109,10 @@ fn test_settings_dpad_cycles_and_saves_language() {
         repo.load_language(),
         LanguagePreference::Fixed(Language::English)
     );
-    assert_eq!(state.toast_msg, Some(("Language: English".to_owned(), 110)));
+    assert_eq!(
+        state.toast_msg,
+        Some((UiText::LanguageChanged(Language::English), 110))
+    );
 
     // ... -> Italiano -> back to the system language
     for _ in 0..4 {

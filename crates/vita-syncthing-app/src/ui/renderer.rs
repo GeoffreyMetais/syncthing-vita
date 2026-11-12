@@ -13,6 +13,7 @@ use crate::ui::screens::{
     render_dashboard_tab, render_folder_picker_tab, render_oled_screensaver, render_settings_tab,
     render_shares_tab, SAVER_H, SAVER_W,
 };
+use crate::ui::strings;
 use crate::ui::theme::UiTheme;
 use crate::ui::widgets::{draw_chrome, draw_toast};
 
@@ -85,7 +86,8 @@ impl VitaUiRenderer {
             }
         }
 
-        draw_toast(&mut self.gfx, &th, state.toast_msg.as_ref());
+        let s = strings::strings(state.language);
+        draw_toast(&mut self.gfx, &th, s, state.toast_msg.as_ref());
         state.tick_toast();
         self.fb.present(&self.gfx.pixels);
     }

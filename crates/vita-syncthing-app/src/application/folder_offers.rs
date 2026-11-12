@@ -7,7 +7,7 @@ use syncthing_core::DeviceId;
 use crate::application::ShareService;
 use crate::domain::{
     ActiveTab, AppState, FolderOffer, IgnoredFolder, ModalDialog, PickerMode, ShareConfigEntry,
-    NEW_SHARE_TEMPLATES,
+    UiText, NEW_SHARE_TEMPLATES,
 };
 use crate::infrastructure::ConfigRepository;
 
@@ -121,14 +121,19 @@ impl FolderOfferService {
 
         state.selected_share_idx = share_idx;
         if state.shares[share_idx].enabled {
-            state.show_toast(&msg);
+            state.show_toast(UiText::OfferAccepted {
+                label: offer.label.clone(),
+                id: offer.folder_id.clone(),
+            });
             state.active_tab = ActiveTab::Shares;
         } else {
             state.picker_mode = PickerMode::ChangeShareTarget;
             ShareService::refresh_picker_items(state, repo);
             state.active_tab = ActiveTab::FolderPicker;
             state.reset_nav_for_tab();
-            state.show_toast(&format!("Choose where to store '{}'", offer.label));
+            state.show_toast(UiText::ChooseWhereToStore {
+                label: offer.label.clone(),
+            });
         }
     }
 
@@ -141,7 +146,10 @@ impl FolderOfferService {
         let offer = state.folder_offers.remove(offer_idx);
         Self::ignore(state, repo, &offer.folder_id, &[offer.device_id]);
         let msg = format!("Declined share '{}' ({})", offer.label, offer.folder_id);
-        state.show_toast(&msg);
+        state.show_toast(UiText::OfferDeclined {
+            label: offer.label.clone(),
+            id: offer.folder_id.clone(),
+        });
         ShareService::log_event(state, repo, &msg);
     }
 
@@ -186,7 +194,7 @@ impl FolderOfferService {
     pub fn clear_declined(state: &mut AppState, repo: &ConfigRepository) -> usize {
         let count = state.ignored_folders.len();
         if count == 0 {
-            state.show_toast("No declined folders");
+            state.show_toast(UiText::NoDeclinedFolders);
             return 0;
         }
         state.ignored_folders.clear();
@@ -197,7 +205,7 @@ impl FolderOfferService {
             "Cleared {} declined folder(s): they will be offered again",
             count
         );
-        state.show_toast(&msg);
+        state.show_toast(UiText::DeclinedCleared { count });
         ShareService::log_event(state, repo, &msg);
         count
     }

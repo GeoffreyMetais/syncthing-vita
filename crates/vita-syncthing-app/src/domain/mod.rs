@@ -4,8 +4,10 @@
 pub mod app_state;
 pub mod models;
 pub mod navigation;
+pub mod ui_text;
 
 pub use app_state::AppState;
+pub use ui_text::UiText;
 pub use models::{
     fmt_size, ActiveTab, CameraPreview, FolderOffer, IgnoredFolder, KnownDevice, Language,
     LanguagePreference, ModalDialog, PickerItem, PickerMode, ShareConfigEntry, ThemeMode, ADD_DEVICE_KEYPAD,

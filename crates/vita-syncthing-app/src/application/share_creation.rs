@@ -2,7 +2,7 @@
 //! device is linked to it in the `ManageDevices` modal that follows creation.
 
 use crate::application::ShareService;
-use crate::domain::{ActiveTab, AppState, ModalDialog, PickerMode};
+use crate::domain::{ActiveTab, AppState, ModalDialog, PickerMode, UiText};
 use crate::infrastructure::ConfigRepository;
 
 pub struct ShareCreation;
@@ -22,7 +22,9 @@ impl ShareCreation {
         if is_new {
             state.pending_share_creation = Some(folder_id.to_owned());
         }
-        state.show_toast(&format!("Link a device to share '{}'", label));
+        state.show_toast(UiText::LinkDeviceToShare {
+            label: label.to_owned(),
+        });
         state.modal = ModalDialog::ManageDevices {
             share_idx,
             selected_dev_idx: 0,
@@ -72,7 +74,7 @@ impl ShareCreation {
                 repo,
                 &format!("Created share '{}' ({}) -> {}", label, folder_id, path),
             );
-            state.show_toast(&format!("Created share '{}'", label));
+            state.show_toast(UiText::ShareCreated { label });
             return true;
         }
         ShareService::remove_share(state, repo, idx);
@@ -81,7 +83,7 @@ impl ShareCreation {
             repo,
             &format!("Share '{}' not created: no device linked", label),
         );
-        state.show_toast(&format!("Share '{}' not created: no device linked", label));
+        state.show_toast(UiText::ShareNotCreated { label });
         false
     }
 }

@@ -32,7 +32,7 @@ pub use bep::{
     BEP_DEFAULT_NUM_CONNECTIONS, BEP_DEFAULT_PORT, BEP_MAGIC,
 };
 pub use cert::VitaIdentity;
-pub use device_id::DeviceId;
+pub use device_id::{DeviceId, DeviceIdParseError};
 pub use discovery::{
     detect_local_ipv4, resolve_peer_tcp_addrs, run_discovery_cycle, scan_lan_bep_peers, Announce,
     DiscoveryCycleResult, DISCOVERY_BROADCAST_ADDR, DISCOVERY_MAGIC, DISCOVERY_PORT,

@@ -4,6 +4,7 @@ use syncthing_core::DeviceId;
 
 use crate::domain::AppState;
 use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton, GFX_W};
+use crate::ui::i18n::messages::fill;
 use crate::ui::strings;
 use crate::ui::theme::{UiTheme, C_GOOD, C_WARN, HINT_Y, MANAGE_DEVICES_H, MANAGE_DEVICES_W};
 use crate::ui::widgets::{action_width, draw_action, draw_chip, draw_hints, draw_row_tick};
@@ -107,9 +108,9 @@ pub fn render_manage_devices_modal(
             headline,
         );
         let sub_hint = if state.sync_in_progress {
-            state.status_line.as_str()
+            s.text(&state.status_line)
         } else {
-            s.modal_manage_devices_empty_hint
+            s.modal_manage_devices_empty_hint.into()
         };
         gfx.text(
             lx,
@@ -118,7 +119,7 @@ pub fn render_manage_devices_modal(
             FontWeight::Regular,
             th.dim,
             Align::Left,
-            sub_hint,
+            &sub_hint,
         );
     } else {
         for (i, dev) in state.devices.iter().take(5).enumerate() {
@@ -158,16 +159,20 @@ pub fn render_manage_devices_modal(
                 &dev.name,
             );
             let sub = if dev.device_id.is_short_placeholder() {
-                format!(
-                    "Short ID: {} (auto-resolves on LAN)  ·  Address: {}",
-                    dev.device_id.syncthing_prefix(),
-                    dev.address
+                fill(
+                    s.messages.device_row_short,
+                    &[
+                        ("prefix", &dev.device_id.syncthing_prefix()),
+                        ("addr", &dev.address),
+                    ],
                 )
             } else {
-                format!(
-                    "ID: {}  ·  Address: {}",
-                    dev.device_id.to_syncthing_string(),
-                    dev.address
+                fill(
+                    s.messages.device_row_full,
+                    &[
+                        ("id", &dev.device_id.to_syncthing_string()),
+                        ("addr", &dev.address),
+                    ],
                 )
             };
             gfx.text_fit(

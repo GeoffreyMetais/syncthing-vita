@@ -45,7 +45,8 @@ syncthing-vita
             │   ├── mod.rs
             │   ├── navigation.rs     # NavFocus / NavState (D-pad focus), tab order, buttons per row
             │   ├── models.rs         # KnownDevice, ShareConfigEntry, PickerItem, ActiveTab, PickerMode, ModalDialog, ThemeMode
-            │   └── app_state.rs      # AppState (pure state & view-model queries, zero I/O or rendering dependencies)
+            │   ├── app_state.rs      # AppState (pure state & view-model queries, zero I/O or rendering dependencies)
+            │   └── ui_text.rs        # UiText: translatable messages (status line, labels, toasts) chosen by inner layers
             ├── application/          # Layer 2: Use Cases, Input Controller & Sync Event Coordinator
             │   ├── mod.rs
             │   ├── share_service.rs  # ShareService (create_share, upsert_device, toggle_device_for_share, refresh_picker_items)
@@ -75,7 +76,8 @@ syncthing-vita
                 │   ├── fr.rs         # French static catalog (STRINGS_FR)
                 │   ├── es.rs         # Spanish static catalog (STRINGS_ES)
                 │   ├── de.rs         # German static catalog (STRINGS_DE)
-                │   └── it.rs         # Italian static catalog (STRINGS_IT)
+                │   ├── it.rs         # Italian static catalog (STRINGS_IT)
+                │   └── messages.rs   # Messages templates, Strings::text(&UiText), device_id_error
                 ├── image.rs          # Greyscale camera frame blit (QR viewfinder)
                 ├── gfx.rs            # 960x544 RGBA8888 2D anti-aliased vector & TrueType software renderer
                 ├── theme.rs          # UiTheme (Dark & OLED palettes) and layout constants
@@ -136,7 +138,7 @@ Dependencies strictly point **inward**. Inner layers never import or depend on o
 ```
 
 1. **Layer 1: Pure Domain Layer (`crates/vita-syncthing-app/src/domain/`)**
-   - **Responsibility**: Pure domain models (`models.rs`), application state container (`app_state.rs`), invariants, and query functions.
+   - **Responsibility**: Pure domain models (`models.rs`), application state container (`app_state.rs`), translatable messages (`ui_text.rs`), invariants, and query functions.
    - **Strict Isolation**: **Zero external dependencies**. Absolutely no I/O, no filesystem, no sockets, no rendering, and no VitaSDK syscalls.
    - **Host Testability**: Must be 100% testable on standard x86_64 host machines without any mocks or emulators.
 
@@ -198,6 +200,7 @@ To prevent code degradation into large, unmaintainable files:
   - **New Screens**: Always create a separate file under `ui/screens/<feature>.rs` and expose it via `ui/screens/mod.rs`.
   - **New Modal Dialogs**: Always create a separate file under `ui/modals/<modal_name>.rs` and expose it via `ui/modals/mod.rs`.
   - **New Services**: Split distinct domain workflows into dedicated services in `application/` rather than adding methods to an existing unrelated service.
+  - **Messages from inner layers**: the domain, application and infrastructure layers never build display strings. They set a `UiText` variant (status line, peer / folder labels, toasts, `Files` rows) and `ui::i18n::messages` renders it with each language's `Messages` templates (`{placeholder}` syntax). Only the protocol log (`syncthing.log`) stays in English.
   - **Factorized UI Copy & Multi-Language Support**: Never scatter hardcoded user-facing strings or button labels across screens and modals. Place all reusable actions, tab titles, hints, status badges, and formatting helpers in `ui/i18n/` (with static language catalogs in `en.rs`, `fr.rs`, `es.rs`, `de.rs`, `it.rs`) and `ui/strings.rs` so copy is deduplicated and i18n-ready without per-frame heap churn.
   - **Avoid "Omnibus" Files**: Never create catch-all files like `display.rs` or `utils.rs`. Group code by specific domain responsibility.
 
@@ -334,6 +337,7 @@ cargo test --workspace
 - `dpad_navigation.rs`: sidebar <-> page focus, Shares rows / buttons / header, Files rows / Up button
 - `qr_scan.rs`: Device ID extraction from QR payloads, `quircs` decoding of a rendered QR code, scanner modal navigation, adding the scanned device
 - `power_policy.rs`: standby blocking while syncing (charging / battery / transfer grace period)
+- `ui_text.rs`: every `UiText` message renders in all 5 languages with its placeholders filled, translated Device ID errors
 - `language_settings.rs`: language preference codec / cycle, `language.cfg` persistence (defaults to the system language), `Settings` language card (D-pad and touch)
 
 ### Cross-Check for PS Vita (`armv7-sony-vita-newlibeabihf`)

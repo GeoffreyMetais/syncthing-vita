@@ -1,7 +1,7 @@
 //! Tab 1 (`Overview` / `Dashboard`): Device status hero card, `QR / ID` & `Sync Now` actions,
 //! transfer statistics, and recent synchronization activity feed.
 
-use crate::domain::{fmt_size, ActiveTab, AppState};
+use crate::domain::{fmt_size, ActiveTab, AppState, UiText};
 use crate::ui::gfx::{rgba, Align, FontWeight, Gfx, Icon, PadButton};
 use crate::ui::strings;
 use crate::ui::theme::{
@@ -33,7 +33,7 @@ pub fn render_dashboard_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
     let tx = lx + 100;
     let (chip_txt, chip_col) = if state.sync_in_progress {
         (s.status_syncing, th.accent_hi)
-    } else if state.peer_label.contains("Scanning") {
+    } else if state.status_line == UiText::ScanningLan {
         (s.status_scanning, C_WARN)
     } else {
         (s.status_ready, C_GOOD)
@@ -61,10 +61,10 @@ pub fn render_dashboard_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         s.hero_device_name,
     );
 
-    let peer_str = s.fmt_peer_and_folders(&state.peer_label, &state.folder_label);
+    let peer_str = s.fmt_peer_and_folders(&s.text(&state.peer_label), &s.text(&state.folder_label));
     gfx.text_fit(
         tx,
-        CONTENT_Y + 80,
+        CONTENT_Y + 77,
         CONTENT_R - 24 - tx,
         15,
         FontWeight::Regular,
@@ -73,15 +73,16 @@ pub fn render_dashboard_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         &peer_str,
     );
 
+    // Kept clear of the focus ring around the actions below (`CONTENT_Y + 128 ± 21`).
     gfx.text_fit(
         tx,
-        CONTENT_Y + 104,
+        CONTENT_Y + 98,
         CONTENT_R - 24 - tx,
         15,
         FontWeight::Medium,
         th.accent_hi,
         Align::Left,
-        &state.status_line,
+        &s.text(&state.status_line),
     );
 
     let act_sync_w = action_width(gfx, PadButton::Cross, s.action_sync_now);

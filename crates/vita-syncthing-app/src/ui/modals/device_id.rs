@@ -97,14 +97,15 @@ pub fn render_device_id_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         }
     }
 
-    gfx.text(
+    gfx.text_fit(
         qr_box_x + qr_box_size / 2,
         qr_box_y + qr_box_size + 22,
+        qr_box_size + 20,
         13,
         FontWeight::Medium,
         th.accent_hi,
         Align::Center,
-        strings::MODAL_DEVICE_ID_SCAN_WEB,
+        s.modal_device_id_scan_web,
     );
 
     // Right Column: Formatted 8-group Syncthing Device ID + Certificate details
@@ -118,7 +119,7 @@ pub fn render_device_id_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         FontWeight::Bold,
         th.accent_hi,
         Align::Left,
-        "SYNCTHING DEVICE ID (8 GROUPS OF 7 CHARS)",
+        s.messages.device_id_section,
     );
 
     let groups: Vec<&str> = dev_id.split('-').collect();
@@ -150,7 +151,7 @@ pub fn render_device_id_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         FontWeight::Medium,
         th.dim,
         Align::Left,
-        "GROUPS 1 - 4",
+        s.messages.device_id_groups_1_4,
     );
     gfx.text_fit(
         rx + 14,
@@ -174,7 +175,7 @@ pub fn render_device_id_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         FontWeight::Medium,
         th.dim,
         Align::Left,
-        "GROUPS 5 - 8",
+        s.messages.device_id_groups_5_8,
     );
     gfx.text_fit(
         rx + 14,

@@ -47,3 +47,34 @@ fn test_device_id_parse_full_and_short() {
     assert!(parsed_14.is_short_placeholder());
     assert!(parsed_14.matches_peer(&full_id));
 }
+
+#[test]
+fn test_parse_user_id_errors_are_typed() {
+    use syncthing_core::DeviceIdParseError;
+
+    assert_eq!(
+        DeviceId::parse_user_id("  "),
+        Err(DeviceIdParseError::Empty)
+    );
+    assert_eq!(
+        DeviceId::parse_user_id("MFZ!WI3D"),
+        Err(DeviceIdParseError::InvalidChar('!'))
+    );
+    assert_eq!(
+        DeviceId::parse_user_id("MFZ"),
+        Err(DeviceIdParseError::TooShort)
+    );
+    assert_eq!(
+        DeviceId::parse_user_id(&"A".repeat(57)),
+        Err(DeviceIdParseError::TooLong(57))
+    );
+    // English messages are unchanged for host tools and logs
+    assert_eq!(
+        DeviceIdParseError::ChecksumMismatch { first_group: 3 }.to_string(),
+        "Typo detected in group 3-4 (check digit mismatch)"
+    );
+    assert_eq!(
+        DeviceIdParseError::TooLong(57).to_string(),
+        "Device ID is too long (57 chars, max 56)"
+    );
+}

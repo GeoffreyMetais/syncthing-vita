@@ -8,6 +8,7 @@ pub mod en;
 pub mod es;
 pub mod fr;
 pub mod it;
+pub mod messages;
 
 use crate::domain::Language;
 
@@ -16,11 +17,14 @@ pub use en::STRINGS_EN;
 pub use es::STRINGS_ES;
 pub use fr::STRINGS_FR;
 pub use it::STRINGS_IT;
+pub use messages::Messages;
 
 /// Strongly-typed string catalog containing all UI labels, actions, hints, and screen titles.
 #[derive(Debug, Clone, Copy)]
 pub struct Strings {
     pub language: Language,
+    /// Templates for domain `UiText` messages (see `messages.rs`).
+    pub messages: &'static Messages,
 
     // Common Actions
     pub action_cancel: &'static str,
@@ -250,7 +254,7 @@ impl Strings {
 
     /// Formats the short ID label: `"Short ID: {short_id}"`.
     pub fn fmt_short_id_label(&self, short_id: &str) -> String {
-        format!("Short ID: {short_id}")
+        messages::fill(self.messages.short_id_label, &[("id", &short_id)])
     }
 
     /// Formats the target folder hint when choosing folder in picker.

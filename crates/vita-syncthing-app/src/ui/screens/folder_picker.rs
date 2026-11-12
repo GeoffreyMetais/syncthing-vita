@@ -129,7 +129,7 @@ pub fn render_folder_picker_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
             },
             if item.is_shared { th.faint } else { th.text },
             Align::Left,
-            &item.label,
+            &s.text(&item.label),
         );
     }
 
