@@ -1,9 +1,10 @@
 //! Italian (`it`) string catalog for VitaSyncthing.
 
 use crate::domain::Language;
-use super::Strings;
+use super::{Messages, Strings};
 
 pub static STRINGS_IT: Strings = Strings {
+    messages: &MESSAGES_IT,
     language: Language::Italian,
 
     // Common Actions
@@ -125,6 +126,9 @@ pub static STRINGS_IT: Strings = Strings {
     settings_sec_log: "REGISTRO PROTOCOLLO BEP/1.0 E TLS 1.3",
     settings_sec_declined: "CARTELLE RIFIUTATE",
     settings_no_declined: "Nessuna · le cartelle offerte dai peer vengono sempre richieste prima",
+    settings_sec_language: "LINGUA",
+    settings_language_system: "Lingua di sistema",
+    action_change_language: "Cambia lingua",
 
     // Screensaver
     saver_wake_hint: "Tocca lo schermo o premi un tasto per riattivare",
@@ -168,7 +172,7 @@ pub static STRINGS_IT: Strings = Strings {
     // Modals: Device ID
     modal_device_id_title: "ID dispositivo PS Vita Syncthing",
     modal_device_id_subtitle: "Scansiona questo codice QR in Syncthing o inserisci l'ID a 56 caratteri",
-    modal_device_id_scan_web: "Scansiona il QR nell'interfaccia Web o app Syncthing",
+    modal_device_id_scan_web: "Scansiona in Syncthing (Web / App)",
     modal_device_id_dev_name: "Nome dispositivo: PlayStation Vita (vita-syncthing)",
     modal_device_id_cert_path: "Certificato identità: ux0:data/syncthing/cert.der",
     modal_device_id_short_label: "ID breve (rilevamento LAN):",
@@ -182,4 +186,80 @@ pub static STRINGS_IT: Strings = Strings {
     // Modals: Scan QR
     modal_scan_qr_title: "Scansiona codice QR del dispositivo",
     modal_scan_qr_subtitle: "Syncthing: Azioni > Mostra ID, poi inquadra con la fotocamera posteriore",
+};
+
+/// IT templates for `UiText` messages.
+pub static MESSAGES_IT: Messages = Messages {
+    ready_press_cross: "Pronto · Premi Croce per sincronizzare",
+    ready_manual_pairing: "Pronto (LAN manuale)",
+    no_peer_linked: "Nessun peer collegato",
+    select_device_to_connect: "Collega un dispositivo in Condivisioni -> Dispositivi",
+    no_folders_synced: "Nessuna cartella sincronizzata",
+    no_remote_folders: "Nessuna cartella remota condivisa",
+    starting_sync: "Avvio della sincronizzazione...",
+    scanning_lan: "Ricerca di peer Syncthing nella LAN (UDP 21027)...",
+    connecting_to: "Connessione TLS 1.3 a {name} ({addr})...",
+    exchanging_index: "Scambio di ClusterConfig e indice BEP...",
+    file_up_to_date: "Aggiornato: {file}",
+    downloading: "Download di {file} ({pct}%)",
+    index_published: "Indice locale della Vita pubblicato ({files} file)",
+    uploading: "Invio al peer: {file}",
+    sync_finished: "Terminato",
+    connections_one: "Connesso (1 connessione)",
+    connections_many: "Connesso (1+{secondary} connessioni)",
+    sync_summary: "{connections} · {up_to_date} aggiornati | {downloaded} ricevuti ({kb} KB) | {uploaded} inviati ({bytes} B)",
+    found_lan_peers: "{count} peer trovato/i nella LAN. Scegli un dispositivo in Condivisioni -> Dispositivi.",
+    no_peer_add_device: "Nessun peer collegato. Aggiungi un dispositivo in Condivisioni -> Dispositivi o Impostazioni.",
+    discovery_error: "Errore di rilevamento LAN: {error}",
+    syncing_with_peers: "Sincronizzazione con i peer della LAN...",
+    theme_dark: "Tema: Scuro (grigio-blu)",
+    theme_oled: "Tema: OLED (nero puro #000000)",
+    language_changed: "Lingua: {name}",
+    device_linked: "{device} aggiunto a '{share}'",
+    device_unlinked: "{device} rimosso da '{share}'",
+    link_device_first: "Collega almeno un dispositivo per creare questa condivisione",
+    added_short_id: "ID breve {prefix} aggiunto (abbinamento automatico nella LAN)",
+    added_device: "Dispositivo {name} aggiunto ({short})",
+    own_device_id: "Impossibile aggiungere l'ID di questa PS Vita",
+    qr_not_device_id: "Questo codice QR non è un ID dispositivo Syncthing",
+    share_deleted: "Condivisione '{label}' eliminata",
+    link_device_to_share: "Collega un dispositivo per condividere '{label}'",
+    share_created: "Condivisione '{label}' creata",
+    share_not_created: "Condivisione '{label}' non creata: nessun dispositivo collegato",
+    saved_in: "Salvato in {path}",
+    share_active: "La condivisione {id} è ora attiva",
+    share_paused: "La condivisione {id} è ora in pausa",
+    offer_accepted: "Condivisione '{label}' accettata ({id})",
+    choose_where_to_store: "Scegli dove salvare '{label}'",
+    offer_declined: "Condivisione '{label}' rifiutata ({id})",
+    no_declined_folders: "Nessuna cartella rifiutata",
+    declined_cleared: "{count} cartella/e rifiutata/e cancellata/e: verranno riproposte",
+    id_empty: "L'ID dispositivo non può essere vuoto",
+    id_invalid_char: "Carattere non valido '{ch}' (Base32: A-Z, 2-7)",
+    id_too_short: "Inserisci almeno 7 caratteri (ID breve) o l'ID completo di 56",
+    id_too_long: "ID dispositivo troppo lungo ({len} caratteri, max 56)",
+    id_checksum: "Errore nei gruppi {first}-{second} (cifra di controllo)",
+    id_decode_failed: "Impossibile decodificare l'ID dispositivo",
+    no_devices_linked: "Nessun dispositivo collegato (Croce per aggiungerne uno)",
+    shared_with: "Condivisa con: {devices}",
+    picker_share_this_folder: "Condividi questa cartella ({path})",
+    picker_keep_current: "Mantieni la cartella attuale ({path})",
+    picker_save_data: "Salvataggi ({path})",
+    picker_pictures: "Immagini PS Vita ({path})",
+    picker_music: "Musica PS Vita ({path})",
+    picker_retroarch: "Salvataggi RetroArch ({path})",
+    picker_default_folder: "Cartella Syncthing predefinita ({path})",
+    picker_browsed_folder: "Usa la cartella sfogliata ({path})",
+    device_id_section: "ID DISPOSITIVO SYNCTHING (8 GRUPPI DA 7)",
+    device_id_groups_1_4: "GRUPPI 1 - 4",
+    device_id_groups_5_8: "GRUPPI 5 - 8",
+    short_id_label: "ID breve: {id}",
+    camera_starting: "Avvio della fotocamera posteriore...",
+    camera_error: "{error} · Inserisci l'ID manualmente",
+    add_device_matches_peer: "Corrisponde al peer LAN {name} ({short} @ {addr}) · Pronto da collegare!",
+    add_device_valid_short: "ID breve valido ({len} car.: {short}) · Abbinamento automatico nella LAN",
+    add_device_valid_full: "ID dispositivo Syncthing completo valido ({short})",
+    device_row_short: "ID breve: {prefix} (risolto nella LAN)  ·  Indirizzo: {addr}",
+    device_row_full: "ID: {id}  ·  Indirizzo: {addr}",
+    unknown_device: "Dispositivo {short}",
 };

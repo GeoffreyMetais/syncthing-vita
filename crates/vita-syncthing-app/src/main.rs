@@ -12,7 +12,7 @@ use vita_syncthing_app::application::power_policy::should_block_standby;
 use vita_syncthing_app::application::{
     FolderOfferService, InputController, QrScanFlow, ShareService, SyncCoordinator, UserCommand,
 };
-use vita_syncthing_app::domain::{AppState, ModalDialog};
+use vita_syncthing_app::domain::{AppState, ModalDialog, UiText};
 use vita_syncthing_app::infrastructure::{
     detect_system_language, init_vita_network, is_on_external_power, keep_system_awake,
     spawn_sync_worker, ConfigRepository, IdentityStore, QrScanner, VitaInput, WorkerMsg,
@@ -51,7 +51,8 @@ fn main() {
     let shares = repo.load_shares();
     let mut state = AppState::new(shares, devices, ConfigRepository::default_browse_root());
     state.theme_mode = repo.load_theme();
-    state.language = detect_system_language();
+    state.set_system_language(detect_system_language());
+    state.set_language_preference(repo.load_language());
     state.ignored_folders = repo.load_ignored_folders();
     if state.sanitize_legacy_unpaired_peers() {
         repo.save_devices(&state.approved_devices());
@@ -117,8 +118,8 @@ fn main() {
         worker_rx = Some(rx);
         worker_ctl = Some(ctl);
     } else {
-        state.peer_label = "No peer linked (Manual pairing)".to_owned();
-        state.status_line = "Select or add a device in Shares -> Devices to connect".to_owned();
+        state.peer_label = UiText::NoPeerLinked;
+        state.status_line = UiText::SelectDeviceToConnect;
     }
 
     let mut last_activity = Instant::now();

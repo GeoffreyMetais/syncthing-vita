@@ -2,7 +2,7 @@
 //! confirmation.
 
 use crate::application::{QrScanFlow, ShareService, UserCommand};
-use crate::domain::{AppState, ModalDialog, ADD_DEVICE_KEYPAD};
+use crate::domain::{AppState, ModalDialog, UiText, ADD_DEVICE_KEYPAD};
 use crate::infrastructure::{
     ConfigRepository, InputFrame, BTN_CIRCLE, BTN_CROSS, BTN_DOWN, BTN_LEFT, BTN_R, BTN_RIGHT,
     BTN_SQUARE, BTN_START, BTN_TRIANGLE, BTN_UP,
@@ -206,16 +206,27 @@ pub(crate) fn confirm_add_device(
     let input_str = state.device_id_input.clone();
     match ShareService::add_device_by_input(state, repo, &input_str, return_share_idx) {
         Ok((dev_id, dev_name, is_short)) => {
-            let msg = if is_short {
-                format!(
-                    "Added Short ID {} (will auto-pair on LAN)",
-                    dev_id.syncthing_prefix()
+            let (msg, toast) = if is_short {
+                (
+                    format!(
+                        "Added Short ID {} (will auto-pair on LAN)",
+                        dev_id.syncthing_prefix()
+                    ),
+                    UiText::AddedShortId {
+                        prefix: dev_id.syncthing_prefix(),
+                    },
                 )
             } else {
-                format!("Added device {} ({})", dev_name, dev_id.short())
+                (
+                    format!("Added device {} ({})", dev_name, dev_id.short()),
+                    UiText::AddedDevice {
+                        name: dev_name.clone(),
+                        short: dev_id.short(),
+                    },
+                )
             };
             ShareService::log_event(state, repo, &msg);
-            state.show_toast(&msg);
+            state.show_toast(toast);
 
             if let Some(share_idx) = return_share_idx {
                 let selected_dev_idx = state
@@ -239,7 +250,7 @@ pub(crate) fn confirm_add_device(
             }
         }
         Err(err) => {
-            state.show_toast(&err);
+            state.show_toast(err);
             UserCommand::None
         }
     }

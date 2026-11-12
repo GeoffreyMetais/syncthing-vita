@@ -7,6 +7,8 @@
 mod base32;
 mod parse;
 
+pub use parse::DeviceIdParseError;
+
 use std::fmt;
 
 use base32::{base32_encode, luhn_mod32_check_char};

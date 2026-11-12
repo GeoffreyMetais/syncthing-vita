@@ -4,16 +4,23 @@
 use syncthing_core::DeviceId;
 
 use crate::domain::models::{
-    ActiveTab, CameraPreview, FolderOffer, IgnoredFolder, KnownDevice, Language, ModalDialog,
-    PickerItem, PickerMode, ShareConfigEntry, ThemeMode, BROWSER_ROWS,
+    ActiveTab, CameraPreview, FolderOffer, IgnoredFolder, KnownDevice, Language,
+    LanguagePreference, ModalDialog, PickerItem, PickerMode, ShareConfigEntry, ThemeMode,
+    BROWSER_ROWS,
 };
 use crate::domain::navigation::{default_col, NavFocus, NavState};
+use crate::domain::ui_text::UiText;
 
 /// Pure application state for PS Vita Syncthing.
 /// All UI screens and modals read `&AppState` without performing I/O or mutating business rules.
 pub struct AppState {
     pub theme_mode: ThemeMode,
+    /// Language actually displayed: `language_pref` resolved against `system_language`.
     pub language: Language,
+    /// Language chosen in Settings (`language.cfg`), defaulting to the system language.
+    pub language_pref: LanguagePreference,
+    /// Language detected from the PS Vita system settings.
+    pub system_language: Language,
     pub active_tab: ActiveTab,
     /// D-pad focus (sidebar or page element).
     pub nav: NavState,
@@ -26,10 +33,10 @@ pub struct AppState {
     pub saver_vy: f32,
     pub sync_in_progress: bool,
     pub vita_device_id: String,
-    pub peer_label: String,
-    pub folder_label: String,
-    pub status_line: String,
-    pub current_file: String,
+    pub peer_label: UiText,
+    pub folder_label: UiText,
+    pub status_line: UiText,
+    pub current_file: UiText,
     pub progress_pct: u32,
     pub files_up_to_date: usize,
     pub files_downloaded: usize,
@@ -64,7 +71,7 @@ pub struct AppState {
     pub selected_picker_idx: usize,
     pub picker_top_idx: usize,
     pub logs: Vec<String>,
-    pub toast_msg: Option<(String, u32)>,
+    pub toast_msg: Option<(UiText, u32)>,
     /// Current text buffer in the `AddDeviceById` modal (updated by PS Vita `SceIme` or keypad).
     pub device_id_input: String,
     /// True while the native PS Vita System Keyboard (`SceIme`) overlay is active.
@@ -86,6 +93,8 @@ impl AppState {
         Self {
             theme_mode: ThemeMode::Oled,
             language: Language::English,
+            language_pref: LanguagePreference::System,
+            system_language: Language::English,
             active_tab: ActiveTab::Dashboard,
             nav: NavState::new(ActiveTab::Dashboard),
             picker_mode: PickerMode::ChangeShareTarget,
@@ -97,10 +106,10 @@ impl AppState {
             saver_vy: 0.45,
             sync_in_progress: false,
             vita_device_id: "Initializing...".to_owned(),
-            peer_label: "Ready (Manual LAN pairing)".to_owned(),
-            folder_label: "No folders synced yet".to_owned(),
-            status_line: "Ready · Press Cross to synchronize".to_owned(),
-            current_file: "-".to_owned(),
+            peer_label: UiText::ReadyManualPairing,
+            folder_label: UiText::NoFoldersSynced,
+            status_line: UiText::ReadyPressCross,
+            current_file: UiText::raw("-"),
             progress_pct: 0,
             files_up_to_date: 0,
             files_downloaded: 0,
@@ -248,23 +257,34 @@ impl AppState {
             ThemeMode::Dark => ThemeMode::Oled,
             ThemeMode::Oled => ThemeMode::Dark,
         };
-        let label = match self.theme_mode {
-            ThemeMode::Dark => "Theme: Dark (Blue-Grey)",
-            ThemeMode::Oled => "Theme: OLED (Pure Black #000000)",
-        };
-        self.show_toast(label);
+        self.show_toast(match self.theme_mode {
+            ThemeMode::Dark => UiText::ThemeDark,
+            ThemeMode::Oled => UiText::ThemeOled,
+        });
     }
 
-    /// Cycles through supported UI languages (English -> Français -> Español -> Deutsch -> Italiano -> English).
-    pub fn toggle_language(&mut self) {
-        self.language = self.language.next();
-        let label = format!("Language: {}", self.language.name());
-        self.show_toast(&label);
+    /// Applies a language preference and updates the displayed language.
+    pub fn set_language_preference(&mut self, pref: LanguagePreference) {
+        self.language_pref = pref;
+        self.language = pref.resolve(self.system_language);
+    }
+
+    /// Sets the detected system language (used while the preference is `System`).
+    pub fn set_system_language(&mut self, lang: Language) {
+        self.system_language = lang;
+        self.language = self.language_pref.resolve(lang);
+    }
+
+    /// Cycles the language preference
+    /// (System -> English -> Français -> Español -> Deutsch -> Italiano -> System).
+    pub fn cycle_language(&mut self) {
+        self.set_language_preference(self.language_pref.next());
+        self.show_toast(UiText::LanguageChanged(self.language));
     }
 
     /// Displays a transient toast notification for ~1.8 seconds (110 frames at 60 FPS).
-    pub fn show_toast(&mut self, msg: &str) {
-        self.toast_msg = Some((msg.to_owned(), 110));
+    pub fn show_toast(&mut self, msg: UiText) {
+        self.toast_msg = Some((msg, 110));
     }
 
     /// Decrements the toast timer by one frame.
@@ -337,14 +357,14 @@ impl AppState {
         self.blocks_uploaded = 0;
         self.bytes_transferred = 0;
         self.progress_pct = 5;
-        self.status_line = "Starting synchronization...".to_owned();
-        self.show_toast("Synchronizing with LAN peers...");
+        self.status_line = UiText::StartingSync;
+        self.show_toast(UiText::SyncingWithPeers);
     }
 
     /// Human-readable summary of devices linked to a share.
-    pub fn share_devices_summary(&self, share: &ShareConfigEntry) -> String {
+    pub fn share_devices_summary(&self, share: &ShareConfigEntry) -> UiText {
         if share.shared_devices.is_empty() {
-            return "No devices linked (Press Cross to add a device)".to_owned();
+            return UiText::NoDevicesLinked;
         }
         let mut names = Vec::new();
         for hex in &share.shared_devices {
@@ -356,6 +376,8 @@ impl AppState {
                 names.push(hex[..7].to_uppercase());
             }
         }
-        format!("Shared with: {}", names.join(", "))
+        UiText::SharedWith {
+            devices: names.join(", "),
+        }
     }
 }

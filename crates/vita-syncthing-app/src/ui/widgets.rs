@@ -1,11 +1,11 @@
 //! Reusable VitaSend-style UI widgets (`draw_card`, `draw_chip`, `draw_action`, `draw_row_tick`,
 //! `draw_progress`, `draw_scrollbar`, `draw_page_title`, `draw_chrome`, `draw_hints`, `draw_toast`).
 
-use crate::domain::{ActiveTab, AppState, NavFocus};
+use crate::domain::{ActiveTab, AppState, NavFocus, UiText};
 use crate::ui::gfx::{
     rgb, with_alpha, Align, Color, FontWeight, Gfx, Icon, PadButton, GFX_H, GFX_W,
 };
-use crate::ui::strings;
+use crate::ui::strings::{self, Strings};
 use crate::ui::theme::{
     UiTheme, CONTENT_R, CONTENT_W, CONTENT_X, C_GOOD, C_WARN, HINT_Y, SIDEBAR_W,
 };
@@ -212,7 +212,7 @@ pub fn draw_chrome(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         FontWeight::Medium,
         th.text,
         Align::Left,
-        &state.peer_label,
+        &s.text(&state.peer_label),
     );
     draw_progress(gfx, 24, card_y + 58, SIDEBAR_W - 88, 8, pct, th.accent);
     let pct_str = format!("{}%", pct);
@@ -228,7 +228,7 @@ pub fn draw_chrome(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
 
     // Sidebar bottom Wi-Fi & version status
     let base = HINT_Y - 18;
-    let wifi_ok = !state.peer_label.contains("Scanning");
+    let wifi_ok = state.status_line != UiText::ScanningLan;
     gfx.icon(
         Icon::Wifi,
         30.0,
@@ -292,8 +292,10 @@ pub fn draw_hints(gfx: &mut Gfx, th: &UiTheme, items: &[(PadButton, Option<PadBu
     }
 }
 
-pub fn draw_toast(gfx: &mut Gfx, th: &UiTheme, toast_msg: Option<&(String, u32)>) {
+pub fn draw_toast(gfx: &mut Gfx, th: &UiTheme, s: &Strings, toast_msg: Option<&(UiText, u32)>) {
     if let Some((msg, _)) = toast_msg {
+        let msg = s.text(msg);
+        let msg = msg.as_ref();
         let size = 16;
         let maxw = 700;
         let tw = gfx.text_width(size, FontWeight::Medium, msg).min(maxw);

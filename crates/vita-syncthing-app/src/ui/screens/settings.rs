@@ -1,17 +1,24 @@
 //! Tab 4 (`Settings & Log` / `Settings`): Dark / Pure-Black OLED theme switcher,
-//! `QR / ID` modal shortcut, declined folder offers (`Clear Declined`), and BEP/1.0 & TLS 1.3
+//! `QR / ID` modal shortcut, UI language (`Change Language`), declined folder offers (`Clear Declined`), and BEP/1.0 & TLS 1.3
 //! protocol event log.
 
-use crate::domain::{ActiveTab, AppState, ThemeMode};
+use crate::domain::{
+    ActiveTab, AppState, LanguagePreference, ThemeMode, SETTINGS_ROW_DECLINED,
+    SETTINGS_ROW_DISPLAY, SETTINGS_ROW_LANGUAGE,
+};
 use crate::ui::gfx::{Align, FontWeight, Gfx, PadButton};
 use crate::ui::strings;
 use crate::ui::theme::{
     UiTheme, CONTENT_B, CONTENT_R, CONTENT_W, CONTENT_X, CONTENT_Y, C_BAD, C_GOOD,
-    SETTINGS_DECLINED_B, SETTINGS_DECLINED_Y,
+    SETTINGS_DECLINED_B, SETTINGS_DECLINED_Y, SETTINGS_LANGUAGE_B, SETTINGS_LANGUAGE_Y,
 };
 use crate::ui::widgets::{
     action_width, draw_action, draw_card, draw_focus_ring, draw_hints, draw_page_title,
 };
+
+/// Vertical centre of the theme card actions: beside the short "Colour Theme"
+/// label, between the section header and the full-width description line.
+const THEME_ACTIONS_Y: i32 = CONTENT_Y + 48;
 
 /// Renders Tab 4: **Settings & Log** (`Settings`).
 pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
@@ -44,47 +51,55 @@ pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         Align::Left,
         s.settings_label_colour_theme,
     );
-    gfx.text_fit(
-        lx,
-        CONTENT_Y + 76,
-        CONTENT_W - 220,
-        14,
-        FontWeight::Regular,
-        th.dim,
-        Align::Left,
-        theme_desc,
-    );
-
     let w_theme = action_width(gfx, PadButton::Cross, s.action_switch_theme);
     let w_qr = action_width(gfx, PadButton::Circle, s.action_qr_id);
     let w_add = action_width(gfx, PadButton::Triangle, s.action_add_device);
     let bx_theme = CONTENT_R - 20 - w_theme;
     let bx_qr = bx_theme - 8 - w_qr;
     let bx_add = bx_qr - 8 - w_add;
+
+    // The actions end above this line, so the description gets the full card width.
+    gfx.text_fit(
+        lx,
+        CONTENT_Y + 76,
+        CONTENT_R - 24 - lx,
+        14,
+        FontWeight::Regular,
+        th.dim,
+        Align::Left,
+        theme_desc,
+    );
     draw_action(
         gfx,
         th,
         bx_add,
-        CONTENT_Y + 62,
+        THEME_ACTIONS_Y,
         PadButton::Triangle,
         s.action_add_device,
     );
-    draw_action(gfx, th, bx_qr, CONTENT_Y + 62, PadButton::Circle, s.action_qr_id);
+    draw_action(
+        gfx,
+        th,
+        bx_qr,
+        THEME_ACTIONS_Y,
+        PadButton::Circle,
+        s.action_qr_id,
+    );
     draw_action(
         gfx,
         th,
         bx_theme,
-        CONTENT_Y + 62,
+        THEME_ACTIONS_Y,
         PadButton::Cross,
         s.action_switch_theme,
     );
     let display_focus = state
         .focused_action(ActiveTab::Settings)
-        .filter(|_| state.is_settings_row_focused(0));
+        .filter(|_| state.is_settings_row_focused(SETTINGS_ROW_DISPLAY));
     match display_focus {
-        Some(0) => draw_focus_ring(gfx, th, bx_add, CONTENT_Y + 62, w_add),
-        Some(1) => draw_focus_ring(gfx, th, bx_qr, CONTENT_Y + 62, w_qr),
-        Some(_) => draw_focus_ring(gfx, th, bx_theme, CONTENT_Y + 62, w_theme),
+        Some(0) => draw_focus_ring(gfx, th, bx_add, THEME_ACTIONS_Y, w_add),
+        Some(1) => draw_focus_ring(gfx, th, bx_qr, THEME_ACTIONS_Y, w_qr),
+        Some(_) => draw_focus_ring(gfx, th, bx_theme, THEME_ACTIONS_Y, w_theme),
         None => {}
     }
 
@@ -98,11 +113,14 @@ pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         s.settings_saver_auto_hint,
     );
 
-    // 2. Declined Folder Offers Card
+    // 2. UI Language Card
+    render_language(gfx, th, state);
+
+    // 3. Declined Folder Offers Card
     render_declined_folders(gfx, th, state);
 
-    // 3. Full Protocol Event Log Card
-    let ly = SETTINGS_DECLINED_B + 14;
+    // 4. Full Protocol Event Log Card
+    let ly = SETTINGS_DECLINED_B + 10;
     let lh = CONTENT_B - ly;
     draw_card(gfx, th, CONTENT_X, ly, CONTENT_W, lh, false);
     gfx.text(
@@ -154,6 +172,48 @@ pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
     );
 }
 
+/// Card showing the UI language (system default or a fixed one) with a `Change Language` button.
+fn render_language(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
+    let s = strings::strings(state.language);
+    let y = SETTINGS_LANGUAGE_Y;
+    let h = SETTINGS_LANGUAGE_B - SETTINGS_LANGUAGE_Y;
+    draw_card(gfx, th, CONTENT_X, y, CONTENT_W, h, false);
+    let lx = CONTENT_X + 24;
+    gfx.text(
+        lx,
+        y + 18,
+        12,
+        FontWeight::Bold,
+        th.accent_hi,
+        Align::Left,
+        s.settings_sec_language,
+    );
+    let value = match state.language_pref {
+        LanguagePreference::System => {
+            format!("{} · {}", s.settings_language_system, state.language.name())
+        }
+        LanguagePreference::Fixed(lang) => lang.name().to_owned(),
+    };
+    let label = s.action_change_language;
+    let w_btn = action_width(gfx, PadButton::Cross, label);
+    let bx = CONTENT_R - 20 - w_btn;
+    let cy = y + h / 2;
+    gfx.text_fit(
+        lx,
+        y + 37,
+        bx - lx - 16,
+        14,
+        FontWeight::Medium,
+        th.text,
+        Align::Left,
+        &value,
+    );
+    draw_action(gfx, th, bx, cy, PadButton::Cross, label);
+    if state.is_settings_row_focused(SETTINGS_ROW_LANGUAGE) {
+        draw_focus_ring(gfx, th, bx, cy, w_btn);
+    }
+}
+
 /// Card listing folder offers declined in the `FolderOffer` modal, with a `Clear Declined` button.
 fn render_declined_folders(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
     let s = strings::strings(state.language);
@@ -163,7 +223,7 @@ fn render_declined_folders(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
     let lx = CONTENT_X + 24;
     gfx.text(
         lx,
-        y + 22,
+        y + 20,
         12,
         FontWeight::Bold,
         th.accent_hi,
@@ -191,7 +251,7 @@ fn render_declined_folders(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
     };
     gfx.text_fit(
         lx,
-        y + 48,
+        y + 44,
         bx - lx - 16,
         14,
         FontWeight::Regular,
@@ -200,7 +260,7 @@ fn render_declined_folders(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         &summary,
     );
     draw_action(gfx, th, bx, cy, PadButton::Cross, label);
-    if state.is_settings_row_focused(1) {
+    if state.is_settings_row_focused(SETTINGS_ROW_DECLINED) {
         draw_focus_ring(gfx, th, bx, cy, w_clear);
     }
 }

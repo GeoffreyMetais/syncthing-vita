@@ -1,10 +1,7 @@
 //! Tests for `ui::i18n` multi-language catalogs, language switching, and formatters.
 
-mod common;
-
-use common::temp_test_dir;
-use vita_syncthing_app::domain::{AppState, Language};
-use vita_syncthing_app::infrastructure::{detect_system_language, ConfigRepository};
+use vita_syncthing_app::domain::Language;
+use vita_syncthing_app::infrastructure::detect_system_language;
 use vita_syncthing_app::ui::strings;
 
 #[test]
@@ -71,25 +68,6 @@ fn test_localized_catalogs_and_formatters() {
         fr.fmt_folder_offer_sub("PC"),
         "PC souhaite partager un dossier avec cette PS Vita"
     );
-}
-
-#[test]
-fn test_state_toggle_language() {
-    let dir = temp_test_dir("i18n-state");
-    let _repo = ConfigRepository::new(&dir);
-    let mut state = AppState::new(Vec::new(), Vec::new(), &dir);
-
-    assert_eq!(state.language, Language::English);
-
-    state.toggle_language();
-    assert_eq!(state.language, Language::French);
-    assert_eq!(state.toast_msg, Some(("Language: Français".to_owned(), 110)));
-
-    state.toggle_language();
-    assert_eq!(state.language, Language::Spanish);
-    assert_eq!(state.toast_msg, Some(("Language: Español".to_owned(), 110)));
-
-    let _ = std::fs::remove_dir_all(&dir);
 }
 
 #[test]

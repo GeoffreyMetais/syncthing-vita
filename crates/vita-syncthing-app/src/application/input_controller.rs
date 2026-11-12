@@ -12,7 +12,7 @@ use crate::infrastructure::{
 };
 use crate::ui::theme::{
     BROWSER_STEP, BROWSER_TOP, CONTENT_R, OPEN_CHIP_W, SETTINGS_CLEAR_BTN_X, SETTINGS_DECLINED_B,
-    SETTINGS_DECLINED_Y,
+    SETTINGS_DECLINED_Y, SETTINGS_LANGUAGE_B, SETTINGS_LANGUAGE_Y,
 };
 
 /// High-level command returned by `InputController` to the main application loop.
@@ -197,6 +197,10 @@ impl InputController {
                             } else {
                                 Self::toggle_theme(state, repo);
                             }
+                        } else if (SETTINGS_LANGUAGE_Y as usize..=SETTINGS_LANGUAGE_B as usize)
+                            .contains(&ty)
+                        {
+                            Self::cycle_language(state, repo);
                         } else if (SETTINGS_DECLINED_Y as usize..=SETTINGS_DECLINED_B as usize)
                             .contains(&ty)
                             && tx >= SETTINGS_CLEAR_BTN_X as usize
@@ -237,6 +241,7 @@ impl InputController {
             PageAction::StartSync => trigger_sync = true,
             PageAction::ShowDeviceId => state.modal = ModalDialog::ShowDeviceId,
             PageAction::ToggleTheme => Self::toggle_theme(state, repo),
+            PageAction::CycleLanguage => Self::cycle_language(state, repo),
             PageAction::AddDevice => return open_add_device_modal(state, None),
             PageAction::NewShare => state.modal = ModalDialog::CreateShare { selected_idx: 0 },
             PageAction::ManageDevices => {
@@ -329,6 +334,12 @@ impl InputController {
     fn toggle_theme(state: &mut AppState, repo: &ConfigRepository) {
         state.toggle_theme();
         repo.save_theme(state.theme_mode);
+    }
+
+    /// Cycles the UI language preference and persists the choice to disk.
+    fn cycle_language(state: &mut AppState, repo: &ConfigRepository) {
+        state.cycle_language();
+        repo.save_language(state.language_pref);
     }
 
     /// Activates `tab`; the `Files` tab opens on the share-creation folder browser.

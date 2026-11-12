@@ -5,7 +5,7 @@ use std::sync::mpsc::Receiver;
 use syncthing_core::SyncEvent;
 
 use crate::application::{FolderOfferService, ShareService};
-use crate::domain::AppState;
+use crate::domain::{AppState, UiText};
 use crate::infrastructure::{ConfigRepository, WorkerMsg};
 
 pub struct SyncCoordinator;
@@ -46,9 +46,8 @@ impl SyncCoordinator {
                         state.session_connected = false;
                         state.auto_reconnect_enabled = allow_auto_reconnect;
                         state.progress_pct = 100;
-                        state.current_file = "Finished".to_owned();
-                        state.status_line = summary.clone();
-                        ShareService::log_event(state, repo, &summary);
+                        state.current_file = UiText::SyncFinished;
+                        state.status_line = summary;
                         disconnected = true;
                     }
                 }
@@ -79,8 +78,9 @@ impl SyncCoordinator {
                     &name,
                     &peer_addr.to_string(),
                 );
-                state.peer_label = format!("{} @ {} ({})", name, peer_addr, client_version);
-                state.status_line = "Exchanging ClusterConfig & BEP Index...".to_owned();
+                state.peer_label =
+                    UiText::Raw(format!("{} @ {} ({})", name, peer_addr, client_version));
+                state.status_line = UiText::ExchangingIndex;
                 state.progress_pct = 40;
                 ShareService::log_event(
                     state,
@@ -103,7 +103,11 @@ impl SyncCoordinator {
                 } else {
                     labels.join(", ")
                 };
-                state.folder_label = joined.clone();
+                state.folder_label = if labels.is_empty() {
+                    UiText::NoRemoteFolders
+                } else {
+                    UiText::Raw(joined.clone())
+                };
                 state.progress_pct = 55;
                 ShareService::log_event(
                     state,
@@ -113,8 +117,8 @@ impl SyncCoordinator {
             }
             SyncEvent::FileUpToDate { name, size, .. } => {
                 state.files_up_to_date += 1;
-                state.current_file = name.clone();
-                state.status_line = format!("Up-to-date (Delta 0 B): {}", name);
+                state.current_file = UiText::Raw(name.clone());
+                state.status_line = UiText::FileUpToDate { file: name.clone() };
                 ShareService::log_event(
                     state,
                     repo,
@@ -131,14 +135,14 @@ impl SyncCoordinator {
                 state.sync_in_progress = true;
                 state.transfer_activity += 1;
                 state.bytes_transferred += size;
-                state.current_file = name.clone();
+                state.current_file = UiText::Raw(name.clone());
                 let pct = if total_size > 0 {
                     (((offset + size as u64) * 100) / total_size) as u32
                 } else {
                     100
                 };
                 state.progress_pct = pct.clamp(55, 95);
-                state.status_line = format!("Downloading {} ({}%)", name, pct);
+                state.status_line = UiText::Downloading { file: name, pct };
             }
             SyncEvent::FileSynced {
                 name,
@@ -148,7 +152,7 @@ impl SyncCoordinator {
             } => {
                 state.files_downloaded += 1;
                 state.transfer_activity += 1;
-                state.current_file = name.clone();
+                state.current_file = UiText::Raw(name.clone());
                 ShareService::log_event(
                     state,
                     repo,
@@ -160,7 +164,7 @@ impl SyncCoordinator {
             }
             SyncEvent::LocalIndexPublished { folder, file_count } => {
                 state.progress_pct = 90;
-                state.status_line = format!("Local Vita index published ({} files)", file_count);
+                state.status_line = UiText::IndexPublished { files: file_count };
                 ShareService::log_event(
                     state,
                     repo,
@@ -173,8 +177,8 @@ impl SyncCoordinator {
                 state.blocks_uploaded += 1;
                 state.transfer_activity += 1;
                 state.bytes_transferred += size;
-                state.current_file = name.clone();
-                state.status_line = format!("Uploading to peer: {}", name);
+                state.current_file = UiText::Raw(name.clone());
+                state.status_line = UiText::Uploading { file: name.clone() };
                 ShareService::log_event(
                     state,
                     repo,
@@ -201,7 +205,9 @@ impl SyncCoordinator {
                 } else {
                     "1 connection".to_owned()
                 };
-                state.current_file = format!("Connected ({})", conn_badge);
+                state.current_file = UiText::Connections {
+                    count: active_connections,
+                };
                 let summary = format!(
                     "Connected ({}) · {} up-to-date | {} DL ({} KB) | {} UL ({} B)",
                     conn_badge,
@@ -211,7 +217,14 @@ impl SyncCoordinator {
                     blocks_uploaded,
                     bytes_uploaded
                 );
-                state.status_line = summary.clone();
+                state.status_line = UiText::SyncSummary {
+                    connections: active_connections,
+                    up_to_date: files_up_to_date,
+                    downloaded: files_downloaded,
+                    downloaded_kb: bytes_downloaded / 1024,
+                    uploaded: blocks_uploaded,
+                    uploaded_bytes: bytes_uploaded,
+                };
                 ShareService::log_event(state, repo, &summary);
             }
             SyncEvent::FolderUnavailable { folder, error } => {

@@ -5,7 +5,7 @@ use syncthing_core::DeviceId;
 
 use crate::application::modal_input::confirm_add_device;
 use crate::application::UserCommand;
-use crate::domain::{AppState, ModalDialog};
+use crate::domain::{AppState, ModalDialog, UiText};
 use crate::infrastructure::{ConfigRepository, QrScanEvent};
 
 pub struct QrScanFlow;
@@ -55,7 +55,7 @@ impl QrScanFlow {
                     cmd
                 }
                 None => {
-                    state.show_toast("This QR code is not a Syncthing Device ID");
+                    state.show_toast(UiText::QrNotDeviceId);
                     UserCommand::None
                 }
             },

@@ -4,7 +4,9 @@
 use syncthing_core::DeviceId;
 
 use crate::application::{FolderOfferService, ShareCreation};
-use crate::domain::{ActiveTab, AppState, KnownDevice, PickerItem, PickerMode, ShareConfigEntry};
+use crate::domain::{
+    ActiveTab, AppState, KnownDevice, PickerItem, PickerMode, ShareConfigEntry, UiText,
+};
 use crate::infrastructure::ConfigRepository;
 
 pub struct ShareService;
@@ -146,7 +148,7 @@ impl ShareService {
         repo: &ConfigRepository,
         raw_input: &str,
         share_idx: Option<usize>,
-    ) -> Result<(DeviceId, String, bool), String> {
+    ) -> Result<(DeviceId, String, bool), UiText> {
         let trimmed = raw_input.trim();
         let (id_part, addr_part) = if let Some((left, right)) = trimmed.split_once('@') {
             let clean_addr = right.trim();
@@ -162,11 +164,11 @@ impl ShareService {
             (trimmed, None)
         };
 
-        let parsed_id = DeviceId::parse_user_id(id_part)?;
+        let parsed_id = DeviceId::parse_user_id(id_part).map_err(UiText::InvalidDeviceId)?;
 
         if let Ok(own_id) = DeviceId::parse_user_id(&state.vita_device_id) {
             if own_id.matches_peer(&parsed_id) {
-                return Err("Cannot add this PS Vita's own Device ID".to_owned());
+                return Err(UiText::OwnDeviceId);
             }
         }
 
@@ -297,8 +299,9 @@ impl ShareService {
             state.config_dirty = true;
             repo.save_shares(&state.shares);
             repo.ensure_dir(&chosen_path);
-            let msg = format!("Saved in {}", chosen_path);
-            state.show_toast(&msg);
+            state.show_toast(UiText::SavedIn {
+                path: chosen_path.clone(),
+            });
             Self::log_event(
                 state,
                 repo,
@@ -374,7 +377,11 @@ impl ShareService {
             state.auto_reconnect_enabled = true;
             repo.save_shares(&state.shares);
             let msg = format!("Share {} is now {}", fid, st);
-            state.show_toast(&msg);
+            state.show_toast(if is_enabled {
+                UiText::ShareActive { id: fid.clone() }
+            } else {
+                UiText::SharePaused { id: fid.clone() }
+            });
             Self::log_event(state, repo, &msg);
         }
     }
@@ -464,7 +471,9 @@ impl ShareService {
 
         let mut items = if state.picker_mode == PickerMode::CreateNewShare {
             vec![PickerItem {
-                label: format!("Share this folder ({})", state.picker_current_dir),
+                label: UiText::PickerShareThisFolder {
+                    path: state.picker_current_dir.clone(),
+                },
                 path: state.picker_current_dir.clone(),
                 is_preset: true,
                 is_shared: false,
@@ -472,49 +481,57 @@ impl ShareService {
         } else {
             vec![
                 PickerItem {
-                    label: format!("Keep current folder ({})", current_target),
+                    label: UiText::PickerKeepCurrent {
+                        path: current_target.clone(),
+                    },
                     path: current_target,
                     is_preset: true,
                     is_shared: false,
                 },
                 PickerItem {
-                    label: "Save Data (ux0:user/00/savedata)".to_owned(),
+                    label: UiText::PickerSaveData {
+                        path: "ux0:user/00/savedata".to_owned(),
+                    },
                     path: "ux0:user/00/savedata".to_owned(),
                     is_preset: true,
                     is_shared: false,
                 },
                 PickerItem {
-                    label: "PS Vita Pictures (ux0:picture)".to_owned(),
+                    label: UiText::PickerPictures {
+                        path: "ux0:picture".to_owned(),
+                    },
                     path: "ux0:picture".to_owned(),
                     is_preset: true,
                     is_shared: false,
                 },
                 PickerItem {
-                    label: "PS Vita Music (ux0:music)".to_owned(),
+                    label: UiText::PickerMusic {
+                        path: "ux0:music".to_owned(),
+                    },
                     path: "ux0:music".to_owned(),
                     is_preset: true,
                     is_shared: false,
                 },
                 PickerItem {
-                    label: "RetroArch Savefiles (ux0:data/retroarch/savefiles)".to_owned(),
+                    label: UiText::PickerRetroArch {
+                        path: "ux0:data/retroarch/savefiles".to_owned(),
+                    },
                     path: "ux0:data/retroarch/savefiles".to_owned(),
                     is_preset: true,
                     is_shared: false,
                 },
                 PickerItem {
-                    label: format!(
-                        "Default Syncthing folder ({}/sync/{})",
-                        base_data_dir, folder_id
-                    ),
+                    label: UiText::PickerDefaultFolder {
+                        path: format!("{}/sync/{}", base_data_dir, folder_id),
+                    },
                     path: format!("{}/sync/{}", base_data_dir, folder_id),
                     is_preset: true,
                     is_shared: false,
                 },
                 PickerItem {
-                    label: format!(
-                        "Use current browsed folder ({})",
-                        state.picker_current_dir.trim_end_matches('/')
-                    ),
+                    label: UiText::PickerBrowsedFolder {
+                        path: state.picker_current_dir.trim_end_matches('/').to_owned(),
+                    },
                     path: state.picker_current_dir.trim_end_matches('/').to_owned(),
                     is_preset: true,
                     is_shared: false,
@@ -531,7 +548,7 @@ impl ShareService {
                 format!("{}/{}", state.picker_current_dir, sub)
             };
             items.push(PickerItem {
-                label: format!("{}/", sub),
+                label: UiText::Raw(format!("{}/", sub)),
                 path: full,
                 is_preset: false,
                 is_shared: false,

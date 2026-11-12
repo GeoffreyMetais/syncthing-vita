@@ -41,13 +41,16 @@ VitaSDK is the standard open-source cross-compilation toolchain for the PlayStat
    export PATH="$VITASDK/bin:$PATH"
    ```
 
-2. **Download and Extract Prebuilt VitaSDK**:
-   VitaSDK provides automated daily tarballs for x86_64 Linux:
+2. **Install VitaSDK with the official bootstrap**:
+   The old `vitasdk-x86_64-linux-ubuntu-latest.tar.bz2` autobuild asset no longer exists.
+   The `vdpm` bootstrap installs the newest supported series as pacman packages and verifies
+   the signed channel manifest (it needs `github.com` and `vitasdk.org`, and refuses an
+   existing destination directory):
    ```bash
-   sudo mkdir -p "$VITASDK"
-   sudo chown -R $(whoami):$(whoami) "$VITASDK"
-   curl -sL https://github.com/vitasdk/autobuilds/releases/download/master-linux/vitasdk-x86_64-linux-ubuntu-latest.tar.bz2 | tar -xj -C "$VITASDK" --strip-components=1
+   git clone --depth 1 https://github.com/vitasdk/vdpm /tmp/vdpm
+   (cd /tmp/vdpm && ./bootstrap-vitasdk.sh)
    ```
+   `scripts/setup_env.sh --install-vitasdk` does the same.
 
 3. **Install Core Libraries via `vdpm`**:
    VitaSDK includes `vdpm` (Vita Development Package Manager) to fetch pre-compiled libraries:
@@ -146,6 +149,8 @@ Vita3K is the leading experimental open-source PlayStation Vita emulator for Win
    curl -fL https://github.com/Vita3K/Vita3K/releases/download/continuous/Vita3K-x86_64.AppImage -o ~/.local/bin/Vita3K
    chmod +x ~/.local/bin/Vita3K
    ```
+   In containers without FUSE, extract the AppImage instead (`scripts/setup_env.sh --install-vita3k`
+   installs an extracted copy behind a `~/.local/bin/Vita3K` wrapper).
 
 3. **Install Sony Official System Firmware & Font Package**:
    Vita3K requires both Sony firmware `.PUP` files to render text and system assets:
@@ -157,8 +162,8 @@ Vita3K is the leading experimental open-source PlayStation Vita emulator for Win
    curl -fL http://dus01.psv.update.playstation.net/update/psv/image/2012_0208/sd_2f1289b2d864758a09225d2789fa3996/PSP2UPDAT.PUP -o /tmp/vita-fw/FONT_PSP2UPDAT.PUP
 
    # Install into Vita3K
-   ~/.local/bin/Vita3K --console 1 --firmware /tmp/vita-fw/PSP2UPDAT.PUP
-   ~/.local/bin/Vita3K --console 1 --firmware /tmp/vita-fw/FONT_PSP2UPDAT.PUP
+   ~/.local/bin/Vita3K -z --firmware /tmp/vita-fw/PSP2UPDAT.PUP
+   ~/.local/bin/Vita3K -z --firmware /tmp/vita-fw/FONT_PSP2UPDAT.PUP
    rm -rf /tmp/vita-fw
    ```
 
@@ -171,8 +176,18 @@ Vita3K is the leading experimental open-source PlayStation Vita emulator for Win
 5. **Headless / Console Execution**:
    To run an app and monitor console output from stdout:
    ```bash
-   ~/.local/bin/Vita3K --console 1 --frontend sdl -l 2 -r <TITLE_ID>
+   ~/.local/bin/Vita3K -z --frontend sdl -l 2 -r <TITLE_ID>
    ```
+   Recent Vita3K builds take `-z` / `--console` **without a value**: `--console 1` makes Vita3K
+   treat `1` as a content path.
+   Headless (no GPU, e.g. cloud containers): run under Xvfb with Mesa's software OpenGL:
+   ```bash
+   mkdir -p -m 700 /tmp/xdg
+   XDG_RUNTIME_DIR=/tmp/xdg LIBGL_ALWAYS_SOFTWARE=1 MESA_GL_VERSION_OVERRIDE=4.6 MESA_GLSL_VERSION_OVERRIDE=460 \
+     xvfb-run -a -s "-screen 0 1280x720x24" ~/.local/bin/Vita3K -z --frontend sdl -B OpenGL -l 2 -r <TITLE_ID>
+   ```
+   The Sony firmware is optional for homebrew. Its update servers only serve plain HTTP, so the
+   download fails behind HTTPS-only proxies.
 
 ---
 

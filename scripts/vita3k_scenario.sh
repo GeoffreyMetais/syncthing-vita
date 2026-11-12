@@ -32,7 +32,7 @@ rm -rf "$DATA/shots"
 cp "$SCRIPT" "$DATA/ui_script.txt"
 unzip -qo "$VPK" -d "$UX0/app/SYNCTHING"
 
-SDL_VIDEODRIVER="${SDL_VIDEODRIVER:-x11}" "$VITA3K_BIN" --console 1 --frontend sdl -l 2 -r SYNCTHING \
+SDL_VIDEODRIVER="${SDL_VIDEODRIVER:-x11}" "$VITA3K_BIN" -z --frontend sdl -l 2 -r SYNCTHING \
     > "$OUT_DIR/vita3k.log" 2>&1 &
 sleep "$RUN_SECS"
 pkill -x Vita3K || true

@@ -45,7 +45,8 @@ syncthing-vita
             │   ├── mod.rs
             │   ├── navigation.rs     # NavFocus / NavState (D-pad focus), tab order, buttons per row
             │   ├── models.rs         # KnownDevice, ShareConfigEntry, PickerItem, ActiveTab, PickerMode, ModalDialog, ThemeMode
-            │   └── app_state.rs      # AppState (pure state & view-model queries, zero I/O or rendering dependencies)
+            │   ├── app_state.rs      # AppState (pure state & view-model queries, zero I/O or rendering dependencies)
+            │   └── ui_text.rs        # UiText: translatable messages (status line, labels, toasts) chosen by inner layers
             ├── application/          # Layer 2: Use Cases, Input Controller & Sync Event Coordinator
             │   ├── mod.rs
             │   ├── share_service.rs  # ShareService (create_share, upsert_device, toggle_device_for_share, refresh_picker_items)
@@ -58,7 +59,7 @@ syncthing-vita
             │   └── modal_input/      # ModalInput: one input handler per modal (create_share, manage_devices, add_device, scan_qr, dialogs)
             ├── infrastructure/       # Layer 3: Persistence, OS Filesystem, PS Vita Hardware & BEP Worker Thread
             │   ├── mod.rs
-            │   ├── config_repo.rs    # ConfigRepository (devices.cfg, shares.cfg, ignored_folders.cfg, theme.cfg, syncthing.log, ux0: directory listing)
+            │   ├── config_repo.rs    # ConfigRepository (devices.cfg, shares.cfg, ignored_folders.cfg, theme.cfg, language.cfg, syncthing.log, ux0: directory listing)
             │   ├── identity_store.rs # IdentityStore (sceKernelGetRandomNumber, device_seed.bin, cert.der)
             │   ├── vita_system.rs    # init_vita_network (SceSysmodule + SceSysmem + SceNet + SceNetCtl) & detect_system_language (SceAppUtil)
             │   ├── ui_script.rs      # Opt-in `ui-script` feature: scripted input replay + frame dumps for Vita3K
@@ -75,7 +76,8 @@ syncthing-vita
                 │   ├── fr.rs         # French static catalog (STRINGS_FR)
                 │   ├── es.rs         # Spanish static catalog (STRINGS_ES)
                 │   ├── de.rs         # German static catalog (STRINGS_DE)
-                │   └── it.rs         # Italian static catalog (STRINGS_IT)
+                │   ├── it.rs         # Italian static catalog (STRINGS_IT)
+                │   └── messages.rs   # Messages templates, Strings::text(&UiText), device_id_error
                 ├── image.rs          # Greyscale camera frame blit (QR viewfinder)
                 ├── gfx.rs            # 960x544 RGBA8888 2D anti-aliased vector & TrueType software renderer
                 ├── theme.rs          # UiTheme (Dark & OLED palettes) and layout constants
@@ -136,7 +138,7 @@ Dependencies strictly point **inward**. Inner layers never import or depend on o
 ```
 
 1. **Layer 1: Pure Domain Layer (`crates/vita-syncthing-app/src/domain/`)**
-   - **Responsibility**: Pure domain models (`models.rs`), application state container (`app_state.rs`), invariants, and query functions.
+   - **Responsibility**: Pure domain models (`models.rs`), application state container (`app_state.rs`), translatable messages (`ui_text.rs`), invariants, and query functions.
    - **Strict Isolation**: **Zero external dependencies**. Absolutely no I/O, no filesystem, no sockets, no rendering, and no VitaSDK syscalls.
    - **Host Testability**: Must be 100% testable on standard x86_64 host machines without any mocks or emulators.
 
@@ -155,7 +157,7 @@ Dependencies strictly point **inward**. Inner layers never import or depend on o
 3. **Layer 3: Infrastructure Layer (`crates/vita-syncthing-app/src/infrastructure/`)**
    - **Responsibility**: Hardware drivers, OS filesystem persistence, background threads, and Vita system modules.
    - **Key Modules**:
-     - `config_repo.rs`: Disk persistence (`devices.cfg`, `shares.cfg`, `ignored_folders.cfg`, `theme.cfg`, `syncthing.log`) and `ux0:` browsing.
+     - `config_repo.rs`: Disk persistence (`devices.cfg`, `shares.cfg`, `ignored_folders.cfg`, `theme.cfg`, `language.cfg`, `syncthing.log`) and `ux0:` browsing.
      - `identity_store.rs`: Device seed PRNG (`sceKernelGetRandomNumber`) and X.509 certificate persistence.
      - `framebuffer.rs`: PS Vita hardware framebuffer management (`SceDisplay`, `SceSysmem`).
      - `input.rs`: Controller & touchscreen hardware drivers (`SceCtrl`, `SceTouch`).
@@ -198,6 +200,7 @@ To prevent code degradation into large, unmaintainable files:
   - **New Screens**: Always create a separate file under `ui/screens/<feature>.rs` and expose it via `ui/screens/mod.rs`.
   - **New Modal Dialogs**: Always create a separate file under `ui/modals/<modal_name>.rs` and expose it via `ui/modals/mod.rs`.
   - **New Services**: Split distinct domain workflows into dedicated services in `application/` rather than adding methods to an existing unrelated service.
+  - **Messages from inner layers**: the domain, application and infrastructure layers never build display strings. They set a `UiText` variant (status line, peer / folder labels, toasts, `Files` rows) and `ui::i18n::messages` renders it with each language's `Messages` templates (`{placeholder}` syntax). Only the protocol log (`syncthing.log`) stays in English.
   - **Factorized UI Copy & Multi-Language Support**: Never scatter hardcoded user-facing strings or button labels across screens and modals. Place all reusable actions, tab titles, hints, status badges, and formatting helpers in `ui/i18n/` (with static language catalogs in `en.rs`, `fr.rs`, `es.rs`, `de.rs`, `it.rs`) and `ui/strings.rs` so copy is deduplicated and i18n-ready without per-frame heap churn.
   - **Avoid "Omnibus" Files**: Never create catch-all files like `display.rs` or `utils.rs`. Group code by specific domain responsibility.
 
@@ -304,6 +307,7 @@ All persistent application state lives in `ux0:data/syncthing/` (or `/tmp/syncth
 | `shares.cfg` | Configured shared folders and linked devices | `<folder_id>\|<label>\|<target_path>\|<0\|1>\|<dev_hex1,dev_hex2>\n` |
 | `ignored_folders.cfg` | Folder offers declined by the user or deleted shares (not prompted again until `Settings` · `Clear Declined`) | `<folder_id>\|<device_id_hex>\n` |
 | `theme.cfg` | Persistent colour theme mode (`dark` or `oled`) | `<dark\|oled>\n` |
+| `language.cfg` | UI language chosen in `Settings` (`system` follows the PS Vita language; a missing file means `system`) | `<system\|en\|fr\|es\|de\|it>\n` |
 | `syncthing.log` | Persistent protocol & UI event log | Plain text lines |
 | `sync/.syncthing_db_<folder>_<root hash>.txt` | Persistent folder database (`local_db/`): version vectors, sequences, blocks and tombstones per entry | `#vita-db-v1` tab-separated text |
 
@@ -333,6 +337,8 @@ cargo test --workspace
 - `dpad_navigation.rs`: sidebar <-> page focus, Shares rows / buttons / header, Files rows / Up button
 - `qr_scan.rs`: Device ID extraction from QR payloads, `quircs` decoding of a rendered QR code, scanner modal navigation, adding the scanned device
 - `power_policy.rs`: standby blocking while syncing (charging / battery / transfer grace period)
+- `ui_text.rs`: every `UiText` message renders in all 5 languages with its placeholders filled, translated Device ID errors
+- `language_settings.rs`: language preference codec / cycle, `language.cfg` persistence (defaults to the system language), `Settings` language card (D-pad and touch)
 
 ### Cross-Check for PS Vita (`armv7-sony-vita-newlibeabihf`)
 ```bash
@@ -357,7 +363,7 @@ After running `just vpk`, you can verify that the required Newlib heap and threa
 ### Install & Smoke-Test in Vita3K (Local Emulator)
 ```bash
 unzip -o target/armv7-sony-vita-newlibeabihf/release/SYNCTHING.vpk -d ~/.local/share/Vita3K/Vita3K/ux0/app/SYNCTHING
-timeout 6s ~/.local/bin/Vita3K --console 1 --frontend sdl -l 2 -r SYNCTHING || true
+timeout 6s ~/.local/bin/Vita3K -z --frontend sdl -l 2 -r SYNCTHING || true
 ```
 
 ### Scripted UI Smoke Tests in Vita3K (`ui-script` feature)
@@ -379,7 +385,7 @@ The UI (`gfx.rs` + `ui/screens/*` + `ui/modals/*` + `ui/renderer.rs`) renders at
   1. `Overview` (`ActiveTab::Dashboard`): Device status card, `QR / ID` modal button (`Circle`), `Sync Now` button (`Cross`), transfer statistics, and recent activity feed.
   2. `Shares` (`ActiveTab::Shares`): List of shared folders, `+ New Share` modal (`Circle`), `Devices` assignment modal (`Cross`), `Delete` with confirmation (`Square`), and `Folder` path picker (`Triangle`).
   3. `Files` (`ActiveTab::FolderPicker`): Interactive `ux0:` directory browser. Selecting a folder (`Cross` or tap) starts creating a share of it (folders already shared are greyed out and cannot be selected or opened); `Triangle` (or tapping the `Open` chip) enters a subfolder, `Circle` goes up/back. The `Shares` tab `Folder` action reuses this browser to change a share's target path.
-  4. `Settings` (`ActiveTab::Settings`): Dark / Pure-Black OLED theme switcher (`Cross`), `QR / ID` modal (`Circle`), `Declined folders` card (D-pad `Down` + `Cross` or tap `Clear Declined` to forget declined folder offers so peers can offer them again), and BEP/1.0 protocol log viewer.
+  4. `Settings` (`ActiveTab::Settings`): Dark / Pure-Black OLED theme switcher (`Cross`), `QR / ID` modal (`Circle`), `Language` card (D-pad `Down` + `Cross` or tap: System -> English -> Français -> Español -> Deutsch -> Italiano, saved in `language.cfg`), `Declined folders` card (D-pad `Down` + `Cross` or tap `Clear Declined` to forget declined folder offers so peers can offer them again), and BEP/1.0 protocol log viewer.
 - **Modal Dialogs** (`ModalDialog` in `domain/models.rs`, rendered by `ui/modals/*`):
   - `CreateShare`: Create a share from PS Vita folder presets (`ux0:user/00/savedata`, `ux0:picture`, `ux0:music`, RetroArch saves) or browse `ux0:`. The share is only kept once a device is linked in the `ManageDevices` modal that follows.
   - `ManageDevices`: Link/unlink discovered Syncthing peers to a share with circular checkboxes (`draw_row_tick`), add one by ID (`Square`) or by QR code (`R · Scan QR`) and trigger immediate `ClusterConfig` advertising (`Triangle · Apply & Sync`); `SELECT` pauses / enables the share.
