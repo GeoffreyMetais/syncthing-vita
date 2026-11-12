@@ -9,7 +9,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use syncthing_core::SyncControl;
-use vita_syncthing_app::application::power_policy::should_block_standby;
+use vita_syncthing_app::application::power_policy::{cpu_clock, should_block_standby, CpuClock};
 use vita_syncthing_app::application::{
     FolderOfferService, FramePacer, FrameSignals, InputController, QrScanFlow, ShareService,
     SyncCoordinator, UserCommand,
@@ -17,7 +17,8 @@ use vita_syncthing_app::application::{
 use vita_syncthing_app::domain::{AppState, ModalDialog, UiText};
 use vita_syncthing_app::infrastructure::{
     detect_system_language, init_vita_network, is_on_external_power, keep_system_awake,
-    spawn_sync_worker, ConfigRepository, IdentityStore, QrScanner, VitaInput, WorkerMsg,
+    set_cpu_clock_mhz, spawn_sync_worker, ConfigRepository, IdentityStore, QrScanner, VitaInput,
+    WorkerMsg,
 };
 use vita_syncthing_app::ui::VitaUiRenderer;
 
@@ -130,6 +131,7 @@ fn main() {
     let mut seen_transfer_activity = state.transfer_activity;
     let mut last_transfer_at: Option<Instant> = None;
     let mut pacer = FramePacer::new();
+    let mut cpu = CpuClock::Full;
 
     // Main interactive loop (Gamepad SceCtrl + Touch SceTouch + OLED Saver), one iteration per
     // display VBlank. Frames are only rendered when the screen changes (dynamic frame rate).
@@ -209,6 +211,7 @@ fn main() {
                     ctl.request_stop();
                 }
                 ShareService::log_event(&mut state, &repo, "Exit requested by user [START].");
+                set_cpu_clock_mhz(CpuClock::Full.mhz());
                 break;
             }
         }
@@ -276,8 +279,21 @@ fn main() {
             seen_transfer_activity = state.transfer_activity;
             last_transfer_at = Some(Instant::now());
         }
+        // Full CPU speed only while transferring (see `power_policy::cpu_clock`).
+        let cpu_target = cpu_clock(
+            last_transfer_at.map(|t| t.elapsed()),
+            last_activity.elapsed(),
+            state.is_scanning_qr(),
+        );
+        if cpu_target != cpu {
+            cpu = cpu_target;
+            set_cpu_clock_mhz(cpu.mhz());
+        }
+
         if last_power_tick.elapsed() >= Duration::from_secs(10) {
             last_power_tick = Instant::now();
+            // The system may reset the clock after standby: re-apply it periodically.
+            set_cpu_clock_mhz(cpu.mhz());
             let sync_active = worker_rx.is_some() || state.auto_reconnect_enabled;
             if should_block_standby(
                 sync_active,

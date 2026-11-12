@@ -62,6 +62,8 @@ pub mod vita_ffi {
     extern "C" {
         /// Returns 1 when the console runs on external power (AC adapter / USB charging).
         pub fn scePowerIsPowerOnline() -> c_int;
+        pub fn scePowerGetArmClockFrequency() -> c_int;
+        pub fn scePowerSetArmClockFrequency(freq: c_int) -> c_int;
     }
 
     #[link(name = "SceSysmem_stub")]
@@ -170,6 +172,21 @@ pub fn is_on_external_power() -> bool {
 pub fn is_on_external_power() -> bool {
     false
 }
+
+/// Sets the ARM CPU clock (MHz) if it differs from the current one (see
+/// `application::power_policy::cpu_clock`). Safe to call periodically: the system may reset
+/// the clock after standby.
+#[cfg(target_os = "vita")]
+pub fn set_cpu_clock_mhz(mhz: u32) {
+    unsafe {
+        if vita_ffi::scePowerGetArmClockFrequency() != mhz as libc::c_int {
+            let _ = vita_ffi::scePowerSetArmClockFrequency(mhz as libc::c_int);
+        }
+    }
+}
+
+#[cfg(not(target_os = "vita"))]
+pub fn set_cpu_clock_mhz(_mhz: u32) {}
 
 /// Detects the system language from VitaSDK `SceAppUtil` (on PS Vita) or environment variables (on host).
 #[cfg(target_os = "vita")]
