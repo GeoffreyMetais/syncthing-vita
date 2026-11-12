@@ -48,6 +48,16 @@ pub enum UiAction {
     /// Browse for another target folder of the selected share.
     ChangeSelectedShareFolder,
 
+    // --- Modal dialogs ---
+    /// Same as pressing this button (buttons and hints of the open modal).
+    Press(PadKey),
+    /// Activate row / key `usize` of the open modal's list or keypad.
+    ModalRow(usize),
+    /// Open the system keyboard (text field of the open modal).
+    OpenKeyboard,
+    /// Absorbs the touch: nothing happens (e.g. the body of a modal).
+    Inert,
+
     // --- `Shares` ---
     /// `Shares`: open the share creation dialog.
     NewShare,
@@ -103,6 +113,19 @@ pub enum ShortcutKey {
     Circle,
     Square,
     Triangle,
+}
+
+/// A physical button a touch element can stand for (`UiAction::Press`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PadKey {
+    Cross,
+    Circle,
+    Square,
+    Triangle,
+    L,
+    R,
+    Start,
+    Select,
 }
 
 /// One interactive element of the frame.

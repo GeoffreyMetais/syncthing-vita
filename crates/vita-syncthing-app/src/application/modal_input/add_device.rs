@@ -1,19 +1,20 @@
 //! `AddDeviceById` modal input: system keyboard, virtual keypad, QR scanner entry and device
 //! confirmation.
 
+use super::ModalTouch;
 use crate::application::{QrScanFlow, ShareService, UserCommand};
 use crate::domain::{AppState, ModalDialog, UiText, ADD_DEVICE_KEYPAD};
 use crate::infrastructure::{
     ConfigRepository, InputFrame, BTN_CIRCLE, BTN_CROSS, BTN_DOWN, BTN_LEFT, BTN_R, BTN_RIGHT,
     BTN_SQUARE, BTN_START, BTN_TRIANGLE, BTN_UP,
 };
-use crate::ui::theme::{add_device_modal_height, SCAN_QR_BTN_W, VIRTUAL_KEYBOARD_BTN_W};
 
 /// Handles input in the `AddDeviceById` modal.
 pub fn handle(
     state: &mut AppState,
     repo: &ConfigRepository,
     input: InputFrame,
+    touch: ModalTouch,
     return_share_idx: Option<usize>,
     mut keypad_idx: usize,
 ) -> UserCommand {
@@ -83,71 +84,17 @@ pub fn handle(
     }
 
     let mut activate_key = (pressed & BTN_CROSS) != 0;
-    if let Some((tx, ty)) = input.touch_tap {
-        let w = 700usize;
-        let h = add_device_modal_height(keypad) as usize;
-        let dx = (960 - w) / 2;
-        let dy = (500 - h) / 2;
-        let lx = dx + 28;
-
-        if ty >= 500 {
-            if tx < 220 {
-                state.fallback_keypad_visible = !keypad;
-            } else if tx < 420 {
-                return confirm_add_device(state, repo, return_share_idx);
-            } else if tx < 540 {
-                QrScanFlow::open(state, return_share_idx);
-            } else if tx >= 760 {
-                close_add_device_modal(state, return_share_idx);
-            }
-            return UserCommand::None;
+    match touch {
+        ModalTouch::Keyboard => return UserCommand::OpenSystemKeyboard,
+        ModalTouch::Row(idx) if keypad && idx < ADD_DEVICE_KEYPAD.len() => {
+            keypad_idx = idx;
+            state.modal = ModalDialog::AddDeviceById {
+                return_share_idx,
+                keypad_idx,
+            };
+            activate_key = true;
         }
-
-        if tx >= dx && tx <= dx + w && ty >= dy && ty <= dy + h {
-            // Tapping the text input box opens the PS Vita System Keyboard, except
-            // its `Virtual Keyboard` button which toggles the fallback keypad
-            if (dy + 76..=dy + 132).contains(&ty) {
-                if tx >= dx + w - 28 - VIRTUAL_KEYBOARD_BTN_W {
-                    state.fallback_keypad_visible = !keypad;
-                    return UserCommand::None;
-                }
-                return UserCommand::OpenSystemKeyboard;
-            }
-            // Tapping bottom action buttons (`Scan QR`, `Add Device`, `Backspace`, `Cancel`)
-            if ty >= dy + h - 52 {
-                if tx >= dx + w - 135 {
-                    close_add_device_modal(state, return_share_idx);
-                } else if tx >= dx + w - 275 {
-                    state.device_id_input.pop();
-                } else if tx >= dx + w - 440 {
-                    return confirm_add_device(state, repo, return_share_idx);
-                } else if tx < lx + SCAN_QR_BTN_W {
-                    QrScanFlow::open(state, return_share_idx);
-                }
-                return UserCommand::None;
-            }
-            // Tapping a key in the 9x4 Base32 keypad grid
-            let grid_y = dy + 162;
-            let key_count = if keypad { ADD_DEVICE_KEYPAD.len() } else { 0 };
-            for idx in 0..key_count {
-                let col = idx % 9;
-                let row = idx / 9;
-                let kx = lx + col * 72;
-                let ky = grid_y + row * 42;
-                if tx >= kx && tx <= kx + 68 && ty >= ky && ty <= ky + 38 {
-                    keypad_idx = idx;
-                    state.modal = ModalDialog::AddDeviceById {
-                        return_share_idx,
-                        keypad_idx,
-                    };
-                    activate_key = true;
-                    break;
-                }
-            }
-        } else {
-            close_add_device_modal(state, return_share_idx);
-            return UserCommand::None;
-        }
+        ModalTouch::Row(_) | ModalTouch::None => {}
     }
 
     if activate_key {

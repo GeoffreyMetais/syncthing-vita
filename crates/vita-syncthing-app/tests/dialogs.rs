@@ -3,13 +3,12 @@
 
 mod common;
 
-use common::{press, tap, temp_test_dir};
+use common::{press, rects_of, tap, tap_rect, temp_test_dir};
 use vita_syncthing_app::application::{ShareService, UserCommand};
-use vita_syncthing_app::domain::{ActiveTab, AppState, ModalDialog};
+use vita_syncthing_app::domain::{ActiveTab, AppState, ModalDialog, PadKey, UiAction};
 use vita_syncthing_app::infrastructure::{
     ConfigRepository, BTN_CIRCLE, BTN_CROSS, BTN_SQUARE, BTN_START,
 };
-use vita_syncthing_app::ui::theme::{CONFIRM_QUIT_H, CONFIRM_QUIT_W};
 
 #[test]
 fn test_start_opens_quit_dialog_and_cross_quits() {
@@ -28,24 +27,26 @@ fn test_start_opens_quit_dialog_and_cross_quits() {
 }
 
 #[test]
-fn test_confirm_quit_touch_targets_follow_dialog_size() {
+fn test_confirm_quit_touch_targets() {
     let dir = temp_test_dir("input-ctl-quit-touch");
     let repo = ConfigRepository::new(&dir);
     let mut state = AppState::new(Vec::new(), Vec::new(), &dir);
 
-    // The `Quit App` action sits at the bottom right of the (720x236) dialog.
-    let dx = (960 - CONFIRM_QUIT_W as usize) / 2;
-    let dy = (500 - CONFIRM_QUIT_H as usize) / 2;
-    let quit_x = dx + CONFIRM_QUIT_W as usize - 80;
-    let quit_y = dy + CONFIRM_QUIT_H as usize - 34;
-
+    // The `Quit App` button and its hint both quit.
     state.modal = ModalDialog::ConfirmQuit;
-    assert_eq!(tap(&mut state, &repo, quit_x, quit_y), UserCommand::QuitApp);
+    let quit = rects_of(&mut state, UiAction::Press(PadKey::Cross));
+    assert_eq!(quit.len(), 2, "the dialog button and the hint");
+    for rect in quit {
+        state.modal = ModalDialog::ConfirmQuit;
+        assert_eq!(tap_rect(&mut state, &repo, rect), UserCommand::QuitApp);
+    }
 
-    // Tapping the dialog body cancels instead of quitting.
-    state.modal = ModalDialog::ConfirmQuit;
-    assert_eq!(tap(&mut state, &repo, 480, dy + 60), UserCommand::None);
-    assert_eq!(state.modal, ModalDialog::None);
+    // Touching the dialog body or outside it cancels instead of quitting.
+    for (x, y) in [(480, 200), (10, 10)] {
+        state.modal = ModalDialog::ConfirmQuit;
+        assert_eq!(tap(&mut state, &repo, x, y), UserCommand::None);
+        assert_eq!(state.modal, ModalDialog::None);
+    }
 }
 
 #[test]

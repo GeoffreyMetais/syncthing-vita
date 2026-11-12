@@ -2,14 +2,17 @@
 
 use qrcodegen::{QrCode, QrCodeEcc};
 
+use crate::domain::interaction::{HitMap, PadKey};
 use crate::domain::AppState;
 use crate::ui::gfx::{rgb, Align, FontWeight, Gfx, Icon, PadButton, GFX_W};
 use crate::ui::strings;
 use crate::ui::theme::{UiTheme, C_GOOD, HINT_Y};
-use crate::ui::widgets::{action_width, draw_action, draw_chip, draw_hints};
+use crate::ui::widgets::{
+    action_width, declare_modal, draw_chip, draw_press_button, draw_press_hints,
+};
 
 /// Modal Dialog 3: Display the PS Vita's Syncthing Device ID + scannable QR code.
-pub fn render_device_id_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
+pub fn render_device_id_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut HitMap) {
     let s = strings::strings(state.language);
     gfx.dim(180);
     let w = 720;
@@ -19,6 +22,12 @@ pub fn render_device_id_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
 
     gfx.shadow(dx, dy, w, h, 18);
     gfx.rrect(dx, dy, w, h, 18, th.card);
+    declare_modal(
+        hits,
+        (dx, dy, w, h),
+        Some(PadKey::Circle),
+        Some(PadKey::Circle),
+    );
     gfx.rrect_outline(dx, dy, w, h, 18, 1, th.border);
 
     let lx = dx + 28;
@@ -233,26 +242,29 @@ pub fn render_device_id_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
     // Bottom buttons at bottom-right of modal
     let w_add = action_width(gfx, PadButton::Square, s.action_add_remote_device);
     let w_close = action_width(gfx, PadButton::Circle, s.action_close);
-    draw_action(
+    draw_press_button(
         gfx,
         th,
+        hits,
         dx + w - 28 - w_close - 10 - w_add,
         dy + h - 32,
         PadButton::Square,
         s.action_add_remote_device,
     );
-    draw_action(
+    draw_press_button(
         gfx,
         th,
+        hits,
         dx + w - 28 - w_close,
         dy + h - 32,
         PadButton::Circle,
         s.action_close,
     );
 
-    draw_hints(
+    draw_press_hints(
         gfx,
         th,
+        hits,
         &[
             (PadButton::Square, None, s.hint_add_remote_device_id),
             (

@@ -1,9 +1,11 @@
 //! On-screen fallback Base32 keypad component for manual device ID entry.
 //! Shown on demand (`Virtual Keyboard`) as a touch/gamepad fallback to the PS Vita System Keyboard (`SceIme`).
 
+use crate::domain::interaction::{HitMap, UiAction};
 use crate::domain::ADD_DEVICE_KEYPAD;
 use crate::ui::gfx::{rgba, Align, Color, FontWeight, Gfx};
 use crate::ui::theme::{UiTheme, C_GOOD};
+use crate::ui::widgets::declare_touch;
 
 /// Grid layout constants for the 36-key (9x4) Base32 keypad.
 pub const KEYPAD_COLS: usize = 9;
@@ -47,6 +49,7 @@ pub fn keypad_button_colors(th: &UiTheme, label: &str, is_sel: bool) -> (Color, 
 pub fn draw_fallback_keypad(
     gfx: &mut Gfx,
     th: &UiTheme,
+    hits: &mut HitMap,
     origin_x: i32,
     grid_y: i32,
     selected_idx: usize,
@@ -58,6 +61,15 @@ pub fn draw_fallback_keypad(
         let kx = origin_x + col * KEYPAD_STEP_X;
         let ky = grid_y + row * KEYPAD_STEP_Y;
         let is_sel = idx == selected_idx && !ime_active;
+        // Touching a key types it.
+        declare_touch(
+            hits,
+            kx,
+            ky,
+            KEYPAD_CELL_W,
+            KEYPAD_CELL_H,
+            UiAction::ModalRow(idx),
+        );
 
         let (bg, fg, outline) = keypad_button_colors(th, label, is_sel);
 

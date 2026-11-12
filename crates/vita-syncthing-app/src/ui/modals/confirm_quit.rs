@@ -1,10 +1,11 @@
 //! Modal Dialog: Confirmation before exiting VitaSync (`START` button).
 
+use crate::domain::interaction::{HitMap, PadKey};
 use crate::domain::AppState;
 use crate::ui::gfx::{rgba, Align, FontWeight, Gfx, Icon, PadButton, GFX_W};
 use crate::ui::strings;
 use crate::ui::theme::{UiTheme, CONFIRM_QUIT_H, CONFIRM_QUIT_W, C_BAD, C_WARN, HINT_Y};
-use crate::ui::widgets::{action_width, draw_action, draw_hints};
+use crate::ui::widgets::{action_width, declare_modal, draw_press_button, draw_press_hints};
 
 /// Horizontal padding inside the dialog.
 const PAD_X: i32 = 28;
@@ -12,7 +13,7 @@ const PAD_X: i32 = 28;
 const HEADER_TEXT_DX: i32 = 52;
 
 /// Modal Dialog 4: Confirmation before exiting VitaSync (`START` button).
-pub fn render_confirm_quit_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
+pub fn render_confirm_quit_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut HitMap) {
     let s = strings::strings(state.language);
     gfx.dim(180);
     let (body_title, body_hint) = if state.sync_in_progress {
@@ -27,6 +28,12 @@ pub fn render_confirm_quit_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState) 
 
     gfx.shadow(dx, dy, w, h, 18);
     gfx.rrect(dx, dy, w, h, 18, th.card);
+    declare_modal(
+        hits,
+        (dx, dy, w, h),
+        Some(PadKey::Circle),
+        Some(PadKey::Circle),
+    );
     gfx.rrect_outline(dx, dy, w, h, 18, 1, th.border);
 
     let lx = dx + PAD_X;
@@ -96,26 +103,29 @@ pub fn render_confirm_quit_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState) 
 
     let w_quit = action_width(gfx, PadButton::Cross, s.action_quit_app);
     let w_cancel = action_width(gfx, PadButton::Circle, s.action_cancel);
-    draw_action(
+    draw_press_button(
         gfx,
         th,
+        hits,
         dx + w - PAD_X - w_quit - 12 - w_cancel,
         dy + h - 34,
         PadButton::Circle,
         s.action_cancel,
     );
-    draw_action(
+    draw_press_button(
         gfx,
         th,
+        hits,
         dx + w - PAD_X - w_quit,
         dy + h - 34,
         PadButton::Cross,
         s.action_quit_app,
     );
 
-    draw_hints(
+    draw_press_hints(
         gfx,
         th,
+        hits,
         &[
             (PadButton::Cross, None, s.hint_confirm_quit),
             (PadButton::Circle, None, s.action_cancel),

@@ -53,15 +53,15 @@ syncthing-vita
             ├── application/          # Layer 2: Use Cases, Input Controller & Sync Event Coordinator
             │   ├── mod.rs
             │   ├── share_service.rs  # ShareService (create_share, upsert_device, toggle_device_for_share, refresh_picker_items)
-            │   ├── shares_controller.rs # SharesController (Shares page: D-pad focus, executes the UiActions declared by the screen)
+            │   ├── dashboard_controller.rs / shares_controller.rs / files_controller.rs / settings_controller.rs # One controller per page: D-pad focus movement, execution of the page's UiActions
             │   ├── share_creation.rs # ShareCreation (new share kept only once a device is linked)
             │   ├── folder_offers.rs  # FolderOfferService (folders offered by peers need consent: accept / decline / later)
             │   ├── frame_pacing.rs   # FramePacer (dynamic frame rate: render only when the screen changes)
             │   ├── dpad_navigation.rs # DpadNavigation (sidebar <-> page focus, Cross on focused element)
             │   ├── qr_scan.rs        # QrScanFlow (scanner events -> AddDeviceById confirmation), extract_device_id
             │   ├── sync_coordinator.rs # SyncCoordinator (maps WorkerMsg & SyncEvent into AppState & ShareService)
-            │   ├── input_controller.rs # InputController (main-screen InputFrame -> AppState + ShareService -> UserCommand)
-            │   └── modal_input/      # ModalInput: one input handler per modal (create_share, manage_devices, add_device, scan_qr, dialogs)
+            │   ├── input_controller.rs # InputController (resolves touch / Cross / shortcuts against the frame's HitMap, executes UiActions)
+            │   └── modal_input/      # ModalInput: resolves touches on the open modal, one key / row handler per modal (create_share, manage_devices, add_device, scan_qr, dialogs)
             ├── infrastructure/       # Layer 3: Persistence, OS Filesystem, PS Vita Hardware & BEP Worker Thread
             │   ├── mod.rs
             │   ├── config_repo.rs    # ConfigRepository (devices.cfg, shares.cfg, ignored_folders.cfg, theme.cfg, language.cfg, syncthing.log, ux0: directory listing)
@@ -159,7 +159,8 @@ Dependencies strictly point **inward**. Inner layers never import or depend on o
      - `input_controller.rs`: Translates main-screen button/touch inputs into actions, modal triggers, and commands.
      - `modal_input/`: Input handling for open modals, one file per modal (mirrors `ui/modals/`).
      - `dpad_navigation.rs`: D-pad focus between the sidebar and the page elements.
-     - `shares_controller.rs`: `Shares` page controller, the reference for the per-screen input pattern (see §3.4).
+     - `dashboard_controller.rs`, `shares_controller.rs`, `files_controller.rs`, `settings_controller.rs`: one controller per page (see §3.4).
+     - **No screen coordinate and no `crate::ui` import in this layer**: what is interactive, and where, is declared by the views (§3.4).
      - `frame_pacing.rs`: `FramePacer` dynamic frame rate (see §7).
      - `power_policy.rs`: automatic standby blocking and CPU clock level (`cpu_clock`: 333 MHz during the initial sync phase (`domain::InitialSyncPeers`, from `PeerConnected` to that peer's first `SyncCycleCompleted` / `SessionEnded`) and transfers + 10 s, 222 MHz for 3 s after input or while scanning a QR code, 111 MHz otherwise; applied by `set_cpu_clock_mhz` in `vita_system.rs`).
    - **Strict Rule**: No UI rendering code or direct hardware drivers.
@@ -224,10 +225,13 @@ These size and SRP rules apply to **both crates** (`vita-syncthing-app` and `syn
 
 An interactive element is declared **once, where it is drawn**. Never hit-test with pixel coordinates in the application layer: button positions depend on the label widths of the current language.
 
-- **Declaration (UI)**: the screen draws the element with `widgets::draw_action_hotspot` (or `HitMap::add`) and gives it a `UiAction`, its D-pad `FocusSlot` and, through the `PadButton` it displays, its face-button shortcut. `ui::renderer::draw_frame` records the frame's elements in `AppState::hit_map`.
-- **Resolution (application)**: the screen's controller resolves touch (`HitMap::action_at`), `Cross` on the focused element (`HitMap::focused_action`) and face buttons (`HitMap::shortcut_action`) from these declarations, then executes the `UiAction`. It must tolerate a stale action (the state may have changed since the frame was drawn): validate indexes.
-- **Status**: the `Shares` page is converted (`ui/screens/shares.rs` + `application/shares_controller.rs`). The sidebar, the bottom hint bar, the other pages and the modals still use fixed coordinates in `input_controller.rs` / `modal_input/`; convert a screen by adding its `UiAction` variants and a `<screen>_controller.rs`, and delete its coordinates from `input_controller.rs`.
-- **Tests** draw the frame before feeding input (`tests/common`: `draw`, `press`, `tap`, `feed`) and locate elements through `state.hit_map`, never with literal coordinates.
+- **Declaration (UI)**: the view declares the element where it draws it; `ui::renderer::draw_frame` records the frame's elements in `AppState::hit_map` (the one piece of state the renderer writes).
+  - *Pages*: `widgets::draw_action_hotspot` (or `HitMap::add`) with a `UiAction`, a D-pad `FocusSlot` and, through the `PadButton` it displays, a face-button shortcut. The sidebar (`draw_chrome`) declares the tabs and the transfer card.
+  - *Hint bar*: `widgets::draw_hint_bar` with `Hint::action(button, label, action)`: touching the hint, or pressing the button it shows, triggers the action (`Hint::info` for purely informative entries). A hint that does not fit on the bar is left out, never cut off.
+  - *Modals*: `declare_modal` right after the card (what a touch outside / inside does), `draw_press_button` and `draw_press_hints` (touching them is the same as pressing the pad button they show: `UiAction::Press`), `declare_touch` with `UiAction::ModalRow(idx)` for list rows and keypad keys. Page elements are not interactive while a modal is open.
+- **Resolution (application)**: `InputController` resolves touch (`HitMap::action_at`), `Cross` on the focused element (`HitMap::focused_action(state.focus_slot())`) and face buttons (`HitMap::shortcut_action`), then `InputController::execute` runs the `UiAction` (global ones itself, page ones through the page's controller). `ModalInput` turns a touch into the pad button or the row it stands for, so modal handlers only know buttons and rows. Executing an action must tolerate a stale frame (the state may have changed since it was drawn): validate indexes.
+- **Adding an element**: add a `UiAction` variant if needed, declare the element in the view, execute the action in the page's controller. Never add a coordinate to the application layer.
+- **Tests** draw the frame before feeding input (`tests/common`: `draw`, `press`, `tap`, `feed`) and locate elements through the hit map (`rect_of`, `rects_of`, `tap_action`, `tap_rect`), never with literal coordinates. `main_screens.rs` and `modal_touch.rs` check in all five languages that every element is on screen and that hints / buttons do not overlap: run them after any layout or label change.
 
 ### 3.5 Tunable Values (`domain/defaults.rs`)
 
@@ -376,6 +380,8 @@ cargo test --workspace
 - `folder_offers.rs`: offered folders need consent, accept / decline / later, a crafted folder label cannot inject a share, declined offers persisted, deleted shares are declined and do not come back, `Settings` · `Clear Declined` (D-pad and touch)
 - `share_service.rs`: share deletion, share creation, device linking, paused accepted folders, `ConfigRepository` roundtrip, manual LAN pairing
 - `input_controller.rs`: global routing — an active screensaver swallows input and wakes on a button press or touch only
+- `main_screens.rs`: sidebar tabs and transfer card, `Overview` card / buttons / hints, `Files` rows and `Open` chip, `Settings` hints; geometry of every page in all 5 languages (elements on screen, hints not overlapping)
+- `modal_touch.rs`: modal touch resolved from declared elements (template rows, device rows, pause / done buttons, text box -> system keyboard, keypad keys, folder offer buttons, outside / inside touches); geometry of every modal in all 5 languages (on screen, hints and buttons not overlapping)
 - `dialogs.rs`: `START` -> `ConfirmQuit` -> `Cross` quits, `ConfirmQuit` touch targets, `ConfirmDeleteShare` (`Square` on Shares, cancel / confirm)
 - `add_device.rs`: add-device-by-short-ID via system keyboard (placeholder upgraded on discovery), virtual keyboard hidden until requested
 - `theme_settings.rs`: theme toggle (D-pad `Cross`, `Square`, touch) and `theme.cfg` persistence

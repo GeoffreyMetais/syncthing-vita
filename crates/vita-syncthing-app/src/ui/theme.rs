@@ -13,10 +13,6 @@ pub const HINT_Y: i32 = 500;
 
 pub const BROWSER_TOP: i32 = 134;
 pub const BROWSER_STEP: i32 = 42;
-/// Touch width of the "Open" chip at the right of a directory row in the `Files` browser.
-pub const OPEN_CHIP_W: i32 = 120;
-/// Touch width of the `Virtual Keyboard` button inside the `AddDeviceById` text box.
-pub const VIRTUAL_KEYBOARD_BTN_W: usize = 200;
 
 /// Top / bottom of the `Language` card on the Settings page (tapping it cycles the language).
 pub const SETTINGS_LANGUAGE_Y: i32 = CONTENT_Y + 128;
@@ -24,8 +20,6 @@ pub const SETTINGS_LANGUAGE_B: i32 = SETTINGS_LANGUAGE_Y + 52;
 /// Top / bottom of the `Declined folders` card on the Settings page.
 pub const SETTINGS_DECLINED_Y: i32 = SETTINGS_LANGUAGE_B + 10;
 pub const SETTINGS_DECLINED_B: i32 = SETTINGS_DECLINED_Y + 62;
-/// Touch area of the `Clear Declined` button: from this `x` to the card's right edge.
-pub const SETTINGS_CLEAR_BTN_X: i32 = CONTENT_R - 220;
 
 /// Size of the `ManageDevices` modal (wide enough for its five bottom actions).
 pub const MANAGE_DEVICES_W: i32 = 780;
@@ -34,9 +28,6 @@ pub const MANAGE_DEVICES_H: i32 = 390;
 /// Size of the `ConfirmQuit` modal (wide enough for the longest translated line).
 pub const CONFIRM_QUIT_W: i32 = 720;
 pub const CONFIRM_QUIT_H: i32 = 236;
-
-/// Touch width of the `R · Scan QR` action at the bottom left of the `AddDeviceById` modal.
-pub const SCAN_QR_BTN_W: usize = 150;
 
 /// Size of the camera viewfinder in the `ScanDeviceQr` modal (`640x360` frames scaled by 3/4).
 pub const SCAN_QR_VIEW_W: i32 = 480;

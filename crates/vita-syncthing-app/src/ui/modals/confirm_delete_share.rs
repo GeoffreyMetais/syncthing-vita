@@ -1,10 +1,11 @@
 //! Modal Dialog: Confirmation before deleting a share (`Square` on the `Shares` tab).
 
+use crate::domain::interaction::{HitMap, PadKey};
 use crate::domain::AppState;
 use crate::ui::gfx::{rgba, Align, FontWeight, Gfx, Icon, PadButton, GFX_W};
 use crate::ui::strings;
 use crate::ui::theme::{UiTheme, C_BAD, HINT_Y};
-use crate::ui::widgets::{action_width, draw_action, draw_hints};
+use crate::ui::widgets::{action_width, declare_modal, draw_press_button, draw_press_hints};
 
 /// Renders the `ConfirmDeleteShare` modal for `shares[share_idx]`.
 pub fn render_confirm_delete_share_modal(
@@ -12,6 +13,7 @@ pub fn render_confirm_delete_share_modal(
     th: &UiTheme,
     state: &AppState,
     share_idx: usize,
+    hits: &mut HitMap,
 ) {
     let s = strings::strings(state.language);
     gfx.dim(180);
@@ -22,6 +24,12 @@ pub fn render_confirm_delete_share_modal(
 
     gfx.shadow(dx, dy, w, h, 18);
     gfx.rrect(dx, dy, w, h, 18, th.card);
+    declare_modal(
+        hits,
+        (dx, dy, w, h),
+        Some(PadKey::Circle),
+        Some(PadKey::Circle),
+    );
     gfx.rrect_outline(dx, dy, w, h, 18, 1, th.border);
 
     let lx = dx + 28;
@@ -96,26 +104,29 @@ pub fn render_confirm_delete_share_modal(
 
     let w_delete = action_width(gfx, PadButton::Cross, s.action_delete);
     let w_cancel = action_width(gfx, PadButton::Circle, s.action_cancel);
-    draw_action(
+    draw_press_button(
         gfx,
         th,
+        hits,
         dx + w - 28 - w_delete - 12 - w_cancel,
         dy + h - 34,
         PadButton::Circle,
         s.action_cancel,
     );
-    draw_action(
+    draw_press_button(
         gfx,
         th,
+        hits,
         dx + w - 28 - w_delete,
         dy + h - 34,
         PadButton::Cross,
         s.action_delete,
     );
 
-    draw_hints(
+    draw_press_hints(
         gfx,
         th,
+        hits,
         &[
             (PadButton::Cross, None, s.hint_confirm_delete),
             (PadButton::Circle, None, s.action_cancel),

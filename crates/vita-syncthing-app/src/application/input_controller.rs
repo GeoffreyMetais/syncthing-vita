@@ -142,6 +142,11 @@ impl InputController {
             UiAction::ToggleTheme | UiAction::CycleLanguage | UiAction::ClearDeclinedFolders => {
                 SettingsController::apply(state, repo, action)
             }
+            // Elements of modal dialogs, resolved by `ModalInput`.
+            UiAction::Press(_)
+            | UiAction::ModalRow(_)
+            | UiAction::OpenKeyboard
+            | UiAction::Inert => {}
         }
         UserCommand::None
     }

@@ -2,14 +2,16 @@
 //! `draw_progress`, `draw_scrollbar`, `draw_page_title`, `draw_chrome`, `draw_hints`, `draw_toast`).
 
 use crate::domain::{
-    ActiveTab, AppState, FocusSlot, HitMap, Hotspot, NavFocus, Rect, ShortcutKey, UiAction, UiText,
+    ActiveTab, AppState, FocusSlot, HitMap, Hotspot, NavFocus, PadKey, Rect, ShortcutKey, UiAction,
+    UiText,
 };
 use crate::ui::gfx::{
     rgb, with_alpha, Align, Color, FontWeight, Gfx, Icon, PadButton, GFX_H, GFX_W,
 };
 use crate::ui::strings::{self, Strings};
 use crate::ui::theme::{
-    UiTheme, ACTION_TOUCH_H, HINT_TOUCH_MARGIN, CONTENT_R, CONTENT_W, CONTENT_X, C_GOOD, C_WARN, HINT_Y, SIDEBAR_W,
+    UiTheme, ACTION_TOUCH_H, CONTENT_R, CONTENT_W, CONTENT_X, C_GOOD, C_WARN, HINT_TOUCH_MARGIN,
+    HINT_Y, SIDEBAR_W,
 };
 
 pub fn draw_card(gfx: &mut Gfx, th: &UiTheme, x: i32, y: i32, w: i32, h: i32, focused: bool) {
@@ -353,6 +355,18 @@ fn shortcut_of(button: PadButton) -> Option<ShortcutKey> {
     }
 }
 
+/// Width of a hint: its button glyph(s) and its label.
+fn hint_width(gfx: &mut Gfx, hint: &Hint, size: i32) -> i32 {
+    let second = hint
+        .second
+        .map_or(0, |b| Gfx::pad_button_width(b, size) + 4);
+    Gfx::pad_button_width(hint.button, size)
+        + 4
+        + second
+        + 5
+        + gfx.text_width(15, FontWeight::Medium, hint.label)
+}
+
 /// Draws the bottom hint bar and declares its actionable hints in the frame's `HitMap`:
 /// touching a hint, or pressing the face button it shows, triggers its action.
 pub fn draw_hint_bar(gfx: &mut Gfx, th: &UiTheme, hits: &mut HitMap, items: &[Hint]) {
@@ -365,6 +379,10 @@ pub fn draw_hint_bar(gfx: &mut Gfx, th: &UiTheme, hits: &mut HitMap, items: &[Hi
     let mut x = 22;
     for hint in items {
         let start_x = x;
+        // A hint that does not fit on the bar is left out instead of being cut off.
+        if start_x + hint_width(gfx, hint, size) > GFX_W - HINT_TOUCH_MARGIN {
+            break;
+        }
         let w1 = Gfx::pad_button_width(hint.button, size);
         gfx.pad_button(hint.button, x + w1 / 2, cy, size);
         x += w1 + 4;
@@ -400,13 +418,91 @@ pub fn draw_hint_bar(gfx: &mut Gfx, th: &UiTheme, hits: &mut HitMap, items: &[Hi
     }
 }
 
-/// Draws a purely informative hint bar (no hint is actionable).
-pub fn draw_hints(gfx: &mut Gfx, th: &UiTheme, items: &[(PadButton, Option<PadButton>, &str)]) {
+/// Button a touch element showing `button` stands for (none for the D-pad glyphs).
+fn pad_key_of(button: PadButton) -> Option<PadKey> {
+    match button {
+        PadButton::Cross => Some(PadKey::Cross),
+        PadButton::Circle => Some(PadKey::Circle),
+        PadButton::Square => Some(PadKey::Square),
+        PadButton::Triangle => Some(PadKey::Triangle),
+        PadButton::L => Some(PadKey::L),
+        PadButton::R => Some(PadKey::R),
+        PadButton::Start => Some(PadKey::Start),
+        PadButton::Select => Some(PadKey::Select),
+        PadButton::Dpad | PadButton::DpadLr | PadButton::DpadUd => None,
+    }
+}
+
+/// Declares a touch-only element of a modal dialog covering (`x`, `y`, `w`, `h`).
+pub fn declare_touch(hits: &mut HitMap, x: i32, y: i32, w: i32, h: i32, action: UiAction) {
+    hits.add(Hotspot {
+        rect: Rect::new(x, y, w, h),
+        action,
+        focus: None,
+        shortcut: None,
+    });
+}
+
+/// Declares what touching a modal dialog does outside its buttons: `outside` its card
+/// (`x`, `y`, `w`, `h`) and `inside` it. `None` absorbs the touch. Call it right after drawing
+/// the card, before the modal's own elements.
+pub fn declare_modal(
+    hits: &mut HitMap,
+    (x, y, w, h): (i32, i32, i32, i32),
+    outside: Option<PadKey>,
+    inside: Option<PadKey>,
+) {
+    let action = |key: Option<PadKey>| key.map_or(UiAction::Inert, UiAction::Press);
+    declare_touch(hits, 0, 0, GFX_W, GFX_H, action(outside));
+    declare_touch(hits, x, y, w, h, action(inside));
+}
+
+/// Draws an action pill of a modal dialog like [`draw_action`]; touching it is the same as
+/// pressing the button it shows. Returns the pill width.
+pub fn draw_press_button(
+    gfx: &mut Gfx,
+    th: &UiTheme,
+    hits: &mut HitMap,
+    x: i32,
+    cy: i32,
+    btn: PadButton,
+    label: &str,
+) -> i32 {
+    let w = draw_action(gfx, th, x, cy, btn, label);
+    if let Some(key) = pad_key_of(btn) {
+        declare_touch(
+            hits,
+            x,
+            cy - ACTION_TOUCH_H / 2,
+            w,
+            ACTION_TOUCH_H,
+            UiAction::Press(key),
+        );
+    }
+    w
+}
+
+/// Draws the hint bar of a modal dialog: touching a hint is the same as pressing the (single)
+/// button it shows.
+pub fn draw_press_hints(
+    gfx: &mut Gfx,
+    th: &UiTheme,
+    hits: &mut HitMap,
+    items: &[(PadButton, Option<PadButton>, &str)],
+) {
     let hints: Vec<Hint> = items
         .iter()
-        .map(|&(button, second, label)| Hint::info(button, second, label))
+        .map(|&(button, second, label)| Hint {
+            button,
+            second,
+            label,
+            action: match second {
+                None => pad_key_of(button).map(UiAction::Press),
+                Some(_) => None,
+            },
+        })
         .collect();
-    draw_hint_bar(gfx, th, &mut HitMap::default(), &hints);
+    draw_hint_bar(gfx, th, hits, &hints);
 }
 
 pub fn draw_toast(gfx: &mut Gfx, th: &UiTheme, s: &Strings, toast_msg: Option<&(UiText, u32)>) {

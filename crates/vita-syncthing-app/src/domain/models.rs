@@ -4,6 +4,9 @@ use syncthing_core::DeviceId;
 
 use crate::domain::ui_text::UiText;
 
+/// Devices visible in the `ManageDevices` dialog (the list does not scroll yet).
+pub const VISIBLE_DEVICES: usize = 5;
+
 /// Number of visible rows in the `ux0:` directory browser.
 pub const BROWSER_ROWS: usize = 8;
 

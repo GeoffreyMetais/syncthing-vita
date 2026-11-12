@@ -87,31 +87,31 @@ pub fn draw_frame(gfx: &mut Gfx, state: &mut AppState) {
     match state.modal {
         ModalDialog::None => {}
         ModalDialog::CreateShare { selected_idx } => {
-            render_create_share_modal(gfx, &th, state, selected_idx);
+            render_create_share_modal(gfx, &th, state, selected_idx, &mut hits);
         }
         ModalDialog::ManageDevices {
             share_idx,
             selected_dev_idx,
         } => {
-            render_manage_devices_modal(gfx, &th, state, share_idx, selected_dev_idx);
+            render_manage_devices_modal(gfx, &th, state, share_idx, selected_dev_idx, &mut hits);
         }
         ModalDialog::AddDeviceById { keypad_idx, .. } => {
-            render_add_device_modal(gfx, &th, state, keypad_idx);
+            render_add_device_modal(gfx, &th, state, keypad_idx, &mut hits);
         }
         ModalDialog::ScanDeviceQr { .. } => {
-            render_scan_qr_modal(gfx, &th, state);
+            render_scan_qr_modal(gfx, &th, state, &mut hits);
         }
         ModalDialog::ShowDeviceId => {
-            render_device_id_modal(gfx, &th, state);
+            render_device_id_modal(gfx, &th, state, &mut hits);
         }
         ModalDialog::ConfirmQuit => {
-            render_confirm_quit_modal(gfx, &th, state);
+            render_confirm_quit_modal(gfx, &th, state, &mut hits);
         }
         ModalDialog::ConfirmDeleteShare { share_idx } => {
-            render_confirm_delete_share_modal(gfx, &th, state, share_idx);
+            render_confirm_delete_share_modal(gfx, &th, state, share_idx, &mut hits);
         }
         ModalDialog::FolderOffer { offer_idx } => {
-            render_folder_offer_modal(gfx, &th, state, offer_idx);
+            render_folder_offer_modal(gfx, &th, state, offer_idx, &mut hits);
         }
     }
 

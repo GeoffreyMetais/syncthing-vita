@@ -2,12 +2,19 @@
 
 use syncthing_core::DeviceId;
 
-use crate::domain::AppState;
+use crate::domain::interaction::{HitMap, PadKey, UiAction};
+use crate::domain::{AppState, VISIBLE_DEVICES};
 use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton, GFX_W};
 use crate::ui::i18n::messages::fill;
 use crate::ui::strings;
 use crate::ui::theme::{UiTheme, C_GOOD, C_WARN, HINT_Y, MANAGE_DEVICES_H, MANAGE_DEVICES_W};
-use crate::ui::widgets::{action_width, draw_action, draw_chip, draw_hints, draw_row_tick};
+use crate::ui::widgets::{
+    action_width, declare_modal, declare_touch, draw_chip, draw_press_button, draw_press_hints,
+    draw_row_tick,
+};
+
+/// Height of the touch target of a device row.
+const DEVICE_ROW_H: i32 = 46;
 
 /// Modal Dialog 2: Add or remove Syncthing devices for a share (`shares[share_idx]`).
 pub fn render_manage_devices_modal(
@@ -16,6 +23,7 @@ pub fn render_manage_devices_modal(
     state: &AppState,
     share_idx: usize,
     selected_dev_idx: usize,
+    hits: &mut HitMap,
 ) {
     let s = strings::strings(state.language);
     gfx.dim(175);
@@ -26,6 +34,7 @@ pub fn render_manage_devices_modal(
 
     gfx.shadow(dx, dy, w, h, 18);
     gfx.rrect(dx, dy, w, h, 18, th.card);
+    declare_modal(hits, (dx, dy, w, h), Some(PadKey::Circle), None);
     gfx.rrect_outline(dx, dy, w, h, 18, 1, th.border);
 
     let share_title = state
@@ -61,15 +70,9 @@ pub fn render_manage_devices_modal(
     );
     let incomplete = state.is_share_creation_incomplete(share_idx);
     let (subtitle, subtitle_col) = if incomplete {
-        (
-            s.modal_manage_devices_subtitle_incomplete,
-            C_WARN,
-        )
+        (s.modal_manage_devices_subtitle_incomplete, C_WARN)
     } else {
-        (
-            s.modal_manage_devices_subtitle,
-            th.dim,
-        )
+        (s.modal_manage_devices_subtitle, th.dim)
     };
     gfx.text(
         lx + 52,
@@ -91,10 +94,7 @@ pub fn render_manage_devices_modal(
 
     if state.devices.is_empty() {
         let (headline, col) = if state.sync_in_progress {
-            (
-                s.modal_manage_devices_scanning,
-                th.accent_hi,
-            )
+            (s.modal_manage_devices_scanning, th.accent_hi)
         } else {
             (s.modal_manage_devices_empty, C_WARN)
         };
@@ -122,9 +122,11 @@ pub fn render_manage_devices_modal(
             &sub_hint,
         );
     } else {
-        for (i, dev) in state.devices.iter().take(5).enumerate() {
+        for (i, dev) in state.devices.iter().take(VISIBLE_DEVICES).enumerate() {
             let ry = dy + 92 + (i as i32) * 52;
             let cy = ry + 23;
+            // Touching a device links / unlinks it.
+            declare_touch(hits, dx, ry, w, DEVICE_ROW_H, UiAction::ModalRow(i));
             let is_sel = i == selected_dev_idx;
             let is_checked = shared_list
                 .iter()
@@ -145,7 +147,11 @@ pub fn render_manage_devices_modal(
                 if is_checked { th.accent_hi } else { th.dim },
             );
 
-            let badge_txt = if is_checked { s.action_linked } else { s.action_not_linked };
+            let badge_txt = if is_checked {
+                s.action_linked
+            } else {
+                s.action_not_linked
+            };
             let badge_col = if is_checked { C_GOOD } else { th.dim };
             draw_chip(gfx, dx + w - 36, cy, badge_txt, badge_col);
 
@@ -194,43 +200,68 @@ pub fn render_manage_devices_modal(
     } else {
         s.action_enable
     };
-    draw_action(gfx, th, lx, dy + h - 32, PadButton::Select, pause_lbl);
+    let w_pause = draw_press_button(gfx, th, hits, lx, dy + h - 32, PadButton::Select, pause_lbl);
     let w_add = action_width(gfx, PadButton::Square, s.action_add_by_id);
     let w_sync = action_width(gfx, PadButton::Triangle, s.action_apply_sync);
-    let close_lbl = if incomplete { s.action_cancel } else { s.action_done };
+    let close_lbl = if incomplete {
+        s.action_cancel
+    } else {
+        s.action_done
+    };
     let w_close = action_width(gfx, PadButton::Circle, close_lbl);
     let bx_close = dx + w - 28 - w_close;
     let bx_sync = bx_close - 10 - w_sync;
     let bx_add = bx_sync - 10 - w_add;
     let w_scan = action_width(gfx, PadButton::R, s.action_scan_qr);
     let bx_scan = bx_add - 10 - w_scan;
-    draw_action(gfx, th, bx_scan, dy + h - 32, PadButton::R, s.action_scan_qr);
-    draw_action(
+    // With long labels the row has no room for `Scan QR`: it stays available with `R`
+    // and in the hint bar instead of covering the `Pause` button.
+    if bx_scan >= lx + w_pause + 10 {
+        draw_press_button(
+            gfx,
+            th,
+            hits,
+            bx_scan,
+            dy + h - 32,
+            PadButton::R,
+            s.action_scan_qr,
+        );
+    }
+    draw_press_button(
         gfx,
         th,
+        hits,
         bx_add,
         dy + h - 32,
         PadButton::Square,
         s.action_add_by_id,
     );
-    draw_action(
+    draw_press_button(
         gfx,
         th,
+        hits,
         bx_sync,
         dy + h - 32,
         PadButton::Triangle,
         s.action_apply_sync,
     );
-    draw_action(gfx, th, bx_close, dy + h - 32, PadButton::Circle, close_lbl);
-
-    draw_hints(
+    draw_press_button(
         gfx,
         th,
+        hits,
+        bx_close,
+        dy + h - 32,
+        PadButton::Circle,
+        close_lbl,
+    );
+
+    draw_press_hints(
+        gfx,
+        th,
+        hits,
         &[
             (PadButton::DpadUd, None, s.hint_select),
             (PadButton::Cross, None, s.hint_toggle),
-            (PadButton::Select, None, s.hint_pause_enable),
-            (PadButton::Square, None, s.hint_add_by_id),
             (PadButton::R, None, s.hint_scan_qr),
             (PadButton::Triangle, None, s.hint_apply_sync),
             (PadButton::Circle, None, close_lbl),
