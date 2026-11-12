@@ -44,6 +44,66 @@ impl Language {
             Language::Italian => Language::English,
         }
     }
+
+    /// ISO 639-1 code used in configuration files.
+    pub const fn code(self) -> &'static str {
+        match self {
+            Language::English => "en",
+            Language::French => "fr",
+            Language::Spanish => "es",
+            Language::German => "de",
+            Language::Italian => "it",
+        }
+    }
+
+    /// Parses an ISO 639-1 code (case-insensitive, trimmed).
+    pub fn from_code(s: &str) -> Option<Self> {
+        let code = s.trim().to_ascii_lowercase();
+        Self::ALL.into_iter().find(|l| l.code() == code)
+    }
+}
+
+/// UI language chosen in Settings: follow the PS Vita system language, or a fixed one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub enum LanguagePreference {
+    #[default]
+    System,
+    Fixed(Language),
+}
+
+impl LanguagePreference {
+    /// Identifier for `language.cfg`: `system` or an ISO 639-1 code.
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::System => "system",
+            Self::Fixed(lang) => lang.code(),
+        }
+    }
+
+    /// Parses `system` or an ISO 639-1 code (case-insensitive, trimmed).
+    pub fn parse(s: &str) -> Option<Self> {
+        if s.trim().eq_ignore_ascii_case("system") {
+            return Some(Self::System);
+        }
+        Language::from_code(s).map(Self::Fixed)
+    }
+
+    /// Cycles System -> English -> Français -> Español -> Deutsch -> Italiano -> System.
+    pub fn next(self) -> Self {
+        match self {
+            Self::System => Self::Fixed(Language::English),
+            Self::Fixed(Language::Italian) => Self::System,
+            Self::Fixed(lang) => Self::Fixed(lang.next()),
+        }
+    }
+
+    /// Language actually displayed, given the detected system language.
+    pub const fn resolve(self, system: Language) -> Language {
+        match self {
+            Self::System => system,
+            Self::Fixed(lang) => lang,
+        }
+    }
 }
 
 /// Colour theme modes supported by the UI.

@@ -89,7 +89,8 @@ pub fn render_dashboard_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
     let bx_sync = CONTENT_R - 18 - act_sync_w;
     let bx_qr = bx_sync - 10 - act_qr_w;
 
-    gfx.text(
+    // The ID value follows the (translated) label instead of a fixed column.
+    let id_label_w = gfx.text(
         lx,
         CONTENT_Y + 134,
         13,
@@ -98,10 +99,11 @@ pub fn render_dashboard_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         Align::Left,
         s.hero_device_id_label,
     );
+    let id_x = lx + id_label_w.max(72) + 10;
     gfx.text_fit(
-        lx + 82,
+        id_x,
         CONTENT_Y + 134,
-        bx_qr - 14 - (lx + 82),
+        bx_qr - 14 - id_x,
         13,
         FontWeight::Regular,
         th.dim,

@@ -125,6 +125,9 @@ pub static STRINGS_FR: Strings = Strings {
     settings_sec_log: "JOURNAL PROTOCOLE BEP/1.0 & TLS 1.3",
     settings_sec_declined: "DOSSIERS REFUSÉS",
     settings_no_declined: "Aucun · les dossiers proposés par les pairs sont toujours demandés",
+    settings_sec_language: "LANGUE",
+    settings_language_system: "Langue du système",
+    action_change_language: "Changer de langue",
 
     // Screensaver
     saver_wake_hint: "Touchez l'écran ou appuyez sur une touche pour réactiver",

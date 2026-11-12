@@ -8,10 +8,11 @@ use syncthing_core::DeviceId;
 use vita_syncthing_app::application::{
     FolderOfferService, InputController, ShareService, UserCommand,
 };
-use vita_syncthing_app::domain::{ActiveTab, AppState, ModalDialog};
+use vita_syncthing_app::domain::{ActiveTab, AppState, ModalDialog, SETTINGS_ROW_DECLINED};
 use vita_syncthing_app::infrastructure::{
     ConfigRepository, InputFrame, BTN_CIRCLE, BTN_CROSS, BTN_DOWN, BTN_SQUARE,
 };
+use vita_syncthing_app::ui::theme::{SETTINGS_DECLINED_B, SETTINGS_DECLINED_Y};
 
 const PEER: DeviceId = DeviceId([0x42; 32]);
 
@@ -152,12 +153,13 @@ fn test_settings_clear_declined_lets_peers_offer_again() {
     assert_eq!(state.ignored_folders.len(), 1);
     state.config_dirty = false;
 
-    // Settings: Down to the declined folders card, Cross on `Clear Declined`
+    // Settings: Down past the language card to the declined folders card, Cross on `Clear Declined`
     state.active_tab = ActiveTab::Settings;
     state.reset_nav_for_tab();
     state.nav.focus = vita_syncthing_app::domain::NavFocus::Content;
     press(&mut state, &repo, BTN_DOWN);
-    assert!(state.is_settings_row_focused(1));
+    press(&mut state, &repo, BTN_DOWN);
+    assert!(state.is_settings_row_focused(SETTINGS_ROW_DECLINED));
     press(&mut state, &repo, BTN_CROSS);
 
     assert!(state.ignored_folders.is_empty());
@@ -188,7 +190,10 @@ fn test_settings_clear_declined_by_touch() {
         &mut state,
         &repo,
         InputFrame {
-            touch_tap: Some((860, 253)),
+            touch_tap: Some((
+                860,
+                (SETTINGS_DECLINED_Y + SETTINGS_DECLINED_B) as usize / 2,
+            )),
             any_activity: true,
             ..Default::default()
         },

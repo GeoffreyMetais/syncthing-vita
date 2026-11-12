@@ -2,7 +2,8 @@
 //! tabs and the current page's elements, and turns `Cross` into the focused element's action.
 
 use crate::domain::{
-    action_count, default_col, ActiveTab, AppState, NavFocus, SETTINGS_ROWS, TAB_ORDER,
+    action_count, default_col, ActiveTab, AppState, NavFocus, SETTINGS_ROWS,
+    SETTINGS_ROW_DISPLAY, SETTINGS_ROW_LANGUAGE, TAB_ORDER,
 };
 use crate::infrastructure::{BTN_CROSS, BTN_DOWN, BTN_LEFT, BTN_RIGHT, BTN_UP};
 
@@ -14,6 +15,7 @@ pub enum PageAction {
     StartSync,
     ShowDeviceId,
     ToggleTheme,
+    CycleLanguage,
     AddDevice,
     NewShare,
     ManageDevices,
@@ -107,16 +109,18 @@ impl DpadNavigation {
             state.nav.row += 1;
             state.nav.col = 0;
         }
-        if state.nav.row == 0 {
+        if state.nav.row == SETTINGS_ROW_DISPLAY {
             return Self::action_row(state, ActiveTab::Settings, buttons);
         }
         if buttons & BTN_LEFT != 0 {
             state.nav.focus = NavFocus::Sidebar;
         }
-        if buttons & BTN_CROSS != 0 {
-            PageAction::ClearDeclinedFolders
-        } else {
+        if buttons & BTN_CROSS == 0 {
             PageAction::None
+        } else if state.nav.row == SETTINGS_ROW_LANGUAGE {
+            PageAction::CycleLanguage
+        } else {
+            PageAction::ClearDeclinedFolders
         }
     }
 

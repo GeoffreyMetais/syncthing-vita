@@ -125,6 +125,9 @@ pub static STRINGS_IT: Strings = Strings {
     settings_sec_log: "REGISTRO PROTOCOLLO BEP/1.0 E TLS 1.3",
     settings_sec_declined: "CARTELLE RIFIUTATE",
     settings_no_declined: "Nessuna · le cartelle offerte dai peer vengono sempre richieste prima",
+    settings_sec_language: "LINGUA",
+    settings_language_system: "Lingua di sistema",
+    action_change_language: "Cambia lingua",
 
     // Screensaver
     saver_wake_hint: "Tocca lo schermo o premi un tasto per riattivare",

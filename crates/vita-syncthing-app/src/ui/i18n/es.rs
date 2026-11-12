@@ -125,6 +125,9 @@ pub static STRINGS_ES: Strings = Strings {
     settings_sec_log: "REGISTRO DE PROTOCOLO BEP/1.0 Y TLS 1.3",
     settings_sec_declined: "CARPETAS RECHAZADAS",
     settings_no_declined: "Ninguna · las carpetas ofrecidas por pares siempre se preguntan",
+    settings_sec_language: "IDIOMA",
+    settings_language_system: "Idioma del sistema",
+    action_change_language: "Cambiar idioma",
 
     // Screensaver
     saver_wake_hint: "Toca la pantalla o presiona cualquier botón para reactivar",

@@ -4,8 +4,8 @@
 use syncthing_core::DeviceId;
 
 use crate::domain::models::{
-    ActiveTab, CameraPreview, FolderOffer, IgnoredFolder, KnownDevice, Language, ModalDialog,
-    PickerItem, PickerMode, ShareConfigEntry, ThemeMode, BROWSER_ROWS,
+    ActiveTab, CameraPreview, FolderOffer, IgnoredFolder, KnownDevice, Language,
+    LanguagePreference, ModalDialog, PickerItem, PickerMode, ShareConfigEntry, ThemeMode, BROWSER_ROWS,
 };
 use crate::domain::navigation::{default_col, NavFocus, NavState};
 
@@ -13,7 +13,12 @@ use crate::domain::navigation::{default_col, NavFocus, NavState};
 /// All UI screens and modals read `&AppState` without performing I/O or mutating business rules.
 pub struct AppState {
     pub theme_mode: ThemeMode,
+    /// Language actually displayed: `language_pref` resolved against `system_language`.
     pub language: Language,
+    /// Language chosen in Settings (`language.cfg`), defaulting to the system language.
+    pub language_pref: LanguagePreference,
+    /// Language detected from the PS Vita system settings.
+    pub system_language: Language,
     pub active_tab: ActiveTab,
     /// D-pad focus (sidebar or page element).
     pub nav: NavState,
@@ -86,6 +91,8 @@ impl AppState {
         Self {
             theme_mode: ThemeMode::Oled,
             language: Language::English,
+            language_pref: LanguagePreference::System,
+            system_language: Language::English,
             active_tab: ActiveTab::Dashboard,
             nav: NavState::new(ActiveTab::Dashboard),
             picker_mode: PickerMode::ChangeShareTarget,
@@ -255,9 +262,22 @@ impl AppState {
         self.show_toast(label);
     }
 
-    /// Cycles through supported UI languages (English -> Français -> Español -> Deutsch -> Italiano -> English).
-    pub fn toggle_language(&mut self) {
-        self.language = self.language.next();
+    /// Applies a language preference and updates the displayed language.
+    pub fn set_language_preference(&mut self, pref: LanguagePreference) {
+        self.language_pref = pref;
+        self.language = pref.resolve(self.system_language);
+    }
+
+    /// Sets the detected system language (used while the preference is `System`).
+    pub fn set_system_language(&mut self, lang: Language) {
+        self.system_language = lang;
+        self.language = self.language_pref.resolve(lang);
+    }
+
+    /// Cycles the language preference
+    /// (System -> English -> Français -> Español -> Deutsch -> Italiano -> System).
+    pub fn cycle_language(&mut self) {
+        self.set_language_preference(self.language_pref.next());
         let label = format!("Language: {}", self.language.name());
         self.show_toast(&label);
     }

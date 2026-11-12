@@ -141,6 +141,10 @@ pub struct Strings {
     pub settings_sec_log: &'static str,
     pub settings_sec_declined: &'static str,
     pub settings_no_declined: &'static str,
+    pub settings_sec_language: &'static str,
+    /// Shown with the detected language while the preference follows the system.
+    pub settings_language_system: &'static str,
+    pub action_change_language: &'static str,
 
     // Screensaver
     pub saver_wake_hint: &'static str,

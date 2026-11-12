@@ -18,9 +18,12 @@ pub const OPEN_CHIP_W: i32 = 120;
 /// Touch width of the `Virtual Keyboard` button inside the `AddDeviceById` text box.
 pub const VIRTUAL_KEYBOARD_BTN_W: usize = 200;
 
+/// Top / bottom of the `Language` card on the Settings page (tapping it cycles the language).
+pub const SETTINGS_LANGUAGE_Y: i32 = CONTENT_Y + 128;
+pub const SETTINGS_LANGUAGE_B: i32 = SETTINGS_LANGUAGE_Y + 52;
 /// Top / bottom of the `Declined folders` card on the Settings page.
-pub const SETTINGS_DECLINED_Y: i32 = CONTENT_Y + 132;
-pub const SETTINGS_DECLINED_B: i32 = SETTINGS_DECLINED_Y + 70;
+pub const SETTINGS_DECLINED_Y: i32 = SETTINGS_LANGUAGE_B + 10;
+pub const SETTINGS_DECLINED_B: i32 = SETTINGS_DECLINED_Y + 62;
 /// Touch area of the `Clear Declined` button: from this `x` to the card's right edge.
 pub const SETTINGS_CLEAR_BTN_X: i32 = CONTENT_R - 220;
 

@@ -125,6 +125,9 @@ pub static STRINGS_EN: Strings = Strings {
     settings_sec_log: "BEP/1.0 & TLS 1.3 PROTOCOL LOG",
     settings_sec_declined: "DECLINED FOLDERS",
     settings_no_declined: "None · folders offered by peers are always asked first",
+    settings_sec_language: "LANGUAGE",
+    settings_language_system: "System default",
+    action_change_language: "Change Language",
 
     // Screensaver
     saver_wake_hint: "Touch screen or press any button to wake",

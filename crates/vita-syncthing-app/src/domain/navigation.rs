@@ -19,7 +19,7 @@ pub struct NavState {
     pub col: usize,
     /// True when the page's top button is focused instead of a row.
     pub header: bool,
-    /// Focused card on pages with fixed rows (Settings: `0` = display, `1` = declined folders).
+    /// Focused card on pages with fixed rows (Settings: `SETTINGS_ROW_*`).
     pub row: usize,
 }
 
@@ -54,8 +54,14 @@ pub const fn action_count(tab: ActiveTab) -> usize {
     }
 }
 
-/// Number of focusable cards on the Settings page: display buttons, then `Clear Declined`.
-pub const SETTINGS_ROWS: usize = 2;
+/// Settings card with the display buttons (`+ Add Device`, `QR / ID`, `Switch Theme`).
+pub const SETTINGS_ROW_DISPLAY: usize = 0;
+/// Settings card with the `Change Language` button.
+pub const SETTINGS_ROW_LANGUAGE: usize = 1;
+/// Settings card with the `Clear Declined` button.
+pub const SETTINGS_ROW_DECLINED: usize = 2;
+/// Number of focusable cards on the Settings page.
+pub const SETTINGS_ROWS: usize = 3;
 
 /// Button focused when entering a tab: the one `Cross` triggered before D-pad navigation.
 pub const fn default_col(tab: ActiveTab) -> usize {

@@ -1,5 +1,5 @@
 //! Persistence and filesystem repository (`devices.cfg`, `shares.cfg`, `ignored_folders.cfg`,
-//! `theme.cfg`, `syncthing.log`, and `ux0:` directory browsing).
+//! `theme.cfg`, `language.cfg`, `syncthing.log`, and `ux0:` directory browsing).
 
 use std::fs::{self, OpenOptions};
 use std::io::Write;
@@ -7,7 +7,8 @@ use std::io::Write;
 use syncthing_core::DeviceId;
 
 use crate::domain::{
-    IgnoredFolder, KnownDevice, ShareConfigEntry, ThemeMode, NEW_SHARE_TEMPLATES,
+    IgnoredFolder, KnownDevice, LanguagePreference, ShareConfigEntry, ThemeMode,
+    NEW_SHARE_TEMPLATES,
 };
 
 /// Repository managing configuration persistence and local filesystem queries on `ux0:`.
@@ -198,6 +199,24 @@ impl ConfigRepository {
         let _ = fs::create_dir_all(&self.base_data_dir);
         let cfg_path = format!("{}/theme.cfg", self.base_data_dir);
         let out = format!("{}\n", theme.as_str());
+        write_replacing(&cfg_path, &out);
+    }
+
+    /// Loads the UI language preference from `<base_data_dir>/language.cfg`.
+    /// Defaults to `LanguagePreference::System` if the file is missing or invalid.
+    pub fn load_language(&self) -> LanguagePreference {
+        let cfg_path = format!("{}/language.cfg", self.base_data_dir);
+        let Ok(content) = fs::read_to_string(&cfg_path) else {
+            return LanguagePreference::System;
+        };
+        LanguagePreference::parse(&content).unwrap_or_default()
+    }
+
+    /// Saves the UI language preference to `<base_data_dir>/language.cfg`.
+    pub fn save_language(&self, pref: LanguagePreference) {
+        let _ = fs::create_dir_all(&self.base_data_dir);
+        let cfg_path = format!("{}/language.cfg", self.base_data_dir);
+        let out = format!("{}\n", pref.as_str());
         write_replacing(&cfg_path, &out);
     }
 
