@@ -39,7 +39,7 @@ fn process_instance_id() -> i64 {
 pub enum WorkerMsg {
     Log(String),
     Progress {
-        pct: u32,
+        pct: Option<u32>,
         status: UiText,
         file: UiText,
     },
@@ -106,6 +106,7 @@ fn run_peer_session_loop(
 ) {
     let mut logged_awaiting = false;
     let mut logged_no_addr = false;
+    let mut report_connecting = true;
     let mut last_error = String::new();
     while !control.is_stop_requested() {
         let (target_id, addrs) = candidate_addrs_for_peer(&kd, &discovered);
@@ -130,14 +131,17 @@ fn run_peer_session_loop(
             if control.is_stop_requested() {
                 return;
             }
-            let _ = tx.send(WorkerMsg::Progress {
-                pct: 25,
-                status: UiText::ConnectingTo {
-                    name: kd.name.clone(),
-                    addr: tcp_addr.to_string(),
-                },
-                file: UiText::raw("-"),
-            });
+            if report_connecting {
+                report_connecting = false;
+                let _ = tx.send(WorkerMsg::Progress {
+                    pct: None,
+                    status: UiText::ConnectingTo {
+                        name: kd.name.clone(),
+                        addr: tcp_addr.to_string(),
+                    },
+                    file: UiText::raw("-"),
+                });
+            }
             let tx_ev = tx.clone();
             match connect_and_sync_with_control(
                 &identity,
@@ -279,7 +283,7 @@ pub fn spawn_sync_worker(
         // If no peer has been manually linked/added yet, run passive LAN discovery only (never dial TCP 22000).
         if approved_devices.is_empty() {
             let _ = tx.send(WorkerMsg::Progress {
-                pct: 20,
+                pct: None,
                 status: UiText::ScanningLan,
                 file: UiText::raw("-"),
             });

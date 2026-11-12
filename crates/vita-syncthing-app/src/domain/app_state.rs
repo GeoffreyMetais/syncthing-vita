@@ -41,7 +41,10 @@ pub struct AppState {
     pub folder_label: UiText,
     pub status_line: UiText,
     pub current_file: UiText,
-    pub progress_pct: u32,
+    /// `None` while initializing / connecting (indeterminate); `Some(0..=100)` once bytes are transferred or sync completes.
+    pub progress_pct: Option<u32>,
+    /// VBlank tick counter used to animate the indeterminate progress bar.
+    pub progress_anim_tick: u32,
     pub files_up_to_date: usize,
     pub files_downloaded: usize,
     pub blocks_uploaded: usize,
@@ -117,7 +120,8 @@ impl AppState {
             folder_label: UiText::NoFoldersSynced,
             status_line: UiText::ReadyPressCross,
             current_file: UiText::raw("-"),
-            progress_pct: 0,
+            progress_pct: Some(0),
+            progress_anim_tick: 0,
             files_up_to_date: 0,
             files_downloaded: 0,
             blocks_uploaded: 0,
@@ -338,6 +342,13 @@ impl AppState {
         false
     }
 
+    /// Advances the indeterminate progress bar animation by one display VBlank.
+    pub fn tick_progress_anim(&mut self) {
+        if self.progress_pct.is_none() {
+            self.progress_anim_tick = self.progress_anim_tick.wrapping_add(1);
+        }
+    }
+
     /// Advances the bouncing DVD-style OLED screensaver position within the given screen bounds
     /// by `frames` display VBlanks (the speed is the same whatever the rendering frame rate).
     pub fn step_screensaver(
@@ -410,7 +421,7 @@ impl AppState {
         self.files_downloaded = 0;
         self.blocks_uploaded = 0;
         self.bytes_transferred = 0;
-        self.progress_pct = 5;
+        self.progress_pct = None;
         self.status_line = UiText::StartingSync;
         self.show_toast(UiText::SyncingWithPeers);
     }

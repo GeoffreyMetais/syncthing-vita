@@ -27,9 +27,20 @@ impl SyncCoordinator {
                 match msg {
                     WorkerMsg::Log(line) => ShareService::log_event(state, repo, &line),
                     WorkerMsg::Progress { pct, status, file } => {
-                        state.progress_pct = pct;
-                        state.status_line = status;
-                        state.current_file = file;
+                        // A background peer retrying its TCP/TLS connection must not regress the
+                        // global progress bar or status once another peer is syncing or connected.
+                        if !state.session_connected && !state.initial_sync.is_active() {
+                            let should_update = match (state.progress_pct, pct) {
+                                (Some(cur), Some(next)) => next >= cur,
+                                (Some(0), None) | (None, _) => true,
+                                (Some(_), None) => false,
+                            };
+                            if should_update {
+                                state.progress_pct = pct;
+                                state.status_line = status;
+                                state.current_file = file;
+                            }
+                        }
                     }
                     WorkerMsg::DeviceDiscovered {
                         device_id,
@@ -49,7 +60,7 @@ impl SyncCoordinator {
                         state.session_connected = false;
                         state.initial_sync.clear();
                         state.auto_reconnect_enabled = allow_auto_reconnect;
-                        state.progress_pct = 100;
+                        state.progress_pct = Some(100);
                         state.current_file = UiText::SyncFinished;
                         state.status_line = summary;
                         disconnected = true;
@@ -87,7 +98,6 @@ impl SyncCoordinator {
                 state.peer_label =
                     UiText::Raw(format!("{} @ {} ({})", name, peer_addr, client_version));
                 state.status_line = UiText::ExchangingIndex;
-                state.progress_pct = 40;
                 ShareService::log_event(
                     state,
                     repo,
@@ -114,7 +124,6 @@ impl SyncCoordinator {
                 } else {
                     UiText::Raw(joined.clone())
                 };
-                state.progress_pct = 55;
                 ShareService::log_event(
                     state,
                     repo,
@@ -143,11 +152,11 @@ impl SyncCoordinator {
                 state.bytes_transferred += size;
                 state.current_file = UiText::Raw(name.clone());
                 let pct = if total_size > 0 {
-                    (((offset + size as u64) * 100) / total_size) as u32
+                    (((offset + size as u64) * 100) / total_size).min(100) as u32
                 } else {
                     100
                 };
-                state.progress_pct = pct.clamp(55, 95);
+                state.progress_pct = Some(pct);
                 state.status_line = UiText::Downloading { file: name, pct };
             }
             SyncEvent::FileSynced {
@@ -169,7 +178,6 @@ impl SyncCoordinator {
                 );
             }
             SyncEvent::LocalIndexPublished { folder, file_count } => {
-                state.progress_pct = 90;
                 state.status_line = UiText::IndexPublished { files: file_count };
                 ShareService::log_event(
                     state,
@@ -207,7 +215,7 @@ impl SyncCoordinator {
                 state.sync_in_progress = false;
                 state.session_connected = true;
                 state.auto_reconnect_enabled = true;
-                state.progress_pct = 100;
+                state.progress_pct = Some(100);
                 let conn_badge = if active_connections > 1 {
                     format!("1+{} connections", active_connections - 1)
                 } else {

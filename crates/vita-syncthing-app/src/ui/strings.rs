@@ -312,11 +312,17 @@ pub fn fmt_offers_waiting(count: usize) -> String {
 }
 
 /// Formats the screensaver active syncing status line.
-pub fn fmt_saver_syncing(pct: u32, current_file: &str) -> String {
-    format!("Syncing {pct}% · {current_file}")
+pub fn fmt_saver_syncing(pct: Option<u32>, current_file: &str) -> String {
+    match pct {
+        Some(p) => format!("Syncing {p}% · {current_file}"),
+        None => format!("Syncing · {current_file}"),
+    }
 }
 
 /// Formats the screensaver idle status line.
-pub fn fmt_saver_idle(pct: u32, status_line: &str) -> String {
-    format!("Idle ({pct}%) · {status_line}")
+pub fn fmt_saver_idle(pct: Option<u32>, status_line: &str) -> String {
+    match pct {
+        Some(p) => format!("Idle ({p}%) · {status_line}"),
+        None => format!("Idle · {status_line}"),
+    }
 }

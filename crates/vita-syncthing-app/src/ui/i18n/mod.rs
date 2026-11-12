@@ -329,24 +329,34 @@ impl Strings {
     }
 
     /// Formats the screensaver active syncing status line.
-    pub fn fmt_saver_syncing(&self, pct: u32, current_file: &str) -> String {
-        match self.language {
-            Language::French => format!("Synchronisation {pct}% · {current_file}"),
-            Language::Spanish => format!("Sincronizando {pct}% · {current_file}"),
-            Language::German => format!("Synchronisiere {pct}% · {current_file}"),
-            Language::Italian => format!("Sincronizzazione {pct}% · {current_file}"),
-            Language::English => format!("Syncing {pct}% · {current_file}"),
+    pub fn fmt_saver_syncing(&self, pct: Option<u32>, current_file: &str) -> String {
+        match (self.language, pct) {
+            (Language::French, Some(p)) => format!("Synchronisation {p}% · {current_file}"),
+            (Language::French, None) => format!("Synchronisation · {current_file}"),
+            (Language::Spanish, Some(p)) => format!("Sincronizando {p}% · {current_file}"),
+            (Language::Spanish, None) => format!("Sincronizando · {current_file}"),
+            (Language::German, Some(p)) => format!("Synchronisiere {p}% · {current_file}"),
+            (Language::German, None) => format!("Synchronisiere · {current_file}"),
+            (Language::Italian, Some(p)) => format!("Sincronizzazione {p}% · {current_file}"),
+            (Language::Italian, None) => format!("Sincronizzazione · {current_file}"),
+            (Language::English, Some(p)) => format!("Syncing {p}% · {current_file}"),
+            (Language::English, None) => format!("Syncing · {current_file}"),
         }
     }
 
     /// Formats the screensaver idle status line.
-    pub fn fmt_saver_idle(&self, pct: u32, status_line: &str) -> String {
-        match self.language {
-            Language::French => format!("Inactif ({pct}%) · {status_line}"),
-            Language::Spanish => format!("Inactivo ({pct}%) · {status_line}"),
-            Language::German => format!("Inaktiv ({pct}%) · {status_line}"),
-            Language::Italian => format!("Inattivo ({pct}%) · {status_line}"),
-            Language::English => format!("Idle ({pct}%) · {status_line}"),
+    pub fn fmt_saver_idle(&self, pct: Option<u32>, status_line: &str) -> String {
+        match (self.language, pct) {
+            (Language::French, Some(p)) => format!("Inactif ({p}%) · {status_line}"),
+            (Language::French, None) => format!("Inactif · {status_line}"),
+            (Language::Spanish, Some(p)) => format!("Inactivo ({p}%) · {status_line}"),
+            (Language::Spanish, None) => format!("Inactivo · {status_line}"),
+            (Language::German, Some(p)) => format!("Inaktiv ({p}%) · {status_line}"),
+            (Language::German, None) => format!("Inaktiv · {status_line}"),
+            (Language::Italian, Some(p)) => format!("Inattivo ({p}%) · {status_line}"),
+            (Language::Italian, None) => format!("Inattivo · {status_line}"),
+            (Language::English, Some(p)) => format!("Idle ({p}%) · {status_line}"),
+            (Language::English, None) => format!("Idle · {status_line}"),
         }
     }
 }

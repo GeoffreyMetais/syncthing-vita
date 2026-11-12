@@ -120,6 +120,7 @@ fn main() {
     // Only auto-connect on startup if the user has already configured/paired at least one device
     if state.has_configured_peers() {
         state.sync_in_progress = true;
+        state.progress_pct = None;
         let offered = std::mem::take(&mut state.pending_folder_offers);
         let (rx, ctl) = spawn_sync_worker(
             repo.base_data_dir(),
@@ -246,6 +247,7 @@ fn main() {
             state.initial_sync.clear();
             if state.has_configured_peers() {
                 state.sync_in_progress = true;
+                state.progress_pct = None;
                 let offered = std::mem::take(&mut state.pending_folder_offers);
                 let (rx, ctl) = spawn_sync_worker(
                     repo.base_data_dir(),
@@ -276,6 +278,7 @@ fn main() {
         {
             signals.background_change = true;
             state.sync_in_progress = true;
+            state.progress_pct = None;
             let offered = std::mem::take(&mut state.pending_folder_offers);
             let (rx, ctl) = spawn_sync_worker(
                 repo.base_data_dir(),
@@ -338,7 +341,8 @@ fn main() {
         signals.user_change |= state.tick_toast();
         signals.user_change |= state.modal != modal_before;
         signals.user_change |= state.oled_saver_active != saver_before;
-        signals.animating |= state.oled_saver_active;
+        state.tick_progress_anim();
+        signals.animating |= state.oled_saver_active || state.progress_pct.is_none();
         #[cfg(feature = "ui-script")]
         {
             signals.user_change |= vita_syncthing_app::infrastructure::ui_script::shot_pending();

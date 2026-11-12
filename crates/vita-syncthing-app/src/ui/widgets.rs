@@ -125,6 +125,25 @@ pub fn draw_progress(gfx: &mut Gfx, x: i32, y: i32, w: i32, h: i32, pct: u32, co
     gfx.rrect(x, y, fw.max(h), h, h / 2, col);
 }
 
+/// Draws an animated indeterminate progress bar for initialization steps before any bytes arrive.
+pub fn draw_indeterminate_progress(
+    gfx: &mut Gfx,
+    x: i32,
+    y: i32,
+    w: i32,
+    h: i32,
+    tick: u32,
+    col: Color,
+) {
+    gfx.rrect(x, y, w, h, h / 2, rgb(38, 47, 56));
+    let seg_w = (w / 3).max(h * 2).min(w);
+    let travel = (w - seg_w).max(0);
+    let phase = (tick % 120) as i32;
+    let pos = if phase < 60 { phase } else { 120 - phase };
+    let offset = (travel * pos) / 60;
+    gfx.rrect(x + offset, y, seg_w, h, h / 2, col);
+}
+
 pub fn draw_scrollbar(
     gfx: &mut Gfx,
     th: &UiTheme,
@@ -244,7 +263,6 @@ pub fn draw_chrome(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut Hit
     } else {
         s.sidebar_last_sync
     };
-    let pct = state.progress_pct.min(100);
     gfx.text(
         24,
         card_y + 20,
@@ -264,8 +282,25 @@ pub fn draw_chrome(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut Hit
         Align::Left,
         &s.text(&state.peer_label),
     );
-    draw_progress(gfx, 24, card_y + 58, SIDEBAR_W - 88, 8, pct, th.accent);
-    let pct_str = format!("{}%", pct);
+    let pct_str = match state.progress_pct {
+        Some(p) => {
+            let p = p.min(100);
+            draw_progress(gfx, 24, card_y + 58, SIDEBAR_W - 88, 8, p, th.accent);
+            format!("{}%", p)
+        }
+        None => {
+            draw_indeterminate_progress(
+                gfx,
+                24,
+                card_y + 58,
+                SIDEBAR_W - 88,
+                8,
+                state.progress_anim_tick,
+                th.accent,
+            );
+            "...".to_owned()
+        }
+    };
     gfx.text(
         SIDEBAR_W - 24,
         card_y + 62,
