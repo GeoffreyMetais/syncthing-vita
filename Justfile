@@ -3,7 +3,6 @@ set shell := ["bash", "-euo", "pipefail", "-c"]
 title_id := "SYNCTHING"
 target := "armv7-sony-vita-newlibeabihf"
 vpk_path := "target/" + target + "/release/" + title_id + ".vpk"
-vita3k_bin := env_var_or_default("VITA3K_BIN", env_var("HOME") + "/.local/bin/Vita3K")
 vita3k_ux0 := env_var_or_default("VITA3K_UX0", env_var("HOME") + "/.local/share/Vita3K/Vita3K/ux0")
 
 # Display available tasks
@@ -22,7 +21,7 @@ test-all:
 check-env:
     ./scripts/setup_env.sh --check-all
 
-# Install full development environment (Rust nightly, Just, VitaSDK, Vita3K, Firmware)
+# Install full development environment (Rust nightly, Just, VitaSDK, Vita3K; firmware is optional)
 setup:
     ./scripts/setup_env.sh --install-all
 
@@ -42,7 +41,7 @@ vpk:
 verify:
     ./.agents/skills/vita-vpk-verify/scripts/verify_and_deploy.sh
 
-# Download and install official Sony firmware into Vita3K
+# Optional: install the official Sony firmware into Vita3K (not needed to run the app)
 setup-firmware:
     ./scripts/setup_env.sh --install-firmware
 
@@ -52,7 +51,7 @@ run-vita3k: vpk
     mkdir -p "{{vita3k_ux0}}/app/{{title_id}}"
     unzip -qo "{{vpk_path}}" -d "{{vita3k_ux0}}/app/{{title_id}}"
     @echo "Running {{title_id}} in Vita3K (SDL mode + stdout streaming)..."
-    {{vita3k_bin}} -z --frontend sdl -l 2 -r {{title_id}}
+    ./scripts/vita3k_launch.sh -z --frontend sdl -l 2 -r {{title_id}}
 
 # Build with scripted input, replay a UI script in Vita3K and save PNG frame dumps to target/ui-shots
 ui-scenario script secs="15":

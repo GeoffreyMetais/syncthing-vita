@@ -3,11 +3,9 @@
 
 mod common;
 
-use common::temp_test_dir;
+use common::{press, temp_test_dir};
 use syncthing_core::DeviceId;
-use vita_syncthing_app::application::{
-    FolderOfferService, InputController, ShareService, UserCommand,
-};
+use vita_syncthing_app::application::{FolderOfferService, InputController, ShareService};
 use vita_syncthing_app::domain::{ActiveTab, AppState, ModalDialog, SETTINGS_ROW_DECLINED};
 use vita_syncthing_app::infrastructure::{
     ConfigRepository, InputFrame, BTN_CIRCLE, BTN_CROSS, BTN_DOWN, BTN_SQUARE,
@@ -15,18 +13,6 @@ use vita_syncthing_app::infrastructure::{
 use vita_syncthing_app::ui::theme::{SETTINGS_DECLINED_B, SETTINGS_DECLINED_Y};
 
 const PEER: DeviceId = DeviceId([0x42; 32]);
-
-fn press(state: &mut AppState, repo: &ConfigRepository, buttons: u32) -> UserCommand {
-    InputController::handle_input(
-        state,
-        repo,
-        InputFrame {
-            pressed: buttons,
-            any_activity: true,
-            ..Default::default()
-        },
-    )
-}
 
 fn setup(name: &str) -> (String, ConfigRepository, AppState) {
     let dir = temp_test_dir(name);

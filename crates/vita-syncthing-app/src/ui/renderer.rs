@@ -1,6 +1,7 @@
 //! Top-level UI Renderer (`VitaUiRenderer`) owning `Gfx` and `VitaFramebuffer`.
 //! Dispatches rendering of `&AppState` across tabs, modals, toast notifications, and OLED screensaver.
 
+use crate::application::frame_pacing::ANIMATION_INTERVAL;
 use crate::domain::{ActiveTab, AppState, ModalDialog};
 use crate::infrastructure::VitaFramebuffer;
 use crate::ui::gfx::{Gfx, GFX_H, GFX_W};
@@ -31,12 +32,15 @@ impl VitaUiRenderer {
         }
     }
 
-    /// Renders a single 60 FPS frame from `state` and presents it to the PS Vita display.
-    pub fn render(&mut self, state: &mut AppState) {
+    /// Renders a frame from `state` and presents it to the PS Vita display on the next VBlank.
+    /// `elapsed_vblanks` is the number of display VBlanks since the previous frame; it keeps
+    /// animations at the same speed whatever the rendering frame rate (see `FramePacer`).
+    pub fn render(&mut self, state: &mut AppState, elapsed_vblanks: u32) {
         let th = UiTheme::for_mode(state.theme_mode);
 
         if state.oled_saver_active {
-            state.step_screensaver(GFX_W as f32, GFX_H as f32, SAVER_W, SAVER_H);
+            let steps = elapsed_vblanks.min(ANIMATION_INTERVAL);
+            state.step_screensaver(GFX_W as f32, GFX_H as f32, SAVER_W, SAVER_H, steps);
             render_oled_screensaver(&mut self.gfx, &th, state);
             self.fb.present(&self.gfx.pixels);
             return;
@@ -88,7 +92,11 @@ impl VitaUiRenderer {
 
         let s = strings::strings(state.language);
         draw_toast(&mut self.gfx, &th, s, state.toast_msg.as_ref());
-        state.tick_toast();
         self.fb.present(&self.gfx.pixels);
+    }
+
+    /// Skips rendering for this VBlank: the previous frame stays on screen.
+    pub fn idle(&mut self) {
+        self.fb.wait_vblank();
     }
 }

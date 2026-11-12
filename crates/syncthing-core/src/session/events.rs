@@ -47,7 +47,9 @@ pub enum SyncEvent {
         offset: u64,
         size: usize,
     },
+    /// A sync cycle with `peer_device_id` completed (the first one ends the initial sync).
     SyncCycleCompleted {
+        peer_device_id: DeviceId,
         active_connections: usize,
         files_up_to_date: usize,
         files_downloaded: usize,

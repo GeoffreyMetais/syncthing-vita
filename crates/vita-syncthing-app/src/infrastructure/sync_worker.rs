@@ -24,7 +24,7 @@ fn process_instance_id() -> i64 {
     })
 }
 
-/// Messages sent by the BEP network threads to the 60 FPS UI thread.
+/// Messages sent by the BEP network threads to the UI thread.
 pub enum WorkerMsg {
     Log(String),
     Progress {
@@ -202,7 +202,7 @@ fn run_peer_session_loop(
 
 /// Spawns UDP 21027 discovery + concurrent persistent `1+2` TLS 1.3 / BEP sessions for all
 /// `approved_devices` so every paired instance (e.g. Linux server and MacOS desktop) stays
-/// connected simultaneously while the UI runs at 60 FPS.
+/// connected simultaneously while the UI thread keeps running.
 pub fn spawn_sync_worker(
     base_data_dir: &str,
     identity: VitaIdentity,

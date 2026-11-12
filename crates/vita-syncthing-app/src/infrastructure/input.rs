@@ -189,7 +189,6 @@ pub struct InputFrame {
     /// Screen coordinates (`0..960`, `0..544`) of a new touch tap on this frame.
     pub touch_tap: Option<(usize, usize)>,
     /// Screen coordinates (`0..960`, `0..544`) of active touch contact.
-    #[allow(dead_code)]
     pub touch_pos: Option<(usize, usize)>,
     /// Updated text from the native PS Vita System Keyboard (`SceIme`), if active.
     pub ime_text: Option<String>,
@@ -199,6 +198,18 @@ pub struct InputFrame {
     pub ime_canceled: bool,
     /// True if any activity (button, stick, touch, or IME) occurred on this frame.
     pub any_activity: bool,
+}
+
+impl InputFrame {
+    /// True if this input can change what is displayed (a press, a tap or system keyboard
+    /// events). A held button or a resting finger keeps `any_activity` set but changes nothing.
+    pub fn changes_view(&self) -> bool {
+        self.pressed != 0
+            || self.touch_tap.is_some()
+            || self.ime_text.is_some()
+            || self.ime_submitted
+            || self.ime_canceled
+    }
 }
 
 #[cfg(target_os = "vita")]

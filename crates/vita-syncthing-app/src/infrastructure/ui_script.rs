@@ -9,6 +9,11 @@ use crate::infrastructure::input::*;
 
 static PENDING_SHOT: Mutex<Option<String>> = Mutex::new(None);
 
+/// True if a `shot` step is waiting for the next presented frame (forces a redraw).
+pub fn shot_pending() -> bool {
+    PENDING_SHOT.lock().map(|p| p.is_some()).unwrap_or(false)
+}
+
 /// Writes `pixels` (960x544 RGBA8888) to disk if a `shot` step requested it.
 pub fn dump_if_requested(pixels: &[u32]) {
     let Some(name) = PENDING_SHOT.lock().ok().and_then(|mut p| p.take()) else {

@@ -40,18 +40,20 @@ syncthing-vita
         ├── tests/                    # Integration tests, one file per use case / component (+ common/ helpers)
         └── src/
             ├── lib.rs                # Library target: declares the four layers ONLY (no logic, no tests)
-            ├── main.rs               # Composition root (binary), 60 FPS event loop, and PS Vita kernel symbols
+            ├── main.rs               # Composition root (binary), VBlank-paced event loop, and PS Vita kernel symbols
             ├── domain/               # Layer 1: Pure Domain Entities, Value Objects & Application State
             │   ├── mod.rs
             │   ├── navigation.rs     # NavFocus / NavState (D-pad focus), tab order, buttons per row
             │   ├── models.rs         # KnownDevice, ShareConfigEntry, PickerItem, ActiveTab, PickerMode, ModalDialog, ThemeMode
             │   ├── app_state.rs      # AppState (pure state & view-model queries, zero I/O or rendering dependencies)
+            │   ├── initial_sync.rs   # InitialSyncPeers (peers in their initial sync phase; full CPU speed meanwhile)
             │   └── ui_text.rs        # UiText: translatable messages (status line, labels, toasts) chosen by inner layers
             ├── application/          # Layer 2: Use Cases, Input Controller & Sync Event Coordinator
             │   ├── mod.rs
             │   ├── share_service.rs  # ShareService (create_share, upsert_device, toggle_device_for_share, refresh_picker_items)
             │   ├── share_creation.rs # ShareCreation (new share kept only once a device is linked)
             │   ├── folder_offers.rs  # FolderOfferService (folders offered by peers need consent: accept / decline / later)
+            │   ├── frame_pacing.rs   # FramePacer (dynamic frame rate: render only when the screen changes)
             │   ├── dpad_navigation.rs # DpadNavigation (sidebar <-> page focus, Cross on focused element)
             │   ├── qr_scan.rs        # QrScanFlow (scanner events -> AddDeviceById confirmation), extract_device_id
             │   ├── sync_coordinator.rs # SyncCoordinator (maps WorkerMsg & SyncEvent into AppState & ShareService)
@@ -152,6 +154,8 @@ Dependencies strictly point **inward**. Inner layers never import or depend on o
      - `input_controller.rs`: Translates main-screen button/touch inputs into actions, modal triggers, and commands.
      - `modal_input/`: Input handling for open modals, one file per modal (mirrors `ui/modals/`).
      - `dpad_navigation.rs`: D-pad focus between the sidebar and the page elements.
+     - `frame_pacing.rs`: `FramePacer` dynamic frame rate (see §7).
+     - `power_policy.rs`: automatic standby blocking and CPU clock level (`cpu_clock`: 333 MHz during the initial sync phase (`domain::InitialSyncPeers`, from `PeerConnected` to that peer's first `SyncCycleCompleted` / `SessionEnded`) and transfers + 10 s, 222 MHz for 3 s after input or while scanning a QR code, 111 MHz otherwise; applied by `set_cpu_clock_mhz` in `vita_system.rs`).
    - **Strict Rule**: No UI rendering code or direct hardware drivers.
 
 3. **Layer 3: Infrastructure Layer (`crates/vita-syncthing-app/src/infrastructure/`)**
@@ -178,12 +182,12 @@ Dependencies strictly point **inward**. Inner layers never import or depend on o
    - **Strict Rule**: Pure read-only view. Receives `&AppState` and visual context. **Never mutate domain state directly, and never perform disk I/O or network calls.**
 
 5. **Composition Root (`crates/vita-syncthing-app/src/main.rs`)**
-   - **Responsibility**: Initializes subsystems, wires dependencies, executes the 60 FPS event loop, and exports required VitaSDK entrypoint symbols (`_newlib_heap_size_user`, `sceUserMainThreadStackSize`).
+   - **Responsibility**: Initializes subsystems, wires dependencies, executes the VBlank-paced event loop, and exports required VitaSDK entrypoint symbols (`_newlib_heap_size_user`, `sceUserMainThreadStackSize`).
    - Must remain concise and free of monolithic rendering or business logic.
    - Imports the layers from the crate's library (`use vita_syncthing_app::...`). `src/lib.rs` only declares `domain`, `application`, `infrastructure` and `ui`; the VitaSDK entrypoint symbols stay in `main.rs`.
 
 6. **Tests (`crates/vita-syncthing-app/tests/`)**
-   - **No `#[cfg(test)] mod tests` inside `src/`** (neither in `main.rs` nor in layer modules). Tests are host integration tests against the library's public API, one file per use case / component (`share_service.rs`, `input_controller.rs`, `power_policy.rs`), with shared helpers in `tests/common/mod.rs` (e.g. `temp_test_dir`).
+   - **No `#[cfg(test)] mod tests` inside `src/`** (neither in `main.rs` nor in layer modules). Tests are host integration tests against the library's public API, one file per use case / component (`share_service.rs`, `input_controller.rs`, `power_policy.rs`), with shared helpers in `tests/common/mod.rs` (`temp_test_dir`, `press`, `tap`). A test belongs to the file of the component it exercises, not to `input_controller.rs` just because it goes through `InputController::handle_input`.
    - Test domain and application logic through public functions; never through Vita hardware drivers (`sce*` code is `#[cfg(target_os = "vita")]` and absent on host).
 
 ---
@@ -333,11 +337,16 @@ cargo test --workspace
 - `share_creation.rs`: a new share without a linked device is discarded, a linked one is kept, `Files` tab folder selection, already-shared folders are not selectable
 - `folder_offers.rs`: offered folders need consent, accept / decline / later, declined offers persisted, deleted shares are declined and do not come back, `Settings` · `Clear Declined` (D-pad and touch)
 - `share_service.rs`: share deletion, share creation, device linking, paused accepted folders, `ConfigRepository` roundtrip, manual LAN pairing
-- `input_controller.rs`: `START` quit dialog, theme toggle, add-device-by-short-ID via system keyboard, share deletion confirmation, `Files` up navigation, virtual keyboard toggle
+- `input_controller.rs`: global routing — an active screensaver swallows input and wakes on a button press or touch only
+- `dialogs.rs`: `START` -> `ConfirmQuit` -> `Cross` quits, `ConfirmQuit` touch targets, `ConfirmDeleteShare` (`Square` on Shares, cancel / confirm)
+- `add_device.rs`: add-device-by-short-ID via system keyboard (placeholder upgraded on discovery), virtual keyboard hidden until requested
+- `theme_settings.rs`: theme toggle (D-pad `Cross`, `Square`, touch) and `theme.cfg` persistence
+- `folder_picker.rs`: `Files` tab `Circle` walks up device-root paths, then leaves the tab
 - `dpad_navigation.rs`: sidebar <-> page focus, Shares rows / buttons / header, Files rows / Up button
 - `qr_scan.rs`: Device ID extraction from QR payloads, `quircs` decoding of a rendered QR code, scanner modal navigation, adding the scanned device
-- `power_policy.rs`: standby blocking while syncing (charging / battery / transfer grace period)
+- `power_policy.rs`: standby blocking while syncing (charging / battery / transfer grace period), CPU clock level (full speed only during the initial sync phase and transfers), initial sync phase tracked per peer from `SyncEvent`s
 - `ui_text.rs`: every `UiText` message renders in all 5 languages with its placeholders filled, translated Device ID errors
+- `frame_pacing.rs`: dynamic frame rate (input -> next VBlank, animations 30 FPS, background updates 10 FPS, static 1 FPS), toast expiry and screensaver speed independent of the frame rate
 - `language_settings.rs`: language preference codec / cycle, `language.cfg` persistence (defaults to the system language), `Settings` language card (D-pad and touch)
 
 ### Cross-Check for PS Vita (`armv7-sony-vita-newlibeabihf`)
@@ -361,9 +370,14 @@ After running `just vpk`, you can verify that the required Newlib heap and threa
 ```
 
 ### Install & Smoke-Test in Vita3K (Local Emulator)
+No Sony firmware is needed (the app only uses HLE modules and embeds its fonts). `scripts/vita3k_launch.sh` runs Vita3K under `xvfb-run` when there is no X display.
 ```bash
-unzip -o target/armv7-sony-vita-newlibeabihf/release/SYNCTHING.vpk -d ~/.local/share/Vita3K/Vita3K/ux0/app/SYNCTHING
-timeout 6s ~/.local/bin/Vita3K -z --frontend sdl -l 2 -r SYNCTHING || true
+just run-vita3k
+# or, with an already built VPK:
+mkdir -p ~/.local/share/Vita3K/Vita3K/ux0/app/SYNCTHING
+unzip -qo target/armv7-sony-vita-newlibeabihf/release/SYNCTHING.vpk -d ~/.local/share/Vita3K/Vita3K/ux0/app/SYNCTHING
+timeout 10s ./scripts/vita3k_launch.sh -z --frontend sdl -l 2 -r SYNCTHING || true; pkill -x Vita3K || true
+tail -n 5 ~/.local/share/Vita3K/Vita3K/ux0/data/syncthing/syncthing.log
 ```
 
 ### Scripted UI Smoke Tests in Vita3K (`ui-script` feature)
@@ -372,14 +386,15 @@ The opt-in `ui-script` Cargo feature (never in release builds) replays inputs fr
 printf 'wait 60\npress R\nwait 10\nshot shares\n' > /tmp/shares.txt
 just ui-scenario /tmp/shares.txt
 ```
-PNGs land in `target/ui-shots/`; the Vita3K app data directory is backed up and restored around the run.
+PNGs land in `target/ui-shots/`; the Vita3K app data directory is backed up and restored around the run. It needs neither firmware nor a display (see above). `wait` frames count as activity (the automatic screensaver never starts during a script) but do not wake a screensaver started with `press SELECT`.
 
 ---
 
 ## 7. UI Layout & Controls Reference (`VitaSend` Design System)
 
-The UI (`gfx.rs` + `ui/screens/*` + `ui/modals/*` + `ui/renderer.rs`) renders at native `960x544` @ 60 FPS with a `212px` left sidebar (`SIDEBAR_W = 212`), main content area (`x = 236..936`, `y = 86..488`), and bottom button hint bar (`y = 500..544`):
+The UI (`gfx.rs` + `ui/screens/*` + `ui/modals/*` + `ui/renderer.rs`) renders at native `960x544` with a `212px` left sidebar (`SIDEBAR_W = 212`), main content area (`x = 236..936`, `y = 86..488`), and bottom button hint bar (`y = 500..544`):
 
+- **Dynamic frame rate** (`application/frame_pacing.rs`): the main loop wakes up on every display VBlank (60 Hz) to poll input, but a frame is only rendered when needed — on the next VBlank after user input (press, tap, IME, dialog, toast expiry), at 30 FPS for animations (OLED screensaver, QR viewfinder), at most 10 FPS for background updates (sync progress, logs), and once per second when static. When adding a time-based animation, set `FrameSignals::animating` in `main.rs` and scale its motion by the elapsed VBlanks passed to `VitaUiRenderer::render`; never count time in rendered frames.
 - **D-pad focus** (`domain/navigation.rs` + `application/dpad_navigation.rs`): focus is on the sidebar or on the page. Sidebar: `Up`/`Down` switch tabs, `Right`/`Cross` enter the page. Page: `Up`/`Down` move between rows (including the top `+ New Share` / `Up` button), `Left`/`Right` between a row's buttons, `Left` on the first one returns to the sidebar, `Cross` activates the focused element (drawn with `draw_focus_ring`). On `Files`, `Right` opens the folder. Face buttons remain direct shortcuts.
 - **Left Sidebar Tabs** (`L` / `R` shoulder buttons, D-pad from the sidebar, or touch tap):
   1. `Overview` (`ActiveTab::Dashboard`): Device status card, `QR / ID` modal button (`Circle`), `Sync Now` button (`Cross`), transfer statistics, and recent activity feed.
