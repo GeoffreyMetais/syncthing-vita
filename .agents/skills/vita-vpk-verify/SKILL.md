@@ -24,9 +24,9 @@ Follow this workflow whenever producing a release build of `vita-syncthing-app` 
    - ELF symbol audit via `arm-vita-eabi-nm` to confirm `_newlib_heap_size_user` (64 MB) and `sceUserMainThreadStackSize` (2 MB) are exported in `.rodata` and bound inside `_init_vita_heap`
    - Automatic unpacking into Vita3K (`~/.local/share/Vita3K/Vita3K/ux0/app/SYNCTHING`)
 
-2. **Optional: Smoke-test in Vita3K**:
+2. **Optional: Smoke-test in Vita3K** (no Sony firmware needed; `vita3k_launch.sh` uses `xvfb-run` when there is no display):
    ```bash
-   timeout 6s ~/.local/bin/Vita3K -z --frontend sdl -l 2 -r SYNCTHING || true
+   timeout 6s ./scripts/vita3k_launch.sh -z --frontend sdl -l 2 -r SYNCTHING || true; pkill -x Vita3K || true
    tail -n 20 ~/.local/share/Vita3K/Vita3K/ux0/data/syncthing/syncthing.log
    ```
 

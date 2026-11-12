@@ -366,9 +366,14 @@ After running `just vpk`, you can verify that the required Newlib heap and threa
 ```
 
 ### Install & Smoke-Test in Vita3K (Local Emulator)
+No Sony firmware is needed (the app only uses HLE modules and embeds its fonts). `scripts/vita3k_launch.sh` runs Vita3K under `xvfb-run` when there is no X display.
 ```bash
-unzip -o target/armv7-sony-vita-newlibeabihf/release/SYNCTHING.vpk -d ~/.local/share/Vita3K/Vita3K/ux0/app/SYNCTHING
-timeout 6s ~/.local/bin/Vita3K -z --frontend sdl -l 2 -r SYNCTHING || true
+just run-vita3k
+# or, with an already built VPK:
+mkdir -p ~/.local/share/Vita3K/Vita3K/ux0/app/SYNCTHING
+unzip -qo target/armv7-sony-vita-newlibeabihf/release/SYNCTHING.vpk -d ~/.local/share/Vita3K/Vita3K/ux0/app/SYNCTHING
+timeout 10s ./scripts/vita3k_launch.sh -z --frontend sdl -l 2 -r SYNCTHING || true; pkill -x Vita3K || true
+tail -n 5 ~/.local/share/Vita3K/Vita3K/ux0/data/syncthing/syncthing.log
 ```
 
 ### Scripted UI Smoke Tests in Vita3K (`ui-script` feature)
@@ -377,7 +382,7 @@ The opt-in `ui-script` Cargo feature (never in release builds) replays inputs fr
 printf 'wait 60\npress R\nwait 10\nshot shares\n' > /tmp/shares.txt
 just ui-scenario /tmp/shares.txt
 ```
-PNGs land in `target/ui-shots/`; the Vita3K app data directory is backed up and restored around the run. No firmware is needed (the app only uses HLE modules); in a headless container run it under `xvfb-run -a -s "-screen 0 1280x720x24" just ui-scenario <script> [secs]`. `wait` frames count as activity (the automatic screensaver never starts during a script) but do not wake a screensaver started with `press SELECT`.
+PNGs land in `target/ui-shots/`; the Vita3K app data directory is backed up and restored around the run. It needs neither firmware nor a display (see above). `wait` frames count as activity (the automatic screensaver never starts during a script) but do not wake a screensaver started with `press SELECT`.
 
 ---
 

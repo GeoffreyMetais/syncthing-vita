@@ -22,7 +22,7 @@ Host System (Linux / macOS / WSL2)
  │    ├── Compiler & Linker: arm-vita-eabi-gcc, arm-vita-eabi-g++, arm-vita-eabi-ld, arm-vita-eabi-nm
  │    ├── Homebrew Packaging: vita-elf-create, vita-make-fself, vita-mksfoex, vita-pack-vpk
  │    └── Package Manager: vdpm (Vita Development Package Manager)
- ├── Emulator: Vita3K (`~/.local/bin/Vita3K`) + Official Sony Firmware (`PSP2UPDAT.PUP`)
+ ├── Emulator: Vita3K (`~/.local/bin/Vita3K`), run via `scripts/vita3k_launch.sh` (no firmware needed)
  └── Deployment: VitaShell FTP (port 1337) / USB MTP
 ```
 
@@ -40,7 +40,7 @@ Run the project setup script or `just`:
 just check-env
 # or: ./scripts/setup_env.sh --check-all
 
-# Automatically install all missing components (Rust nightly, Just, VitaSDK, Vita3K, Firmware)
+# Automatically install all missing components (Rust nightly, Just, VitaSDK, Vita3K; firmware is optional)
 just setup
 # or: ./scripts/setup_env.sh --install-all
 ```
@@ -149,19 +149,28 @@ just verify
 
 Vita3K is the leading experimental open-source PlayStation Vita emulator for Windows, Linux, and macOS.
 
+### No Firmware Needed
+VitaSyncthing only uses HLE-implemented modules and embeds its own Poppins fonts, so it boots in Vita3K **without the Sony firmware**. Running the app only needs:
+1. the Vita3K binary (`~/.local/bin/Vita3K`),
+2. the emulated storage directory `~/.local/share/Vita3K/Vita3K/ux0/app` (`--prepare-vita3k`; `just run-vita3k`, `just ui-scenario` and `just verify` also create it),
+3. an X display, or `xvfb-run` (package `xvfb`) when there is none — `scripts/vita3k_launch.sh` switches to `xvfb-run` automatically.
+
 ### Automated Installation via Setup Script
 ```bash
-./scripts/setup_env.sh --install-vita3k
-./scripts/setup_env.sh --install-firmware
+./scripts/setup_env.sh --install-vita3k   # AppImage + launcher + config + ux0: storage
+./scripts/setup_env.sh --prepare-vita3k   # only config + ux0: storage (Vita3K installed another way)
+./scripts/setup_env.sh --install-firmware # optional
 ```
 
 This:
 1. Extracts the AppImage to `~/.local/share/vita3k-appdir` (avoiding `/dev/fuse` requirements in containers/WSL).
 2. Sets up a bundled runtime launcher at `~/.local/bin/Vita3K` using `sharun` to isolate Qt6 and glibc dependencies.
 3. Automatically sets OpenGL overrides (`MESA_GL_VERSION_OVERRIDE=4.5`, `MESA_GLSL_VERSION_OVERRIDE=450`, `LIBGL_ALWAYS_SOFTWARE=1`) for headless Xvfb or software rasterizers.
-4. Preconfigures `~/.config/Vita3K/config.yml` with `initial-setup: true` and `show-welcome: false` so tests run headlessly without wizard screens.
+4. Preconfigures `~/.config/Vita3K/config.yml` (`initial-setup: true`, `show-welcome: false`, `warn-missing-firmware: false`, `pref-path` under `$HOME`) and creates `ux0/app` + `ux0/data`, so tests run headlessly without wizard screens.
 
-### Manual Firmware Installation:
+`--check-all` reports missing firmware as informational only. Vita3K creates empty `vs0`/`os0` folders on first start, so installed firmware is detected by the modules in `vs0/sys/external`.
+
+### Optional Manual Firmware Installation:
 ```bash
 mkdir -p /tmp/vita-fw
 # Main Firmware PUP (127 MB, required)
@@ -179,15 +188,15 @@ Installed homebrew applications live in:
 
 ### Headless / Console Execution:
 ```bash
-just run-vita3k
+just run-vita3k                                  # build, deploy to ux0:app/SYNCTHING, run
+just ui-scenario /path/to/script.txt [seconds]   # scripted inputs + PNG frame dumps
+timeout 10s ./scripts/vita3k_launch.sh -z --frontend sdl -l 2 -r SYNCTHING || true; pkill -x Vita3K || true
 ```
 Recent Vita3K builds take `-z` / `--console` without a value (`--console 1` makes Vita3K treat `1` as a content path).
 
-For headless environments without a physical GPU:
+Without a physical GPU, Vita3K needs Mesa software OpenGL (`backend-renderer: OpenGL` in the config, plus `LIBGL_ALWAYS_SOFTWARE=1`, `MESA_GL_VERSION_OVERRIDE=4.5`, `MESA_GLSL_VERSION_OVERRIDE=450`; the launcher written by `--install-vita3k` sets them). The app's own log is the quickest boot check:
 ```bash
-mkdir -p -m 700 /tmp/xdg
-XDG_RUNTIME_DIR=/tmp/xdg LIBGL_ALWAYS_SOFTWARE=1 MESA_GL_VERSION_OVERRIDE=4.5 MESA_GLSL_VERSION_OVERRIDE=450 \
-  xvfb-run -a -s "-screen 0 1024x768x24" ~/.local/bin/Vita3K -z --frontend sdl -B OpenGL -l 2 -r SYNCTHING
+tail -n 5 ~/.local/share/Vita3K/Vita3K/ux0/data/syncthing/syncthing.log
 ```
 
 ---

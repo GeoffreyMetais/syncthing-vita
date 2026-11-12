@@ -44,7 +44,7 @@ fi
 echo "    Found exported symbols:"
 grep -E "_newlib_heap_size_user|sceUserMainThread" <<< "${SYMBOLS}"
 
-if [[ -d "${HOME}/.local/share/Vita3K/Vita3K/ux0" ]]; then
+if [[ -x "${VITA3K_BIN:-${HOME}/.local/bin/Vita3K}" ]]; then
     echo "==> [4/4] Installing SYNCTHING.vpk into Vita3K (ux0:/app/SYNCTHING)..."
     mkdir -p "${VITA3K_APP_DIR}"
     unzip -qo "${VPK_PATH}" -d "${VITA3K_APP_DIR}"
