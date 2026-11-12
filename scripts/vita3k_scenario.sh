@@ -20,7 +20,7 @@ cd "$(dirname "$0")/.."
 BACKUP="$(mktemp -d)"
 [[ -d "$DATA" ]] && cp -a "$DATA" "$BACKUP/syncthing"
 restore() {
-    pkill -x Vita3K 2>/dev/null || true
+    pkill -f Vita3K 2>/dev/null || true
     rm -rf "$DATA"
     [[ -d "$BACKUP/syncthing" ]] && cp -a "$BACKUP/syncthing" "$DATA"
     rm -rf "$BACKUP"
@@ -32,10 +32,15 @@ rm -rf "$DATA/shots"
 cp "$SCRIPT" "$DATA/ui_script.txt"
 unzip -qo "$VPK" -d "$UX0/app/SYNCTHING"
 
-SDL_VIDEODRIVER="${SDL_VIDEODRIVER:-x11}" "$VITA3K_BIN" -z --frontend sdl -l 2 -r SYNCTHING \
-    > "$OUT_DIR/vita3k.log" 2>&1 &
+if [[ -z "${DISPLAY:-}" ]] || ! command -v xset >/dev/null 2>&1 || ! xset q >/dev/null 2>&1; then
+    SDL_VIDEODRIVER="${SDL_VIDEODRIVER:-x11}" xvfb-run -a -s "-screen 0 1024x768x24 +extension GLX +render" \
+        "$VITA3K_BIN" -z --frontend sdl -l 2 -r SYNCTHING > "$OUT_DIR/vita3k.log" 2>&1 &
+else
+    SDL_VIDEODRIVER="${SDL_VIDEODRIVER:-x11}" "$VITA3K_BIN" -z --frontend sdl -l 2 -r SYNCTHING \
+        > "$OUT_DIR/vita3k.log" 2>&1 &
+fi
 sleep "$RUN_SECS"
-pkill -x Vita3K || true
+pkill -f Vita3K || true
 sleep 1
 
 for f in "$DATA"/shots/*.rgba; do

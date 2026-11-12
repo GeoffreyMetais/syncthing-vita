@@ -194,6 +194,11 @@ install_vita3k() {
         mv "$(dirname "${VITA3K_APPDIR}")/AppDir" "${VITA3K_APPDIR}"
     rm -f "${appimage_tmp}"
 
+    # Ensure shaders directory is accessible at root of AppDir
+    if [[ -d "${VITA3K_APPDIR}/share/Vita3K/shaders-builtin" ]]; then
+        ln -sf "${VITA3K_APPDIR}/share/Vita3K/shaders-builtin" "${VITA3K_APPDIR}/shaders-builtin"
+    fi
+
     echo "Creating robust Vita3K launcher script at ${VITA3K_BIN}..."
     rm -f "${VITA3K_BIN}"
     cat << 'EOF' > "${VITA3K_BIN}"
@@ -214,6 +219,8 @@ export MESA_GL_VERSION_OVERRIDE=4.5
 export MESA_GLSL_VERSION_OVERRIDE=450
 
 VITA3K_APPDIR="${HOME}/.local/share/vita3k-appdir"
+[[ -d "${VITA3K_APPDIR}/share/Vita3K/shaders-builtin" && ! -e "${VITA3K_APPDIR}/shaders-builtin" ]] && \
+    ln -sf "${VITA3K_APPDIR}/share/Vita3K/shaders-builtin" "${VITA3K_APPDIR}/shaders-builtin"
 
 # Default to OpenGL renderer for maximum compatibility across headless/Mesa environments
 HAS_BACKEND=false
@@ -276,13 +283,13 @@ install_firmware() {
         -o /tmp/vita-fw/PSP2UPDAT.PUP
 
     echo "Installing main system firmware into Vita3K..."
-    "${VITA3K_BIN}" --console 1 --firmware /tmp/vita-fw/PSP2UPDAT.PUP
+    "${VITA3K_BIN}" -z --firmware /tmp/vita-fw/PSP2UPDAT.PUP
 
     echo "Attempting font package download (optional)..."
     if curl -s -fL "http://dus01.psv.update.playstation.net/update/psv/image/2012_0208/sd_2f1289b2d864758a09225d2789fa3996/PSP2UPDAT.PUP" \
         -o /tmp/vita-fw/FONT_PSP2UPDAT.PUP 2>/dev/null; then
         echo "Installing font package..."
-        "${VITA3K_BIN}" --console 1 --firmware /tmp/vita-fw/FONT_PSP2UPDAT.PUP || true
+        "${VITA3K_BIN}" -z --firmware /tmp/vita-fw/FONT_PSP2UPDAT.PUP || true
     else
         echo "ℹ️  Font package not available on Sony CDN (homebrew app uses embedded Poppins fonts; skipping)."
     fi
