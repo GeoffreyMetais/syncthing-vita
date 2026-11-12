@@ -54,18 +54,39 @@ check_tools() {
 
 install_vitasdk() {
     echo "=== Installing VitaSDK to ${VITASDK_DIR} ==="
-    sudo mkdir -p "${VITASDK_DIR}"
-    sudo chown -R "$(whoami):$(whoami)" "${VITASDK_DIR}"
-    curl -sL https://github.com/vitasdk/autobuilds/releases/download/master-linux/vitasdk-x86_64-linux-ubuntu-latest.tar.bz2 | tar -xj -C "${VITASDK_DIR}" --strip-components=1
-    echo "✅ VitaSDK extracted. Ensure VITASDK=${VITASDK_DIR} and PATH=\"\$VITASDK/bin:\$PATH\" are exported."
+    if [[ -x "${VITASDK_DIR}/bin/arm-vita-eabi-gcc" ]]; then
+        echo "✅ VitaSDK already installed at: ${VITASDK_DIR}"
+        return
+    fi
+    # The official bootstrap installs the newest supported series with pacman (vdpm),
+    # verifying the signed channel manifest. It refuses an existing destination.
+    if [[ -d "${VITASDK_DIR}" ]] && [[ -z "$(ls -A "${VITASDK_DIR}")" ]]; then
+        rmdir "${VITASDK_DIR}"
+    fi
+    local src
+    src="$(mktemp -d)"
+    git clone -q --depth 1 https://github.com/vitasdk/vdpm "${src}/vdpm"
+    (cd "${src}/vdpm" && VITASDK="${VITASDK_DIR}" ./bootstrap-vitasdk.sh)
+    rm -rf "${src}"
+    echo "✅ VitaSDK installed. Ensure VITASDK=${VITASDK_DIR} and PATH=\"\$VITASDK/bin:\$PATH\" are exported."
 }
 
 install_vita3k() {
     echo "=== Installing Vita3K to ${VITA3K_BIN} ==="
-    mkdir -p "$(dirname "${VITA3K_BIN}")"
-    curl -fL https://github.com/Vita3K/Vita3K/releases/download/continuous/Vita3K-x86_64.AppImage -o "${VITA3K_BIN}"
+    local bin_dir
+    bin_dir="$(dirname "${VITA3K_BIN}")"
+    mkdir -p "${bin_dir}"
+    curl -fL https://github.com/Vita3K/Vita3K/releases/download/continuous/Vita3K-x86_64.AppImage \
+        -o "${bin_dir}/Vita3K.AppImage"
+    chmod +x "${bin_dir}/Vita3K.AppImage"
+    # Extract the AppImage so it also runs in containers without FUSE.
+    rm -rf "${bin_dir}/vita3k-appdir" "${bin_dir}/squashfs-root"
+    (cd "${bin_dir}" && ./Vita3K.AppImage --appimage-extract >/dev/null && mv squashfs-root vita3k-appdir)
+    printf '#!/bin/sh\nexec "%s/vita3k-appdir/AppRun" "$@"\n' "${bin_dir}" > "${VITA3K_BIN}"
     chmod +x "${VITA3K_BIN}"
     echo "✅ Vita3K installed at: ${VITA3K_BIN}"
+    echo "   Headless: xvfb-run -a env XDG_RUNTIME_DIR=/tmp/xdg LIBGL_ALWAYS_SOFTWARE=1 MESA_GL_VERSION_OVERRIDE=4.6 \\"
+    echo "             ${VITA3K_BIN} -z --frontend sdl -B OpenGL -l 2 -r SYNCTHING"
 }
 
 install_firmware() {
@@ -74,12 +95,14 @@ install_firmware() {
         exit 1
     fi
     echo "=== Downloading & Installing Sony PS Vita Firmware into Vita3K ==="
+    # Sony's update servers only serve these files over plain HTTP: this step fails
+    # behind HTTPS-only proxies. Homebrew such as VitaSyncthing runs without firmware.
     mkdir -p /tmp/vita-fw
     curl -fL http://dus01.psp2.update.playstation.net/update/psp2/image/2022_0209/rel_f2c7b12fe85496ec88a0391b514d6e3b/PSP2UPDAT.PUP -o /tmp/vita-fw/PSP2UPDAT.PUP
     curl -fL http://dus01.psv.update.playstation.net/update/psv/image/2012_0208/sd_2f1289b2d864758a09225d2789fa3996/PSP2UPDAT.PUP -o /tmp/vita-fw/FONT_PSP2UPDAT.PUP
     
-    "${VITA3K_BIN}" --console 1 --firmware /tmp/vita-fw/PSP2UPDAT.PUP
-    "${VITA3K_BIN}" --console 1 --firmware /tmp/vita-fw/FONT_PSP2UPDAT.PUP
+    "${VITA3K_BIN}" -z --firmware /tmp/vita-fw/PSP2UPDAT.PUP
+    "${VITA3K_BIN}" -z --firmware /tmp/vita-fw/FONT_PSP2UPDAT.PUP
     rm -rf /tmp/vita-fw
     echo "✅ Firmware installation complete."
 }

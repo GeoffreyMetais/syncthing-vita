@@ -357,7 +357,7 @@ After running `just vpk`, you can verify that the required Newlib heap and threa
 ### Install & Smoke-Test in Vita3K (Local Emulator)
 ```bash
 unzip -o target/armv7-sony-vita-newlibeabihf/release/SYNCTHING.vpk -d ~/.local/share/Vita3K/Vita3K/ux0/app/SYNCTHING
-timeout 6s ~/.local/bin/Vita3K --console 1 --frontend sdl -l 2 -r SYNCTHING || true
+timeout 6s ~/.local/bin/Vita3K -z --frontend sdl -l 2 -r SYNCTHING || true
 ```
 
 ### Scripted UI Smoke Tests in Vita3K (`ui-script` feature)

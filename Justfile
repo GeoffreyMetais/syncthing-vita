@@ -31,8 +31,8 @@ setup-firmware:
     mkdir -p /tmp/vita-fw
     curl -fL http://dus01.psp2.update.playstation.net/update/psp2/image/2022_0209/rel_f2c7b12fe85496ec88a0391b514d6e3b/PSP2UPDAT.PUP -o /tmp/vita-fw/PSP2UPDAT.PUP
     curl -fL http://dus01.psv.update.playstation.net/update/psv/image/2012_0208/sd_2f1289b2d864758a09225d2789fa3996/PSP2UPDAT.PUP -o /tmp/vita-fw/FONT_PSP2UPDAT.PUP
-    {{vita3k_bin}} --console 1 --firmware /tmp/vita-fw/PSP2UPDAT.PUP
-    {{vita3k_bin}} --console 1 --firmware /tmp/vita-fw/FONT_PSP2UPDAT.PUP
+    {{vita3k_bin}} -z --firmware /tmp/vita-fw/PSP2UPDAT.PUP
+    {{vita3k_bin}} -z --firmware /tmp/vita-fw/FONT_PSP2UPDAT.PUP
 
 # Build .vpk, deploy to ux0:app/SYNCTHING and run inside Vita3K with log streaming
 run-vita3k: vpk
@@ -40,7 +40,7 @@ run-vita3k: vpk
     mkdir -p "{{vita3k_ux0}}/app/{{title_id}}"
     unzip -qo "{{vpk_path}}" -d "{{vita3k_ux0}}/app/{{title_id}}"
     @echo "Running {{title_id}} in Vita3K (SDL mode + stdout streaming)..."
-    {{vita3k_bin}} --console 1 --frontend sdl -l 2 -r {{title_id}}
+    {{vita3k_bin}} -z --frontend sdl -l 2 -r {{title_id}}
 
 # Build with scripted input, replay a UI script in Vita3K and save PNG frame dumps to target/ui-shots
 ui-scenario script secs="15":
