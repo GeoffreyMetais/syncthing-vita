@@ -14,6 +14,18 @@ default:
 test-host:
     cargo test -p syncthing-core
 
+# Run all workspace unit and integration tests on host (x86_64)
+test-all:
+    cargo test --workspace
+
+# Check environment dependencies, VitaSDK, Rust nightly, and Vita3K setup
+check-env:
+    ./scripts/setup_env.sh --check-all
+
+# Install full development environment (Rust nightly, Just, VitaSDK, Vita3K, Firmware)
+setup:
+    ./scripts/setup_env.sh --install-all
+
 # Build binary on Linux host to quickly test networking flow
 run-host:
     cargo run -p vita-syncthing-app
@@ -24,15 +36,14 @@ check-vita:
 
 # Cross-compile for PS Vita target and generate .vpk package
 vpk:
-    VITASDK="${VITASDK:-/usr/local/vitasdk}" PATH="${VITASDK:-/usr/local/vitasdk}/bin:$PATH" ./scripts/build_vpk.sh
+    ./scripts/build_vpk.sh
 
-# Download and automatically install both official Sony firmwares into Vita3K
-setup-firmware:
-    mkdir -p /tmp/vita-fw
-    curl -fL http://dus01.psp2.update.playstation.net/update/psp2/image/2022_0209/rel_f2c7b12fe85496ec88a0391b514d6e3b/PSP2UPDAT.PUP -o /tmp/vita-fw/PSP2UPDAT.PUP
-    curl -fL http://dus01.psv.update.playstation.net/update/psv/image/2012_0208/sd_2f1289b2d864758a09225d2789fa3996/PSP2UPDAT.PUP -o /tmp/vita-fw/FONT_PSP2UPDAT.PUP
-    {{vita3k_bin}} -z --firmware /tmp/vita-fw/PSP2UPDAT.PUP
-    {{vita3k_bin}} -z --firmware /tmp/vita-fw/FONT_PSP2UPDAT.PUP
+# Run complete release VPK build, ELF symbol audit, and Vita3K installation
+verify:
+    ./.agents/skills/vita-vpk-verify/scripts/verify_and_deploy.sh
+
+# Download and install official Sony firmware into Vita3K
+    ./scripts/setup_env.sh --install-firmware
 
 # Build .vpk, deploy to ux0:app/SYNCTHING and run inside Vita3K with log streaming
 run-vita3k: vpk
