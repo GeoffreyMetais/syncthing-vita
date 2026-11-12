@@ -19,6 +19,7 @@ pub use models::{
     BROWSER_ROWS, NEW_SHARE_TEMPLATES, VISIBLE_DEVICES,
 };
 pub use navigation::{
-    action_count, default_col, NavFocus, NavState, SETTINGS_ROWS, SETTINGS_ROW_DECLINED,
-    SETTINGS_ROW_DISPLAY, SETTINGS_ROW_LANGUAGE, TAB_ORDER,
+    action_count, default_col, settings_row_action_count, NavFocus, NavState, SETTINGS_ROWS,
+    SETTINGS_ROW_DECLINED, SETTINGS_ROW_DEVICES, SETTINGS_ROW_DISPLAY, SETTINGS_ROW_LANGUAGE,
+    TAB_ORDER,
 };

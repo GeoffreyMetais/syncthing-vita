@@ -87,6 +87,7 @@ fn test_settings_dpad_cycles_and_saves_language() {
     assert_eq!(state.language, Language::Spanish);
 
     press(&mut state, &repo, BTN_DOWN);
+    press(&mut state, &repo, BTN_DOWN);
     assert!(state.is_settings_row_focused(SETTINGS_ROW_LANGUAGE));
 
     // System (Español) -> English

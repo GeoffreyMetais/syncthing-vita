@@ -123,6 +123,8 @@ pub static STRINGS_IT: Strings = Strings {
     settings_desc_theme_dark: "Scuro — Design blu ardesia VitaSend con accento turchese",
     settings_desc_theme_oled: "OLED — Fondo nero puro #000000 (risparmia batteria OLED)",
     settings_saver_auto_hint: "Il salvaschermo OLED si attiva dopo 12s di sincronizzazione (o tasto SELECT).",
+    settings_sec_devices: "DISPOSITIVI E ABBINAMENTO",
+    settings_desc_devices: "Aggiungi un dispositivo o vedi l'ID di questa PS Vita",
     settings_sec_log: "REGISTRO PROTOCOLLO BEP/1.0 E TLS 1.3",
     settings_sec_declined: "CARTELLE RIFIUTATE",
     settings_no_declined: "Nessuna · le cartelle offerte dai peer vengono sempre richieste prima",

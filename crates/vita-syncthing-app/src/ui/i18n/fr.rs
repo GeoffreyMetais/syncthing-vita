@@ -123,6 +123,8 @@ pub static STRINGS_FR: Strings = Strings {
     settings_desc_theme_dark: "Sombre — Aspect bleu ardoise VitaSend avec accent turquoise",
     settings_desc_theme_oled: "OLED — Fond noir pur #000000 (économise la batterie PS Vita OLED)",
     settings_saver_auto_hint: "L'économiseur d'écran OLED s'active après 12s en sync (ou touche SELECT).",
+    settings_sec_devices: "APPAREILS & APPAIRAGE",
+    settings_desc_devices: "Associer un appareil ou afficher l'ID de la PS Vita",
     settings_sec_log: "JOURNAL PROTOCOLE BEP/1.0 & TLS 1.3",
     settings_sec_declined: "DOSSIERS REFUSÉS",
     settings_no_declined: "Aucun · les dossiers proposés par les pairs sont toujours demandés",

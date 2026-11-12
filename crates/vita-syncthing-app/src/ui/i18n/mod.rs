@@ -142,6 +142,8 @@ pub struct Strings {
     pub settings_desc_theme_dark: &'static str,
     pub settings_desc_theme_oled: &'static str,
     pub settings_saver_auto_hint: &'static str,
+    pub settings_sec_devices: &'static str,
+    pub settings_desc_devices: &'static str,
     pub settings_sec_log: &'static str,
     pub settings_sec_declined: &'static str,
     pub settings_no_declined: &'static str,

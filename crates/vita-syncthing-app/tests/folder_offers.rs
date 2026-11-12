@@ -140,10 +140,11 @@ fn test_settings_clear_declined_lets_peers_offer_again() {
     assert_eq!(state.ignored_folders.len(), 1);
     state.config_dirty = false;
 
-    // Settings: Down past the language card to the declined folders card, Cross on `Clear Declined`
+    // Settings: Down past the devices and language cards to the declined folders card, Cross on `Clear Declined`
     state.active_tab = ActiveTab::Settings;
     state.reset_nav_for_tab();
     state.nav.focus = vita_syncthing_app::domain::NavFocus::Content;
+    press(&mut state, &repo, BTN_DOWN);
     press(&mut state, &repo, BTN_DOWN);
     press(&mut state, &repo, BTN_DOWN);
     assert!(state.is_settings_row_focused(SETTINGS_ROW_DECLINED));

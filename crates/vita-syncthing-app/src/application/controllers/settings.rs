@@ -3,15 +3,14 @@
 
 use crate::application::{DpadNavigation, FolderOfferService};
 use crate::domain::{
-    action_count, default_col, ActiveTab, AppState, NavFocus, UiAction, SETTINGS_ROWS,
-    SETTINGS_ROW_DISPLAY,
+    default_col, settings_row_action_count, ActiveTab, AppState, NavFocus, UiAction, SETTINGS_ROWS,
 };
 use crate::infrastructure::{ConfigRepository, BTN_DOWN, BTN_LEFT, BTN_UP};
 
 pub struct SettingsController;
 
 impl SettingsController {
-    /// Moves the D-pad focus: the display card's button row, then one button per card.
+    /// Moves the D-pad focus between Settings cards and within multi-button cards.
     pub fn move_focus(state: &mut AppState, buttons: u32) -> Option<UiAction> {
         if buttons & BTN_UP != 0 && state.nav.row > 0 {
             state.nav.row -= 1;
@@ -21,8 +20,9 @@ impl SettingsController {
             state.nav.row += 1;
             state.nav.col = 0;
         }
-        if state.nav.row == SETTINGS_ROW_DISPLAY {
-            DpadNavigation::move_in_row(state, action_count(ActiveTab::Settings), buttons);
+        let cols = settings_row_action_count(state.nav.row);
+        if cols > 1 {
+            DpadNavigation::move_in_row(state, cols, buttons);
         } else if buttons & BTN_LEFT != 0 {
             state.nav.focus = NavFocus::Sidebar;
         }
