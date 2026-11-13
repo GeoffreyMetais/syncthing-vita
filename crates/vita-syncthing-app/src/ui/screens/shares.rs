@@ -158,7 +158,8 @@ fn draw_share_card(
         );
     }
 
-    // Line 1: title, then the status chip right after it.
+    // Line 1: title, and the status chip right-aligned on the text column (left of the
+    // buttons), at the same place on every card.
     let tx = lx + 58;
     let max_w = bx_devs - 16 - tx;
     let (status_txt, status_col) = if share.enabled {
@@ -166,9 +167,9 @@ fn draw_share_card(
     } else {
         (s.status_paused, C_WARN)
     };
-    let chip_w = gfx.text_width(13, FontWeight::Medium, status_txt) + 22;
+    let chip_w = draw_chip(gfx, tx + max_w, ry + 21, status_txt, status_col);
     let title = s.fmt_share_title(&share.label, &share.folder_id);
-    let title_w = gfx.text_fit(
+    gfx.text_fit(
         tx,
         ry + 21,
         max_w - chip_w - 10,
@@ -177,13 +178,6 @@ fn draw_share_card(
         th.text,
         Align::Left,
         &title,
-    );
-    draw_chip(
-        gfx,
-        tx + title_w + 10 + chip_w,
-        ry + 21,
-        status_txt,
-        status_col,
     );
 
     // Line 2: target path, then the linked devices. The path keeps its full width unless the
