@@ -72,22 +72,20 @@ pub const SCREENSAVER_TIMEOUT_IDLE: Duration = Duration::from_secs(45);
 /// Share presets offered in the `Create New Share` dialog: `(folder ID, label, target path)`.
 /// The `__browse__` entry opens the folder browser instead of creating a share.
 pub const NEW_SHARE_TEMPLATES: &[(&str, &str, &str)] = &[
-    ("vita-savedata", "Vita Save Data", "ux0:user/00/savedata"),
     (
-        "vita-pictures",
-        "Vita Screenshots & Pictures",
-        "ux0:picture",
+        "vita-shared",
+        "Vita Shared Folder",
+        "ux0:data/syncthing/shared",
     ),
-    ("vita-music", "Vita Music Library", "ux0:music"),
     (
         "retroarch-saves",
         "RetroArch Savefiles",
         "ux0:data/retroarch/savefiles",
     ),
     (
-        "vita-shared",
-        "Vita Shared Folder",
-        "ux0:data/syncthing/shared",
+        "retroarch-savetate",
+        "RetroArch Savestates filess",
+        "ux0:data/retroarch/savestates",
     ),
     (
         "__browse__",
