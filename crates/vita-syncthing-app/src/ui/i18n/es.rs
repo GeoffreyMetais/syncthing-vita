@@ -38,7 +38,6 @@ pub static STRINGS_ES: Strings = Strings {
     action_apply_sync: "Aplicar y sinc",
     action_scan_qr: "Escanear QR",
     action_new_share: "Nueva carpeta",
-    action_sync_now: "Sincronizar",
     action_qr_id: "QR / ID",
     action_switch_theme: "Cambiar tema",
     action_clear_declined: "Borrar rechazados",
@@ -103,7 +102,7 @@ pub static STRINGS_ES: Strings = Strings {
     // Screen 2: Shared Folders
     msg_no_shares: "No hay carpetas compartidas configuradas aún",
     msg_no_shares_hint_1: "Pulsa Triángulo (Nueva carpeta) para crear una carpeta y vincular un dispositivo,",
-    msg_no_shares_hint_2: "o pulsa Sincronizar para importar carpetas compartidas.",
+    msg_no_shares_hint_2: "o toca la tarjeta de sincronización para importar carpetas compartidas.",
 
     // Screen 3: Files & Folder Picker
     picker_title_create: "Compartir una carpeta",
@@ -188,7 +187,7 @@ pub static STRINGS_ES: Strings = Strings {
 
 /// ES templates for `UiText` messages.
 pub static MESSAGES_ES: Messages = Messages {
-    ready_press_cross: "Listo · Pulsa Cruz para sincronizar",
+    ready_tap_sync_card: "Listo · Toca la tarjeta de sincronización",
     ready_manual_pairing: "Listo (LAN manual)",
     no_peer_linked: "Ningún par vinculado",
     select_device_to_connect: "Vincula un dispositivo en Dispositivos de una carpeta",

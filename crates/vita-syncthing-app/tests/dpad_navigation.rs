@@ -25,9 +25,11 @@ fn test_dashboard_buttons_then_sidebar_tabs() {
     press(&mut state, &repo, BTN_RIGHT);
     assert_eq!(state.nav.focus, NavFocus::Content);
 
-    // The page opens on the device card buttons: col 0 is QR / ID, Right moves to Sync Now
+    // The page opens on the device card buttons: col 0 is QR / ID, Right moves to New Share
     press(&mut state, &repo, BTN_RIGHT);
-    assert_eq!(press(&mut state, &repo, BTN_CROSS), UserCommand::StartSync);
+    assert_eq!(press(&mut state, &repo, BTN_CROSS), UserCommand::None);
+    assert_eq!(state.modal, ModalDialog::CreateShare { selected_idx: 0 });
+    state.modal = ModalDialog::None;
     press(&mut state, &repo, BTN_LEFT);
     press(&mut state, &repo, BTN_CROSS);
     assert_eq!(state.modal, ModalDialog::ShowDeviceId);
@@ -89,11 +91,13 @@ fn test_overview_share_rows_buttons_and_device_card() {
     state.nav.header = false;
     state.nav.col = 1;
 
-    // Up twice reaches the device card, on its last button (Sync Now)
+    // Up twice reaches the device card, on its last button (New Share)
     press(&mut state, &repo, BTN_UP);
     press(&mut state, &repo, BTN_UP);
     assert!(state.is_header_focused(ActiveTab::Dashboard));
-    assert_eq!(press(&mut state, &repo, BTN_CROSS), UserCommand::StartSync);
+    press(&mut state, &repo, BTN_CROSS);
+    assert_eq!(state.modal, ModalDialog::CreateShare { selected_idx: 0 });
+    state.modal = ModalDialog::None;
 
     // Left from its first button goes to the sidebar
     press(&mut state, &repo, BTN_LEFT);

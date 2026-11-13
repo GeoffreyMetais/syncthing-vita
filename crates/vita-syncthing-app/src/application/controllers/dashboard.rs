@@ -10,7 +10,7 @@ use crate::infrastructure::{BTN_DOWN, BTN_UP};
 pub struct DashboardController;
 
 impl DashboardController {
-    /// Moves the D-pad focus: the `[QR / ID, Sync Now]` header row, then one row per share
+    /// Moves the D-pad focus: the `[QR / ID, New Share]` header row, then one row per share
     /// with its `[Devices, Delete, Folder]` buttons.
     pub fn move_focus(state: &mut AppState, buttons: u32) -> Option<UiAction> {
         let count = state.shares.len();

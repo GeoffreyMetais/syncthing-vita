@@ -38,7 +38,6 @@ pub static STRINGS_FR: Strings = Strings {
     action_apply_sync: "Appliquer & Sync",
     action_scan_qr: "Scanner QR",
     action_new_share: "Nouveau partage",
-    action_sync_now: "Synchroniser",
     action_qr_id: "QR / ID",
     action_switch_theme: "Changer thème",
     action_clear_declined: "Effacer refusés",
@@ -103,7 +102,7 @@ pub static STRINGS_FR: Strings = Strings {
     // Screen 2: Shared Folders
     msg_no_shares: "Aucun dossier partagé configuré",
     msg_no_shares_hint_1: "Appuyez sur Triangle (Nouveau partage) pour créer un partage sur votre PS Vita,",
-    msg_no_shares_hint_2: "ou appuyez sur Synchroniser pour importer les dossiers d'un pair.",
+    msg_no_shares_hint_2: "ou touchez la carte de synchro pour importer les dossiers d'un pair.",
 
     // Screen 3: Files & Folder Picker
     picker_title_create: "Partager un dossier",
@@ -188,7 +187,7 @@ pub static STRINGS_FR: Strings = Strings {
 
 /// FR templates for `UiText` messages.
 pub static MESSAGES_FR: Messages = Messages {
-    ready_press_cross: "Prêt · Appuyez sur Croix pour synchroniser",
+    ready_tap_sync_card: "Prêt · Touchez la carte de synchro pour synchroniser",
     ready_manual_pairing: "Prêt (appairage LAN manuel)",
     no_peer_linked: "Aucun pair lié",
     select_device_to_connect: "Liez un appareil dans les Appareils d'un partage",

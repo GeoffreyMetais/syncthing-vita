@@ -73,7 +73,7 @@ pub const SETTINGS_ROW_DECLINED: usize = 3;
 /// Number of focusable cards on the Settings page.
 pub const SETTINGS_ROWS: usize = 4;
 
-/// Focusable buttons of the `Overview` device card (`[QR / ID, Sync Now]`), its header row.
+/// Focusable buttons of the `Overview` device card (`[QR / ID, New Share]`), its header row.
 pub const DASHBOARD_HEADER_ACTIONS: usize = 2;
 
 /// Button focused when entering a tab: the first one of the row.

@@ -38,7 +38,6 @@ pub static STRINGS_IT: Strings = Strings {
     action_apply_sync: "Applica e sincronizza",
     action_scan_qr: "Scansiona QR",
     action_new_share: "Nuova condivisione",
-    action_sync_now: "Sincronizza ora",
     action_qr_id: "QR / ID",
     action_switch_theme: "Cambia tema",
     action_clear_declined: "Cancella rifiutati",
@@ -103,7 +102,7 @@ pub static STRINGS_IT: Strings = Strings {
     // Screen 2: Shared Folders
     msg_no_shares: "Nessuna cartella condivisa configurata",
     msg_no_shares_hint_1: "Premi Triangolo (Nuova condivisione) per creare una cartella su PS Vita,",
-    msg_no_shares_hint_2: "o premi Sincronizza ora per importare cartelle condivise.",
+    msg_no_shares_hint_2: "o tocca la scheda di sincronizzazione per importare cartelle condivise.",
 
     // Screen 3: Files & Folder Picker
     picker_title_create: "Condividi una cartella",
@@ -188,7 +187,7 @@ pub static STRINGS_IT: Strings = Strings {
 
 /// IT templates for `UiText` messages.
 pub static MESSAGES_IT: Messages = Messages {
-    ready_press_cross: "Pronto · Premi Croce per sincronizzare",
+    ready_tap_sync_card: "Pronto · Tocca la scheda di sincronizzazione",
     ready_manual_pairing: "Pronto (LAN manuale)",
     no_peer_linked: "Nessun peer collegato",
     select_device_to_connect: "Collega un dispositivo nei Dispositivi di una condivisione",

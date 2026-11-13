@@ -112,9 +112,9 @@ fn draw_share_card(
         if share.enabled { th.accent_hi } else { th.dim },
     );
 
-    // Action buttons on the right: [X Devices] [SQ Delete] [X Folder]. `Triangle` is the
-    // page's `New Share`, so `Folder` is reached with the D-pad (`Cross`) or by touch.
-    let w_folder = action_width(gfx, PadButton::Cross, s.action_folder);
+    // Action buttons on the right: [X Devices] [SQ Delete] [TRI Folder]. While the device
+    // card has the focus, `Triangle` is the page's `New Share` instead.
+    let w_folder = action_width(gfx, PadButton::Triangle, s.action_folder);
     let w_delete = action_width(gfx, PadButton::Square, s.action_delete);
     let w_devs = action_width(gfx, PadButton::Cross, s.action_devices);
     let bx_folder = CONTENT_R - 12 - w_folder;
@@ -137,7 +137,7 @@ fn draw_share_card(
         ),
         (
             bx_folder,
-            PadButton::Cross,
+            PadButton::Triangle,
             s.action_folder,
             UiAction::ChangeShareFolder(i),
         ),

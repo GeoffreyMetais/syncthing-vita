@@ -16,7 +16,7 @@ use crate::domain::UiText;
 #[derive(Debug)]
 pub struct Messages {
     /// Initial status line.
-    pub ready_press_cross: &'static str,
+    pub ready_tap_sync_card: &'static str,
     /// Initial peer label.
     pub ready_manual_pairing: &'static str,
     /// Peer label with no linked device.
@@ -161,7 +161,7 @@ impl Strings {
         let m = self.messages;
         let s: &'static str = match t {
             UiText::Raw(s) => return Cow::Borrowed(s),
-            UiText::ReadyPressCross => m.ready_press_cross,
+            UiText::ReadyTapSyncCard => m.ready_tap_sync_card,
             UiText::ReadyManualPairing => m.ready_manual_pairing,
             UiText::NoPeerLinked => m.no_peer_linked,
             UiText::SelectDeviceToConnect => m.select_device_to_connect,

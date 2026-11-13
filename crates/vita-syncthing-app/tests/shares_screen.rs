@@ -118,13 +118,21 @@ fn test_face_buttons_trigger_the_element_that_displays_them() {
     assert_eq!(state.modal, ModalDialog::ShowDeviceId);
     state.modal = ModalDialog::None;
 
-    // `Triangle` is `New Share`, not the row's `Folder` button.
+    // On a share row, `Triangle` is that row's `Folder` button...
+    press(&mut state, &repo, BTN_TRIANGLE);
+    assert_eq!(state.modal, ModalDialog::None);
+    assert_eq!(state.active_tab, ActiveTab::FolderPicker);
+    assert_eq!(state.picker_mode, PickerMode::ChangeShareTarget);
+    assert_eq!(state.selected_share_idx, 1);
+
+    // ...and on the device card, the page's `New Share`.
+    state.active_tab = ActiveTab::Dashboard;
+    state.nav.header = true;
     press(&mut state, &repo, BTN_TRIANGLE);
     assert_eq!(state.modal, ModalDialog::CreateShare { selected_idx: 0 });
-    assert_eq!(state.active_tab, ActiveTab::Dashboard);
     state.modal = ModalDialog::None;
 
-    // `Folder` is reached by touch (or the D-pad).
+    // The `Folder` button can also be touched.
     let folder = rect_of(&mut state, UiAction::ChangeShareFolder(1));
     tap_rect(&mut state, &repo, folder);
     assert_eq!(state.active_tab, ActiveTab::FolderPicker);

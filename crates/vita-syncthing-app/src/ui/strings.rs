@@ -40,7 +40,6 @@ pub const ACTION_ADD_REMOTE_DEVICE: &str = "Add Remote Device";
 pub const ACTION_APPLY_SYNC: &str = "Apply & Sync";
 pub const ACTION_SCAN_QR: &str = "Scan QR";
 pub const ACTION_NEW_SHARE: &str = "New Share";
-pub const ACTION_SYNC_NOW: &str = "Sync Now";
 pub const ACTION_QR_ID: &str = "QR / ID";
 pub const ACTION_SWITCH_THEME: &str = "Switch Theme";
 pub const ACTION_CLEAR_DECLINED: &str = "Clear Declined";
@@ -124,9 +123,9 @@ pub const MSG_NO_SYNC_EVENTS: &str = "No synchronization events recorded yet.";
 pub const SHARES_TITLE: &str = "Shared Folders";
 pub const MSG_NO_SHARES: &str = "No shared folders configured yet";
 pub const MSG_NO_SHARES_HINT_1: &str =
-    "Press Circle (New Share) to create a share on your PS Vita and link a device,";
+    "Press Triangle (New Share) to create a share on your PS Vita and link a device,";
 pub const MSG_NO_SHARES_HINT_2: &str =
-    "or press Overview -> Sync Now to import folders shared by a remote peer.";
+    "or tap the sync card to import folders shared by a remote peer.";
 
 // ============================================================================
 // Screen 3: Files & Folder Picker

@@ -1,4 +1,4 @@
-//! Tab 1 (`Overview` / `Dashboard`): compact "This device" card (`QR / ID` & `Sync Now`
+//! Tab 1 (`Overview` / `Dashboard`): compact "This device" card (`QR / ID` & `New Share`
 //! actions) above the list of shares (`ui/screens/shares.rs`).
 
 use crate::domain::{AppState, FocusSlot, HitMap, Hotspot, Rect, UiAction, UiText};
@@ -27,29 +27,39 @@ pub fn render_dashboard_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits:
 
     let selected = state.selected_share_idx;
     let has_selection = selected < state.shares.len();
-    draw_hint_bar(
-        gfx,
-        th,
-        hits,
-        &[
-            Hint::info(PadButton::Dpad, Some(PadButton::Cross), s.hint_navigate),
-            Hint::action(PadButton::Circle, s.action_qr_id, UiAction::ShowDeviceId),
-            Hint::action(PadButton::Triangle, s.action_new_share, UiAction::NewShare),
-            Hint {
-                action: has_selection.then_some(UiAction::DeleteShare(selected)),
-                ..Hint::info(PadButton::Square, None, s.action_delete)
-            },
-            Hint::info(PadButton::L, Some(PadButton::R), s.hint_tabs),
-            Hint::action(
-                PadButton::Select,
-                s.hint_screensaver,
-                UiAction::StartScreensaver,
-            ),
-        ],
-    );
+    // `Triangle` is the focused share's `Folder`, and `New Share` anywhere else.
+    let triangle = if state.is_share_row_focused() {
+        Hint::action(
+            PadButton::Triangle,
+            s.action_folder,
+            UiAction::ChangeShareFolder(selected),
+        )
+    } else {
+        Hint::action(PadButton::Triangle, s.action_new_share, UiAction::NewShare)
+    };
+    let mut hints = vec![
+        Hint::info(PadButton::Dpad, Some(PadButton::Cross), s.hint_navigate),
+        Hint::action(PadButton::Circle, s.action_qr_id, UiAction::ShowDeviceId),
+        triangle,
+    ];
+    // `Delete` is only offered when there is a share to delete.
+    if has_selection {
+        hints.push(Hint::action(
+            PadButton::Square,
+            s.action_delete,
+            UiAction::DeleteShare(selected),
+        ));
+    }
+    hints.push(Hint::info(PadButton::L, Some(PadButton::R), s.hint_tabs));
+    hints.push(Hint::action(
+        PadButton::Select,
+        s.hint_screensaver,
+        UiAction::StartScreensaver,
+    ));
+    draw_hint_bar(gfx, th, hits, &hints);
 }
 
-/// "This device" card: name, status, Device ID and the `[QR / ID, Sync Now]` header buttons.
+/// "This device" card: name, status, Device ID and the `[QR / ID, New Share]` header buttons.
 fn draw_device_card(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut HitMap) {
     let s = strings::strings(state.language);
     let header_focused = state.is_focused(FocusSlot::Header { col: 0 })
@@ -112,10 +122,10 @@ fn draw_device_card(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut Hi
         s.hero_device_name,
     );
 
-    let act_sync_w = action_width(gfx, PadButton::Cross, s.action_sync_now);
+    let act_new_w = action_width(gfx, PadButton::Triangle, s.action_new_share);
     let act_qr_w = action_width(gfx, PadButton::Circle, s.action_qr_id);
-    let bx_sync = CONTENT_R - 16 - act_sync_w;
-    let bx_qr = bx_sync - 10 - act_qr_w;
+    let bx_new = CONTENT_R - 16 - act_new_w;
+    let bx_qr = bx_new - 10 - act_qr_w;
     let buttons_cy = CONTENT_Y + 70;
     // Text left of the buttons stays clear of their focus ring.
     let text_w = bx_qr - 16 - tx;
@@ -161,10 +171,10 @@ fn draw_device_card(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut Hi
             UiAction::ShowDeviceId,
         ),
         (
-            bx_sync,
-            PadButton::Cross,
-            s.action_sync_now,
-            UiAction::StartSync,
+            bx_new,
+            PadButton::Triangle,
+            s.action_new_share,
+            UiAction::NewShare,
         ),
     ];
     for (col, (bx, pad, label, action)) in buttons.into_iter().enumerate() {

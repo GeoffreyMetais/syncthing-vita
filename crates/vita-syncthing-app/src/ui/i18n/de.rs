@@ -38,7 +38,6 @@ pub static STRINGS_DE: Strings = Strings {
     action_apply_sync: "Übernehmen & Sync",
     action_scan_qr: "QR scannen",
     action_new_share: "Neue Freigabe",
-    action_sync_now: "Jetzt synchronisieren",
     action_qr_id: "QR / ID",
     action_switch_theme: "Design wechseln",
     action_clear_declined: "Abgelehnte löschen",
@@ -103,7 +102,7 @@ pub static STRINGS_DE: Strings = Strings {
     // Screen 2: Shared Folders
     msg_no_shares: "Noch keine freigegebenen Ordner eingerichtet",
     msg_no_shares_hint_1: "Dreieck (Neue Freigabe) drücken, um einen Ordner freizugeben,",
-    msg_no_shares_hint_2: "oder Jetzt synchronisieren drücken, um Freigaben zu importieren.",
+    msg_no_shares_hint_2: "oder die Sync-Karte antippen, um Freigaben zu importieren.",
 
     // Screen 3: Files & Folder Picker
     picker_title_create: "Ordner freigeben",
@@ -188,7 +187,7 @@ pub static STRINGS_DE: Strings = Strings {
 
 /// DE templates for `UiText` messages.
 pub static MESSAGES_DE: Messages = Messages {
-    ready_press_cross: "Bereit · Kreuz drücken zum Synchronisieren",
+    ready_tap_sync_card: "Bereit · Sync-Karte antippen zum Synchronisieren",
     ready_manual_pairing: "Bereit (LAN, manuell)",
     no_peer_linked: "Kein Peer verknüpft",
     select_device_to_connect: "Gerät unter Geräte einer Freigabe verknüpfen",

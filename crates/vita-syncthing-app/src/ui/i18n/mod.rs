@@ -57,7 +57,6 @@ pub struct Strings {
     pub action_apply_sync: &'static str,
     pub action_scan_qr: &'static str,
     pub action_new_share: &'static str,
-    pub action_sync_now: &'static str,
     pub action_qr_id: &'static str,
     pub action_switch_theme: &'static str,
     pub action_clear_declined: &'static str,

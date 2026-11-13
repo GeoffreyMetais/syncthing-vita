@@ -100,11 +100,13 @@ impl InputController {
             return Self::execute(state, repo, action);
         }
 
-        // 5. Face buttons trigger the element (button or hint) that displays them
+        // 5. Face buttons trigger the element (button or hint) that displays them. On the
+        // `Overview`, the buttons of a share row answer only while that row has the focus
+        // (`Triangle` is `Folder` there, `New Share` elsewhere).
         let selected_row = match state.active_tab {
-            ActiveTab::Dashboard => state.selected_share_idx,
-            ActiveTab::FolderPicker => state.selected_picker_idx,
-            ActiveTab::Settings => 0,
+            ActiveTab::Dashboard => state.is_share_row_focused().then_some(state.selected_share_idx),
+            ActiveTab::FolderPicker => Some(state.selected_picker_idx),
+            ActiveTab::Settings => Some(0),
         };
         let shortcut = SHORTCUT_BUTTONS
             .iter()

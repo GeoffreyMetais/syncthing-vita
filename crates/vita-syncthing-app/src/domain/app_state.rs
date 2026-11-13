@@ -120,7 +120,7 @@ impl AppState {
             vita_device_id: "Initializing...".to_owned(),
             peer_label: UiText::ReadyManualPairing,
             folder_label: UiText::NoFoldersSynced,
-            status_line: UiText::ReadyPressCross,
+            status_line: UiText::ReadyTapSyncCard,
             current_file: UiText::raw("-"),
             progress_pct: Some(0),
             progress_anim_tick: 0,
@@ -254,6 +254,14 @@ impl AppState {
     pub fn focused_action(&self, tab: ActiveTab) -> Option<usize> {
         (self.active_tab == tab && self.nav.focus == NavFocus::Content && !self.nav.header)
             .then_some(self.nav.col)
+    }
+
+    /// True when a share row of the `Overview` (not its device card) has D-pad focus.
+    pub fn is_share_row_focused(&self) -> bool {
+        self.active_tab == ActiveTab::Dashboard
+            && self.nav.focus == NavFocus::Content
+            && !self.nav.header
+            && self.selected_share_idx < self.shares.len()
     }
 
     /// True when the Settings card `row` has D-pad focus.
