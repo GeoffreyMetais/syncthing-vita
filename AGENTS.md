@@ -412,6 +412,11 @@ Output package:
 target/armv7-sony-vita-newlibeabihf/release/SYNCTHING.vpk
 ```
 
+### Download a CI-Built VPK
+- Every push to `main` that passes CI replaces the rolling `nightly` pre-release: the latest build is always at `https://github.com/<owner>/<repo>/releases/download/nightly/SYNCTHING.vpk` (no login, no zip).
+- Pushing a `v*` tag creates a GitHub Release of that version with `SYNCTHING.vpk` attached.
+- Pull request runs keep the zipped `SYNCTHING-vpk` artifact, linked from the run summary.
+
 ### Verify Symbol Exports in the Vita ELF
 After running `just vpk`, you can verify that the required Newlib heap and thread symbols are exported in `.rodata`:
 ```bash

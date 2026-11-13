@@ -3,6 +3,9 @@ name: CI
 on:
   pull_request:
     branches: [main]
+  push:
+    branches: [main]
+    tags: ['v*']
   workflow_dispatch:
 
 concurrency:
@@ -79,8 +82,59 @@ jobs:
           grep -E "_newlib_heap_size_user|sceUserMainThread" <<< "${SYMBOLS}"
 
       - name: Upload SYNCTHING.vpk artifact
+        id: upload-vpk
         uses: actions/upload-artifact@v4
         with:
           name: SYNCTHING-vpk
           path: target/armv7-sony-vita-newlibeabihf/release/SYNCTHING.vpk
           if-no-files-found: error
+
+      - name: Link the VPK in the run summary
+        run: |
+          {
+            echo "### SYNCTHING.vpk"
+            echo ""
+            echo "- Artifact of this run (zipped, GitHub login required): ${{ steps.upload-vpk.outputs.artifact-url }}"
+            echo "- Latest \`main\` build: https://github.com/${{ github.repository }}/releases/download/nightly/SYNCTHING.vpk"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  publish:
+    name: Publish VPK Release
+    # Only builds of `main` and of `v*` tags are published, once every check passed.
+    if: github.event_name == 'push'
+    needs: [test-host, build-vita]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    concurrency:
+      group: publish-${{ github.ref }}
+      cancel-in-progress: true
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GH_REPO: ${{ github.repository }}
+    steps:
+      - name: Download SYNCTHING.vpk artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: SYNCTHING-vpk
+
+      - name: Update the rolling `nightly` pre-release (main)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          NOTES="Latest successful build of \`main\` (${GITHUB_SHA::7}), rebuilt on every merge.
+          Direct download: https://github.com/${GH_REPO}/releases/download/nightly/SYNCTHING.vpk"
+          # Recreate the release so that the `nightly` tag points at this commit.
+          gh release delete nightly --cleanup-tag --yes || true
+          gh release create nightly SYNCTHING.vpk \
+            --target "${GITHUB_SHA}" \
+            --prerelease \
+            --title "Nightly (${GITHUB_SHA::7})" \
+            --notes "${NOTES}"
+
+      - name: Create the tagged release (v*)
+        if: startsWith(github.ref, 'refs/tags/v')
+        run: |
+          gh release create "${GITHUB_REF_NAME}" SYNCTHING.vpk \
+            --verify-tag \
+            --title "${GITHUB_REF_NAME}" \
+            --generate-notes
