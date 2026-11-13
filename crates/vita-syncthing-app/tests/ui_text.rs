@@ -60,7 +60,6 @@ fn all_messages() -> Vec<UiText> {
             device: s("PC"),
             share: s("Saves"),
         },
-        UiText::LinkDeviceFirst,
         UiText::AddedShortId {
             prefix: s("MFZWI3D"),
         },
@@ -80,6 +79,13 @@ fn all_messages() -> Vec<UiText> {
         },
         UiText::ShareActive { id: s("saves") },
         UiText::SharePaused { id: s("saves") },
+        UiText::ShareReadOnly { id: s("saves") },
+        UiText::ShareReadWrite { id: s("saves") },
+        UiText::RevertRequested { id: s("saves") },
+        UiText::LocalChangesReverted {
+            id: s("saves"),
+            count: 3,
+        },
         UiText::OfferAccepted {
             label: s("Saves"),
             id: s("saves"),
@@ -173,7 +179,6 @@ fn test_messages_are_translated_and_parameters_filled() {
             UiText::ReadyTapSyncCard,
             UiText::NoFoldersSynced,
             UiText::SyncFinished,
-            UiText::LinkDeviceFirst,
             UiText::QrNotDeviceId,
             UiText::NoDevicesLinked,
         ] {

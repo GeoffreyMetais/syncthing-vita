@@ -12,7 +12,7 @@ use syncthing_core::session::folders::{FolderSyncState, INDEX_BATCH_FILES};
 use syncthing_core::session::upload::serve_block_request;
 use syncthing_core::{
     connect_and_sync, connect_and_sync_with_control, read_bep_message, BepClusterConfig,
-    BepFileInfo, BepHello, BepIndex, BepMessageType, BepRequest, BepResponse, DeviceId,
+    BepFileInfo, BepHello, BepIndex, BepMessageType, BepRequest, BepResponse, DeviceId, FolderType,
     FsSyncStorage, SyncControl, SyncEvent, SyncSessionStatus, SyncTuning, VitaIdentity,
 };
 
@@ -350,4 +350,178 @@ fn test_scan_reports_progress_for_keepalives() {
     assert!(!ctx.keepalive_due());
     ctx.tuning.keepalive_interval = Duration::ZERO;
     assert!(ctx.keepalive_due());
+}
+
+/// Wire value of the `type` field (3) of each folder of a `ClusterConfig` payload.
+fn announced_folder_types(payload: &[u8]) -> Vec<(String, u64)> {
+    use syncthing_core::proto::{decode_varint, WireIter};
+    let mut out = Vec::new();
+    for item in WireIter::new(payload) {
+        let (field, _, folder) = item.unwrap();
+        if field != 1 {
+            continue;
+        }
+        let (mut id, mut folder_type) = (String::new(), 0);
+        for f in WireIter::new(folder) {
+            match f.unwrap() {
+                (1, 2, data) => id = String::from_utf8_lossy(data).into_owned(),
+                (3, 0, data) => folder_type = decode_varint(data).unwrap().0,
+                _ => {}
+            }
+        }
+        out.push((id, folder_type));
+    }
+    out
+}
+
+#[test]
+fn test_receive_only_folder_applies_remote_changes_but_never_offers_local_ones() {
+    let vita_id = vita_identity().device_id;
+    let peer = FakePeer::spawn(0x55, move |conn| {
+        let remote = conn.file("saves", "remote.txt", b"from the peer", 1);
+        conn.send_cluster_config(&["saves"], vita_id);
+        conn.wait_for(BepMessageType::ClusterConfig, Duration::from_secs(5))
+            .expect("ClusterConfig reply");
+        conn.send_index("saves", vec![remote], false);
+        conn.serve_until_idle(Duration::from_millis(1500));
+    });
+
+    let root = common::fresh_temp_dir("session_e2e_receive_only");
+    let mut storage = FsSyncStorage::new(&root);
+    storage.set_folder_devices("saves", vec![peer.device_id]);
+    storage.set_folder_type("saves", FolderType::ReceiveOnly);
+    std::fs::create_dir_all(storage.folder_root("saves")).unwrap();
+    std::fs::write(
+        storage.resolve_safe_path("saves", "local.txt"),
+        b"vita save",
+    )
+    .unwrap();
+
+    sync_once(&peer, &storage);
+    let received = peer.join();
+
+    // The peer's file was pulled...
+    let pulled = storage.resolve_safe_path("saves", "remote.txt");
+    assert_eq!(std::fs::read(pulled).unwrap(), b"from the peer");
+    // ...while the local-only file is announced invalid, so the peer never pulls it.
+    let published: Vec<(String, bool)> = payloads(&received, BepMessageType::Index)
+        .iter()
+        .chain(payloads(&received, BepMessageType::IndexUpdate).iter())
+        .flat_map(|p| BepIndex::decode(p).unwrap().files)
+        .map(|f| (f.name, f.invalid))
+        .collect();
+    assert!(published.contains(&("local.txt".to_owned(), true)));
+    assert!(published.contains(&("remote.txt".to_owned(), false)));
+    assert!(!published.contains(&("local.txt".to_owned(), false)));
+    // The folder is announced as receive-only.
+    let configs = payloads(&received, BepMessageType::ClusterConfig);
+    assert_eq!(
+        announced_folder_types(configs[0]),
+        vec![("saves".to_owned(), FolderType::ReceiveOnly.wire_value())]
+    );
+}
+
+#[test]
+fn test_receive_only_folder_still_serves_blocks() {
+    let mut storage = storage_with_shared_file("session_receive_only_serves");
+    storage.set_folder_type("saves", FolderType::ReceiveOnly);
+    let resp = request_block(&storage, LINKED_PEER, "saves");
+    assert_eq!(resp.code, 0);
+    assert_eq!(resp.data, CONTENT);
+}
+
+#[test]
+fn test_revert_request_restores_a_receive_only_folder() {
+    let vita_id = vita_identity().device_id;
+    let peer = FakePeer::spawn(0x56, move |conn| {
+        let remote = conn.file("saves", "slot.bin", b"peer save", 1);
+        conn.send_cluster_config(&["saves"], vita_id);
+        conn.wait_for(BepMessageType::ClusterConfig, Duration::from_secs(5))
+            .expect("ClusterConfig reply");
+        conn.send_index("saves", vec![remote], false);
+        // Serves the initial pull, then the pull that follows the revert.
+        conn.serve_until_idle(Duration::from_secs(8));
+    });
+
+    let root = common::fresh_temp_dir("session_e2e_revert");
+    let mut storage = FsSyncStorage::new(&root);
+    storage.set_folder_devices("saves", vec![peer.device_id]);
+    storage.set_folder_type("saves", FolderType::ReceiveOnly);
+    let slot = storage.resolve_safe_path("saves", "slot.bin");
+    let added = storage.resolve_safe_path("saves", "added.txt");
+
+    let control = SyncControl::with_tuning(SyncTuning {
+        rescan_interval: Duration::from_secs(3600),
+        ..SyncTuning::default()
+    });
+    let (events_tx, events_rx) = mpsc::channel();
+    let (peer_addr, peer_id) = (peer.addr, peer.device_id);
+    let session_control = std::sync::Arc::clone(&control);
+    let session = std::thread::spawn(move || {
+        connect_and_sync_with_control(
+            &vita_identity(),
+            peer_addr,
+            Some(peer_id),
+            &BepHello::new_vita_default(),
+            &storage,
+            Duration::from_secs(4),
+            Some(session_control),
+            move |event| {
+                let _ = events_tx.send(event);
+            },
+        )
+    });
+    let wait_event = |matches: &dyn Fn(&SyncEvent) -> bool| loop {
+        let event = events_rx
+            .recv_timeout(Duration::from_secs(20))
+            .expect("session event");
+        if matches(&event) {
+            return event;
+        }
+    };
+
+    wait_event(&|e| matches!(e, SyncEvent::SyncCycleCompleted { .. }));
+    assert_eq!(std::fs::read(&slot).unwrap(), b"peer save");
+
+    // Local changes on the Vita, then a revert request.
+    std::fs::write(&slot, b"edited on the Vita").unwrap();
+    std::fs::write(&added, b"new").unwrap();
+    control.request_revert("saves");
+    let event = wait_event(&|e| matches!(e, SyncEvent::LocalChangesReverted { .. }));
+    assert!(matches!(
+        event,
+        SyncEvent::LocalChangesReverted { ref folder, reverted: 2 } if folder == "saves"
+    ));
+    // The request was handled once.
+    assert!(control.take_revert_requests(|_| true).is_empty());
+
+    control.request_stop();
+    session.join().unwrap().expect("session failed");
+    peer.join();
+    assert_eq!(std::fs::read(&slot).unwrap(), b"peer save");
+    assert!(!added.exists());
+}
+
+#[test]
+fn test_revert_requests_are_taken_once_by_matching_sessions() {
+    let control = SyncControl::new();
+    control.request_revert("saves");
+    control.request_revert("music");
+    control.request_revert("saves");
+    assert_eq!(
+        control.take_revert_requests(|f| f == "saves"),
+        vec!["saves"]
+    );
+    assert!(control.take_revert_requests(|f| f == "saves").is_empty());
+    assert_eq!(control.take_revert_requests(|_| true), vec!["music"]);
+}
+
+#[test]
+fn test_discovery_request_is_taken_once() {
+    let control = SyncControl::new();
+    assert!(!control.take_discovery_request());
+    control.request_discovery();
+    control.request_discovery();
+    assert!(control.take_discovery_request());
+    assert!(!control.take_discovery_request());
 }

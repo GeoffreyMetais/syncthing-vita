@@ -35,7 +35,6 @@ pub static STRINGS_EN: Strings = Strings {
     action_add_device: "Add Device",
     action_add_device_id: "Add Device ID",
     action_add_remote_device: "Add Remote Device",
-    action_apply_sync: "Apply & Sync",
     action_scan_qr: "Scan QR",
     action_new_share: "New Share",
     action_qr_id: "QR / ID",
@@ -51,6 +50,8 @@ pub static STRINGS_EN: Strings = Strings {
     status_scanning: "Scanning",
     status_active: "Active",
     status_paused: "Paused",
+    share_mode_read_write: "Read & write",
+    share_mode_read_only: "Read only",
 
     // Navigation & Sidebar
     tab_overview: "Overview",
@@ -84,7 +85,7 @@ pub static STRINGS_EN: Strings = Strings {
     hint_pause_enable: "Pause/Enable",
     hint_add_by_id: "Add by ID",
     hint_scan_qr: "Scan QR",
-    hint_apply_sync: "Apply & Sync",
+    hint_scan_lan: "Scan LAN",
     hint_confirm_delete: "Confirm Delete",
     hint_confirm_quit: "Confirm Quit",
     hint_create_pick_devices: "Create & Pick Devices",
@@ -168,6 +169,13 @@ pub static STRINGS_EN: Strings = Strings {
     modal_delete_share_decline_hint:
         "Peers' offers of it are declined (undo in Settings · Clear Declined).",
 
+    // Modals: Confirm Revert (read-only share)
+    action_revert: "Revert",
+    modal_revert_title: "Revert local changes?",
+    modal_revert_subtitle: "The peers' version replaces the PS Vita's",
+    modal_revert_added_hint: "Files added on the PS Vita are deleted.",
+    modal_revert_restored_hint: "Edited or deleted files are downloaded again.",
+
     // Modals: Confirm Quit
     modal_quit_title: "Quit VitaSync?",
     modal_quit_subtitle: "Confirm whether to close the application and return to LiveArea",
@@ -227,7 +235,6 @@ pub static MESSAGES_EN: Messages = Messages {
     language_changed: "Language: {name}",
     device_linked: "Added {device} to '{share}'",
     device_unlinked: "Removed {device} from '{share}'",
-    link_device_first: "Link at least one device to create this share",
     added_short_id: "Added Short ID {prefix} (will auto-pair on LAN)",
     added_device: "Added device {name} ({short})",
     own_device_id: "Cannot add this PS Vita's own Device ID",
@@ -239,6 +246,10 @@ pub static MESSAGES_EN: Messages = Messages {
     saved_in: "Saved in {path}",
     share_active: "Share {id} is now active",
     share_paused: "Share {id} is now paused",
+    share_read_only: "Share {id} is now read only",
+    share_read_write: "Share {id} is now read & write",
+    revert_requested: "Reverting local changes of {id}...",
+    local_changes_reverted: "Local changes of {id} reverted ({count})",
     offer_accepted: "Accepted share '{label}' ({id})",
     choose_where_to_store: "Choose where to store '{label}'",
     offer_declined: "Declined share '{label}' ({id})",

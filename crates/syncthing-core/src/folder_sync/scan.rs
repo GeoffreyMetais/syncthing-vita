@@ -5,7 +5,7 @@ use std::fs;
 use std::io;
 
 use super::mtime_secs;
-use crate::bep::{BepFileInfo, BepIndex, FolderIndexState};
+use crate::bep::{BepFileInfo, BepIndex, FolderIndexState, FolderType};
 use crate::device_id::DeviceId;
 use crate::local_db::{with_folder_db, FolderDb, LocalEntry};
 use crate::storage::blocks::hash_file_blocks;
@@ -169,6 +169,7 @@ impl FsSyncStorage {
                 index_id: db.index_id,
                 max_sequence: db.max_sequence,
                 paused: false,
+                folder_type: FolderType::SendReceive,
             },
         )
     }

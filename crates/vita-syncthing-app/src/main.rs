@@ -13,8 +13,8 @@ use std::time::Instant;
 use syncthing_core::SyncControl;
 use vita_syncthing_app::application::power_policy::{cpu_clock, should_block_standby, CpuClock};
 use vita_syncthing_app::application::{
-    FolderOfferService, FramePacer, FrameSignals, InputController, QrScanFlow, ShareService,
-    SyncCoordinator, UploadActivity, UserCommand,
+    DevicesScan, FolderOfferService, FramePacer, FrameSignals, InputController, QrScanFlow,
+    ShareService, SyncCoordinator, UploadActivity, UserCommand,
 };
 use vita_syncthing_app::domain::defaults::{
     AUTO_RECONNECT_DELAY, POWER_TICK_INTERVAL, QUIT_WORKER_WAIT, SCREENSAVER_TIMEOUT_IDLE,
@@ -159,6 +159,11 @@ fn main() {
         let saver_before = state.oled_saver_active;
 
         let mut command = InputController::handle_input(&mut state, &repo, frame_input);
+        // Delayed LAN scan of the devices dialog, counted in VBlanks (one per loop iteration).
+        let scan_cmd = DevicesScan::tick(&mut state);
+        if command == UserCommand::None {
+            command = scan_cmd;
+        }
 
         // Rear camera runs only while the QR scanner modal is open
         qr_scanner.set_active(state.is_scanning_qr());
@@ -174,9 +179,19 @@ fn main() {
             }
         }
 
+        // A LAN scan goes to the running worker; without one, a sync starts with a discovery.
+        if command == UserCommand::ScanLan {
+            match worker_ctl {
+                Some(ref ctl) => {
+                    ctl.request_discovery();
+                    command = UserCommand::None;
+                }
+                None => command = UserCommand::StartSync,
+            }
+        }
         signals.user_change |= command != UserCommand::None;
         match command {
-            UserCommand::None => {}
+            UserCommand::None | UserCommand::ScanLan => {}
             UserCommand::OpenSystemKeyboard => {
                 state.ime_active = input_ctl.open_ime(&state.device_id_input);
             }
@@ -234,6 +249,14 @@ fn main() {
         let ime_open = input_ctl.is_ime_open();
         signals.user_change |= ime_open != state.ime_active;
         state.ime_active = ime_open;
+
+        // Revert requests of read-only shares go to the running worker (its sessions take them),
+        // unless that worker is about to be replaced by one with the new configuration.
+        if let (Some(ref ctl), false) = (&worker_ctl, state.config_dirty) {
+            for folder_id in std::mem::take(&mut state.pending_reverts) {
+                ctl.request_revert(&folder_id);
+            }
+        }
 
         // Reload persistent worker if share/device configuration was changed and modals are closed
         if state.config_dirty && state.modal == ModalDialog::None {

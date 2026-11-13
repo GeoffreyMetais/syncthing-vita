@@ -21,7 +21,7 @@ pub mod lz4;
 pub mod request;
 
 pub use close::BepClose;
-pub use cluster_config::{BepClusterConfig, BepFolder, FolderIndexState};
+pub use cluster_config::{BepClusterConfig, BepFolder, FolderIndexState, FolderType};
 pub use framing::{read_bep_message, read_bep_message_after_first_byte, write_bep_message};
 pub use header::{BepCompression, BepHeader, BepMessageType};
 pub use hello::BepHello;

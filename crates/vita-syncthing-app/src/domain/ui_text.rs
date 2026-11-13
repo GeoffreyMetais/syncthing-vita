@@ -82,7 +82,6 @@ pub enum UiText {
         device: String,
         share: String,
     },
-    LinkDeviceFirst,
     AddedShortId {
         prefix: String,
     },
@@ -113,6 +112,19 @@ pub enum UiText {
     },
     SharePaused {
         id: String,
+    },
+    ShareReadOnly {
+        id: String,
+    },
+    ShareReadWrite {
+        id: String,
+    },
+    RevertRequested {
+        id: String,
+    },
+    LocalChangesReverted {
+        id: String,
+        count: usize,
     },
     OfferAccepted {
         label: String,

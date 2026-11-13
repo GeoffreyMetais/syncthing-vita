@@ -4,7 +4,7 @@
 //! Every interactive element is declared in the frame's `HitMap` where it is drawn; input is
 //! handled from these declarations by `application::SharesController`.
 
-use crate::domain::{ActiveTab, AppState, FocusSlot, HitMap, Hotspot, Rect, UiAction};
+use crate::domain::{ActiveTab, AppState, FocusSlot, HitMap, Hotspot, Rect, ShareMode, UiAction};
 use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton};
 use crate::ui::strings;
 use crate::ui::theme::{UiTheme, CONTENT_R, CONTENT_W, CONTENT_X, C_GOOD, C_WARN};
@@ -116,6 +116,12 @@ fn draw_share_card(
         24.0,
         if share.enabled { th.accent_hi } else { th.dim },
     );
+    // A read-only share (peers never modify its files) carries a lock badge on its icon.
+    if share.mode == ShareMode::ReadOnly {
+        let (bx, by) = ((lx + 40) as f32, (ry + SHARE_CARD_H / 2 + 16) as f32);
+        gfx.circle(bx, by, 10.0, th.card);
+        gfx.icon(Icon::Lock, bx, by, 14.0, th.accent_hi);
+    }
 
     // Action buttons on the right: [X Devices] [SQ Delete] [TRI Folder]. While the device
     // card has the focus, `Triangle` is the page's `New Share` instead.

@@ -35,7 +35,6 @@ pub static STRINGS_FR: Strings = Strings {
     action_add_device: "Ajouter appareil",
     action_add_device_id: "Ajouter ID d'appareil",
     action_add_remote_device: "Ajouter appareil distant",
-    action_apply_sync: "Appliquer & Sync",
     action_scan_qr: "Scanner QR",
     action_new_share: "Nouveau partage",
     action_qr_id: "QR / ID",
@@ -51,6 +50,8 @@ pub static STRINGS_FR: Strings = Strings {
     status_scanning: "Analyse...",
     status_active: "Actif",
     status_paused: "En pause",
+    share_mode_read_write: "Lecture & écriture",
+    share_mode_read_only: "Lecture seule",
 
     // Navigation & Sidebar
     tab_overview: "Aperçu",
@@ -84,7 +85,7 @@ pub static STRINGS_FR: Strings = Strings {
     hint_pause_enable: "Pause/Activer",
     hint_add_by_id: "Ajouter par ID",
     hint_scan_qr: "Scanner QR",
-    hint_apply_sync: "Appliquer & Sync",
+    hint_scan_lan: "Scanner le réseau",
     hint_confirm_delete: "Confirmer suppression",
     hint_confirm_quit: "Confirmer quitter",
     hint_create_pick_devices: "Créer & Choisir appareils",
@@ -169,6 +170,13 @@ pub static STRINGS_FR: Strings = Strings {
     modal_delete_share_decline_hint:
         "Les offres futures des pairs seront refusées (modifiable dans Paramètres).",
 
+    // Modals: Confirm Revert (read-only share)
+    action_revert: "Restaurer",
+    modal_revert_title: "Annuler les modifications locales ?",
+    modal_revert_subtitle: "La version des pairs remplace celle de la PS Vita",
+    modal_revert_added_hint: "Les fichiers ajoutés sur la PS Vita sont supprimés.",
+    modal_revert_restored_hint: "Les fichiers modifiés ou supprimés sont retéléchargés.",
+
     // Modals: Confirm Quit
     modal_quit_title: "Quitter VitaSync ?",
     modal_quit_subtitle: "Confirmez si vous souhaitez quitter et retourner à la LiveArea",
@@ -229,7 +237,6 @@ pub static MESSAGES_FR: Messages = Messages {
     language_changed: "Langue : {name}",
     device_linked: "{device} ajouté à « {share} »",
     device_unlinked: "{device} retiré de « {share} »",
-    link_device_first: "Liez au moins un appareil pour créer ce partage",
     added_short_id: "ID court {prefix} ajouté (appairage auto sur le LAN)",
     added_device: "Appareil {name} ajouté ({short})",
     own_device_id: "Impossible d'ajouter l'ID de cette PS Vita",
@@ -241,6 +248,10 @@ pub static MESSAGES_FR: Messages = Messages {
     saved_in: "Enregistré dans {path}",
     share_active: "Le partage {id} est actif",
     share_paused: "Le partage {id} est en pause",
+    share_read_only: "Le partage {id} est en lecture seule",
+    share_read_write: "Le partage {id} est en lecture & écriture",
+    revert_requested: "Annulation des modifications locales de {id}...",
+    local_changes_reverted: "Modifications locales de {id} annulées ({count})",
     offer_accepted: "Partage « {label} » accepté ({id})",
     choose_where_to_store: "Choisissez où enregistrer « {label} »",
     offer_declined: "Partage « {label} » refusé ({id})",

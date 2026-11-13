@@ -35,7 +35,6 @@ pub static STRINGS_DE: Strings = Strings {
     action_add_device: "Gerät hinzufügen",
     action_add_device_id: "Geräte-ID hinzufügen",
     action_add_remote_device: "Remote-Gerät hinzufügen",
-    action_apply_sync: "Übernehmen & Sync",
     action_scan_qr: "QR scannen",
     action_new_share: "Neue Freigabe",
     action_qr_id: "QR / ID",
@@ -51,6 +50,8 @@ pub static STRINGS_DE: Strings = Strings {
     status_scanning: "Scanne...",
     status_active: "Aktiv",
     status_paused: "Pausiert",
+    share_mode_read_write: "Lesen & Schreiben",
+    share_mode_read_only: "Nur lesen",
 
     // Navigation & Sidebar
     tab_overview: "Übersicht",
@@ -84,7 +85,7 @@ pub static STRINGS_DE: Strings = Strings {
     hint_pause_enable: "Pause/Aktivieren",
     hint_add_by_id: "Über ID hinzufügen",
     hint_scan_qr: "QR scannen",
-    hint_apply_sync: "Übernehmen & Sync",
+    hint_scan_lan: "LAN durchsuchen",
     hint_confirm_delete: "Löschen bestätigen",
     hint_confirm_quit: "Beenden bestätigen",
     hint_create_pick_devices: "Erstellen & Geräte wählen",
@@ -166,6 +167,13 @@ pub static STRINGS_DE: Strings = Strings {
     modal_delete_share_decline_hint:
         "Angebote von Peers werden abgelehnt (in Einstellungen änderbar).",
 
+    // Modals: Confirm Revert (read-only share)
+    action_revert: "Zurücksetzen",
+    modal_revert_title: "Lokale Änderungen zurücksetzen?",
+    modal_revert_subtitle: "Die Version der Geräte ersetzt die der PS Vita",
+    modal_revert_added_hint: "Auf der PS Vita hinzugefügte Dateien werden gelöscht.",
+    modal_revert_restored_hint: "Geänderte oder gelöschte Dateien werden neu geladen.",
+
     // Modals: Confirm Quit
     modal_quit_title: "VitaSync beenden?",
     modal_quit_subtitle:
@@ -224,7 +232,6 @@ pub static MESSAGES_DE: Messages = Messages {
     language_changed: "Sprache: {name}",
     device_linked: "{device} zu „{share}“ hinzugefügt",
     device_unlinked: "{device} aus „{share}“ entfernt",
-    link_device_first: "Mindestens ein Gerät verknüpfen, um diese Freigabe zu erstellen",
     added_short_id: "Kurz-ID {prefix} hinzugefügt (automatische Kopplung im LAN)",
     added_device: "Gerät {name} hinzugefügt ({short})",
     own_device_id: "Die eigene ID dieser PS Vita kann nicht hinzugefügt werden",
@@ -236,6 +243,10 @@ pub static MESSAGES_DE: Messages = Messages {
     saved_in: "Gespeichert in {path}",
     share_active: "Freigabe {id} ist jetzt aktiv",
     share_paused: "Freigabe {id} ist jetzt pausiert",
+    share_read_only: "Freigabe {id} ist jetzt schreibgeschützt",
+    share_read_write: "Freigabe {id} ist jetzt beschreibbar",
+    revert_requested: "Lokale Änderungen von {id} werden zurückgesetzt...",
+    local_changes_reverted: "Lokale Änderungen von {id} zurückgesetzt ({count})",
     offer_accepted: "Freigabe „{label}“ angenommen ({id})",
     choose_where_to_store: "Speicherort für „{label}“ wählen",
     offer_declined: "Freigabe „{label}“ abgelehnt ({id})",

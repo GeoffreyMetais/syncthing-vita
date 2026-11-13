@@ -1,7 +1,8 @@
 //! Local filesystem storage for shared folders (`ux0:data/syncthing/sync` or custom `ux0:` paths).
 //!
 //! [`FsSyncStorage`] is split by responsibility:
-//! - this file: folder registry (custom roots, paused state, advertised folders) and path resolution
+//! - this file: folder registry (custom roots, paused state, folder types, advertised folders)
+//!   and path resolution
 //! - [`blocks`] — block hashing, delta comparison and block reads served to peers
 //! - [`download`] — crash-safe download assembly (temp file, streaming writes, commit / abort)
 //! - [`atomic`] — crash-safe file replacement (backup kept until the new file is in place)
@@ -19,7 +20,7 @@ use std::path::{Path, PathBuf};
 
 use sha2::{Digest, Sha256};
 
-use crate::bep::BepFolder;
+use crate::bep::{BepFolder, FolderType};
 use crate::device_id::DeviceId;
 use vita_fs::accessible_root;
 
@@ -31,6 +32,8 @@ pub struct FsSyncStorage {
     custom_folder_paths: HashMap<String, PathBuf>,
     /// Folders paused by user
     paused_folders: HashSet<String>,
+    /// Folder types other than the default `SendReceive` (e.g. read-only `ReceiveOnly` shares)
+    folder_types: HashMap<String, FolderType>,
     /// Devices each configured folder is shared with. A folder missing here is not shared with
     /// anyone: it is never announced, indexed, downloaded or served.
     folder_devices: HashMap<String, Vec<DeviceId>>,
@@ -44,6 +47,7 @@ impl FsSyncStorage {
             default_root_dir: default_root_dir.into(),
             custom_folder_paths: HashMap::new(),
             paused_folders: HashSet::new(),
+            folder_types: HashMap::new(),
             folder_devices: HashMap::new(),
             local_folders: Vec::new(),
         }
@@ -94,6 +98,30 @@ impl FsSyncStorage {
 
     pub fn is_folder_paused(&self, folder_id: &str) -> bool {
         self.paused_folders.contains(folder_id)
+    }
+
+    /// Sets the type of a shared folder. A `ReceiveOnly` folder applies a peer's changes, but
+    /// its own local changes are announced as invalid so peers never pull them
+    /// (see [`crate::folder_sync::mask_local_changes`]).
+    pub fn set_folder_type(&mut self, folder_id: &str, folder_type: FolderType) {
+        if folder_type == FolderType::SendReceive {
+            self.folder_types.remove(folder_id);
+        } else {
+            self.folder_types.insert(folder_id.to_owned(), folder_type);
+        }
+    }
+
+    /// Type of `folder_id` (`SendReceive` unless set otherwise).
+    pub fn folder_type(&self, folder_id: &str) -> FolderType {
+        self.folder_types
+            .get(folder_id)
+            .copied()
+            .unwrap_or_default()
+    }
+
+    /// Returns `true` if the local changes of `folder_id` must never be sent to peers.
+    pub fn is_folder_receive_only(&self, folder_id: &str) -> bool {
+        self.folder_type(folder_id) == FolderType::ReceiveOnly
     }
 
     /// Declares the devices `folder_id` is shared with (replacing any previous list).

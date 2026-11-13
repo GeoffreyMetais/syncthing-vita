@@ -20,7 +20,7 @@ fn test_share_without_linked_device_is_discarded() {
     assert!(state.is_share_creation_incomplete(idx));
     assert!(matches!(state.modal, ModalDialog::ManageDevices { .. }));
 
-    // Apply & Sync is refused while no device is linked
+    // `Triangle` only scans the LAN when no device is known: here it does nothing
     assert_eq!(press(&mut state, &repo, BTN_TRIANGLE), UserCommand::None);
     assert!(matches!(state.modal, ModalDialog::ManageDevices { .. }));
 

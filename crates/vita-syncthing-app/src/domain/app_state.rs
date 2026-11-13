@@ -50,6 +50,9 @@ pub struct AppState {
     pub progress_pct: Option<u32>,
     /// VBlank tick counter used to animate the indeterminate progress bar.
     pub progress_anim_tick: u32,
+    /// VBlanks left before the open `ManageDevices` dialog scans the LAN (`None`: no scan
+    /// planned). See `application::DevicesScan`.
+    pub devices_scan_countdown: Option<u32>,
     pub files_up_to_date: usize,
     pub files_downloaded: usize,
     pub blocks_uploaded: usize,
@@ -72,6 +75,9 @@ pub struct AppState {
     /// Folder IDs explicitly created, enabled, or linked to a device by the user during this session
     /// that should be advertised as new folder offers in the next BEP `ClusterConfig`.
     pub pending_folder_offers: Vec<String>,
+    /// Read-only shares whose local changes the user asked to revert, waiting to be handed to
+    /// the running sync worker.
+    pub pending_reverts: Vec<String>,
     /// Folder ID of a share being created: it is discarded unless a device gets linked before
     /// the `ManageDevices` modal closes.
     pub pending_share_creation: Option<String>,
@@ -128,6 +134,7 @@ impl AppState {
             current_file: UiText::raw("-"),
             progress_pct: Some(0),
             progress_anim_tick: 0,
+            devices_scan_countdown: None,
             files_up_to_date: 0,
             files_downloaded: 0,
             blocks_uploaded: 0,
@@ -141,6 +148,7 @@ impl AppState {
             transfer_activity: 0,
             config_dirty: false,
             pending_folder_offers: Vec::new(),
+            pending_reverts: Vec::new(),
             pending_share_creation: None,
             folder_offers: Vec::new(),
             ignored_folders: Vec::new(),

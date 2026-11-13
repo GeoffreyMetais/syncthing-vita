@@ -35,7 +35,6 @@ pub static STRINGS_IT: Strings = Strings {
     action_add_device: "Aggiungi dispositivo",
     action_add_device_id: "Aggiungi ID dispositivo",
     action_add_remote_device: "Aggiungi dispositivo remoto",
-    action_apply_sync: "Applica e sincronizza",
     action_scan_qr: "Scansiona QR",
     action_new_share: "Nuova condivisione",
     action_qr_id: "QR / ID",
@@ -51,6 +50,8 @@ pub static STRINGS_IT: Strings = Strings {
     status_scanning: "Scansione...",
     status_active: "Attivo",
     status_paused: "In pausa",
+    share_mode_read_write: "Lettura e scrittura",
+    share_mode_read_only: "Sola lettura",
 
     // Navigation & Sidebar
     tab_overview: "Panoramica",
@@ -84,7 +85,7 @@ pub static STRINGS_IT: Strings = Strings {
     hint_pause_enable: "Pausa/Abilita",
     hint_add_by_id: "Aggiungi con ID",
     hint_scan_qr: "Scansiona QR",
-    hint_apply_sync: "Applica e sincronizza",
+    hint_scan_lan: "Cerca in rete",
     hint_confirm_delete: "Conferma eliminazione",
     hint_confirm_quit: "Conferma uscita",
     hint_create_pick_devices: "Crea e scegli disp.",
@@ -167,6 +168,13 @@ pub static STRINGS_IT: Strings = Strings {
     modal_delete_share_decline_hint:
         "Le future offerte dei peer verranno rifiutate (modificabile in Impostazioni).",
 
+    // Modals: Confirm Revert (read-only share)
+    action_revert: "Ripristina",
+    modal_revert_title: "Annullare le modifiche locali?",
+    modal_revert_subtitle: "La versione dei dispositivi sostituisce quella della PS Vita",
+    modal_revert_added_hint: "I file aggiunti sulla PS Vita vengono eliminati.",
+    modal_revert_restored_hint: "I file modificati o eliminati vengono riscaricati.",
+
     // Modals: Confirm Quit
     modal_quit_title: "Uscire da VitaSync?",
     modal_quit_subtitle: "Conferma per chiudere l'applicazione e tornare alla LiveArea",
@@ -227,7 +235,6 @@ pub static MESSAGES_IT: Messages = Messages {
     language_changed: "Lingua: {name}",
     device_linked: "{device} aggiunto a '{share}'",
     device_unlinked: "{device} rimosso da '{share}'",
-    link_device_first: "Collega almeno un dispositivo per creare questa condivisione",
     added_short_id: "ID breve {prefix} aggiunto (abbinamento automatico nella LAN)",
     added_device: "Dispositivo {name} aggiunto ({short})",
     own_device_id: "Impossibile aggiungere l'ID di questa PS Vita",
@@ -239,6 +246,10 @@ pub static MESSAGES_IT: Messages = Messages {
     saved_in: "Salvato in {path}",
     share_active: "La condivisione {id} è ora attiva",
     share_paused: "La condivisione {id} è ora in pausa",
+    share_read_only: "La condivisione {id} è ora in sola lettura",
+    share_read_write: "La condivisione {id} è ora in lettura e scrittura",
+    revert_requested: "Annullamento delle modifiche locali di {id}...",
+    local_changes_reverted: "Modifiche locali di {id} annullate ({count})",
     offer_accepted: "Condivisione '{label}' accettata ({id})",
     choose_where_to_store: "Scegli dove salvare '{label}'",
     offer_declined: "Condivisione '{label}' rifiutata ({id})",

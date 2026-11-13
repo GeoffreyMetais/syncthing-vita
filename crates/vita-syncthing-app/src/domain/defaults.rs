@@ -39,6 +39,10 @@ pub const DISCOVERY_INTERVAL: Duration = Duration::from_secs(20);
 pub const DISCOVERY_LISTEN: Duration = Duration::from_millis(1500);
 /// How long the one-shot LAN scan listens when no device is linked yet.
 pub const DISCOVERY_SCAN_LISTEN: Duration = Duration::from_secs(2);
+/// VBlanks the `ManageDevices` dialog of a share that already has a linked device stays open
+/// before the LAN is scanned (3 s; cancelled when the dialog closes). A share without a linked
+/// device scans as soon as the dialog opens.
+pub const DEVICES_DIALOG_SCAN_DELAY: u32 = 3 * VBLANK_HZ;
 
 // --- Power ---------------------------------------------------------------------------------
 
@@ -75,22 +79,20 @@ pub const SCREENSAVER_TIMEOUT_IDLE: Duration = Duration::from_secs(45);
 /// Share presets offered in the `Create New Share` dialog: `(folder ID, label, target path)`.
 /// The `__browse__` entry opens the folder browser instead of creating a share.
 pub const NEW_SHARE_TEMPLATES: &[(&str, &str, &str)] = &[
-    ("vita-savedata", "Vita Save Data", "ux0:user/00/savedata"),
     (
-        "vita-pictures",
-        "Vita Screenshots & Pictures",
-        "ux0:picture",
+        "vita-shared",
+        "Vita Shared Folder",
+        "ux0:data/syncthing/shared",
     ),
-    ("vita-music", "Vita Music Library", "ux0:music"),
     (
         "retroarch-saves",
         "RetroArch Savefiles",
         "ux0:data/retroarch/savefiles",
     ),
     (
-        "vita-shared",
-        "Vita Shared Folder",
-        "ux0:data/syncthing/shared",
+        "retroarch-savetate",
+        "RetroArch Savestates filess",
+        "ux0:data/retroarch/savestates",
     ),
     (
         "__browse__",

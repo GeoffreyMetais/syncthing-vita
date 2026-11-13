@@ -10,7 +10,7 @@ use syncthing_core::DeviceId;
 
 use super::config_fields::{escape_field, unescape_field};
 use crate::domain::{
-    IgnoredFolder, KnownDevice, LanguagePreference, ShareConfigEntry, ThemeMode,
+    IgnoredFolder, KnownDevice, LanguagePreference, ShareConfigEntry, ShareMode, ThemeMode,
     NEW_SHARE_TEMPLATES,
 };
 
@@ -128,6 +128,9 @@ impl ConfigRepository {
                         label: unescape_field(parts[1]),
                         target_path,
                         enabled: parts[3] != "0",
+                        mode: parts
+                            .get(5)
+                            .map_or(ShareMode::ReadWrite, |c| ShareMode::from_code(c)),
                         shared_devices,
                     });
                 }
@@ -147,12 +150,13 @@ impl ConfigRepository {
         for s in shares {
             let devs = s.shared_devices.join(",");
             out.push_str(&format!(
-                "{}|{}|{}|{}|{}\n",
+                "{}|{}|{}|{}|{}|{}\n",
                 escape_field(&s.folder_id),
                 escape_field(&s.label),
                 escape_field(&s.target_path),
                 if s.enabled { "1" } else { "0" },
-                devs
+                devs,
+                s.mode.code()
             ));
         }
         write_replacing(&cfg_path, &out);

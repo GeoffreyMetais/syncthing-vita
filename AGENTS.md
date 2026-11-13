@@ -57,8 +57,10 @@ syncthing-vita
             │   ├── share_service.rs  # ShareService (create_share, upsert_device, toggle_device_for_share, refresh_picker_items)
             │   ├── dashboard_controller.rs / shares_controller.rs / files_controller.rs / settings_controller.rs # One controller per page: D-pad focus movement, execution of the page's UiActions
             │   ├── share_creation.rs # ShareCreation (new share kept only once a device is linked)
+            │   ├── share_mode.rs     # ShareModeService (share read & write <-> read only, revert of local changes)
             │   ├── folder_offers.rs  # FolderOfferService (folders offered by peers need consent: accept / decline / later)
             │   ├── frame_pacing.rs   # FramePacer (dynamic frame rate: render only when the screen changes)
+            │   ├── devices_scan.rs   # DevicesScan (LAN scan of the ManageDevices dialog: immediate or delayed, cancelled on close)
             │   ├── dpad_navigation.rs # DpadNavigation (sidebar <-> page focus, Cross on focused element)
             │   ├── qr_scan.rs        # QrScanFlow (scanner events -> AddDeviceById confirmation), extract_device_id
             │   ├── sync_coordinator.rs # SyncCoordinator (maps WorkerMsg & SyncEvent into AppState & ShareService)
@@ -110,6 +112,7 @@ syncthing-vita
                 │   ├── device_id.rs
                 │   ├── confirm_quit.rs
                 │   ├── confirm_delete_share.rs
+                │   ├── confirm_revert_share.rs
                 │   └── folder_offer.rs
                 └── renderer.rs       # VitaUiRenderer (coordinates Gfx + VitaFramebuffer presentation)
 ```
@@ -157,6 +160,7 @@ Dependencies strictly point **inward**. Inner layers never import or depend on o
    - **Key Modules**:
      - `share_service.rs`: Share creation, device linkage, path validation.
      - `share_creation.rs`: Share creation workflow — a new share is discarded if `ManageDevices` closes with no linked device.
+     - `share_mode.rs`: `ShareModeService::toggle` switches a share between `ShareMode::ReadWrite` and `ShareMode::ReadOnly`, saves it and restarts the worker (`config_dirty`). `ShareModeService::request_revert` queues a read-only share in `AppState::pending_reverts`; `main.rs` hands it to the running worker (`SyncControl::request_revert`) once no configuration change is pending, and a sync is started if none runs.
      - `folder_offers.rs`: Consent for folders offered by peers (`FolderOffer` modal); declined offers persisted.
      - `sync_coordinator.rs`: Maps background `WorkerMsg` protocol events into `AppState` updates.
      - `controllers/`: `input.rs` (`InputController`: translates main-screen button/touch inputs into actions, modal triggers, and commands) and one controller per page (`dashboard.rs` with the share list's `shares.rs`, `files.rs`, `settings.rs`; see §3.4).
@@ -264,6 +268,7 @@ Timings, limits and presets that govern the app's behaviour (rescan interval, re
 - **`device_id/`**: `DeviceId` value object; parsing of user input (`parse.rs`) and Base32/Luhn primitives (`base32.rs`) are separate.
 - **`discovery/`**: `Announce` codec, address ordering, local IP detection, UDP broadcast cycle, LAN TCP-scan fallback — one file each.
 - **Folder authorization**: `FsSyncStorage::is_folder_shared_with(folder_id, peer)` is the single gate of every session. A folder is only announced, indexed, downloaded or served for the devices declared with `set_folder_devices`; a folder a peer merely announces in its `ClusterConfig` is reported through `SyncEvent::ClusterConfigReceived` (so the app can ask for consent) but never synchronized. Any new message handler in `session/` must check `FolderSyncState::is_shared_folder` or `is_folder_shared_with` before touching a folder.
+- **Folder types (read-only shares)**: `FsSyncStorage::set_folder_type(folder_id, FolderType)`. A `FolderType::ReceiveOnly` folder (the app's read-only share) is announced with `type = RECEIVE_ONLY` (BEP `Folder` field 3) in our `ClusterConfig` and applies the peer's changes like any folder, but its local changes are never offered: `index_exchange::publish_index` passes its index through `folder_sync::mask_local_changes`, which flags `invalid` every entry whose version the peer has not seen (local creation, modification or deletion), as Syncthing does. Any new code path that publishes an index must go through `publish_index`. *Revert Local Changes*: `SyncControl::request_revert(folder)` is taken once by a persistent session sharing that receive-only folder (`session/revert.rs`, step F of the persistent loop): `FsSyncStorage::revert_local_changes` deletes entries the peer does not have and resets the version of locally modified / deleted ones, then the peer's version is pulled and published, and `SyncEvent::LocalChangesReverted` is emitted.
 - **`storage/`**: `FsSyncStorage` split by concern — registry & paths (`mod.rs`), block hashing / delta / block reads (`blocks.rs`), crash-safe download temp files (`download.rs`), `sceIo` path quirks (`vita_fs.rs`). Extend `FsSyncStorage` with a new `impl` block in the file owning that concern instead of growing `mod.rs`.
 - **Crash-safe writes**: a file is never deleted before its replacement is in place. Use `storage::atomic::{write_file_synced, replace_file, recover_replaced_file}` (temp file, previous version kept as a backup, recovery on the next load); downloads, folder databases and the app's `.cfg` files all go through them.
 - **Scans never turn an error into a deletion**: an entry that exists but cannot be inspected (`DiskEntryKind::Unreadable`, failing `stat()`) keeps its database entry, as does everything below it. Only an entry absent from a successful directory listing becomes a tombstone.
@@ -277,6 +282,7 @@ Timings, limits and presets that govern the app's behaviour (rescan interval, re
   - `secondary.rs` — `+2` secondary connections (open, promotion, polling, keepalive)
   - `initial_sync.rs` — initial download, local `Index` publication, request draining
   - `persistent.rs` — persistent keepalive / rescan loop
+  - `revert.rs` — revert of a receive-only folder's local changes (UI-requested through `SyncControl`)
   - `dispatch.rs` — routing of primary-connection messages in an established session
   - `index_exchange.rs` — local index publication and runtime `ClusterConfig` / `Index` handling
   - `download.rs` / `upload.rs` — block transfers (pull / serve)
@@ -350,7 +356,7 @@ Text fields of the `.cfg` files (device names, addresses, folder IDs, labels, pa
 | `device_seed.bin` | 32-byte random seed for deterministic ECDSA P-256 keypair | Raw 32 bytes |
 | `cert.der` | Self-signed X.509 DER certificate whose SHA-256 is the Syncthing `DeviceId` | ASN.1 DER |
 | `devices.cfg` | Known/discovered remote Syncthing peers | `<device_id_hex>\|<name>\|<ip:port>\n` |
-| `shares.cfg` | Configured shared folders and linked devices | `<folder_id>\|<label>\|<target_path>\|<0\|1>\|<dev_hex1,dev_hex2>\n` |
+| `shares.cfg` | Configured shared folders, linked devices and access mode (`rw` read & write, `ro` read only; missing means `rw`) | `<folder_id>\|<label>\|<target_path>\|<0\|1>\|<dev_hex1,dev_hex2>\|<rw\|ro>\n` |
 | `ignored_folders.cfg` | Folder offers declined by the user or deleted shares (not prompted again until `Settings` · `Clear Declined`) | `<folder_id>\|<device_id_hex>\n` |
 | `theme.cfg` | Persistent colour theme mode (`dark` or `oled`) | `<dark\|oled>\n` |
 | `language.cfg` | UI language chosen in `Settings` (`system` follows the PS Vita language; a missing file means `system`) | `<system\|en\|fr\|es\|de\|it>\n` |
@@ -370,12 +376,12 @@ cargo test --workspace
 - `device_id.rs`: Luhn-mod-32 `DeviceId` formatting, full / short / hex user-input parsing
 - `discovery.rs`: Protobuf `Announce` roundtrip, advertised TCP address resolution
 - `identity.rs`: X.509 certificate & `DeviceId` derivation
-- `storage.rs`: streaming download, delta sync, `ux0:` device-root path variants
+- `storage.rs`: streaming download, delta sync, `ux0:` device-root path variants, folder types
 - `local_db.rs`: persistent folder database text format roundtrip
-- `folder_sync.rs`: version convergence across peers, local deletions become tombstones
+- `folder_sync.rs`: version convergence across peers, local deletions become tombstones, receive-only masking of local changes, revert of local changes
 - `version_vector.rs`: version vector ordering / merge / bump
 - `bep_codec.rs` / `storage.rs` / `folder_sync.rs` also cover the hardening rules: bounded LZ4 output, bounded block sizes, interrupted download commit recovery, unreadable entries never recorded as deleted
-- `session.rs`: folder authorization (per-device sharing gate, block requests refused for unlinked peers, unconfigured or paused folders) and end-to-end sessions against the fake peer (only shared folders are announced / pulled, an `IndexUpdate` received during a download is applied, a local change is published as an incremental `IndexUpdate`, batched publication, scan progress for keepalives)
+- `session.rs`: folder authorization (per-device sharing gate, block requests refused for unlinked peers, unconfigured or paused folders) and end-to-end sessions against the fake peer (only shared folders are announced / pulled, an `IndexUpdate` received during a download is applied, a local change is published as an incremental `IndexUpdate`, batched publication, scan progress for keepalives, a receive-only folder is announced as such, pulls the peer's changes and publishes its local changes as invalid, a revert request restores it once)
 
 `vita-syncthing-app` tests live in `crates/vita-syncthing-app/tests/` (`cargo test -p vita-syncthing-app`):
 - `share_creation.rs`: a new share without a linked device is discarded, a linked one is kept, `Files` tab folder selection, already-shared folders are not selectable
@@ -383,7 +389,7 @@ cargo test --workspace
 - `share_service.rs`: share deletion, share creation, device linking, paused accepted folders, `ConfigRepository` roundtrip, manual LAN pairing
 - `input_controller.rs`: global routing — an active screensaver swallows input and wakes on a button press or touch only
 - `main_screens.rs`: sidebar tabs and transfer card, `Overview` device card / share list / hints, `Files` rows and `Open` chip, `Settings` hints; geometry of every page in all 5 languages (elements on screen, hints not overlapping)
-- `modal_touch.rs`: modal touch resolved from declared elements (template rows, device rows, pause / done buttons, text box -> system keyboard, keypad keys, folder offer buttons, outside / inside touches); geometry of every modal in all 5 languages (on screen, hints and buttons not overlapping)
+- `modal_touch.rs`: modal touch resolved from declared elements (template rows, device rows, pause / done buttons, `Scan QR` button in every language, `Triangle` LAN scan without devices, text box -> system keyboard, keypad keys, folder offer buttons, outside / inside touches); geometry of every modal in all 5 languages (on screen, hints and buttons not overlapping)
 - `dialogs.rs`: `START` -> `ConfirmQuit` -> `Cross` quits, `ConfirmQuit` touch targets, `ConfirmDeleteShare` (`Square` on the Overview, cancel / confirm)
 - `add_device.rs`: add-device-by-short-ID via system keyboard (placeholder upgraded on discovery), virtual keyboard hidden until requested
 - `theme_settings.rs`: theme toggle (D-pad `Cross`, `Square`, touch) and `theme.cfg` persistence
@@ -396,6 +402,8 @@ cargo test --workspace
 - `frame_pacing.rs`: dynamic frame rate (input -> next VBlank, animations 30 FPS, background updates 10 FPS, static 1 FPS), toast expiry and screensaver speed independent of the frame rate
 - `worker_slot.rs`: a new worker starts only after the previous one ended, bounded wait on quit
 - `config_fields.rs`: interrupted `.cfg` replacement restored from its backup, `.cfg` field escaping roundtrip, legacy `%` text kept, hostile names / labels through `devices.cfg` / `shares.cfg` / `ignored_folders.cfg`, invalid linked-device entries dropped
+- `share_mode.rs`: read & write / read only toggle (`L` and touch in `ManageDevices`), `shares.cfg` persistence (legacy lines without a mode are read & write), mode / revert buttons geometry in all 5 languages, revert of local changes (`START` in `ManageDevices` + `ConfirmRevertShare`, pad and touch, read-only shares only), `LocalChangesReverted` toast
+- `devices_scan.rs`: `ManageDevices` LAN scan — immediate without a linked device, after the delay with one, cancelled on close (and re-armed on reopening), also while another device is connected
 - `language_settings.rs`: language preference codec / cycle, `language.cfg` persistence (defaults to the system language), `Settings` language card (D-pad and touch)
 
 ### Cross-Check for PS Vita (`armv7-sony-vita-newlibeabihf`)
@@ -462,7 +470,8 @@ The UI (`gfx.rs` + `ui/screens/*` + `ui/modals/*` + `ui/renderer.rs`) renders at
   3. `Settings` (`ActiveTab::Settings`): Dark / Pure-Black OLED theme switcher (`Cross`), `QR / ID` modal (`Circle`), `Language` card (D-pad `Down` + `Cross` or tap: System -> English -> Français -> Español -> Deutsch -> Italiano, saved in `language.cfg`), `Declined folders` card (D-pad `Down` + `Cross` or tap `Clear Declined` to forget declined folder offers so peers can offer them again), and BEP/1.0 protocol log viewer.
 - **Modal Dialogs** (`ModalDialog` in `domain/models.rs`, rendered by `ui/modals/*`):
   - `CreateShare`: Create a share from PS Vita folder presets (`ux0:user/00/savedata`, `ux0:picture`, `ux0:music`, RetroArch saves) or browse `ux0:`. The share is only kept once a device is linked in the `ManageDevices` modal that follows.
-  - `ManageDevices`: Link/unlink discovered Syncthing peers to a share with circular checkboxes (`draw_row_tick`), add one by ID (`Square`) or by QR code (`R · Scan QR`) and trigger immediate `ClusterConfig` advertising (`Triangle · Apply & Sync`); `SELECT` pauses / enables the share.
+  - `ManageDevices`: Link/unlink discovered Syncthing peers to a share with circular checkboxes (`draw_row_tick`), add one by ID (`Square`) or by QR code (`R · Scan QR`); changes apply when the dialog closes (`Circle · Done`: `config_dirty` restarts the worker, which advertises the folder in its `ClusterConfig`); opening the dialog scans the LAN (`DevicesScan`): at once for a share with no linked device, after `DEVICES_DIALOG_SCAN_DELAY` (3 s, counted in VBlanks by `main.rs`, cancelled when the dialog closes) otherwise, also while another device is connected (`UserCommand::ScanLan`: `main.rs` asks the running worker for a discovery cycle now with `SyncControl::request_discovery`, or starts a sync when none runs); while no device is known, `Triangle` (hint `Scan LAN`) scans again; `SELECT` pauses / enables the share; `L` (header button showing the current mode) switches it between **Read & write** and **Read only** (Syncthing "Receive Only": the Vita receives its peers' changes but never sends its own). On a read-only share, `START · Revert` (header) opens `ConfirmRevertShare`. Read-only shares carry a lock badge on their `Overview` card.
+  - `ConfirmRevertShare`: Syncthing's *Revert Local Changes* for a read-only share: files added on the PS Vita are deleted, edited or deleted files are downloaded again from the peers. `Cross` confirms, `Circle` cancels; both return to `ManageDevices`. Runs in the next connected session; a toast reports the result.
   - `AddDeviceById`: Enter a remote Short / Full Device ID with the PS Vita system keyboard (opened on entry or by tapping the text box). The fallback Base32 keypad is hidden by default; `Triangle · Virtual Keyboard` shows / hides it.
   - `ScanDeviceQr`: Rear-camera (`SceCamera`) viewfinder opened with `R · Scan QR` from `AddDeviceById` or from `ManageDevices` (next to `+ Add by ID`). The camera runs only while the modal is open; a decoded full Device ID is added like a typed one, `Circle` goes back to the ID form. Vita3K's emulated camera only delivers blank frames, so decoding must be tested on hardware.
   - `ShowDeviceId`: Displays a scannable QR code (`qrcodegen`) alongside the 8-group Syncthing Device ID.
