@@ -22,6 +22,15 @@ if [[ -z "${VITASDK:-}" ]]; then
 fi
 export PATH="${VITASDK}/bin:${PATH}"
 
+# Workspace version (Cargo.toml [workspace.package]) -> param.sfo APP_VER ("XX.YY"):
+# MAJOR on two digits, then MINOR and PATCH on one digit each (0.1.0 -> 00.10, 1.2.3 -> 01.23).
+APP_VERSION="$(awk -F'"' '/^\[workspace\.package\]/{s=1;next} /^\[/{s=0} s && /^version *=/{print $2; exit}' Cargo.toml)"
+if [[ ! "${APP_VERSION}" =~ ^([0-9]{1,2})\.([0-9])\.([0-9])$ ]]; then
+    echo "Error: workspace version '${APP_VERSION}' does not fit param.sfo APP_VER (expected M.m.p with m, p <= 9)." >&2
+    exit 1
+fi
+APP_VER="$(printf '%02d.%d%d' "${BASH_REMATCH[1]}" "${BASH_REMATCH[2]}" "${BASH_REMATCH[3]}")"
+
 BUILD_DIR="target/${TARGET}/${PROFILE}"
 PKG_DIR="${BUILD_DIR}/pkg"
 SCE_SYS_DIR="${PKG_DIR}/sce_sys"
@@ -44,9 +53,10 @@ echo "[3/5] Generating eboot.bin (vita-make-fself)..."
 # -c: compressed full-permission homebrew eboot (required for full ux0: access & sysmodules)
 vita-make-fself -c "${BUILD_DIR}/${APP_NAME}.velf" "${PKG_DIR}/eboot.bin"
 
-echo "[4/5] Generating param.sfo (vita-mksfoex)..."
+echo "[4/5] Generating param.sfo (vita-mksfoex, version ${APP_VERSION} -> APP_VER ${APP_VER})..."
 # ATTRIBUTE2=12 enables extended memory mode (+109 MB on Vita) if needed
-vita-mksfoex -s TITLE_ID="${TITLE_ID}" -d ATTRIBUTE2=12 "${TITLE_NAME}" "${SCE_SYS_DIR}/param.sfo"
+vita-mksfoex -s TITLE_ID="${TITLE_ID}" -s APP_VER="${APP_VER}" -d ATTRIBUTE2=12 \
+    "${TITLE_NAME}" "${SCE_SYS_DIR}/param.sfo"
 
 echo "[5/5] Packaging VPK archive (vita-pack-vpk)..."
 VPK_PATH="${BUILD_DIR}/${TITLE_ID}.vpk"
