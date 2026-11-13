@@ -2,6 +2,7 @@
 //! (`SyncCoordinator`), and user input presenter/controller (`InputController`).
 
 pub mod controllers;
+pub mod devices_scan;
 pub mod dpad_navigation;
 pub mod folder_offers;
 pub mod frame_pacing;
@@ -17,6 +18,7 @@ pub use controllers::{
     DashboardController, FilesController, InputController, SettingsController, SharesController,
     UserCommand,
 };
+pub use devices_scan::DevicesScan;
 pub use dpad_navigation::DpadNavigation;
 pub use folder_offers::FolderOfferService;
 pub use frame_pacing::{FramePacer, FrameSignals};

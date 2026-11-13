@@ -47,6 +47,9 @@ pub struct AppState {
     pub progress_pct: Option<u32>,
     /// VBlank tick counter used to animate the indeterminate progress bar.
     pub progress_anim_tick: u32,
+    /// VBlanks left before the open `ManageDevices` dialog scans the LAN (`None`: no scan
+    /// planned). See `application::DevicesScan`.
+    pub devices_scan_countdown: Option<u32>,
     pub files_up_to_date: usize,
     pub files_downloaded: usize,
     pub blocks_uploaded: usize,
@@ -127,6 +130,7 @@ impl AppState {
             current_file: UiText::raw("-"),
             progress_pct: Some(0),
             progress_anim_tick: 0,
+            devices_scan_countdown: None,
             files_up_to_date: 0,
             files_downloaded: 0,
             blocks_uploaded: 0,

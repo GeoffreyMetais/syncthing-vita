@@ -12,6 +12,7 @@ pub struct SyncControl {
     stop_requested: AtomicBool,
     rescan_requested: AtomicBool,
     rescan_epoch: AtomicU64,
+    discovery_requested: AtomicBool,
     /// Receive-only folders whose local changes must be reverted, until a session takes them.
     revert_requests: Mutex<Vec<String>>,
     tuning: SyncTuning,
@@ -54,6 +55,17 @@ impl SyncControl {
 
     pub fn rescan_epoch(&self) -> u64 {
         self.rescan_epoch.load(Ordering::SeqCst)
+    }
+
+    /// Asks the application's discovery loop for a LAN discovery cycle now, instead of at its
+    /// next periodic one (e.g. the user is looking for a device to add).
+    pub fn request_discovery(&self) {
+        self.discovery_requested.store(true, Ordering::SeqCst);
+    }
+
+    /// Returns `true` once per [`Self::request_discovery`] call (the request is consumed).
+    pub fn take_discovery_request(&self) -> bool {
+        self.discovery_requested.swap(false, Ordering::SeqCst)
     }
 
     /// Asks the next session that synchronizes `folder_id` to revert its local changes.

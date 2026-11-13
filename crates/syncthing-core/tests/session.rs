@@ -515,3 +515,13 @@ fn test_revert_requests_are_taken_once_by_matching_sessions() {
     assert!(control.take_revert_requests(|f| f == "saves").is_empty());
     assert_eq!(control.take_revert_requests(|_| true), vec!["music"]);
 }
+
+#[test]
+fn test_discovery_request_is_taken_once() {
+    let control = SyncControl::new();
+    assert!(!control.take_discovery_request());
+    control.request_discovery();
+    control.request_discovery();
+    assert!(control.take_discovery_request());
+    assert!(!control.take_discovery_request());
+}

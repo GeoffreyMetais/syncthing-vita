@@ -13,7 +13,6 @@ mod manage_devices;
 mod scan_qr;
 
 pub(crate) use add_device::{confirm_add_device, open_add_device_modal};
-pub(crate) use manage_devices::scan_on_open;
 
 use crate::application::UserCommand;
 use crate::domain::{AppState, ModalDialog, PadKey, UiAction};

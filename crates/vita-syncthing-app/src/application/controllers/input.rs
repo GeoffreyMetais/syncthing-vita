@@ -5,8 +5,10 @@
 //! Open modals are handled by `ModalInput`, D-pad focus by `DpadNavigation`.
 
 use crate::application::dpad_navigation::DpadNavigation;
-use crate::application::modal_input::{open_add_device_modal, scan_on_open, ModalInput};
-use crate::application::{FilesController, SettingsController, ShareService, SharesController};
+use crate::application::modal_input::{open_add_device_modal, ModalInput};
+use crate::application::{
+    DevicesScan, FilesController, SettingsController, ShareService, SharesController,
+};
 use crate::domain::{
     ActiveTab, AppState, ModalDialog, PickerMode, ShortcutKey, UiAction, TAB_ORDER,
 };
@@ -27,6 +29,9 @@ const SHORTCUT_BUTTONS: [(u32, ShortcutKey); 3] = [
 pub enum UserCommand {
     None,
     StartSync,
+    /// Look for Syncthing devices on the LAN now: asks the running worker for a discovery
+    /// cycle, or starts a sync (whose first step is a discovery) when no worker runs.
+    ScanLan,
     OpenSystemKeyboard,
     QuitApp,
 }
@@ -46,8 +51,9 @@ impl InputController {
         if state.active_tab != prev_tab {
             state.reset_nav_for_tab();
         }
+        let scan = DevicesScan::on_input(prev_modal, state);
         if cmd == UserCommand::None {
-            cmd = scan_on_open(prev_modal, state);
+            cmd = scan;
         }
         cmd
     }

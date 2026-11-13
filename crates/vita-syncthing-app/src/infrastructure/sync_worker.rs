@@ -71,6 +71,24 @@ fn sleep_interruptible(control: &SyncControl, duration: Duration) -> bool {
     !control.is_stop_requested()
 }
 
+/// Waits up to `duration` before the next discovery cycle. Returns early when the UI asks for a
+/// LAN scan (`SyncControl::request_discovery`); `false` if a stop was requested.
+fn wait_for_next_discovery(control: &SyncControl, duration: Duration) -> bool {
+    let mut elapsed = Duration::ZERO;
+    while elapsed < duration {
+        if control.is_stop_requested() {
+            return false;
+        }
+        if control.take_discovery_request() {
+            return true;
+        }
+        let rem = (duration - elapsed).min(STOP_CHECK_STEP);
+        std::thread::sleep(rem);
+        elapsed += rem;
+    }
+    !control.is_stop_requested()
+}
+
 fn candidate_addrs_for_peer(
     kd: &KnownDevice,
     discovered: &SharedDiscoveredAddrs,
@@ -452,7 +470,7 @@ pub fn spawn_sync_worker(
             }
             first_pass = false;
 
-            if !sleep_interruptible(&worker_control, DISCOVERY_INTERVAL) {
+            if !wait_for_next_discovery(&worker_control, DISCOVERY_INTERVAL) {
                 break;
             }
         }
