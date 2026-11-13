@@ -12,7 +12,7 @@ use syncthing_core::session::folders::{FolderSyncState, INDEX_BATCH_FILES};
 use syncthing_core::session::upload::serve_block_request;
 use syncthing_core::{
     connect_and_sync, connect_and_sync_with_control, read_bep_message, BepClusterConfig,
-    BepFileInfo, BepHello, BepIndex, BepMessageType, BepRequest, BepResponse, DeviceId,
+    BepFileInfo, BepHello, BepIndex, BepMessageType, BepRequest, BepResponse, DeviceId, FolderType,
     FsSyncStorage, SyncControl, SyncEvent, SyncSessionStatus, SyncTuning, VitaIdentity,
 };
 
@@ -350,4 +350,78 @@ fn test_scan_reports_progress_for_keepalives() {
     assert!(!ctx.keepalive_due());
     ctx.tuning.keepalive_interval = Duration::ZERO;
     assert!(ctx.keepalive_due());
+}
+
+/// Wire value of the `type` field (3) of each folder of a `ClusterConfig` payload.
+fn announced_folder_types(payload: &[u8]) -> Vec<(String, u64)> {
+    use syncthing_core::proto::{decode_varint, WireIter};
+    let mut out = Vec::new();
+    for item in WireIter::new(payload) {
+        let (field, _, folder) = item.unwrap();
+        if field != 1 {
+            continue;
+        }
+        let (mut id, mut folder_type) = (String::new(), 0);
+        for f in WireIter::new(folder) {
+            match f.unwrap() {
+                (1, 2, data) => id = String::from_utf8_lossy(data).into_owned(),
+                (3, 0, data) => folder_type = decode_varint(data).unwrap().0,
+                _ => {}
+            }
+        }
+        out.push((id, folder_type));
+    }
+    out
+}
+
+#[test]
+fn test_send_only_folder_publishes_but_never_applies_remote_changes() {
+    let vita_id = vita_identity().device_id;
+    let peer = FakePeer::spawn(0x55, move |conn| {
+        let remote = conn.file("saves", "remote.txt", b"from the peer", 1);
+        conn.send_cluster_config(&["saves"], vita_id);
+        conn.wait_for(BepMessageType::ClusterConfig, Duration::from_secs(5))
+            .expect("ClusterConfig reply");
+        conn.send_index("saves", vec![remote], false);
+        conn.serve_until_idle(Duration::from_millis(1500));
+    });
+
+    let root = common::fresh_temp_dir("session_e2e_send_only");
+    let mut storage = FsSyncStorage::new(&root);
+    storage.set_folder_devices("saves", vec![peer.device_id]);
+    storage.set_folder_type("saves", FolderType::SendOnly);
+    std::fs::create_dir_all(storage.folder_root("saves")).unwrap();
+    std::fs::write(
+        storage.resolve_safe_path("saves", "local.txt"),
+        b"vita save",
+    )
+    .unwrap();
+
+    sync_once(&peer, &storage);
+    let received = peer.join();
+
+    // The peer's file was neither requested nor written...
+    assert!(payloads(&received, BepMessageType::Request).is_empty());
+    assert!(!storage.resolve_safe_path("saves", "remote.txt").exists());
+    // ...while the local file is still published, and the folder is announced as send-only.
+    let published: Vec<String> = payloads(&received, BepMessageType::Index)
+        .iter()
+        .flat_map(|p| BepIndex::decode(p).unwrap().files)
+        .map(|f| f.name)
+        .collect();
+    assert_eq!(published, vec!["local.txt".to_owned()]);
+    let configs = payloads(&received, BepMessageType::ClusterConfig);
+    assert_eq!(
+        announced_folder_types(configs[0]),
+        vec![("saves".to_owned(), FolderType::SendOnly.wire_value())]
+    );
+}
+
+#[test]
+fn test_send_only_folder_still_serves_blocks() {
+    let mut storage = storage_with_shared_file("session_send_only_serves");
+    storage.set_folder_type("saves", FolderType::SendOnly);
+    let resp = request_block(&storage, LINKED_PEER, "saves");
+    assert_eq!(resp.code, 0);
+    assert_eq!(resp.data, CONTENT);
 }

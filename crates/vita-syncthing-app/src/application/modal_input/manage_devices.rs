@@ -1,11 +1,12 @@
-//! `ManageDevices` modal input: link devices to a share, pause it, apply & sync.
+//! `ManageDevices` modal input: link devices to a share, pause it, switch its read-only mode,
+//! apply & sync.
 
 use super::open_add_device_modal;
-use crate::application::{QrScanFlow, ShareCreation, ShareService, UserCommand};
+use crate::application::{QrScanFlow, ShareCreation, ShareModeService, ShareService, UserCommand};
 use crate::domain::{AppState, ModalDialog, UiText, VISIBLE_DEVICES};
 use crate::infrastructure::{
-    ConfigRepository, InputFrame, BTN_CIRCLE, BTN_CROSS, BTN_DOWN, BTN_R, BTN_SELECT, BTN_SQUARE,
-    BTN_TRIANGLE, BTN_UP,
+    ConfigRepository, InputFrame, BTN_CIRCLE, BTN_CROSS, BTN_DOWN, BTN_L, BTN_R, BTN_SELECT,
+    BTN_SQUARE, BTN_TRIANGLE, BTN_UP,
 };
 
 /// Handles input in the `ManageDevices` modal; `row` is the device row touched, if any.
@@ -46,6 +47,10 @@ pub fn handle(
     if (input.pressed & BTN_SELECT) != 0 {
         state.selected_share_idx = share_idx;
         ShareService::toggle_selected_share(state, repo);
+        return UserCommand::None;
+    }
+    if (input.pressed & BTN_L) != 0 {
+        ShareModeService::toggle(state, repo, share_idx);
         return UserCommand::None;
     }
     if (input.pressed & BTN_TRIANGLE) != 0 {

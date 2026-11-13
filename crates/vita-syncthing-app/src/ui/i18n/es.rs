@@ -51,6 +51,8 @@ pub static STRINGS_ES: Strings = Strings {
     status_scanning: "Escaneando...",
     status_active: "Activo",
     status_paused: "En pausa",
+    share_mode_read_write: "Lectura y escritura",
+    share_mode_read_only: "Solo lectura",
 
     // Navigation & Sidebar
     tab_overview: "Resumen",
@@ -236,6 +238,8 @@ pub static MESSAGES_ES: Messages = Messages {
     saved_in: "Guardado en {path}",
     share_active: "La carpeta {id} está activa",
     share_paused: "La carpeta {id} está en pausa",
+    share_read_only: "La carpeta {id} es ahora de solo lectura",
+    share_read_write: "La carpeta {id} es ahora de lectura y escritura",
     offer_accepted: "Carpeta '{label}' aceptada ({id})",
     choose_where_to_store: "Elige dónde guardar '{label}'",
     offer_declined: "Carpeta '{label}' rechazada ({id})",

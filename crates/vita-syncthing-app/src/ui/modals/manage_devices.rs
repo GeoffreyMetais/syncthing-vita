@@ -3,7 +3,7 @@
 use syncthing_core::DeviceId;
 
 use crate::domain::interaction::{HitMap, PadKey, UiAction};
-use crate::domain::{AppState, VISIBLE_DEVICES};
+use crate::domain::{AppState, ShareMode, VISIBLE_DEVICES};
 use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton, GFX_W};
 use crate::ui::i18n::messages::fill;
 use crate::ui::strings;
@@ -57,11 +57,21 @@ pub fn render_manage_devices_modal(
         22.0,
         th.accent_hi,
     );
+    // Header right: the share's access mode; touching it (or `L`) switches to the other one.
+    let mode_lbl = match state.shares.get(share_idx).map(|sh| sh.mode) {
+        Some(ShareMode::ReadOnly) => s.share_mode_read_only,
+        _ => s.share_mode_read_write,
+    };
+    let w_mode = action_width(gfx, PadButton::L, mode_lbl);
+    let bx_mode = dx + w - 28 - w_mode;
+    draw_press_button(gfx, th, hits, bx_mode, dy + 40, PadButton::L, mode_lbl);
+    let header_w = bx_mode - 12 - (lx + 52);
+
     let header_title = s.fmt_devices_for_share(&share_title);
     gfx.text_fit(
         lx + 52,
         dy + 32,
-        w - 110,
+        header_w,
         20,
         FontWeight::Bold,
         th.text,
@@ -74,9 +84,10 @@ pub fn render_manage_devices_modal(
     } else {
         (s.modal_manage_devices_subtitle, th.dim)
     };
-    gfx.text(
+    gfx.text_fit(
         lx + 52,
         dy + 54,
+        header_w,
         14,
         FontWeight::Regular,
         subtitle_col,

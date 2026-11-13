@@ -51,6 +51,8 @@ pub static STRINGS_DE: Strings = Strings {
     status_scanning: "Scanne...",
     status_active: "Aktiv",
     status_paused: "Pausiert",
+    share_mode_read_write: "Lesen & Schreiben",
+    share_mode_read_only: "Nur lesen",
 
     // Navigation & Sidebar
     tab_overview: "Übersicht",
@@ -235,6 +237,8 @@ pub static MESSAGES_DE: Messages = Messages {
     saved_in: "Gespeichert in {path}",
     share_active: "Freigabe {id} ist jetzt aktiv",
     share_paused: "Freigabe {id} ist jetzt pausiert",
+    share_read_only: "Freigabe {id} ist jetzt schreibgeschützt",
+    share_read_write: "Freigabe {id} ist jetzt beschreibbar",
     offer_accepted: "Freigabe „{label}“ angenommen ({id})",
     choose_where_to_store: "Speicherort für „{label}“ wählen",
     offer_declined: "Freigabe „{label}“ abgelehnt ({id})",

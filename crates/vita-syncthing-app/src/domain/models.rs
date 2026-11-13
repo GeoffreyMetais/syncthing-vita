@@ -203,6 +203,43 @@ pub struct KnownDevice {
     pub address: String,
 }
 
+/// Access mode of a share on the PS Vita.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum ShareMode {
+    /// Local changes are sent to peers and their changes are applied (Syncthing "Send & Receive").
+    #[default]
+    ReadWrite,
+    /// Local changes are sent to peers, but their changes never modify the PS Vita's files
+    /// (Syncthing "Send Only").
+    ReadOnly,
+}
+
+impl ShareMode {
+    /// The other mode (the `ManageDevices` toggle).
+    pub fn toggled(self) -> Self {
+        match self {
+            Self::ReadWrite => Self::ReadOnly,
+            Self::ReadOnly => Self::ReadWrite,
+        }
+    }
+
+    /// Code stored in `shares.cfg`.
+    pub fn code(self) -> &'static str {
+        match self {
+            Self::ReadWrite => "rw",
+            Self::ReadOnly => "ro",
+        }
+    }
+
+    /// Parses a `shares.cfg` code; anything unknown (or missing) is `ReadWrite`.
+    pub fn from_code(code: &str) -> Self {
+        match code.trim() {
+            "ro" => Self::ReadOnly,
+            _ => Self::ReadWrite,
+        }
+    }
+}
+
 /// Syncthing shared folder configuration on PS Vita.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ShareConfigEntry {
@@ -210,6 +247,8 @@ pub struct ShareConfigEntry {
     pub label: String,
     pub target_path: String,
     pub enabled: bool,
+    /// Whether peers may modify this folder on the PS Vita.
+    pub mode: ShareMode,
     /// Hex strings (`DeviceId::to_hex()`) of remote devices this folder is shared with.
     pub shared_devices: Vec<String>,
 }

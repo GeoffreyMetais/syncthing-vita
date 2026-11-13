@@ -9,6 +9,7 @@ pub mod modal_input;
 pub mod power_policy;
 pub mod qr_scan;
 pub mod share_creation;
+pub mod share_mode;
 pub mod share_service;
 pub mod sync_coordinator;
 
@@ -22,5 +23,6 @@ pub use frame_pacing::{FramePacer, FrameSignals};
 pub use modal_input::ModalInput;
 pub use qr_scan::{extract_device_id, QrScanFlow};
 pub use share_creation::ShareCreation;
+pub use share_mode::ShareModeService;
 pub use share_service::ShareService;
 pub use sync_coordinator::SyncCoordinator;

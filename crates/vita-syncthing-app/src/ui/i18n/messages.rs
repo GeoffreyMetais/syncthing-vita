@@ -83,6 +83,10 @@ pub struct Messages {
     pub share_active: &'static str,
     /// `{id}`.
     pub share_paused: &'static str,
+    /// `{id}`.
+    pub share_read_only: &'static str,
+    /// `{id}`.
+    pub share_read_write: &'static str,
     /// `{label}`, `{id}`.
     pub offer_accepted: &'static str,
     /// `{label}`.
@@ -240,6 +244,8 @@ impl Strings {
             UiText::SavedIn { path } => fill(m.saved_in, &[("path", path)]),
             UiText::ShareActive { id } => fill(m.share_active, &[("id", id)]),
             UiText::SharePaused { id } => fill(m.share_paused, &[("id", id)]),
+            UiText::ShareReadOnly { id } => fill(m.share_read_only, &[("id", id)]),
+            UiText::ShareReadWrite { id } => fill(m.share_read_write, &[("id", id)]),
             UiText::OfferAccepted { label, id } => {
                 fill(m.offer_accepted, &[("label", label), ("id", id)])
             }

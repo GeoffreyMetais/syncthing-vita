@@ -5,7 +5,7 @@ mod common;
 
 use common::temp_test_dir;
 use syncthing_core::DeviceId;
-use vita_syncthing_app::domain::{IgnoredFolder, KnownDevice, ShareConfigEntry};
+use vita_syncthing_app::domain::{IgnoredFolder, KnownDevice, ShareConfigEntry, ShareMode};
 use vita_syncthing_app::infrastructure::config_fields::{escape_field, unescape_field};
 use vita_syncthing_app::infrastructure::ConfigRepository;
 
@@ -45,6 +45,7 @@ fn test_hostile_fields_roundtrip_through_config_files() {
         label: HOSTILE.to_owned(),
         target_path: "ux0:music/100% hits".to_owned(),
         enabled: true,
+        mode: ShareMode::ReadWrite,
         shared_devices: vec![PEER.to_hex()],
     }]);
     let shares = repo.load_shares();

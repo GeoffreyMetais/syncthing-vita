@@ -7,7 +7,7 @@ use std::time::Duration;
 
 use syncthing_core::{
     connect_and_sync_with_control, resolve_peer_tcp_addrs, run_discovery_cycle, scan_lan_bep_peers,
-    Announce, BepFolder, BepHello, DeviceId, FsSyncStorage, SyncControl, SyncEvent,
+    Announce, BepFolder, BepHello, DeviceId, FolderType, FsSyncStorage, SyncControl, SyncEvent,
     SyncSessionStatus, SyncTuning, VitaIdentity, BEP_DEFAULT_PORT, DISCOVERY_BROADCAST_ADDR,
 };
 
@@ -17,7 +17,7 @@ use crate::domain::defaults::{
     KEEPALIVE_INTERVAL, MAX_PEER_SESSIONS, NO_ADDRESS_POLL, RESCAN_INTERVAL, RETRY_AFTER_ERROR,
     RETRY_AFTER_SESSION, RETRY_AWAITING_PAIRING,
 };
-use crate::domain::{KnownDevice, ShareConfigEntry, UiText};
+use crate::domain::{KnownDevice, ShareConfigEntry, ShareMode, UiText};
 
 /// Stack size of the worker and peer session threads.
 const WORKER_STACK_SIZE: usize = 1536 * 1024;
@@ -249,6 +249,14 @@ pub fn spawn_sync_worker(
         for s in &shares_snapshot {
             storage.set_folder_path(&s.folder_id, &s.target_path);
             storage.set_folder_paused(&s.folder_id, !s.enabled);
+            // A read-only share is Syncthing's "Send Only": peers never modify its files.
+            storage.set_folder_type(
+                &s.folder_id,
+                match s.mode {
+                    ShareMode::ReadWrite => FolderType::SendReceive,
+                    ShareMode::ReadOnly => FolderType::SendOnly,
+                },
+            );
             // Authorization: a folder is only synchronized with the devices linked to its share.
             let device_ids: Vec<DeviceId> = s
                 .shared_devices

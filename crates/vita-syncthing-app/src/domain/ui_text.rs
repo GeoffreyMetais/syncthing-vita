@@ -114,6 +114,12 @@ pub enum UiText {
     SharePaused {
         id: String,
     },
+    ShareReadOnly {
+        id: String,
+    },
+    ShareReadWrite {
+        id: String,
+    },
     OfferAccepted {
         label: String,
         id: String,

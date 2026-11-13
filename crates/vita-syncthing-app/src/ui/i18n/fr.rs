@@ -51,6 +51,8 @@ pub static STRINGS_FR: Strings = Strings {
     status_scanning: "Analyse...",
     status_active: "Actif",
     status_paused: "En pause",
+    share_mode_read_write: "Lecture & écriture",
+    share_mode_read_only: "Lecture seule",
 
     // Navigation & Sidebar
     tab_overview: "Aperçu",
@@ -240,6 +242,8 @@ pub static MESSAGES_FR: Messages = Messages {
     saved_in: "Enregistré dans {path}",
     share_active: "Le partage {id} est actif",
     share_paused: "Le partage {id} est en pause",
+    share_read_only: "Le partage {id} est en lecture seule",
+    share_read_write: "Le partage {id} est en lecture & écriture",
     offer_accepted: "Partage « {label} » accepté ({id})",
     choose_where_to_store: "Choisissez où enregistrer « {label} »",
     offer_declined: "Partage « {label} » refusé ({id})",

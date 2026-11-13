@@ -80,6 +80,8 @@ fn all_messages() -> Vec<UiText> {
         },
         UiText::ShareActive { id: s("saves") },
         UiText::SharePaused { id: s("saves") },
+        UiText::ShareReadOnly { id: s("saves") },
+        UiText::ShareReadWrite { id: s("saves") },
         UiText::OfferAccepted {
             label: s("Saves"),
             id: s("saves"),

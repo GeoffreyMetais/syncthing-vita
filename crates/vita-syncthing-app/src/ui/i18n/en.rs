@@ -51,6 +51,8 @@ pub static STRINGS_EN: Strings = Strings {
     status_scanning: "Scanning",
     status_active: "Active",
     status_paused: "Paused",
+    share_mode_read_write: "Read & write",
+    share_mode_read_only: "Read only",
 
     // Navigation & Sidebar
     tab_overview: "Overview",
@@ -238,6 +240,8 @@ pub static MESSAGES_EN: Messages = Messages {
     saved_in: "Saved in {path}",
     share_active: "Share {id} is now active",
     share_paused: "Share {id} is now paused",
+    share_read_only: "Share {id} is now read only",
+    share_read_write: "Share {id} is now read & write",
     offer_accepted: "Accepted share '{label}' ({id})",
     choose_where_to_store: "Choose where to store '{label}'",
     offer_declined: "Declined share '{label}' ({id})",

@@ -70,6 +70,10 @@ pub struct Strings {
     pub status_scanning: &'static str,
     pub status_active: &'static str,
     pub status_paused: &'static str,
+    /// Mode of a share whose files peers may modify.
+    pub share_mode_read_write: &'static str,
+    /// Mode of a share whose files peers never modify.
+    pub share_mode_read_only: &'static str,
 
     // Navigation & Sidebar
     pub tab_overview: &'static str,

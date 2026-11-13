@@ -13,12 +13,37 @@ pub struct BepFolder {
     pub device_ids: Vec<DeviceId>,
 }
 
+/// Folder type announced in `ClusterConfig` (BEP `Folder.type`, field 3).
+///
+/// Only the types the Vita supports locally are modelled. The wire values are Syncthing's
+/// (`SEND_RECEIVE = 0`, `SEND_ONLY = 1`); field 3 was the legacy `read_only` flag, whose
+/// `true` meant the same as `SEND_ONLY`.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum FolderType {
+    /// Local changes are sent and remote changes are applied (read-write share).
+    #[default]
+    SendReceive,
+    /// Local changes are sent, remote changes are never applied (read-only share).
+    SendOnly,
+}
+
+impl FolderType {
+    /// BEP wire value of the folder type.
+    pub fn wire_value(self) -> u64 {
+        match self {
+            Self::SendReceive => 0,
+            Self::SendOnly => 1,
+        }
+    }
+}
+
 /// Folder index state metadata for `ClusterConfig`.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct FolderIndexState {
     pub index_id: u64,
     pub max_sequence: i64,
     pub paused: bool,
+    pub folder_type: FolderType,
 }
 
 /// `ClusterConfig` message (type 0).
@@ -99,6 +124,9 @@ impl BepClusterConfig {
             encode_bytes_field(&mut folder_buf, 1, folder.id.as_bytes());
             if !folder.label.is_empty() {
                 encode_bytes_field(&mut folder_buf, 2, folder.label.as_bytes());
+            }
+            if state.folder_type != FolderType::SendReceive {
+                encode_varint_field(&mut folder_buf, 3, state.folder_type.wire_value());
             }
             if state.paused {
                 encode_varint_field(&mut folder_buf, 7, 1);
