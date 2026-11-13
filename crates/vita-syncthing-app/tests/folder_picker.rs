@@ -21,7 +21,7 @@ fn test_files_tab_up_navigation_walks_device_root_paths() {
     assert_eq!(state.picker_current_dir, "ux0:");
     assert_eq!(state.active_tab, ActiveTab::FolderPicker);
     press(&mut state, &repo, BTN_CIRCLE);
-    assert_eq!(state.active_tab, ActiveTab::Shares);
+    assert_eq!(state.active_tab, ActiveTab::Dashboard);
 
     let _ = std::fs::remove_dir_all(&dir);
 }

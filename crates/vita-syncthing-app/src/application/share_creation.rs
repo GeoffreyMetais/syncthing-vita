@@ -33,7 +33,7 @@ impl ShareCreation {
     }
 
     /// Starts creating a share from a browsed `ux0:` folder path, deriving a clean `folder_id`
-    /// and `label` from the folder name, and switches to the `Shares` tab.
+    /// and `label` from the folder name, and switches to the `Overview` tab (share list).
     pub fn begin_from_path(state: &mut AppState, repo: &ConfigRepository, raw_path: &str) -> usize {
         let chosen_path = raw_path.trim_end_matches('/').to_owned();
         let raw_name = chosen_path
@@ -53,7 +53,7 @@ impl ShareCreation {
             .collect();
         let label = format!("Vita {}", raw_name);
         state.picker_mode = PickerMode::ChangeShareTarget;
-        state.active_tab = ActiveTab::Shares;
+        state.active_tab = ActiveTab::Dashboard;
         Self::begin(state, repo, &folder_id, &label, &chosen_path)
     }
 

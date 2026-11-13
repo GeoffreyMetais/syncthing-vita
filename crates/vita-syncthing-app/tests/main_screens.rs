@@ -122,19 +122,21 @@ fn test_overview_card_buttons_and_hints() {
     assert_eq!(state.modal, ModalDialog::ShowDeviceId);
     state.modal = ModalDialog::None;
 
-    // `Square` and its hint both pause / enable the selected share.
-    assert!(state.shares[0].enabled);
+    // The share list is on the `Overview`: `Square` asks to delete the selected share.
+    let share_card = rect_of(&mut state, UiAction::SelectShare(0));
+    assert!(share_card.y >= card.y + card.h);
     press(&mut state, &repo, BTN_SQUARE);
-    assert!(!state.shares[0].enabled);
-    tap_action(&mut state, &repo, UiAction::ToggleSelectedShare);
-    assert!(state.shares[0].enabled);
+    assert_eq!(state.modal, ModalDialog::ConfirmDeleteShare { share_idx: 0 });
+    state.modal = ModalDialog::None;
 
-    // `Triangle` browses for another target folder of the selected share.
+    // `Triangle` and its hint both open the share creation dialog.
     press(&mut state, &repo, BTN_TRIANGLE);
-    assert_eq!(state.active_tab, ActiveTab::FolderPicker);
-    assert_eq!(state.picker_mode, PickerMode::ChangeShareTarget);
+    assert_eq!(state.modal, ModalDialog::CreateShare { selected_idx: 0 });
+    state.modal = ModalDialog::None;
+    tap_action(&mut state, &repo, UiAction::NewShare);
+    assert_eq!(state.modal, ModalDialog::CreateShare { selected_idx: 0 });
+    state.modal = ModalDialog::None;
 
-    tap_action(&mut state, &repo, UiAction::SwitchTab(ActiveTab::Dashboard));
     tap_action(&mut state, &repo, UiAction::StartScreensaver);
     assert!(state.oled_saver_active);
     let _ = std::fs::remove_dir_all(&dir);

@@ -40,7 +40,6 @@ pub const ACTION_ADD_REMOTE_DEVICE: &str = "Add Remote Device";
 pub const ACTION_APPLY_SYNC: &str = "Apply & Sync";
 pub const ACTION_SCAN_QR: &str = "Scan QR";
 pub const ACTION_NEW_SHARE: &str = "New Share";
-pub const ACTION_SYNC_NOW: &str = "Sync Now";
 pub const ACTION_QR_ID: &str = "QR / ID";
 pub const ACTION_SWITCH_THEME: &str = "Switch Theme";
 pub const ACTION_CLEAR_DECLINED: &str = "Clear Declined";
@@ -124,9 +123,9 @@ pub const MSG_NO_SYNC_EVENTS: &str = "No synchronization events recorded yet.";
 pub const SHARES_TITLE: &str = "Shared Folders";
 pub const MSG_NO_SHARES: &str = "No shared folders configured yet";
 pub const MSG_NO_SHARES_HINT_1: &str =
-    "Press Circle (New Share) to create a share on your PS Vita and link a device,";
+    "Press Triangle (New Share) to create a share on your PS Vita and link a device,";
 pub const MSG_NO_SHARES_HINT_2: &str =
-    "or press Overview -> Sync Now to import folders shared by a remote peer.";
+    "or tap the sync card to import folders shared by a remote peer.";
 
 // ============================================================================
 // Screen 3: Files & Folder Picker
@@ -249,16 +248,6 @@ pub const MODAL_SCAN_QR_SUBTITLE: &str =
 /// Formats the overview page subtitle: `"{active} active share(s) · {devices} known device(s)"`.
 pub fn fmt_active_shares_devices(active: usize, devices: usize) -> String {
     format!("{active} active share(s) · {devices} known device(s)")
-}
-
-/// Formats the peer and folder label string for the hero card.
-pub fn fmt_peer_and_folders(peer: &str, folders: &str) -> String {
-    format!("Peer: {peer} · Folders: {folders}")
-}
-
-/// Formats the recent statistics chip on the dashboard.
-pub fn fmt_recent_stats(ok: usize, dl: usize, ul: usize, bytes_str: &str) -> String {
-    format!("Delta OK: {ok}  ·  DL: {dl}  ·  UL: {ul}  ·  {bytes_str}")
 }
 
 /// Formats a share card title: `"{label}  ·  {folder_id}"`.

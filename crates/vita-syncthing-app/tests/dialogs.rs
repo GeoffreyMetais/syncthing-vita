@@ -50,12 +50,12 @@ fn test_confirm_quit_touch_targets() {
 }
 
 #[test]
-fn test_square_on_shares_tab_asks_confirmation_before_deleting() {
+fn test_square_on_overview_asks_confirmation_before_deleting() {
     let dir = temp_test_dir("delete-share-input");
     let repo = ConfigRepository::new(&dir);
     let mut state = AppState::new(Vec::new(), Vec::new(), &dir);
     ShareService::create_share(&mut state, &repo, "a", "Share A", &format!("{}/a", dir));
-    state.active_tab = ActiveTab::Shares;
+    state.active_tab = ActiveTab::Dashboard;
 
     // Square opens the confirmation; Circle cancels without deleting
     press(&mut state, &repo, BTN_SQUARE);

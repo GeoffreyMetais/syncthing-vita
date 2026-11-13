@@ -38,7 +38,6 @@ pub static STRINGS_IT: Strings = Strings {
     action_apply_sync: "Applica e sincronizza",
     action_scan_qr: "Scansiona QR",
     action_new_share: "Nuova condivisione",
-    action_sync_now: "Sincronizza ora",
     action_qr_id: "QR / ID",
     action_switch_theme: "Cambia tema",
     action_clear_declined: "Cancella rifiutati",
@@ -55,7 +54,6 @@ pub static STRINGS_IT: Strings = Strings {
 
     // Navigation & Sidebar
     tab_overview: "Panoramica",
-    tab_shares: "Condivisioni",
     tab_files: "File",
     tab_settings: "Impostazioni",
     app_title: "VitaSync",
@@ -100,14 +98,11 @@ pub static STRINGS_IT: Strings = Strings {
     hero_this_device: "Questo dispositivo",
     hero_device_name: "PlayStation Vita",
     hero_device_id_label: "ID dispositivo",
-    section_recent_activity: "Attività recente",
-    msg_no_sync_events: "Nessun evento di sincronizzazione ancora registrato.",
 
     // Screen 2: Shared Folders
-    shares_title: "Cartelle condivise",
     msg_no_shares: "Nessuna cartella condivisa configurata",
-    msg_no_shares_hint_1: "Premi Cerchio (Nuova condivisione) per creare una cartella su PS Vita,",
-    msg_no_shares_hint_2: "o premi Panoramica -> Sincronizza ora per importare cartelle condivise.",
+    msg_no_shares_hint_1: "Premi Triangolo (Nuova condivisione) per creare una cartella su PS Vita,",
+    msg_no_shares_hint_2: "o tocca la scheda di sincronizzazione per importare cartelle condivise.",
 
     // Screen 3: Files & Folder Picker
     picker_title_create: "Condividi una cartella",
@@ -192,10 +187,10 @@ pub static STRINGS_IT: Strings = Strings {
 
 /// IT templates for `UiText` messages.
 pub static MESSAGES_IT: Messages = Messages {
-    ready_press_cross: "Pronto · Premi Croce per sincronizzare",
+    ready_tap_sync_card: "Pronto · Tocca la scheda di sincronizzazione",
     ready_manual_pairing: "Pronto (LAN manuale)",
     no_peer_linked: "Nessun peer collegato",
-    select_device_to_connect: "Collega un dispositivo in Condivisioni -> Dispositivi",
+    select_device_to_connect: "Collega un dispositivo nei Dispositivi di una condivisione",
     no_folders_synced: "Nessuna cartella sincronizzata",
     no_remote_folders: "Nessuna cartella remota condivisa",
     starting_sync: "Avvio della sincronizzazione...",
@@ -210,8 +205,8 @@ pub static MESSAGES_IT: Messages = Messages {
     connections_one: "Connesso (1 connessione)",
     connections_many: "Connesso (1+{secondary} connessioni)",
     sync_summary: "{connections} · {up_to_date} aggiornati | {downloaded} ricevuti ({kb} KB) | {uploaded} inviati ({bytes} B)",
-    found_lan_peers: "{count} peer trovato/i nella LAN. Scegli un dispositivo in Condivisioni -> Dispositivi.",
-    no_peer_add_device: "Nessun peer collegato. Aggiungi un dispositivo in Condivisioni -> Dispositivi o Impostazioni.",
+    found_lan_peers: "{count} peer trovato/i nella LAN. Scegli un dispositivo nei Dispositivi di una condivisione.",
+    no_peer_add_device: "Nessun peer collegato. Aggiungi un dispositivo nei Dispositivi di una condivisione o Impostazioni.",
     discovery_error: "Errore di rilevamento LAN: {error}",
     syncing_with_peers: "Sincronizzazione con i peer della LAN...",
     theme_dark: "Tema: Scuro (grigio-blu)",

@@ -1,7 +1,7 @@
 //! Input & Page Controllers: `InputController` routes main-screen gamepad and touch input
-//! against the frame's `HitMap`, and each page controller (`DashboardController`,
-//! `SharesController`, `FilesController`, `SettingsController`) handles D-pad focus movement
-//! and page-specific `UiAction`s.
+//! against the frame's `HitMap`, and each page controller (`DashboardController` with the
+//! share list's `SharesController`, `FilesController`, `SettingsController`) handles D-pad
+//! focus movement and page-specific `UiAction`s.
 
 pub mod dashboard;
 pub mod files;

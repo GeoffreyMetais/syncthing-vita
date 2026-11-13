@@ -9,7 +9,7 @@ use std::time::Duration;
 
 // --- Synchronization -----------------------------------------------------------------------
 
-/// Interval between automatic rescans of the shared folders (`Sync Now` rescans immediately).
+/// Interval between automatic rescans of the shared folders (the sidebar sync card rescans immediately).
 /// A rescan walks every shared folder for each connected device.
 pub const RESCAN_INTERVAL: Duration = Duration::from_secs(60);
 /// Maximum silence on a connection before a keepalive `Ping` is sent.

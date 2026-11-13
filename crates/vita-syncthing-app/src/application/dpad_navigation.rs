@@ -4,9 +4,7 @@
 //! How the focus moves within a page belongs to that page's controller; which element holds
 //! the focus, and what it does, is declared by the screen in the frame's `HitMap`.
 
-use crate::application::{
-    DashboardController, FilesController, SettingsController, SharesController,
-};
+use crate::application::{DashboardController, FilesController, SettingsController};
 use crate::domain::{ActiveTab, AppState, NavFocus, UiAction, TAB_ORDER};
 use crate::infrastructure::{BTN_CROSS, BTN_DOWN, BTN_LEFT, BTN_RIGHT, BTN_UP};
 
@@ -29,7 +27,6 @@ impl DpadNavigation {
         }
         let moved = match state.active_tab {
             ActiveTab::Dashboard => DashboardController::move_focus(state, buttons),
-            ActiveTab::Shares => SharesController::move_focus(state, buttons),
             ActiveTab::FolderPicker => FilesController::move_focus(state, buttons),
             ActiveTab::Settings => SettingsController::move_focus(state, buttons),
         };
@@ -61,17 +58,17 @@ impl DpadNavigation {
         None
     }
 
-    /// Moves along a row of `columns` buttons: `Left` on the first button (or on the page
-    /// header) goes back to the sidebar, `Right` stops at the last button.
+    /// Moves along a row of `columns` buttons: `Left` on the first button goes back to the
+    /// sidebar, `Right` stops at the last button.
     pub(crate) fn move_in_row(state: &mut AppState, columns: usize, buttons: u32) {
         if buttons & BTN_LEFT != 0 {
-            if state.nav.col == 0 || state.nav.header {
+            if state.nav.col == 0 {
                 state.nav.focus = NavFocus::Sidebar;
             } else {
                 state.nav.col -= 1;
             }
         }
-        if buttons & BTN_RIGHT != 0 && !state.nav.header && state.nav.col + 1 < columns {
+        if buttons & BTN_RIGHT != 0 && state.nav.col + 1 < columns {
             state.nav.col += 1;
         }
     }

@@ -15,7 +15,7 @@ pub enum UiText {
 
     // Overview status line, peer and folder labels
     /// Initial status line before any sync.
-    ReadyPressCross,
+    ReadyTapSyncCard,
     /// Initial peer label before any sync.
     ReadyManualPairing,
     /// Peer label while no device is linked to a share.
@@ -130,7 +130,7 @@ pub enum UiText {
         count: usize,
     },
 
-    // Shares tab
+    // Overview share list
     /// Share card line when no device is linked yet.
     NoDevicesLinked,
     /// Share card line listing the linked devices (`name (short ID)`, comma-separated).

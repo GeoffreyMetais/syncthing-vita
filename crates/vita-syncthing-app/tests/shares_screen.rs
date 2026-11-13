@@ -1,4 +1,4 @@
-//! `Shares` page: touch, `Cross` on the focused element and face-button shortcuts are all
+//! Share list of the `Overview` page: touch, `Cross` on the focused element and face-button shortcuts are all
 //! resolved from the elements the screen declares while drawing (`HitMap`).
 
 mod common;
@@ -16,7 +16,7 @@ use vita_syncthing_app::infrastructure::{
 
 const PEER: DeviceId = DeviceId([0x42; 32]);
 
-/// State on the `Shares` tab with `count` shares linked to `PEER`.
+/// State on the `Overview` tab with `count` shares linked to `PEER`.
 fn setup(name: &str, count: usize) -> (String, ConfigRepository, AppState) {
     let dir = temp_test_dir(name);
     let repo = ConfigRepository::new(&dir);
@@ -29,7 +29,7 @@ fn setup(name: &str, count: usize) -> (String, ConfigRepository, AppState) {
         ShareService::toggle_device_for_share(&mut state, &repo, share_idx, PEER);
     }
     state.modal = ModalDialog::None;
-    state.active_tab = ActiveTab::Shares;
+    state.active_tab = ActiveTab::Dashboard;
     (dir, repo, state)
 }
 
@@ -100,8 +100,10 @@ fn test_tapping_a_card_selects_it_and_new_share_opens_the_dialog() {
 #[test]
 fn test_face_buttons_trigger_the_element_that_displays_them() {
     let (dir, repo, mut state) = setup("shares-shortcuts", 2);
-    // Sidebar -> page, then down to the second share.
+    // Sidebar -> device card, then down to the first share and the second one.
     press(&mut state, &repo, BTN_RIGHT);
+    press(&mut state, &repo, BTN_DOWN);
+    state.selected_share_idx = 0;
     press(&mut state, &repo, BTN_DOWN);
     assert_eq!(state.selected_share_idx, 1);
 
@@ -113,10 +115,26 @@ fn test_face_buttons_trigger_the_element_that_displays_them() {
     state.modal = ModalDialog::None;
 
     press(&mut state, &repo, BTN_CIRCLE);
+    assert_eq!(state.modal, ModalDialog::ShowDeviceId);
+    state.modal = ModalDialog::None;
+
+    // On a share row, `Triangle` is that row's `Folder` button...
+    press(&mut state, &repo, BTN_TRIANGLE);
+    assert_eq!(state.modal, ModalDialog::None);
+    assert_eq!(state.active_tab, ActiveTab::FolderPicker);
+    assert_eq!(state.picker_mode, PickerMode::ChangeShareTarget);
+    assert_eq!(state.selected_share_idx, 1);
+
+    // ...and on the device card, the page's `New Share`.
+    state.active_tab = ActiveTab::Dashboard;
+    state.nav.header = true;
+    press(&mut state, &repo, BTN_TRIANGLE);
     assert_eq!(state.modal, ModalDialog::CreateShare { selected_idx: 0 });
     state.modal = ModalDialog::None;
 
-    press(&mut state, &repo, BTN_TRIANGLE);
+    // The `Folder` button can also be touched.
+    let folder = rect_of(&mut state, UiAction::ChangeShareFolder(1));
+    tap_rect(&mut state, &repo, folder);
     assert_eq!(state.active_tab, ActiveTab::FolderPicker);
     assert_eq!(state.picker_mode, PickerMode::ChangeShareTarget);
     let _ = std::fs::remove_dir_all(&dir);
@@ -126,6 +144,7 @@ fn test_face_buttons_trigger_the_element_that_displays_them() {
 fn test_cross_activates_the_focused_element() {
     let (dir, repo, mut state) = setup("shares-cross-focus", 1);
     press(&mut state, &repo, BTN_RIGHT);
+    press(&mut state, &repo, BTN_DOWN);
     // The focus ring is on `Devices`; the frame declares that slot.
     draw(&mut state);
     let focused = FocusSlot::RowAction { row: 0, col: 0 };

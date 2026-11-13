@@ -36,11 +36,11 @@ fn test_localized_catalogs_and_formatters() {
     assert_eq!(it.action_cancel, "Annulla");
 
     // Screen titles vary
-    assert_eq!(en.shares_title, "Shared Folders");
-    assert_eq!(fr.shares_title, "Dossiers partagés");
-    assert_eq!(es.shares_title, "Carpetas compartidas");
-    assert_eq!(de.shares_title, "Freigegebene Ordner");
-    assert_eq!(it.shares_title, "Cartelle condivise");
+    assert_eq!(en.dashboard_title, "Overview");
+    assert_eq!(fr.dashboard_title, "Aperçu");
+    assert_eq!(es.dashboard_title, "Resumen");
+    assert_eq!(de.dashboard_title, "Übersicht");
+    assert_eq!(it.dashboard_title, "Panoramica");
 
     // Dynamic formatting varies
     assert_eq!(

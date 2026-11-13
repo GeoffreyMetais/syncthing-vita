@@ -81,8 +81,7 @@ fn test_selecting_a_folder_in_files_tab_starts_share_creation() {
     let repo = ConfigRepository::new(&dir);
     let mut state = AppState::new(Vec::new(), Vec::new(), &dir);
 
-    // Dashboard -> Shares -> Files
-    press(&mut state, &repo, BTN_R);
+    // Overview -> Files
     press(&mut state, &repo, BTN_R);
     assert_eq!(state.active_tab, ActiveTab::FolderPicker);
     assert_eq!(state.picker_mode, PickerMode::CreateNewShare);
@@ -94,7 +93,7 @@ fn test_selecting_a_folder_in_files_tab_starts_share_creation() {
     // Cross on the "saves/" folder opens device linking for a new pending share
     press(&mut state, &repo, BTN_DOWN);
     press(&mut state, &repo, BTN_CROSS);
-    assert_eq!(state.active_tab, ActiveTab::Shares);
+    assert_eq!(state.active_tab, ActiveTab::Dashboard);
     assert_eq!(state.shares.len(), 1);
     assert_eq!(state.shares[0].folder_id, "saves");
     assert_eq!(state.shares[0].target_path, format!("{}/saves", dir));
@@ -120,6 +119,7 @@ fn test_already_shared_folders_are_not_selectable_in_files_tab() {
 
     state.active_tab = ActiveTab::FolderPicker;
     state.picker_mode = PickerMode::CreateNewShare;
+    state.reset_nav_for_tab();
     state.nav.focus = vita_syncthing_app::domain::NavFocus::Content;
     ShareService::refresh_picker_items(&mut state, &repo);
     assert_eq!(state.picker_items[1].path, saves);

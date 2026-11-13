@@ -844,49 +844,44 @@ impl Gfx {
                 self.circle(cx - 0.26 * s, cy + 0.23 * s, 0.045 * s, c);
             }
             Icon::Vita => {
-                let tb = t * 0.72;
-                let tt = (s * 0.032).max(1.1);
-                let bx0 = (cx - 0.50 * s + 0.5).floor() as i32;
-                let by0 = (cy - 0.25 * s + 0.5).floor() as i32;
-                self.rrect_outline(
-                    bx0,
-                    by0,
-                    (1.0 * s + 0.5).floor() as i32,
-                    (0.50 * s + 0.5).floor() as i32,
-                    (0.17 * s + 0.5) as i32,
-                    (tb + 0.5) as i32,
-                    c,
-                );
-                let sx0 = (cx - 0.215 * s + 0.5).floor() as i32;
-                let sy0 = (cy - 0.17 * s + 0.5).floor() as i32;
-                self.rrect(
-                    sx0,
-                    sy0,
-                    (0.43 * s + 0.5).floor() as i32,
-                    (0.34 * s + 0.5).floor() as i32,
-                    2,
-                    with_alpha(c, 90),
-                );
-                let lx = cx - 0.355 * s;
-                let rx = cx + 0.355 * s;
-                self.line(lx, cy - 0.17 * s, lx, cy - 0.03 * s, tt * 1.7, c);
-                self.line(
-                    lx - 0.07 * s,
-                    cy - 0.10 * s,
-                    lx + 0.07 * s,
-                    cy - 0.10 * s,
-                    tt * 1.7,
-                    c,
-                );
-                self.ring(lx, cy + 0.11 * s, 0.05 * s, tt, c);
-                let by = cy - 0.10 * s;
-                let d = 0.055 * s;
-                let r = 0.022 * s + 0.35;
-                self.circle(rx, by - d, r, c);
-                self.circle(rx, by + d, r, c);
-                self.circle(rx - d, by, r, c);
-                self.circle(rx + d, by, r, c);
-                self.ring(rx, cy + 0.11 * s, 0.05 * s, tt, c);
+                // PS Vita silhouette: a pill-shaped body with fully rounded ends, a wide 16:9
+                // screen, a d-pad of four separate buttons, four face buttons, and two small
+                // analog sticks just below them, on the screen side.
+                let tb = (t * 0.72 + 0.5).max(1.0) as i32;
+                let px = |v: f32| (v + 0.5).floor() as i32;
+                let (bw, bh) = (px(1.0 * s), px(0.52 * s));
+                self.rrect_outline(px(cx - 0.5 * s), px(cy - 0.26 * s), bw, bh, bh / 2, tb, c);
+
+                let (sw, sh) = (px(0.46 * s), px(0.29 * s));
+                let (sx, sy) = (px(cx) - sw / 2, px(cy) - sh / 2);
+                self.rrect(sx, sy, sw, sh, (0.02 * s) as i32, with_alpha(c, 70));
+                self.rrect_outline(sx, sy, sw, sh, (0.02 * s) as i32, 1, with_alpha(c, 160));
+
+                // Control clusters, mirrored on both sides of the screen.
+                let gap = 0.056 * s;
+                let dot = (0.026 * s).max(0.9);
+                let (lx, rx, ky) = (cx - 0.33 * s, cx + 0.33 * s, cy - 0.06 * s);
+                for (dx, dy) in [(0.0, -gap), (0.0, gap), (-gap, 0.0), (gap, 0.0)] {
+                    // D-pad: four square buttons around an empty centre.
+                    let half = dot * 0.95;
+                    self.rrect(
+                        px(lx + dx - half),
+                        px(ky + dy - half),
+                        px(2.0 * half).max(2),
+                        px(2.0 * half).max(2),
+                        1,
+                        c,
+                    );
+                    // Face buttons: rings when there is room for them, dots otherwise.
+                    if s >= 80.0 {
+                        self.ring(rx + dx, ky + dy, dot * 1.05, (0.012 * s).max(1.0), c);
+                    } else {
+                        self.circle(rx + dx, ky + dy, dot, c);
+                    }
+                }
+                let stick_r = (0.036 * s).max(1.2);
+                self.circle(cx - 0.28 * s, cy + 0.135 * s, stick_r, c);
+                self.circle(cx + 0.28 * s, cy + 0.135 * s, stick_r, c);
             }
             Icon::ArrowDown => {
                 l(self, 0.0, -0.36, 0.0, 0.36);

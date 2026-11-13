@@ -1,4 +1,4 @@
-//! Modal Dialog: Confirmation before deleting a share (`Square` on the `Shares` tab).
+//! Modal Dialog: Confirmation before deleting a share (`Square` on the `Overview` share list).
 
 use crate::domain::interaction::{HitMap, PadKey};
 use crate::domain::AppState;

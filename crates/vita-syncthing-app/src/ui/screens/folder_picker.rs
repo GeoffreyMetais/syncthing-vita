@@ -62,8 +62,8 @@ pub fn render_folder_picker_tab(
         PadButton::Circle,
         s.action_up,
         UiAction::PickerUp,
-        FocusSlot::Header,
-        state.is_focused(FocusSlot::Header),
+        FocusSlot::Header { col: 0 },
+        state.is_focused(FocusSlot::Header { col: 0 }),
     );
     let mut right = CONTENT_R - 18 - uw;
 

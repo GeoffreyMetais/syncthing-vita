@@ -25,9 +25,11 @@ fn test_dashboard_buttons_then_sidebar_tabs() {
     press(&mut state, &repo, BTN_RIGHT);
     assert_eq!(state.nav.focus, NavFocus::Content);
 
-    // In Content, col 0 is QR / ID; Right moves to Sync Now (col 1)
+    // The page opens on the device card buttons: col 0 is QR / ID, Right moves to New Share
     press(&mut state, &repo, BTN_RIGHT);
-    assert_eq!(press(&mut state, &repo, BTN_CROSS), UserCommand::StartSync);
+    assert_eq!(press(&mut state, &repo, BTN_CROSS), UserCommand::None);
+    assert_eq!(state.modal, ModalDialog::CreateShare { selected_idx: 0 });
+    state.modal = ModalDialog::None;
     press(&mut state, &repo, BTN_LEFT);
     press(&mut state, &repo, BTN_CROSS);
     assert_eq!(state.modal, ModalDialog::ShowDeviceId);
@@ -37,8 +39,7 @@ fn test_dashboard_buttons_then_sidebar_tabs() {
     press(&mut state, &repo, BTN_LEFT);
     assert_eq!(state.nav.focus, NavFocus::Sidebar);
     press(&mut state, &repo, BTN_DOWN);
-    assert_eq!(state.active_tab, ActiveTab::Shares);
-    press(&mut state, &repo, BTN_DOWN);
+    assert_eq!(state.active_tab, ActiveTab::FolderPicker);
     press(&mut state, &repo, BTN_DOWN);
     assert_eq!(state.active_tab, ActiveTab::Settings);
     press(&mut state, &repo, BTN_DOWN);
@@ -54,20 +55,25 @@ fn test_dashboard_buttons_then_sidebar_tabs() {
 }
 
 #[test]
-fn test_shares_rows_buttons_and_header() {
+fn test_overview_share_rows_buttons_and_device_card() {
     let (dir, repo, mut state) = setup("dpad-shares");
     ShareService::create_share(&mut state, &repo, "a", "A", &format!("{}/a", dir));
     ShareService::create_share(&mut state, &repo, "b", "B", &format!("{}/b", dir));
     state.selected_share_idx = 0;
-    state.active_tab = ActiveTab::Shares;
+    state.active_tab = ActiveTab::Dashboard;
     state.reset_nav_for_tab();
     state.nav.focus = NavFocus::Content;
+    assert!(state.is_header_focused(ActiveTab::Dashboard));
 
-    // Down selects the second share, Right moves to its Delete button
+    // Down leaves the device card for the first share, then selects the second one;
+    // Right moves to its Delete button
+    press(&mut state, &repo, BTN_DOWN);
+    assert_eq!(state.selected_share_idx, 0);
+    assert!(!state.is_header_focused(ActiveTab::Dashboard));
     press(&mut state, &repo, BTN_DOWN);
     assert_eq!(state.selected_share_idx, 1);
     press(&mut state, &repo, BTN_RIGHT);
-    assert_eq!(state.focused_action(ActiveTab::Shares), Some(1));
+    assert_eq!(state.focused_action(ActiveTab::Dashboard), Some(1));
     press(&mut state, &repo, BTN_CROSS);
     assert_eq!(
         state.modal,
@@ -75,15 +81,26 @@ fn test_shares_rows_buttons_and_header() {
     );
     state.modal = ModalDialog::None;
 
-    // Up twice reaches the "+ New Share" header
+    // Right reaches the Folder button, which has no face button shortcut
+    press(&mut state, &repo, BTN_RIGHT);
+    press(&mut state, &repo, BTN_RIGHT);
+    assert_eq!(state.focused_action(ActiveTab::Dashboard), Some(2));
+    press(&mut state, &repo, BTN_CROSS);
+    assert_eq!(state.active_tab, ActiveTab::FolderPicker);
+    state.active_tab = ActiveTab::Dashboard;
+    state.nav.header = false;
+    state.nav.col = 1;
+
+    // Up twice reaches the device card, on its last button (New Share)
     press(&mut state, &repo, BTN_UP);
     press(&mut state, &repo, BTN_UP);
-    assert!(state.is_header_focused(ActiveTab::Shares));
+    assert!(state.is_header_focused(ActiveTab::Dashboard));
     press(&mut state, &repo, BTN_CROSS);
     assert_eq!(state.modal, ModalDialog::CreateShare { selected_idx: 0 });
     state.modal = ModalDialog::None;
 
-    // Left from the header goes to the sidebar
+    // Left from its first button goes to the sidebar
+    press(&mut state, &repo, BTN_LEFT);
     press(&mut state, &repo, BTN_LEFT);
     assert_eq!(state.nav.focus, NavFocus::Sidebar);
 
@@ -97,8 +114,6 @@ fn test_files_rows_open_and_up_button() {
 
     // Sidebar -> Files tab -> page
     press(&mut state, &repo, BTN_LEFT);
-    press(&mut state, &repo, BTN_LEFT);
-    press(&mut state, &repo, BTN_DOWN);
     press(&mut state, &repo, BTN_DOWN);
     press(&mut state, &repo, BTN_CROSS);
     assert_eq!(state.active_tab, ActiveTab::FolderPicker);

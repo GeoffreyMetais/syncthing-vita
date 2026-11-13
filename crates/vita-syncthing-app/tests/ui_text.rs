@@ -12,7 +12,7 @@ fn s(v: &str) -> String {
 /// One sample of every `UiText` variant (except `Raw`).
 fn all_messages() -> Vec<UiText> {
     vec![
-        UiText::ReadyPressCross,
+        UiText::ReadyTapSyncCard,
         UiText::ReadyManualPairing,
         UiText::NoPeerLinked,
         UiText::SelectDeviceToConnect,
@@ -129,7 +129,7 @@ fn test_messages_are_translated_and_parameters_filled() {
 
     assert_eq!(
         en.text(&UiText::SelectDeviceToConnect),
-        "Select or add a device in Shares -> Devices to connect"
+        "Select or add a device in a share's Devices to connect"
     );
     assert_eq!(fr.text(&UiText::NoPeerLinked), "Aucun pair lié");
     assert_eq!(
@@ -170,7 +170,7 @@ fn test_messages_are_translated_and_parameters_filled() {
     ] {
         let other = strings::strings(lang);
         for msg in [
-            UiText::ReadyPressCross,
+            UiText::ReadyTapSyncCard,
             UiText::NoFoldersSynced,
             UiText::SyncFinished,
             UiText::LinkDeviceFirst,

@@ -43,10 +43,6 @@ pub enum UiAction {
     StartScreensaver,
     /// Ask for confirmation before quitting.
     ConfirmQuit,
-    /// Pause / enable the selected share.
-    ToggleSelectedShare,
-    /// Browse for another target folder of the selected share.
-    ChangeSelectedShareFolder,
 
     // --- Modal dialogs ---
     /// Same as pressing this button (buttons and hints of the open modal).
@@ -58,16 +54,16 @@ pub enum UiAction {
     /// Absorbs the touch: nothing happens (e.g. the body of a modal).
     Inert,
 
-    // --- `Shares` ---
-    /// `Shares`: open the share creation dialog.
+    // --- `Overview` share list ---
+    /// Open the share creation dialog.
     NewShare,
-    /// `Shares`: select the share row.
+    /// Select the share row.
     SelectShare(usize),
-    /// `Shares`: open the device linking dialog of the share.
+    /// Open the device linking dialog of the share.
     ManageDevices(usize),
-    /// `Shares`: ask for confirmation before deleting the share.
+    /// Ask for confirmation before deleting the share.
     DeleteShare(usize),
-    /// `Shares`: browse for another target folder of the share.
+    /// Browse for another target folder of the share.
     ChangeShareFolder(usize),
 
     // --- `Files` ---
@@ -90,8 +86,9 @@ pub enum UiAction {
 /// D-pad focus position an element holds on its page.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FocusSlot {
-    /// The page's top button.
-    Header,
+    /// Button `col` (left to right) of the page's top element (`Files`: the single `Up`
+    /// button, `Overview`: the device card buttons).
+    Header { col: usize },
     /// Button `col` (left to right) of list row `row`.
     RowAction { row: usize, col: usize },
 }
@@ -100,7 +97,7 @@ impl FocusSlot {
     /// List row the slot belongs to (`None` for the page header).
     pub fn row(&self) -> Option<usize> {
         match self {
-            FocusSlot::Header => None,
+            FocusSlot::Header { .. } => None,
             FocusSlot::RowAction { row, .. } => Some(*row),
         }
     }
@@ -175,17 +172,15 @@ impl HitMap {
             .map(|h| h.action)
     }
 
-    /// Action triggered by face button `key`: a page-level element, or an element of the
-    /// selected list row `selected_row`.
-    pub fn shortcut_action(&self, key: ShortcutKey, selected_row: usize) -> Option<UiAction> {
-        self.hotspots
-            .iter()
-            .find(|h| {
-                h.shortcut == Some(key)
-                    && h.focus
-                        .and_then(|f| f.row())
-                        .is_none_or(|row| row == selected_row)
-            })
+    /// Action triggered by face button `key`: an element of the selected list row
+    /// `selected_row` first (it is the one the user is looking at), else a page-level element
+    /// (page header, hint bar). Elements of the other rows never answer.
+    pub fn shortcut_action(&self, key: ShortcutKey, selected_row: Option<usize>) -> Option<UiAction> {
+        let with_key = || self.hotspots.iter().filter(move |h| h.shortcut == Some(key));
+        let row_of = |h: &Hotspot| h.focus.and_then(|f| f.row());
+        selected_row
+            .and_then(|selected| with_key().find(|h| row_of(h) == Some(selected)))
+            .or_else(|| with_key().find(|h| row_of(h).is_none()))
             .map(|h| h.action)
     }
 }

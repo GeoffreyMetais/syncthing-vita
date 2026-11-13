@@ -142,10 +142,10 @@ impl ThemeMode {
 /// Main navigation tabs in the left sidebar.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ActiveTab {
+    /// `Overview`: device status card and the list of shares.
     Dashboard = 0,
-    Shares = 1,
-    FolderPicker = 2,
-    Settings = 3,
+    FolderPicker = 1,
+    Settings = 2,
 }
 
 /// Mode for the `Files` (`FolderPicker`) tab.

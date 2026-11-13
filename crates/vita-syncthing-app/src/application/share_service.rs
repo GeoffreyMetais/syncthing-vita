@@ -283,7 +283,7 @@ impl ShareService {
         idx
     }
 
-    /// Updates the target path of the currently selected share and returns to the `Shares` tab.
+    /// Updates the target path of the currently selected share and returns to the `Overview` tab.
     pub fn update_selected_share_target(
         state: &mut AppState,
         repo: &ConfigRepository,
@@ -307,7 +307,7 @@ impl ShareService {
                 repo,
                 &format!("Target directory updated for {} -> {}", fid, chosen_path),
             );
-            state.active_tab = ActiveTab::Shares;
+            state.active_tab = ActiveTab::Dashboard;
         }
     }
 
@@ -573,7 +573,7 @@ impl ShareService {
         state.clamp_picker_scroll();
     }
 
-    /// Navigates one directory level up in the `ux0:` picker, or returns to the `Shares` tab if at root.
+    /// Navigates one directory level up in the `ux0:` picker, or returns to the `Overview` tab if at root.
     pub fn navigate_picker_up(state: &mut AppState, repo: &ConfigRepository) {
         match parent_dir(&state.picker_current_dir) {
             Some(parent) => {
@@ -581,7 +581,7 @@ impl ShareService {
                 state.selected_picker_idx = 0;
                 Self::refresh_picker_items(state, repo);
             }
-            None => state.active_tab = ActiveTab::Shares,
+            None => state.active_tab = ActiveTab::Dashboard,
         }
     }
 

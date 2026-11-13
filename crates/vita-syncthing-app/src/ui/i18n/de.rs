@@ -38,7 +38,6 @@ pub static STRINGS_DE: Strings = Strings {
     action_apply_sync: "Übernehmen & Sync",
     action_scan_qr: "QR scannen",
     action_new_share: "Neue Freigabe",
-    action_sync_now: "Jetzt synchronisieren",
     action_qr_id: "QR / ID",
     action_switch_theme: "Design wechseln",
     action_clear_declined: "Abgelehnte löschen",
@@ -55,7 +54,6 @@ pub static STRINGS_DE: Strings = Strings {
 
     // Navigation & Sidebar
     tab_overview: "Übersicht",
-    tab_shares: "Freigaben",
     tab_files: "Dateien",
     tab_settings: "Einstellungen",
     app_title: "VitaSync",
@@ -100,14 +98,11 @@ pub static STRINGS_DE: Strings = Strings {
     hero_this_device: "Dieses Gerät",
     hero_device_name: "PlayStation Vita",
     hero_device_id_label: "Geräte-ID",
-    section_recent_activity: "Letzte Aktivitäten",
-    msg_no_sync_events: "Noch keine Synchronisationsereignisse aufgezeichnet.",
 
     // Screen 2: Shared Folders
-    shares_title: "Freigegebene Ordner",
     msg_no_shares: "Noch keine freigegebenen Ordner eingerichtet",
-    msg_no_shares_hint_1: "Kreis (Neue Freigabe) drücken, um einen Ordner freizugeben,",
-    msg_no_shares_hint_2: "oder Übersicht -> Jetzt synchronisieren drücken, um Freigaben zu importieren.",
+    msg_no_shares_hint_1: "Dreieck (Neue Freigabe) drücken, um einen Ordner freizugeben,",
+    msg_no_shares_hint_2: "oder die Sync-Karte antippen, um Freigaben zu importieren.",
 
     // Screen 3: Files & Folder Picker
     picker_title_create: "Ordner freigeben",
@@ -192,10 +187,10 @@ pub static STRINGS_DE: Strings = Strings {
 
 /// DE templates for `UiText` messages.
 pub static MESSAGES_DE: Messages = Messages {
-    ready_press_cross: "Bereit · Kreuz drücken zum Synchronisieren",
+    ready_tap_sync_card: "Bereit · Sync-Karte antippen zum Synchronisieren",
     ready_manual_pairing: "Bereit (LAN, manuell)",
     no_peer_linked: "Kein Peer verknüpft",
-    select_device_to_connect: "Gerät unter Freigaben -> Geräte verknüpfen",
+    select_device_to_connect: "Gerät unter Geräte einer Freigabe verknüpfen",
     no_folders_synced: "Noch keine Ordner synchronisiert",
     no_remote_folders: "Keine entfernten Ordner freigegeben",
     starting_sync: "Synchronisierung wird gestartet...",
@@ -210,8 +205,8 @@ pub static MESSAGES_DE: Messages = Messages {
     connections_one: "Verbunden (1 Verbindung)",
     connections_many: "Verbunden (1+{secondary} Verbindungen)",
     sync_summary: "{connections} · {up_to_date} aktuell | {downloaded} empfangen ({kb} KB) | {uploaded} gesendet ({bytes} B)",
-    found_lan_peers: "{count} LAN-Peer(s) gefunden. Gerät unter Freigaben -> Geräte wählen.",
-    no_peer_add_device: "Kein Peer verknüpft. Gerät unter Freigaben -> Geräte oder Einstellungen hinzufügen.",
+    found_lan_peers: "{count} LAN-Peer(s) gefunden. Gerät unter Geräte einer Freigabe wählen.",
+    no_peer_add_device: "Kein Peer verknüpft. Gerät unter Geräte einer Freigabe oder Einstellungen hinzufügen.",
     discovery_error: "Fehler bei der LAN-Suche: {error}",
     syncing_with_peers: "Synchronisiere mit LAN-Peers...",
     theme_dark: "Design: Dunkel (Blaugrau)",
