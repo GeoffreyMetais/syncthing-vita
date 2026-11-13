@@ -7,7 +7,7 @@ use syncthing_core::DeviceId;
 use crate::application::ShareService;
 use crate::domain::{
     ActiveTab, AppState, FolderOffer, IgnoredFolder, ModalDialog, PickerMode, ShareConfigEntry,
-    UiText, NEW_SHARE_TEMPLATES,
+    ShareMode, UiText, NEW_SHARE_TEMPLATES,
 };
 use crate::infrastructure::ConfigRepository;
 
@@ -104,6 +104,7 @@ impl FolderOfferService {
                     label: offer.label.clone(),
                     target_path: Self::default_target(repo, &offer.folder_id),
                     enabled: false,
+                    mode: ShareMode::ReadWrite,
                     shared_devices: vec![peer_hex],
                 });
                 state.shares.len() - 1

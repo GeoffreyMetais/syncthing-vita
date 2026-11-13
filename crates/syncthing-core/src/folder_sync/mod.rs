@@ -3,9 +3,13 @@
 //! - [`scan`] — local disk scans and local `Index` generation
 //! - [`pull`] — pull planning against a peer's index (deletions, directories, conflicts)
 //!   and bookkeeping of completed downloads
+//! - [`receive_only`] — local changes of receive-only folders are published as invalid
 
 mod pull;
+pub mod receive_only;
 mod scan;
+
+pub use receive_only::mask_local_changes;
 
 use std::fs;
 use std::time::UNIX_EPOCH;

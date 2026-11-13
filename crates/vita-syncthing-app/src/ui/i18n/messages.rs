@@ -62,7 +62,6 @@ pub struct Messages {
     pub device_linked: &'static str,
     /// `{device}`, `{share}`.
     pub device_unlinked: &'static str,
-    pub link_device_first: &'static str,
     /// `{prefix}`.
     pub added_short_id: &'static str,
     /// `{name}`, `{short}`.
@@ -83,6 +82,14 @@ pub struct Messages {
     pub share_active: &'static str,
     /// `{id}`.
     pub share_paused: &'static str,
+    /// `{id}`.
+    pub share_read_only: &'static str,
+    /// `{id}`.
+    pub share_read_write: &'static str,
+    /// `{id}`.
+    pub revert_requested: &'static str,
+    /// `{id}`, `{count}`.
+    pub local_changes_reverted: &'static str,
     /// `{label}`, `{id}`.
     pub offer_accepted: &'static str,
     /// `{label}`.
@@ -175,7 +182,6 @@ impl Strings {
             UiText::SyncingWithPeers => m.syncing_with_peers,
             UiText::ThemeDark => m.theme_dark,
             UiText::ThemeOled => m.theme_oled,
-            UiText::LinkDeviceFirst => m.link_device_first,
             UiText::OwnDeviceId => m.own_device_id,
             UiText::QrNotDeviceId => m.qr_not_device_id,
             UiText::NoDeclinedFolders => m.no_declined_folders,
@@ -240,6 +246,12 @@ impl Strings {
             UiText::SavedIn { path } => fill(m.saved_in, &[("path", path)]),
             UiText::ShareActive { id } => fill(m.share_active, &[("id", id)]),
             UiText::SharePaused { id } => fill(m.share_paused, &[("id", id)]),
+            UiText::ShareReadOnly { id } => fill(m.share_read_only, &[("id", id)]),
+            UiText::ShareReadWrite { id } => fill(m.share_read_write, &[("id", id)]),
+            UiText::RevertRequested { id } => fill(m.revert_requested, &[("id", id)]),
+            UiText::LocalChangesReverted { id, count } => {
+                fill(m.local_changes_reverted, &[("id", id), ("count", count)])
+            }
             UiText::OfferAccepted { label, id } => {
                 fill(m.offer_accepted, &[("label", label), ("id", id)])
             }

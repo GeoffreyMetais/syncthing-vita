@@ -262,6 +262,18 @@ impl SyncCoordinator {
                 state.transfer_activity += 1;
                 ShareService::log_event(state, repo, &format!("[{}] {}", folder, description));
             }
+            SyncEvent::LocalChangesReverted { folder, reverted } => {
+                state.transfer_activity += 1;
+                ShareService::log_event(
+                    state,
+                    repo,
+                    &format!("[{}] Local changes reverted ({} entries)", folder, reverted),
+                );
+                state.show_toast(UiText::LocalChangesReverted {
+                    id: folder,
+                    count: reverted,
+                });
+            }
             SyncEvent::FileError {
                 folder,
                 name,

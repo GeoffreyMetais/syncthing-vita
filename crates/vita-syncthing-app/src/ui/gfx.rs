@@ -69,6 +69,7 @@ pub enum Icon {
     Wifi,
     Refresh,
     Back,
+    Lock,
 }
 
 #[allow(dead_code)]
@@ -912,6 +913,27 @@ impl Gfx {
                 self.arc(cx, cy, 0.34 * s, -1.2, 3.6, t, c);
                 l(self, 0.14, -0.40, 0.28, -0.18);
                 l(self, 0.28, -0.18, 0.02, -0.12);
+            }
+            Icon::Lock => {
+                // Shackle (upper half circle and its legs), then the filled body.
+                self.arc(
+                    cx,
+                    cy - 0.12 * s,
+                    0.22 * s,
+                    std::f32::consts::PI,
+                    std::f32::consts::TAU,
+                    t * 1.2,
+                    c,
+                );
+                l(self, -0.22, -0.12, -0.22, 0.0);
+                l(self, 0.22, -0.12, 0.22, 0.0);
+                let body = [
+                    (cx - 0.34 * s, cy - 0.04 * s),
+                    (cx + 0.34 * s, cy - 0.04 * s),
+                    (cx + 0.34 * s, cy + 0.42 * s),
+                    (cx - 0.34 * s, cy + 0.42 * s),
+                ];
+                self.poly(&body, c);
             }
         }
     }

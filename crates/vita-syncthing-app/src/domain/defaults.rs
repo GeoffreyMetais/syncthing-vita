@@ -39,6 +39,10 @@ pub const DISCOVERY_INTERVAL: Duration = Duration::from_secs(20);
 pub const DISCOVERY_LISTEN: Duration = Duration::from_millis(1500);
 /// How long the one-shot LAN scan listens when no device is linked yet.
 pub const DISCOVERY_SCAN_LISTEN: Duration = Duration::from_secs(2);
+/// VBlanks the `ManageDevices` dialog of a share that already has a linked device stays open
+/// before the LAN is scanned (3 s; cancelled when the dialog closes). A share without a linked
+/// device scans as soon as the dialog opens.
+pub const DEVICES_DIALOG_SCAN_DELAY: u32 = 3 * VBLANK_HZ;
 
 // --- Power ---------------------------------------------------------------------------------
 

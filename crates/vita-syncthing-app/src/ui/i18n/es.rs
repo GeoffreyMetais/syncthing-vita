@@ -35,7 +35,6 @@ pub static STRINGS_ES: Strings = Strings {
     action_add_device: "Añadir dispositivo",
     action_add_device_id: "Añadir ID dispositivo",
     action_add_remote_device: "Añadir dispositivo remoto",
-    action_apply_sync: "Aplicar y sinc",
     action_scan_qr: "Escanear QR",
     action_new_share: "Nueva carpeta",
     action_qr_id: "QR / ID",
@@ -51,6 +50,8 @@ pub static STRINGS_ES: Strings = Strings {
     status_scanning: "Escaneando...",
     status_active: "Activo",
     status_paused: "En pausa",
+    share_mode_read_write: "Lectura y escritura",
+    share_mode_read_only: "Solo lectura",
 
     // Navigation & Sidebar
     tab_overview: "Resumen",
@@ -84,7 +85,7 @@ pub static STRINGS_ES: Strings = Strings {
     hint_pause_enable: "Pausar/Activar",
     hint_add_by_id: "Añadir por ID",
     hint_scan_qr: "Escanear QR",
-    hint_apply_sync: "Aplicar y sinc",
+    hint_scan_lan: "Buscar en la red",
     hint_confirm_delete: "Confirmar eliminación",
     hint_confirm_quit: "Confirmar salida",
     hint_create_pick_devices: "Crear y elegir disp.",
@@ -167,6 +168,13 @@ pub static STRINGS_ES: Strings = Strings {
     modal_delete_share_decline_hint:
         "Las ofertas futuras de pares se rechazarán (deshacer en Ajustes).",
 
+    // Modals: Confirm Revert (read-only share)
+    action_revert: "Revertir",
+    modal_revert_title: "¿Revertir los cambios locales?",
+    modal_revert_subtitle: "La versión de los pares reemplaza la de la PS Vita",
+    modal_revert_added_hint: "Los archivos añadidos en la PS Vita se eliminan.",
+    modal_revert_restored_hint: "Los archivos modificados o eliminados se descargan de nuevo.",
+
     // Modals: Confirm Quit
     modal_quit_title: "¿Salir de VitaSync?",
     modal_quit_subtitle: "Confirma si deseas cerrar la aplicación y volver a LiveArea",
@@ -225,7 +233,6 @@ pub static MESSAGES_ES: Messages = Messages {
     language_changed: "Idioma: {name}",
     device_linked: "{device} añadido a '{share}'",
     device_unlinked: "{device} quitado de '{share}'",
-    link_device_first: "Vincula al menos un dispositivo para crear esta carpeta",
     added_short_id: "ID corto {prefix} añadido (emparejamiento automático en la LAN)",
     added_device: "Dispositivo {name} añadido ({short})",
     own_device_id: "No se puede añadir el ID de esta PS Vita",
@@ -237,6 +244,10 @@ pub static MESSAGES_ES: Messages = Messages {
     saved_in: "Guardado en {path}",
     share_active: "La carpeta {id} está activa",
     share_paused: "La carpeta {id} está en pausa",
+    share_read_only: "La carpeta {id} es ahora de solo lectura",
+    share_read_write: "La carpeta {id} es ahora de lectura y escritura",
+    revert_requested: "Revirtiendo los cambios locales de {id}...",
+    local_changes_reverted: "Cambios locales de {id} revertidos ({count})",
     offer_accepted: "Carpeta '{label}' aceptada ({id})",
     choose_where_to_store: "Elige dónde guardar '{label}'",
     offer_declined: "Carpeta '{label}' rechazada ({id})",

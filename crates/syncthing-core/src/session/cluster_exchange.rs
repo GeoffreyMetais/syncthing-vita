@@ -146,18 +146,26 @@ fn initial_folder_states(
         .shared_folders
         .iter()
         .map(|f| {
+            let folder_type = ctx.storage.folder_type(&f.id);
             let state = if ctx.storage.is_folder_paused(&f.id) {
                 FolderIndexState {
                     index_id: 0,
                     max_sequence: 0,
                     paused: true,
+                    folder_type,
                 }
             } else {
                 scan_local_index(stream, ctx, folders, &f.id)
                     .map(|(_, st)| st)
                     .unwrap_or_default()
             };
-            (f.clone(), state)
+            (
+                f.clone(),
+                FolderIndexState {
+                    folder_type,
+                    ..state
+                },
+            )
         })
         .collect()
 }

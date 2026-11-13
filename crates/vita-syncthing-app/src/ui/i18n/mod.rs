@@ -54,7 +54,6 @@ pub struct Strings {
     pub action_add_device: &'static str,
     pub action_add_device_id: &'static str,
     pub action_add_remote_device: &'static str,
-    pub action_apply_sync: &'static str,
     pub action_scan_qr: &'static str,
     pub action_new_share: &'static str,
     pub action_qr_id: &'static str,
@@ -70,6 +69,10 @@ pub struct Strings {
     pub status_scanning: &'static str,
     pub status_active: &'static str,
     pub status_paused: &'static str,
+    /// Mode of a share whose files peers may modify.
+    pub share_mode_read_write: &'static str,
+    /// Mode of a share whose files peers never modify.
+    pub share_mode_read_only: &'static str,
 
     // Navigation & Sidebar
     pub tab_overview: &'static str,
@@ -103,7 +106,7 @@ pub struct Strings {
     pub hint_pause_enable: &'static str,
     pub hint_add_by_id: &'static str,
     pub hint_scan_qr: &'static str,
-    pub hint_apply_sync: &'static str,
+    pub hint_scan_lan: &'static str,
     pub hint_confirm_delete: &'static str,
     pub hint_confirm_quit: &'static str,
     pub hint_create_pick_devices: &'static str,
@@ -178,6 +181,13 @@ pub struct Strings {
     pub modal_delete_share_title: &'static str,
     pub modal_delete_share_subtitle: &'static str,
     pub modal_delete_share_decline_hint: &'static str,
+
+    // Modals: Confirm Revert (read-only share)
+    pub action_revert: &'static str,
+    pub modal_revert_title: &'static str,
+    pub modal_revert_subtitle: &'static str,
+    pub modal_revert_added_hint: &'static str,
+    pub modal_revert_restored_hint: &'static str,
 
     // Modals: Confirm Quit
     pub modal_quit_title: &'static str,

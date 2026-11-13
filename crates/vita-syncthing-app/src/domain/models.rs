@@ -203,6 +203,11 @@ pub enum ModalDialog {
     ConfirmDeleteShare {
         share_idx: usize,
     },
+    /// Confirmation dialog before reverting the local changes of the read-only
+    /// `shares[share_idx]` (opened from `ManageDevices`, which it returns to).
+    ConfirmRevertShare {
+        share_idx: usize,
+    },
     /// A remote device offers to share a folder: the user accepts, declines or postpones it.
     FolderOffer {
         offer_idx: usize,
@@ -217,6 +222,43 @@ pub struct KnownDevice {
     pub address: String,
 }
 
+/// Access mode of a share on the PS Vita.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum ShareMode {
+    /// Local changes are sent to peers and their changes are applied (Syncthing "Send & Receive").
+    #[default]
+    ReadWrite,
+    /// Peers' changes are applied, but local changes are never sent to them
+    /// (Syncthing "Receive Only").
+    ReadOnly,
+}
+
+impl ShareMode {
+    /// The other mode (the `ManageDevices` toggle).
+    pub fn toggled(self) -> Self {
+        match self {
+            Self::ReadWrite => Self::ReadOnly,
+            Self::ReadOnly => Self::ReadWrite,
+        }
+    }
+
+    /// Code stored in `shares.cfg`.
+    pub fn code(self) -> &'static str {
+        match self {
+            Self::ReadWrite => "rw",
+            Self::ReadOnly => "ro",
+        }
+    }
+
+    /// Parses a `shares.cfg` code; anything unknown (or missing) is `ReadWrite`.
+    pub fn from_code(code: &str) -> Self {
+        match code.trim() {
+            "ro" => Self::ReadOnly,
+            _ => Self::ReadWrite,
+        }
+    }
+}
+
 /// Syncthing shared folder configuration on PS Vita.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ShareConfigEntry {
@@ -224,6 +266,8 @@ pub struct ShareConfigEntry {
     pub label: String,
     pub target_path: String,
     pub enabled: bool,
+    /// Whether peers may modify this folder on the PS Vita.
+    pub mode: ShareMode,
     /// Hex strings (`DeviceId::to_hex()`) of remote devices this folder is shared with.
     pub shared_devices: Vec<String>,
 }

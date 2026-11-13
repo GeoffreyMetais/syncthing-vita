@@ -5,7 +5,7 @@ use syncthing_core::DeviceId;
 
 use crate::application::{FolderOfferService, ShareCreation};
 use crate::domain::{
-    ActiveTab, AppState, KnownDevice, PickerItem, PickerMode, ShareConfigEntry, UiText,
+    ActiveTab, AppState, KnownDevice, PickerItem, PickerMode, ShareConfigEntry, ShareMode, UiText,
 };
 use crate::infrastructure::ConfigRepository;
 
@@ -267,6 +267,7 @@ impl ShareService {
                 label: label.to_owned(),
                 target_path: target_path.to_owned(),
                 enabled: true,
+                mode: ShareMode::ReadWrite,
                 shared_devices: Vec::new(),
             });
             state.shares.len() - 1

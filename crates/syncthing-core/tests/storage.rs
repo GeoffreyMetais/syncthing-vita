@@ -5,7 +5,7 @@ mod common;
 use std::path::{Path, PathBuf};
 
 use syncthing_core::storage::vita_fs::with_device_root_slash;
-use syncthing_core::{BepIndex, DeviceId, FsSyncStorage};
+use syncthing_core::{BepIndex, DeviceId, FolderType, FsSyncStorage};
 
 #[test]
 fn test_delta_sync_and_local_index_roundtrip() {
@@ -146,4 +146,19 @@ fn test_interrupted_commit_restores_the_previous_file() {
         .any(|f| f.name == "save.bin" && !f.deleted));
     assert_eq!(std::fs::read(dir.join("save.bin")).unwrap(), b"version 1");
     assert!(!storage.download_backup_path("f", "save.bin").exists());
+}
+
+#[test]
+fn test_folder_type_defaults_to_send_receive() {
+    let mut storage = FsSyncStorage::new(common::fresh_temp_dir("storage_folder_type"));
+    assert_eq!(storage.folder_type("saves"), FolderType::SendReceive);
+    assert!(!storage.is_folder_receive_only("saves"));
+
+    storage.set_folder_type("saves", FolderType::ReceiveOnly);
+    assert_eq!(storage.folder_type("saves"), FolderType::ReceiveOnly);
+    assert!(storage.is_folder_receive_only("saves"));
+    assert!(!storage.is_folder_receive_only("music"));
+
+    storage.set_folder_type("saves", FolderType::SendReceive);
+    assert!(!storage.is_folder_receive_only("saves"));
 }

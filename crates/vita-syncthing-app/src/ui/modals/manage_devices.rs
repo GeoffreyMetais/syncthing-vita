@@ -3,7 +3,7 @@
 use syncthing_core::DeviceId;
 
 use crate::domain::interaction::{HitMap, PadKey, UiAction};
-use crate::domain::{AppState, VISIBLE_DEVICES};
+use crate::domain::{AppState, ShareMode, VISIBLE_DEVICES};
 use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton, GFX_W};
 use crate::ui::i18n::messages::fill;
 use crate::ui::strings;
@@ -57,11 +57,40 @@ pub fn render_manage_devices_modal(
         22.0,
         th.accent_hi,
     );
+    // Header right: the share's access mode; touching it (or `L`) switches to the other one.
+    // A read-only share can also revert its local changes (`START`, confirmed first).
+    let read_only = state
+        .shares
+        .get(share_idx)
+        .is_some_and(|sh| sh.mode == ShareMode::ReadOnly);
+    let mode_lbl = if read_only {
+        s.share_mode_read_only
+    } else {
+        s.share_mode_read_write
+    };
+    let w_mode = action_width(gfx, PadButton::L, mode_lbl);
+    let mut header_right = dx + w - 28 - w_mode;
+    draw_press_button(gfx, th, hits, header_right, dy + 40, PadButton::L, mode_lbl);
+    if read_only {
+        let w_revert = action_width(gfx, PadButton::Start, s.action_revert);
+        header_right -= 10 + w_revert;
+        draw_press_button(
+            gfx,
+            th,
+            hits,
+            header_right,
+            dy + 40,
+            PadButton::Start,
+            s.action_revert,
+        );
+    }
+    let header_w = header_right - 12 - (lx + 52);
+
     let header_title = s.fmt_devices_for_share(&share_title);
     gfx.text_fit(
         lx + 52,
         dy + 32,
-        w - 110,
+        header_w,
         20,
         FontWeight::Bold,
         th.text,
@@ -74,9 +103,10 @@ pub fn render_manage_devices_modal(
     } else {
         (s.modal_manage_devices_subtitle, th.dim)
     };
-    gfx.text(
+    gfx.text_fit(
         lx + 52,
         dy + 54,
+        header_w,
         14,
         FontWeight::Regular,
         subtitle_col,
@@ -202,7 +232,6 @@ pub fn render_manage_devices_modal(
     };
     let w_pause = draw_press_button(gfx, th, hits, lx, dy + h - 32, PadButton::Select, pause_lbl);
     let w_add = action_width(gfx, PadButton::Square, s.action_add_by_id);
-    let w_sync = action_width(gfx, PadButton::Triangle, s.action_apply_sync);
     let close_lbl = if incomplete {
         s.action_cancel
     } else {
@@ -210,11 +239,10 @@ pub fn render_manage_devices_modal(
     };
     let w_close = action_width(gfx, PadButton::Circle, close_lbl);
     let bx_close = dx + w - 28 - w_close;
-    let bx_sync = bx_close - 10 - w_sync;
-    let bx_add = bx_sync - 10 - w_add;
+    let bx_add = bx_close - 10 - w_add;
     let w_scan = action_width(gfx, PadButton::R, s.action_scan_qr);
     let bx_scan = bx_add - 10 - w_scan;
-    // With long labels the row has no room for `Scan QR`: it stays available with `R`
+    // With very long labels the row has no room for `Scan QR`: it stays available with `R`
     // and in the hint bar instead of covering the `Pause` button.
     if bx_scan >= lx + w_pause + 10 {
         draw_press_button(
@@ -240,31 +268,28 @@ pub fn render_manage_devices_modal(
         gfx,
         th,
         hits,
-        bx_sync,
-        dy + h - 32,
-        PadButton::Triangle,
-        s.action_apply_sync,
-    );
-    draw_press_button(
-        gfx,
-        th,
-        hits,
         bx_close,
         dy + h - 32,
         PadButton::Circle,
         close_lbl,
     );
 
-    draw_press_hints(
-        gfx,
-        th,
-        hits,
-        &[
-            (PadButton::DpadUd, None, s.hint_select),
-            (PadButton::Cross, None, s.hint_toggle),
-            (PadButton::R, None, s.hint_scan_qr),
-            (PadButton::Triangle, None, s.hint_apply_sync),
-            (PadButton::Circle, None, close_lbl),
-        ],
-    );
+    // No device to tick yet: `Triangle` scans the LAN (while no sync is running).
+    let empty_hints = [
+        (PadButton::Triangle, None, s.hint_scan_lan),
+        (PadButton::R, None, s.hint_scan_qr),
+        (PadButton::Circle, None, close_lbl),
+    ];
+    let device_hints = [
+        (PadButton::DpadUd, None, s.hint_select),
+        (PadButton::Cross, None, s.hint_toggle),
+        (PadButton::R, None, s.hint_scan_qr),
+        (PadButton::Circle, None, close_lbl),
+    ];
+    let hints: &[_] = match (state.devices.is_empty(), state.sync_in_progress) {
+        (true, false) => &empty_hints,
+        (true, true) => &empty_hints[1..],
+        (false, _) => &device_hints,
+    };
+    draw_press_hints(gfx, th, hits, hints);
 }

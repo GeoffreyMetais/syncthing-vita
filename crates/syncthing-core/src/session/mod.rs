@@ -26,6 +26,7 @@ pub mod initial_sync;
 pub mod keepalive;
 pub mod outcome;
 pub mod persistent;
+pub mod revert;
 pub mod secondary;
 pub mod tuning;
 pub mod upload;

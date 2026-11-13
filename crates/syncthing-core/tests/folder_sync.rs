@@ -2,8 +2,9 @@
 
 mod common;
 
+use syncthing_core::folder_sync::mask_local_changes;
 use syncthing_core::version_vector::{version_ge, version_merge};
-use syncthing_core::{BepFileInfo, BepVersionCounter, DeviceId, FsSyncStorage};
+use syncthing_core::{BepFileInfo, BepIndex, BepVersionCounter, DeviceId, FsSyncStorage};
 
 fn remote_file(name: &str, versions: Vec<BepVersionCounter>) -> BepFileInfo {
     BepFileInfo {
@@ -147,4 +148,101 @@ fn test_unreadable_entry_is_not_recorded_as_deleted() {
     assert!(!deleted("album/track.mp3"));
     assert!(!deleted("kept.bin"));
     assert!(deleted("gone.bin"));
+}
+
+#[test]
+fn test_receive_only_masks_local_changes() {
+    let peer = |value| BepVersionCounter {
+        short_device_id: 0x9A7C,
+        value,
+    };
+    let vita = BepVersionCounter {
+        short_device_id: 0x1111,
+        value: 1,
+    };
+    let remote = vec![
+        remote_file("same.txt", vec![peer(2)]),
+        remote_file("newer_on_peer.txt", vec![peer(5)]),
+        remote_file("edited.txt", vec![peer(1)]),
+        BepFileInfo {
+            invalid: true,
+            ..remote_file("peer_invalid.txt", vec![peer(1)])
+        },
+    ];
+    let local = BepIndex {
+        folder: "saves".to_owned(),
+        files: vec![
+            remote_file("same.txt", vec![peer(2)]),
+            remote_file("newer_on_peer.txt", vec![peer(3)]),
+            remote_file("edited.txt", vec![peer(1), vita]),
+            remote_file("created.txt", vec![vita]),
+            remote_file("peer_invalid.txt", vec![peer(1)]),
+        ],
+    };
+
+    let masked = mask_local_changes(&local, &remote);
+    let invalid: Vec<(&str, bool)> = masked
+        .files
+        .iter()
+        .map(|f| (f.name.as_str(), f.invalid))
+        .collect();
+    assert_eq!(
+        invalid,
+        vec![
+            ("same.txt", false),
+            ("newer_on_peer.txt", false),
+            ("edited.txt", true),
+            ("created.txt", true),
+            ("peer_invalid.txt", true),
+        ]
+    );
+    // Only the flag changes.
+    assert_eq!(masked.files[2].versions, local.files[2].versions);
+    assert_eq!(masked.folder, "saves");
+}
+
+#[test]
+fn test_revert_local_changes_restores_the_peer_state() {
+    let tmp_dir = common::fresh_temp_dir("revert_local_changes");
+    let storage = FsSyncStorage::new(&tmp_dir);
+    let own_id = DeviceId([0x22; 32]);
+    let root = storage.folder_root("f");
+    std::fs::create_dir_all(&root).unwrap();
+    std::fs::write(root.join("edited.txt"), b"abc").unwrap();
+    std::fs::write(root.join("removed.txt"), b"xyz").unwrap();
+    // The peer has exactly what the Vita has.
+    let (synced, _) = storage.build_local_index("f", own_id, &[]).unwrap();
+    let remote = synced.files.clone();
+
+    // Local changes: one file edited, one deleted, a file and a directory added.
+    std::fs::write(root.join("edited.txt"), b"edited on the Vita").unwrap();
+    std::fs::remove_file(root.join("removed.txt")).unwrap();
+    std::fs::write(root.join("added.txt"), b"new").unwrap();
+    std::fs::create_dir_all(root.join("NEWDIR")).unwrap();
+    std::fs::write(root.join("NEWDIR/inner.txt"), b"new").unwrap();
+    let (changed, _) = storage.build_local_index("f", own_id, &remote).unwrap();
+    let masked = mask_local_changes(&changed, &remote);
+    assert!(masked.files.iter().all(|f| f.invalid));
+
+    let reverted = storage
+        .revert_local_changes("f", own_id, &remote, &mut || {})
+        .unwrap();
+    assert_eq!(reverted, 5);
+    // Added entries are gone from disk...
+    assert!(!root.join("added.txt").exists());
+    assert!(!root.join("NEWDIR").exists());
+    // ...and the next pull fetches the peer's version of the edited and deleted files.
+    let plan = storage.plan_pull("f", own_id, &remote).unwrap();
+    let mut downloads: Vec<&str> = plan.downloads.iter().map(|f| f.name.as_str()).collect();
+    downloads.sort();
+    assert_eq!(downloads, vec!["edited.txt", "removed.txt"]);
+    // Nothing added on the Vita is offered to the peer any more.
+    let (after, _) = storage.build_local_index("f", own_id, &remote).unwrap();
+    let offered: Vec<String> = mask_local_changes(&after, &remote)
+        .files
+        .into_iter()
+        .filter(|f| !f.invalid && !f.deleted)
+        .map(|f| f.name)
+        .collect();
+    assert!(offered.is_empty(), "{offered:?}");
 }
