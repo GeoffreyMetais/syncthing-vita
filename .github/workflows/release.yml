@@ -1,0 +1,83 @@
+name: Release
+
+# Pushing a `vX.Y.Z` tag builds SYNCTHING.vpk and publishes it as a GitHub Release.
+# The tag must match the workspace version in Cargo.toml (also written to param.sfo APP_VER).
+# VitaDB catalogs download the latest release's `SYNCTHING.vpk` asset: keep this file name.
+
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+
+env:
+  CARGO_TERM_COLOR: always
+  VPK_PATH: target/armv7-sony-vita-newlibeabihf/release/SYNCTHING.vpk
+
+jobs:
+  release:
+    name: Build & Publish SYNCTHING.vpk
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Check that the tag matches the workspace version
+        run: |
+          VERSION="$(awk -F'"' '/^\[workspace\.package\]/{s=1;next} /^\[/{s=0} s && /^version *=/{print $2; exit}' Cargo.toml)"
+          if [[ "${GITHUB_REF_NAME}" != "v${VERSION}" ]]; then
+            echo "ERROR: tag ${GITHUB_REF_NAME} does not match Cargo.toml version ${VERSION} (expected v${VERSION})." >&2
+            exit 1
+          fi
+
+      - name: Install Rust stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Rust nightly toolchain with rust-src
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rust-src
+
+      - name: Cache Cargo dependencies and build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: release
+
+      - name: Run all workspace unit and integration tests
+        env:
+          RUSTFLAGS: "-D warnings"
+        run: cargo +stable test --workspace
+
+      - name: Install VitaSDK
+        env:
+          VITASDK: ${{ runner.temp }}/vitasdk
+        run: |
+          ./scripts/setup_env.sh --install-vitasdk
+          echo "VITASDK=${VITASDK}" >> "$GITHUB_ENV"
+          echo "${VITASDK}/bin" >> "$GITHUB_PATH"
+
+      - name: Build PS Vita release VPK
+        run: ./scripts/build_vpk.sh
+
+      - name: Audit hardware-critical ELF symbols
+        run: |
+          ELF_PATH="target/armv7-sony-vita-newlibeabihf/release/vita-syncthing-app.elf"
+          SYMBOLS="$(arm-vita-eabi-nm -n "${ELF_PATH}")"
+          grep -q "R _newlib_heap_size_user" <<< "${SYMBOLS}" || {
+            echo "ERROR: _newlib_heap_size_user is missing or weak in ${ELF_PATH}!" >&2
+            exit 1
+          }
+          grep -q "R sceUserMainThreadStackSize" <<< "${SYMBOLS}" || {
+            echo "ERROR: sceUserMainThreadStackSize is missing in ${ELF_PATH}!" >&2
+            exit 1
+          }
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "${GITHUB_REF_NAME}" "${VPK_PATH}" \
+            --title "${GITHUB_REF_NAME}" \
+            --generate-notes \
+            --verify-tag

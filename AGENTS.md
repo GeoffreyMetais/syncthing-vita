@@ -18,7 +18,7 @@ This document provides essential architectural context, build workflows, and **r
 syncthing-vita
 ├── Cargo.toml                        # Workspace manifest (Edition 2021, LTO + opt-level = "z")
 ├── Justfile                          # Task runner (test-host, check-vita, build-vita, vpk)
-├── scripts/build_vpk.sh              # Full VPK build pipeline (vita-elf-create, vita-make-fself, vita-mksfoex, vita-pack-vpk)
+├── scripts/build_vpk.sh              # Full VPK build pipeline (vita-elf-create, vita-make-fself, vita-mksfoex, vita-pack-vpk); APP_VER from the Cargo version
 ├── scripts/gen_livearea.py           # Generates the LiveArea images (assets/sce_sys/: icon, background, gate — PS Vita + Syncthing emblem)
 └── crates/
     ├── syncthing-core/               # Platform-independent Syncthing BEP/1.0 & Discovery engine
@@ -419,6 +419,17 @@ Output package:
 ```text
 target/armv7-sony-vita-newlibeabihf/release/SYNCTHING.vpk
 ```
+`build_vpk.sh` writes the workspace version (`[workspace.package] version` in `Cargo.toml`) to `param.sfo` as `APP_VER`: major on two digits, minor and patch on one digit each (`0.1.0` -> `00.10`, `1.2.3` -> `01.23`). A minor or patch above 9 fails the build.
+
+### Publish a Release
+1. Bump `version` in the root `Cargo.toml` and commit it on `main`.
+2. Push a matching tag:
+   ```bash
+   git tag -a v0.1.0 -m "v0.1.0" && git push origin v0.1.0
+   ```
+3. `.github/workflows/release.yml` checks that the tag matches the version, runs the host tests, builds the VPK, audits the ELF symbols and publishes a GitHub Release with `SYNCTHING.vpk` attached (notes generated from the merged PRs).
+
+VitaDB catalogs (NeoVitaDB) download the `SYNCTHING.vpk` asset of the latest release: never rename it.
 
 ### Verify Symbol Exports in the Vita ELF
 After running `just vpk`, you can verify that the required Newlib heap and thread symbols are exported in `.rodata`:
