@@ -50,12 +50,13 @@ syncthing-vita
             │   ├── app_state.rs      # AppState (pure state & view-model queries, zero I/O or rendering dependencies)
             │   ├── interaction.rs    # HitMap / Hotspot / UiAction / FocusSlot: interactive elements declared by the frame on screen
             │   ├── defaults.rs       # Every tunable value of the app: sync / discovery / power / display timings, limits, share presets
+            │   ├── log_view.rs       # LogView (full-screen protocol log viewer: session lines / `Show All` history, scroll window)
             │   ├── initial_sync.rs   # InitialSyncPeers (peers in their initial sync phase; full CPU speed meanwhile)
             │   └── ui_text.rs        # UiText: translatable messages (status line, labels, toasts) chosen by inner layers
             ├── application/          # Layer 2: Use Cases, Input Controller & Sync Event Coordinator
             │   ├── mod.rs
             │   ├── share_service.rs  # ShareService (create_share, upsert_device, toggle_device_for_share, refresh_picker_items)
-            │   ├── dashboard_controller.rs / shares_controller.rs / files_controller.rs / settings_controller.rs # One controller per page: D-pad focus movement, execution of the page's UiActions
+            │   ├── dashboard_controller.rs / shares_controller.rs / files_controller.rs / settings_controller.rs / logs.rs # One controller per page: D-pad focus movement, execution of the page's UiActions (`LogsController`: log viewer scrolling)
             │   ├── share_creation.rs # ShareCreation (new share kept only once a device is linked)
             │   ├── share_mode.rs     # ShareModeService (share read & write <-> read only, revert of local changes)
             │   ├── folder_offers.rs  # FolderOfferService (folders offered by peers need consent: accept / decline / later)
@@ -101,6 +102,7 @@ syncthing-vita
                 │   ├── shares.rs
                 │   ├── folder_picker.rs
                 │   ├── settings.rs
+                │   ├── logs.rs       # Full-screen protocol log viewer (opened from the Settings log card)
                 │   └── screensaver.rs
                 ├── modals/           # Modal dialog views & fallback keypad
                 │   ├── mod.rs
@@ -189,7 +191,7 @@ Dependencies strictly point **inward**. Inner layers never import or depend on o
    - **Key Modules**:
      - `i18n/`: Zero-allocation multi-language catalogs (`Strings`) supporting English (`en`), French (`fr`), Spanish (`es`), German (`de`), and Italian (`it`).
      - `strings.rs`: Centralized user-facing strings, action constants, button hints, and zero-allocation formatting helpers re-exporting `ui::i18n`.
-     - `screens/`: Independent full-screen views (`dashboard.rs` drawing the share list of `shares.rs`, `folder_picker.rs`, `settings.rs`, `screensaver.rs`).
+     - `screens/`: Independent full-screen views (`dashboard.rs` drawing the share list of `shares.rs`, `folder_picker.rs`, `settings.rs`, `logs.rs`, `screensaver.rs`).
      - `modals/`: Isolated modal dialogs (`create_share.rs`, `manage_devices.rs`, `add_device.rs`, `device_id.rs`, `confirm_quit.rs`, `confirm_delete_share.rs`, `fallback_keyboard.rs`).
      - `widgets.rs`: Reusable UI elements (cards, chips, checkboxes, buttons, chrome, toast).
      - `gfx.rs`: Software 2D rendering primitives, anti-aliased geometry, and TrueType rasterization.
@@ -404,6 +406,7 @@ cargo test --workspace
 - `config_fields.rs`: interrupted `.cfg` replacement restored from its backup, `.cfg` field escaping roundtrip, legacy `%` text kept, hostile names / labels through `devices.cfg` / `shares.cfg` / `ignored_folders.cfg`, invalid linked-device entries dropped
 - `share_mode.rs`: read & write / read only toggle (`L` and touch in `ManageDevices`), `shares.cfg` persistence (legacy lines without a mode are read & write), mode / revert buttons geometry in all 5 languages, revert of local changes (`START` in `ManageDevices` + `ConfirmRevertShare`, pad and touch, read-only shares only), `LocalChangesReverted` toast
 - `devices_scan.rs`: `ManageDevices` LAN scan — immediate without a linked device, after the delay with one, cancelled on close (and re-armed on reopening), also while another device is connected
+- `log_viewer.rs`: log viewer opened from the `Settings` log card (touch, D-pad `Open`), closed with `Circle`, scrolling by line / page (D-pad, `L` / `R`, touch) within bounds, new lines followed at the bottom and a scrolled-back window kept, `Show All` loading `syncthing.log` and back, session buffer size, geometry in all 5 languages
 - `language_settings.rs`: language preference codec / cycle, `language.cfg` persistence (defaults to the system language), `Settings` language card (D-pad and touch)
 
 ### Cross-Check for PS Vita (`armv7-sony-vita-newlibeabihf`)
@@ -467,7 +470,7 @@ The UI (`gfx.rs` + `ui/screens/*` + `ui/modals/*` + `ui/renderer.rs`) renders at
 - **Left Sidebar Tabs** (`L` / `R` shoulder buttons, D-pad from the sidebar, or touch tap):
   1. `Overview` (`ActiveTab::Dashboard`): compact device status card (the page header row: `QR / ID` modal (`Circle`) and `New Share` modal (`Triangle`) buttons), then the list of shared folders (4 visible, scrolling with the selection): `Devices` assignment modal (`Cross`), `Delete` with confirmation (`Square`) and `Folder` path picker (`Triangle`) on each card. A row's face buttons answer only while that row has the D-pad focus (`HitMap::shortcut_action` prefers the focused row, then page-level elements): `Triangle` is `Folder` on a share row and `New Share` anywhere else, and the hint bar shows which. A sync is started by tapping the sidebar transfer card. The protocol log is only on `Settings`.
   2. `Files` (`ActiveTab::FolderPicker`): Interactive `ux0:` directory browser. Selecting a folder (`Cross` or tap) starts creating a share of it (folders already shared are greyed out and cannot be selected or opened); `Triangle` (or tapping the `Open` chip) enters a subfolder, `Circle` goes up/back. The `Overview` share `Folder` action reuses this browser to change a share's target path.
-  3. `Settings` (`ActiveTab::Settings`): Dark / Pure-Black OLED theme switcher (`Cross`), `QR / ID` modal (`Circle`), `Language` card (D-pad `Down` + `Cross` or tap: System -> English -> Français -> Español -> Deutsch -> Italiano, saved in `language.cfg`), `Declined folders` card (D-pad `Down` + `Cross` or tap `Clear Declined` to forget declined folder offers so peers can offer them again), and BEP/1.0 protocol log viewer.
+  3. `Settings` (`ActiveTab::Settings`): Dark / Pure-Black OLED theme switcher (`Cross`), `QR / ID` modal (`Circle`), `Language` card (D-pad `Down` + `Cross` or tap: System -> English -> Français -> Español -> Deutsch -> Italiano, saved in `language.cfg`), `Declined folders` card (D-pad `Down` + `Cross` or tap `Clear Declined` to forget declined folder offers so peers can offer them again), and the protocol log card (latest lines). Tapping the log card, or `Cross` on its `Open` button, opens the **log viewer** (`AppState::log_view`, `ui/screens/logs.rs`): a full-screen page (no sidebar) listing this session's lines (`AppState::logs`, last `LOG_BUFFER_LINES`), newest at the bottom; D-pad `Up`/`Down` scroll one line, `L`/`R` (or `Left`/`Right`, or touching the upper / lower half of the list) one page, `Triangle · Show All` loads the whole `syncthing.log` history (last `LOG_HISTORY_MAX_LINES` lines) and toggles back, `Circle · Back` returns to `Settings`.
 - **Modal Dialogs** (`ModalDialog` in `domain/models.rs`, rendered by `ui/modals/*`):
   - `CreateShare`: Create a share from PS Vita folder presets (`ux0:user/00/savedata`, `ux0:picture`, `ux0:music`, RetroArch saves) or browse `ux0:`. The share is only kept once a device is linked in the `ManageDevices` modal that follows.
   - `ManageDevices`: Link/unlink discovered Syncthing peers to a share with circular checkboxes (`draw_row_tick`), add one by ID (`Square`) or by QR code (`R · Scan QR`); changes apply when the dialog closes (`Circle · Done`: `config_dirty` restarts the worker, which advertises the folder in its `ClusterConfig`); opening the dialog scans the LAN (`DevicesScan`): at once for a share with no linked device, after `DEVICES_DIALOG_SCAN_DELAY` (3 s, counted in VBlanks by `main.rs`, cancelled when the dialog closes) otherwise, also while another device is connected (`UserCommand::ScanLan`: `main.rs` asks the running worker for a discovery cycle now with `SyncControl::request_discovery`, or starts a sync when none runs); while no device is known, `Triangle` (hint `Scan LAN`) scans again; `SELECT` pauses / enables the share; `L` (header button showing the current mode) switches it between **Read & write** and **Read only** (Syncthing "Receive Only": the Vita receives its peers' changes but never sends its own). On a read-only share, `START · Revert` (header) opens `ConfirmRevertShare`. Read-only shares carry a lock badge on their `Overview` card.

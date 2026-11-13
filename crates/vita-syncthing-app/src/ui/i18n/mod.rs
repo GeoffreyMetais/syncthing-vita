@@ -151,6 +151,26 @@ pub struct Strings {
     pub settings_language_system: &'static str,
     pub action_change_language: &'static str,
 
+    // Screen: full-screen protocol log viewer
+    /// Title of the full-screen protocol log viewer.
+    pub logs_title: &'static str,
+    /// Log viewer showing this session's lines.
+    pub logs_scope_session: &'static str,
+    /// Log viewer showing the whole `syncthing.log` history.
+    pub logs_scope_history: &'static str,
+    /// Log viewer with no line to show.
+    pub logs_empty: &'static str,
+    /// Log viewer: show the whole `syncthing.log` history.
+    pub action_show_all: &'static str,
+    /// Log viewer: back to this session's lines.
+    pub action_show_session: &'static str,
+    /// Log viewer: D-pad scrolls one line.
+    pub hint_scroll: &'static str,
+    /// Log viewer: page towards older lines.
+    pub hint_older: &'static str,
+    /// Log viewer: page towards newer lines.
+    pub hint_newer: &'static str,
+
     // Screensaver
     pub saver_wake_hint: &'static str,
 
@@ -271,6 +291,11 @@ impl Strings {
     /// Formats the item counter in the breadcrumb bar: `"{current} / {total}"`.
     pub fn fmt_item_counter(&self, current: usize, total: usize) -> String {
         format!("{current} / {total}")
+    }
+
+    /// Formats the lines shown by the log viewer: `"{first}–{last} / {total}"` (1-based).
+    pub fn fmt_log_range(&self, first: usize, last: usize, total: usize) -> String {
+        format!("{first}–{last} / {total}")
     }
 
     /// Formats the declined folders count and list.

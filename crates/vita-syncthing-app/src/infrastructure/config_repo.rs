@@ -1,8 +1,9 @@
 //! Persistence and filesystem repository (`devices.cfg`, `shares.cfg`, `ignored_folders.cfg`,
 //! `theme.cfg`, `language.cfg`, `syncthing.log`, and `ux0:` directory browsing).
 
+use std::collections::VecDeque;
 use std::fs::{self, OpenOptions};
-use std::io::Write;
+use std::io::{BufRead, BufReader, Write};
 use std::path::Path;
 
 use syncthing_core::storage::atomic::{recover_replaced_file, replace_file, write_file_synced};
@@ -13,6 +14,9 @@ use crate::domain::{
     IgnoredFolder, KnownDevice, LanguagePreference, ShareConfigEntry, ShareMode, ThemeMode,
     NEW_SHARE_TEMPLATES,
 };
+
+/// Prefix of every line of `syncthing.log`.
+const LOG_LINE_PREFIX: &str = "[VITA-SYNCTHING] ";
 
 /// Repository managing configuration persistence and local filesystem queries on `ux0:`.
 #[derive(Debug, Clone)]
@@ -43,12 +47,34 @@ impl ConfigRepository {
 
     /// Appends a diagnostic log line to stdout and `<base_data_dir>/syncthing.log`.
     pub fn write_log(&self, msg: &str) {
-        println!("[VITA-SYNCTHING] {}", msg);
+        println!("{LOG_LINE_PREFIX}{msg}");
         let _ = fs::create_dir_all(&self.base_data_dir);
         let log_path = format!("{}/syncthing.log", self.base_data_dir);
         if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(&log_path) {
-            let _ = writeln!(file, "[VITA-SYNCTHING] {}", msg);
+            let _ = writeln!(file, "{LOG_LINE_PREFIX}{msg}");
         }
+    }
+
+    /// Reads the last `max_lines` lines of `<base_data_dir>/syncthing.log` (oldest first,
+    /// without their prefix). The file is streamed: only `max_lines` lines are held at once.
+    pub fn read_log_history(&self, max_lines: usize) -> Vec<String> {
+        let log_path = format!("{}/syncthing.log", self.base_data_dir);
+        let Ok(file) = fs::File::open(&log_path) else {
+            return Vec::new();
+        };
+        let mut tail = VecDeque::with_capacity(max_lines.min(256));
+        for line in BufReader::new(file).split(b'\n').map_while(Result::ok) {
+            if max_lines == 0 {
+                break;
+            }
+            if tail.len() == max_lines {
+                tail.pop_front();
+            }
+            let text = String::from_utf8_lossy(&line);
+            let text = text.strip_prefix(LOG_LINE_PREFIX).unwrap_or(&text);
+            tail.push_back(text.to_owned());
+        }
+        tail.into()
     }
 
     /// Ensures a directory path exists on disk.

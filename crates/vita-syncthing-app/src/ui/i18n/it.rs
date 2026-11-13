@@ -131,6 +131,17 @@ pub static STRINGS_IT: Strings = Strings {
     settings_language_system: "Lingua di sistema",
     action_change_language: "Cambia lingua",
 
+    // Log viewer
+    logs_title: "Registro del protocollo",
+    logs_scope_session: "Questa sessione",
+    logs_scope_history: "Cronologia completa · syncthing.log",
+    logs_empty: "Nessuna voce per ora",
+    action_show_all: "Mostra tutto",
+    action_show_session: "Questa sessione",
+    hint_scroll: "Scorri",
+    hint_older: "Più vecchi",
+    hint_newer: "Più recenti",
+
     // Screensaver
     saver_wake_hint: "Tocca lo schermo o premi un tasto per riattivare",
 
