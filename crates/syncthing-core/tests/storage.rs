@@ -152,13 +152,13 @@ fn test_interrupted_commit_restores_the_previous_file() {
 fn test_folder_type_defaults_to_send_receive() {
     let mut storage = FsSyncStorage::new(common::fresh_temp_dir("storage_folder_type"));
     assert_eq!(storage.folder_type("saves"), FolderType::SendReceive);
-    assert!(!storage.is_folder_send_only("saves"));
+    assert!(!storage.is_folder_receive_only("saves"));
 
-    storage.set_folder_type("saves", FolderType::SendOnly);
-    assert_eq!(storage.folder_type("saves"), FolderType::SendOnly);
-    assert!(storage.is_folder_send_only("saves"));
-    assert!(!storage.is_folder_send_only("music"));
+    storage.set_folder_type("saves", FolderType::ReceiveOnly);
+    assert_eq!(storage.folder_type("saves"), FolderType::ReceiveOnly);
+    assert!(storage.is_folder_receive_only("saves"));
+    assert!(!storage.is_folder_receive_only("music"));
 
     storage.set_folder_type("saves", FolderType::SendReceive);
-    assert!(!storage.is_folder_send_only("saves"));
+    assert!(!storage.is_folder_receive_only("saves"));
 }

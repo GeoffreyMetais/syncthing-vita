@@ -32,7 +32,7 @@ pub struct FsSyncStorage {
     custom_folder_paths: HashMap<String, PathBuf>,
     /// Folders paused by user
     paused_folders: HashSet<String>,
-    /// Folder types other than the default `SendReceive` (e.g. read-only `SendOnly` shares)
+    /// Folder types other than the default `SendReceive` (e.g. read-only `ReceiveOnly` shares)
     folder_types: HashMap<String, FolderType>,
     /// Devices each configured folder is shared with. A folder missing here is not shared with
     /// anyone: it is never announced, indexed, downloaded or served.
@@ -100,8 +100,9 @@ impl FsSyncStorage {
         self.paused_folders.contains(folder_id)
     }
 
-    /// Sets the type of a shared folder. A `SendOnly` folder publishes its local changes and
-    /// serves its blocks, but never applies a peer's changes (no download, no deletion).
+    /// Sets the type of a shared folder. A `ReceiveOnly` folder applies a peer's changes, but
+    /// its own local changes are announced as invalid so peers never pull them
+    /// (see [`crate::folder_sync::mask_local_changes`]).
     pub fn set_folder_type(&mut self, folder_id: &str, folder_type: FolderType) {
         if folder_type == FolderType::SendReceive {
             self.folder_types.remove(folder_id);
@@ -118,9 +119,9 @@ impl FsSyncStorage {
             .unwrap_or_default()
     }
 
-    /// Returns `true` if remote changes must never be applied to `folder_id`.
-    pub fn is_folder_send_only(&self, folder_id: &str) -> bool {
-        self.folder_type(folder_id) == FolderType::SendOnly
+    /// Returns `true` if the local changes of `folder_id` must never be sent to peers.
+    pub fn is_folder_receive_only(&self, folder_id: &str) -> bool {
+        self.folder_type(folder_id) == FolderType::ReceiveOnly
     }
 
     /// Declares the devices `folder_id` is shared with (replacing any previous list).

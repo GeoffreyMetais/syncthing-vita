@@ -375,7 +375,7 @@ fn announced_folder_types(payload: &[u8]) -> Vec<(String, u64)> {
 }
 
 #[test]
-fn test_send_only_folder_publishes_but_never_applies_remote_changes() {
+fn test_receive_only_folder_applies_remote_changes_but_never_offers_local_ones() {
     let vita_id = vita_identity().device_id;
     let peer = FakePeer::spawn(0x55, move |conn| {
         let remote = conn.file("saves", "remote.txt", b"from the peer", 1);
@@ -386,10 +386,10 @@ fn test_send_only_folder_publishes_but_never_applies_remote_changes() {
         conn.serve_until_idle(Duration::from_millis(1500));
     });
 
-    let root = common::fresh_temp_dir("session_e2e_send_only");
+    let root = common::fresh_temp_dir("session_e2e_receive_only");
     let mut storage = FsSyncStorage::new(&root);
     storage.set_folder_devices("saves", vec![peer.device_id]);
-    storage.set_folder_type("saves", FolderType::SendOnly);
+    storage.set_folder_type("saves", FolderType::ReceiveOnly);
     std::fs::create_dir_all(storage.folder_root("saves")).unwrap();
     std::fs::write(
         storage.resolve_safe_path("saves", "local.txt"),
@@ -400,27 +400,31 @@ fn test_send_only_folder_publishes_but_never_applies_remote_changes() {
     sync_once(&peer, &storage);
     let received = peer.join();
 
-    // The peer's file was neither requested nor written...
-    assert!(payloads(&received, BepMessageType::Request).is_empty());
-    assert!(!storage.resolve_safe_path("saves", "remote.txt").exists());
-    // ...while the local file is still published, and the folder is announced as send-only.
-    let published: Vec<String> = payloads(&received, BepMessageType::Index)
+    // The peer's file was pulled...
+    let pulled = storage.resolve_safe_path("saves", "remote.txt");
+    assert_eq!(std::fs::read(pulled).unwrap(), b"from the peer");
+    // ...while the local-only file is announced invalid, so the peer never pulls it.
+    let published: Vec<(String, bool)> = payloads(&received, BepMessageType::Index)
         .iter()
+        .chain(payloads(&received, BepMessageType::IndexUpdate).iter())
         .flat_map(|p| BepIndex::decode(p).unwrap().files)
-        .map(|f| f.name)
+        .map(|f| (f.name, f.invalid))
         .collect();
-    assert_eq!(published, vec!["local.txt".to_owned()]);
+    assert!(published.contains(&("local.txt".to_owned(), true)));
+    assert!(published.contains(&("remote.txt".to_owned(), false)));
+    assert!(!published.contains(&("local.txt".to_owned(), false)));
+    // The folder is announced as receive-only.
     let configs = payloads(&received, BepMessageType::ClusterConfig);
     assert_eq!(
         announced_folder_types(configs[0]),
-        vec![("saves".to_owned(), FolderType::SendOnly.wire_value())]
+        vec![("saves".to_owned(), FolderType::ReceiveOnly.wire_value())]
     );
 }
 
 #[test]
-fn test_send_only_folder_still_serves_blocks() {
-    let mut storage = storage_with_shared_file("session_send_only_serves");
-    storage.set_folder_type("saves", FolderType::SendOnly);
+fn test_receive_only_folder_still_serves_blocks() {
+    let mut storage = storage_with_shared_file("session_receive_only_serves");
+    storage.set_folder_type("saves", FolderType::ReceiveOnly);
     let resp = request_block(&storage, LINKED_PEER, "saves");
     assert_eq!(resp.code, 0);
     assert_eq!(resp.data, CONTENT);

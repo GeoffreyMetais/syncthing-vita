@@ -23,7 +23,6 @@ const BLOCK_RESPONSE_TIMEOUT: Duration = Duration::from_secs(20);
 /// Brings `folder_id` up to date with the peer's `files`.
 /// Directories, deletions and identical content are handled locally (version-vector plan);
 /// only files with a newer remote version are downloaded.
-/// A send-only (read-only) folder is never modified by a peer: nothing is planned or applied.
 /// Returns `true` if anything changed locally.
 pub fn download_folder(
     stream: &mut BepTlsStream,
@@ -33,7 +32,6 @@ pub fn download_folder(
     count_up_to_date: bool,
 ) -> io::Result<bool> {
     if ctx.storage.is_folder_paused(folder_id)
-        || ctx.storage.is_folder_send_only(folder_id)
         || !ctx
             .storage
             .is_folder_shared_with(folder_id, &ctx.peer_device_id)

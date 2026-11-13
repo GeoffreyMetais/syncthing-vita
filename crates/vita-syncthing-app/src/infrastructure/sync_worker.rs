@@ -249,12 +249,12 @@ pub fn spawn_sync_worker(
         for s in &shares_snapshot {
             storage.set_folder_path(&s.folder_id, &s.target_path);
             storage.set_folder_paused(&s.folder_id, !s.enabled);
-            // A read-only share is Syncthing's "Send Only": peers never modify its files.
+            // A read-only share is Syncthing's "Receive Only": its local changes are never sent.
             storage.set_folder_type(
                 &s.folder_id,
                 match s.mode {
                     ShareMode::ReadWrite => FolderType::SendReceive,
-                    ShareMode::ReadOnly => FolderType::SendOnly,
+                    ShareMode::ReadOnly => FolderType::ReceiveOnly,
                 },
             );
             // Authorization: a folder is only synchronized with the devices linked to its share.

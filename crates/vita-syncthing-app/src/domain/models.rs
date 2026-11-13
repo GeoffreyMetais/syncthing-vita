@@ -209,8 +209,8 @@ pub enum ShareMode {
     /// Local changes are sent to peers and their changes are applied (Syncthing "Send & Receive").
     #[default]
     ReadWrite,
-    /// Local changes are sent to peers, but their changes never modify the PS Vita's files
-    /// (Syncthing "Send Only").
+    /// Peers' changes are applied, but local changes are never sent to them
+    /// (Syncthing "Receive Only").
     ReadOnly,
 }
 

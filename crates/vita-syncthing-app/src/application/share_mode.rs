@@ -1,5 +1,5 @@
-//! Share access mode: read & write (Syncthing "Send & Receive") or read only ("Send Only",
-//! peers never modify the PS Vita's files).
+//! Share access mode: read & write (Syncthing "Send & Receive") or read only ("Receive Only":
+//! the PS Vita receives its peers' changes but never sends its own).
 
 use super::ShareService;
 use crate::domain::{AppState, ShareMode, UiText};

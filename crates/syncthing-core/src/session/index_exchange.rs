@@ -9,6 +9,7 @@ use super::events::SyncEvent;
 use super::folders::{published_file_count, FolderSyncState};
 use super::keepalive::send_keepalive_if_due;
 use crate::bep::{write_bep_message, BepClusterConfig, BepIndex, FolderIndexState};
+use crate::folder_sync::mask_local_changes;
 use crate::tls::BepTlsStream;
 
 /// Scans `folder_id` and returns its local index, sending keepalive `Ping`s while a long scan
@@ -67,6 +68,14 @@ fn publish_index(
     if !folders.is_peer_folder(&index.folder) {
         return Ok(false);
     }
+    // A receive-only folder never offers its local changes to the peer.
+    let masked;
+    let index = if ctx.storage.is_folder_receive_only(&index.folder) {
+        masked = mask_local_changes(index, folders.remote_files(&index.folder));
+        &masked
+    } else {
+        index
+    };
     let messages = folders.take_unpublished(index);
     for (msg_type, batch) in &messages {
         write_bep_message(stream, *msg_type, &batch.encode())?;

@@ -2,8 +2,9 @@
 
 mod common;
 
+use syncthing_core::folder_sync::mask_local_changes;
 use syncthing_core::version_vector::{version_ge, version_merge};
-use syncthing_core::{BepFileInfo, BepVersionCounter, DeviceId, FsSyncStorage};
+use syncthing_core::{BepFileInfo, BepIndex, BepVersionCounter, DeviceId, FsSyncStorage};
 
 fn remote_file(name: &str, versions: Vec<BepVersionCounter>) -> BepFileInfo {
     BepFileInfo {
@@ -147,4 +148,55 @@ fn test_unreadable_entry_is_not_recorded_as_deleted() {
     assert!(!deleted("album/track.mp3"));
     assert!(!deleted("kept.bin"));
     assert!(deleted("gone.bin"));
+}
+
+#[test]
+fn test_receive_only_masks_local_changes() {
+    let peer = |value| BepVersionCounter {
+        short_device_id: 0x9A7C,
+        value,
+    };
+    let vita = BepVersionCounter {
+        short_device_id: 0x1111,
+        value: 1,
+    };
+    let remote = vec![
+        remote_file("same.txt", vec![peer(2)]),
+        remote_file("newer_on_peer.txt", vec![peer(5)]),
+        remote_file("edited.txt", vec![peer(1)]),
+        BepFileInfo {
+            invalid: true,
+            ..remote_file("peer_invalid.txt", vec![peer(1)])
+        },
+    ];
+    let local = BepIndex {
+        folder: "saves".to_owned(),
+        files: vec![
+            remote_file("same.txt", vec![peer(2)]),
+            remote_file("newer_on_peer.txt", vec![peer(3)]),
+            remote_file("edited.txt", vec![peer(1), vita]),
+            remote_file("created.txt", vec![vita]),
+            remote_file("peer_invalid.txt", vec![peer(1)]),
+        ],
+    };
+
+    let masked = mask_local_changes(&local, &remote);
+    let invalid: Vec<(&str, bool)> = masked
+        .files
+        .iter()
+        .map(|f| (f.name.as_str(), f.invalid))
+        .collect();
+    assert_eq!(
+        invalid,
+        vec![
+            ("same.txt", false),
+            ("newer_on_peer.txt", false),
+            ("edited.txt", true),
+            ("created.txt", true),
+            ("peer_invalid.txt", true),
+        ]
+    );
+    // Only the flag changes.
+    assert_eq!(masked.files[2].versions, local.files[2].versions);
+    assert_eq!(masked.folder, "saves");
 }
