@@ -71,6 +71,7 @@ fn all_messages() -> Vec<UiText> {
         UiText::OwnDeviceId,
         UiText::InvalidDeviceId(DeviceIdParseError::TooLong(60)),
         UiText::QrNotDeviceId,
+        UiText::WifiConnected,
         UiText::ShareDeleted { label: s("Saves") },
         UiText::LinkDeviceToShare { label: s("Saves") },
         UiText::ShareCreated { label: s("Saves") },
@@ -175,6 +176,7 @@ fn test_messages_are_translated_and_parameters_filled() {
             UiText::SyncFinished,
             UiText::LinkDeviceFirst,
             UiText::QrNotDeviceId,
+            UiText::WifiConnected,
             UiText::NoDevicesLinked,
         ] {
             assert_ne!(other.text(&msg), en.text(&msg), "{lang:?} {msg:?}");

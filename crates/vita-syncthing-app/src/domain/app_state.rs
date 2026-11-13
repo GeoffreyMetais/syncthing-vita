@@ -14,6 +14,7 @@ use crate::domain::navigation::{
     default_col, starts_on_header, NavFocus, NavState, DASHBOARD_HEADER_ACTIONS,
 };
 use crate::domain::ui_text::UiText;
+use crate::domain::wifi::WifiState;
 
 /// Pure application state for PS Vita Syncthing.
 /// All UI screens and modals read `&AppState` without performing I/O or mutating business rules.
@@ -96,6 +97,8 @@ pub struct AppState {
     pub qr_preview: CameraPreview,
     /// Camera failure reported while scanning (e.g. PlayStation TV has no camera).
     pub qr_camera_error: Option<String>,
+    /// Wi-Fi link reported by the system and the user's answer to the `WifiOff` prompt.
+    pub wifi: WifiState,
 }
 
 impl AppState {
@@ -156,6 +159,7 @@ impl AppState {
             fallback_keypad_visible: false,
             qr_preview: CameraPreview::default(),
             qr_camera_error: None,
+            wifi: WifiState::default(),
         }
     }
 

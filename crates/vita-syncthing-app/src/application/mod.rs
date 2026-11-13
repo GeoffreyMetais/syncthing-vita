@@ -12,6 +12,7 @@ pub mod share_creation;
 pub mod share_service;
 pub mod sync_coordinator;
 pub mod upload_activity;
+pub mod wifi_prompt;
 
 pub use controllers::{
     DashboardController, FilesController, InputController, SettingsController, SharesController,
@@ -26,3 +27,4 @@ pub use share_creation::ShareCreation;
 pub use share_service::ShareService;
 pub use sync_coordinator::SyncCoordinator;
 pub use upload_activity::UploadActivity;
+pub use wifi_prompt::{WifiChange, WifiPrompt};

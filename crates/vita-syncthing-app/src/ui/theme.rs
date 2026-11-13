@@ -32,6 +32,10 @@ pub const MANAGE_DEVICES_H: i32 = 390;
 pub const CONFIRM_QUIT_W: i32 = 720;
 pub const CONFIRM_QUIT_H: i32 = 236;
 
+/// Size of the `WifiOff` modal (same width as `ConfirmQuit`, two instruction lines).
+pub const WIFI_OFF_W: i32 = 720;
+pub const WIFI_OFF_H: i32 = 250;
+
 /// Size of the camera viewfinder in the `ScanDeviceQr` modal (`640x360` frames scaled by 3/4).
 pub const SCAN_QR_VIEW_W: i32 = 480;
 pub const SCAN_QR_VIEW_H: i32 = 270;

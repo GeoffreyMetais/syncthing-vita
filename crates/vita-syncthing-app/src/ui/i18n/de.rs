@@ -185,6 +185,16 @@ pub static STRINGS_DE: Strings = Strings {
     modal_device_id_full_label: "Vollständige 56-stellige Geräte-ID:",
     modal_device_id_scan_hint: "Auf Smartphone/PC: Syncthing > Geräte > Hinzufügen > QR scannen",
 
+    // Modals: Wi-Fi Off
+    modal_wifi_title: "Keine Wi-Fi-Verbindung",
+    modal_wifi_subtitle: "Syncthing braucht Wi-Fi, um deine Geräte zu erreichen",
+    modal_wifi_step_open:
+        "Drücke die PS-Taste und öffne Einstellungen › Netzwerk › Wi-Fi-Einstellungen.",
+    modal_wifi_step_enable: "Schalte Wi-Fi ein (und den Flugmodus aus) und kehre hierher zurück.",
+    modal_wifi_waiting: "Dieses Fenster schließt sich, sobald die PS Vita verbunden ist.",
+    action_continue_offline: "Offline fortfahren",
+    sidebar_wifi_off: "Wi-Fi aus",
+
     // Modals: Folder Offer
     modal_folder_offer_title: "Neuer freigegebener Ordner",
     modal_folder_offer_hint:
@@ -228,6 +238,7 @@ pub static MESSAGES_DE: Messages = Messages {
     added_short_id: "Kurz-ID {prefix} hinzugefügt (automatische Kopplung im LAN)",
     added_device: "Gerät {name} hinzugefügt ({short})",
     own_device_id: "Die eigene ID dieser PS Vita kann nicht hinzugefügt werden",
+    wifi_connected: "Wi-Fi verbunden",
     qr_not_device_id: "Dieser QR-Code ist keine Syncthing-Geräte-ID",
     share_deleted: "Freigabe „{label}“ gelöscht",
     link_device_to_share: "Gerät verknüpfen, um „{label}“ freizugeben",

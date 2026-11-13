@@ -1,4 +1,4 @@
-//! Input for the simple dialogs: `ShowDeviceId`, `ConfirmDeleteShare`, `ConfirmQuit`.
+//! Input for the simple dialogs: `ShowDeviceId`, `ConfirmDeleteShare`, `ConfirmQuit`, `WifiOff`.
 //! Touches arrive as the pad button of the element touched (see `ModalInput`).
 
 use super::open_add_device_modal;
@@ -47,6 +47,18 @@ pub fn confirm_quit(state: &mut AppState, input: InputFrame) -> UserCommand {
     if (input.pressed & (BTN_CIRCLE | BTN_START | BTN_SQUARE | BTN_TRIANGLE)) != 0 {
         state.modal = ModalDialog::None;
         return UserCommand::None;
+    }
+    UserCommand::None
+}
+
+/// Handles input in the `WifiOff` modal: `Circle` continues offline (the prompt does not come
+/// back until the console has been connected again), `START` asks to quit.
+pub fn wifi_off(state: &mut AppState, input: InputFrame) -> UserCommand {
+    if (input.pressed & BTN_START) != 0 {
+        state.modal = ModalDialog::ConfirmQuit;
+    } else if (input.pressed & (BTN_CIRCLE | BTN_CROSS)) != 0 {
+        state.wifi.prompt_dismissed = true;
+        state.modal = ModalDialog::None;
     }
     UserCommand::None
 }

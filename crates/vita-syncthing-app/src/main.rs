@@ -14,17 +14,17 @@ use syncthing_core::SyncControl;
 use vita_syncthing_app::application::power_policy::{cpu_clock, should_block_standby, CpuClock};
 use vita_syncthing_app::application::{
     FolderOfferService, FramePacer, FrameSignals, InputController, QrScanFlow, ShareService,
-    SyncCoordinator, UploadActivity, UserCommand,
+    SyncCoordinator, UploadActivity, UserCommand, WifiChange, WifiPrompt,
 };
 use vita_syncthing_app::domain::defaults::{
     AUTO_RECONNECT_DELAY, POWER_TICK_INTERVAL, QUIT_WORKER_WAIT, SCREENSAVER_TIMEOUT_IDLE,
-    SCREENSAVER_TIMEOUT_SYNCING,
+    SCREENSAVER_TIMEOUT_SYNCING, WIFI_POLL_INTERVAL,
 };
 use vita_syncthing_app::domain::{AppState, ModalDialog, UiText};
 use vita_syncthing_app::infrastructure::{
     detect_system_language, init_vita_network, is_on_external_power, keep_system_awake,
-    set_cpu_clock_mhz, spawn_sync_worker, wait_for_worker, ConfigRepository, IdentityStore,
-    QrScanner, VitaInput, WorkerMsg,
+    set_cpu_clock_mhz, spawn_sync_worker, wait_for_worker, wifi_link, ConfigRepository,
+    IdentityStore, QrScanner, VitaInput, WorkerMsg,
 };
 use vita_syncthing_app::ui::VitaUiRenderer;
 
@@ -145,6 +145,9 @@ fn main() {
     let mut uploads = UploadActivity::new();
     let mut pacer = FramePacer::new();
     let mut cpu = CpuClock::Full;
+    // Wi-Fi cannot be switched on by the app: the user is asked to do it (`WifiOff` modal).
+    let mut wifi = WifiPrompt::new();
+    let mut last_wifi_poll = Instant::now() - WIFI_POLL_INTERVAL;
 
     // Main interactive loop (Gamepad SceCtrl + Touch SceTouch + OLED Saver), one iteration per
     // display VBlank. Frames are only rendered when the screen changes (dynamic frame rate).
@@ -234,6 +237,20 @@ fn main() {
         let ime_open = input_ctl.is_ime_open();
         signals.user_change |= ime_open != state.ime_active;
         state.ime_active = ime_open;
+
+        if last_wifi_poll.elapsed() >= WIFI_POLL_INTERVAL {
+            last_wifi_poll = Instant::now();
+            match wifi.update(&mut state, wifi_link(), last_wifi_poll) {
+                WifiChange::None => {}
+                WifiChange::Updated => signals.background_change = true,
+                WifiChange::Restored => {
+                    signals.background_change = true;
+                    ShareService::log_event(&mut state, &repo, "Wi-Fi connected.");
+                    // Restart the worker so discovery and sessions use the new address.
+                    state.config_dirty |= state.has_configured_peers();
+                }
+            }
+        }
 
         // Reload persistent worker if share/device configuration was changed and modals are closed
         if state.config_dirty && state.modal == ModalDialog::None {
@@ -328,7 +345,8 @@ fn main() {
         // Automatic activation of OLED screensaver (pure black #000000 background):
         // - After 12 seconds of inactivity while synchronization is in progress
         // - After 45 seconds of inactivity when idle (or press SELECT anytime)
-        let oled_timeout = if state.sync_in_progress {
+        // The Wi-Fi prompt gets the longer delay: it must stay readable while the user acts on it.
+        let oled_timeout = if state.sync_in_progress && state.modal != ModalDialog::WifiOff {
             SCREENSAVER_TIMEOUT_SYNCING
         } else {
             SCREENSAVER_TIMEOUT_IDLE

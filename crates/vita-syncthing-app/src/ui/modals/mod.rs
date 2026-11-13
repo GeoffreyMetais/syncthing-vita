@@ -8,6 +8,7 @@
 //! - `confirm_quit`: Application exit confirmation modal (`ConfirmQuit`)
 //! - `confirm_delete_share`: Share deletion confirmation modal (`ConfirmDeleteShare`)
 //! - `folder_offer`: Consent dialog for a folder offered by a remote device (`FolderOffer`)
+//! - `wifi_off`: Steps to turn Wi-Fi on when the console is offline (`WifiOff`)
 
 pub mod add_device;
 pub mod confirm_delete_share;
@@ -18,6 +19,7 @@ pub mod fallback_keyboard;
 pub mod folder_offer;
 pub mod manage_devices;
 pub mod scan_qr;
+pub mod wifi_off;
 
 pub use add_device::render_add_device_modal;
 pub use confirm_delete_share::render_confirm_delete_share_modal;
@@ -27,3 +29,4 @@ pub use device_id::render_device_id_modal;
 pub use folder_offer::render_folder_offer_modal;
 pub use manage_devices::render_manage_devices_modal;
 pub use scan_qr::render_scan_qr_modal;
+pub use wifi_off::render_wifi_off_modal;

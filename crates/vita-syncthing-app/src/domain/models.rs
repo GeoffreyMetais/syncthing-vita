@@ -207,6 +207,9 @@ pub enum ModalDialog {
     FolderOffer {
         offer_idx: usize,
     },
+    /// The console has no Wi-Fi connection: asks the user to turn Wi-Fi on. Closes by itself
+    /// once connected.
+    WifiOff,
 }
 
 /// Known or discovered remote Syncthing device.

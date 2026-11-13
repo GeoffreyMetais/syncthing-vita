@@ -93,6 +93,8 @@ pub enum UiText {
     OwnDeviceId,
     InvalidDeviceId(DeviceIdParseError),
     QrNotDeviceId,
+    /// Toast once the Wi-Fi connection is back.
+    WifiConnected,
     ShareDeleted {
         label: String,
     },

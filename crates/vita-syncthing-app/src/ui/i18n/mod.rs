@@ -197,6 +197,16 @@ pub struct Strings {
     pub modal_device_id_full_label: &'static str,
     pub modal_device_id_scan_hint: &'static str,
 
+    // Modals: Wi-Fi Off
+    pub modal_wifi_title: &'static str,
+    pub modal_wifi_subtitle: &'static str,
+    pub modal_wifi_step_open: &'static str,
+    pub modal_wifi_step_enable: &'static str,
+    pub modal_wifi_waiting: &'static str,
+    pub action_continue_offline: &'static str,
+    /// Sidebar network line while the console has no Wi-Fi connection.
+    pub sidebar_wifi_off: &'static str,
+
     // Modals: Folder Offer
     pub modal_folder_offer_title: &'static str,
     pub modal_folder_offer_hint: &'static str,

@@ -94,6 +94,7 @@ impl ModalInput {
             ModalDialog::FolderOffer { offer_idx } => {
                 folder_offer::handle(state, repo, input, offer_idx)
             }
+            ModalDialog::WifiOff => dialogs::wifi_off(state, input),
         }
     }
 }

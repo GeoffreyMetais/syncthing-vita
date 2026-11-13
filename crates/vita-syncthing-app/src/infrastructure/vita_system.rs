@@ -1,6 +1,6 @@
 //! PS Vita system initialization (`SceSysmodule`, `SceSysmem`, `SceNet`, `SceNetCtl`, `SceLibKernel`, `SceAppUtil`).
 
-use crate::domain::Language;
+use crate::domain::{Language, WifiLink};
 
 #[cfg(target_os = "vita")]
 const NET_INIT_SIZE: usize = 1024 * 1024;
@@ -87,6 +87,7 @@ pub mod vita_ffi {
     extern "C" {
         pub fn sceNetCtlInit() -> c_int;
         pub fn sceNetCtlTerm();
+        pub fn sceNetCtlInetGetState(state: *mut c_int) -> c_int;
     }
 }
 
@@ -147,6 +148,35 @@ pub fn init_vita_network() -> Result<Vec<u8>, String> {
 #[cfg(not(target_os = "vita"))]
 pub fn init_vita_network() -> Result<Vec<u8>, String> {
     Ok(Vec::new())
+}
+
+/// Reports the console's Wi-Fi link (`sceNetCtlInetGetState`). Needs `init_vita_network` first.
+/// A userland application cannot switch Wi-Fi on: when it is off, the user is asked to do it
+/// (`application::WifiPrompt`).
+#[cfg(target_os = "vita")]
+pub fn wifi_link() -> WifiLink {
+    const SCE_NETCTL_STATE_DISCONNECTED: libc::c_int = 0;
+    const SCE_NETCTL_STATE_CONNECTING: libc::c_int = 1;
+    const SCE_NETCTL_STATE_FINALIZING: libc::c_int = 2;
+    const SCE_NETCTL_STATE_CONNECTED: libc::c_int = 3;
+
+    let mut state: libc::c_int = -1;
+    let ret = unsafe { vita_ffi::sceNetCtlInetGetState(&mut state) };
+    if ret < 0 {
+        return WifiLink::Unknown;
+    }
+    match state {
+        SCE_NETCTL_STATE_DISCONNECTED => WifiLink::Disconnected,
+        SCE_NETCTL_STATE_CONNECTING | SCE_NETCTL_STATE_FINALIZING => WifiLink::Connecting,
+        SCE_NETCTL_STATE_CONNECTED => WifiLink::Connected,
+        _ => WifiLink::Unknown,
+    }
+}
+
+/// Host builds use the host's network.
+#[cfg(not(target_os = "vita"))]
+pub fn wifi_link() -> WifiLink {
+    WifiLink::Connected
 }
 
 /// Keeps the PS Vita out of automatic standby (see `application::power_policy` for when).

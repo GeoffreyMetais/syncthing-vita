@@ -8,7 +8,7 @@ use crate::ui::gfx::{Gfx, GFX_H, GFX_W};
 use crate::ui::modals::{
     render_add_device_modal, render_confirm_delete_share_modal, render_confirm_quit_modal,
     render_create_share_modal, render_device_id_modal, render_folder_offer_modal,
-    render_manage_devices_modal, render_scan_qr_modal,
+    render_manage_devices_modal, render_scan_qr_modal, render_wifi_off_modal,
 };
 use crate::ui::screens::{
     render_dashboard_tab, render_folder_picker_tab, render_oled_screensaver, render_settings_tab,
@@ -110,6 +110,9 @@ pub fn draw_frame(gfx: &mut Gfx, state: &mut AppState) {
         }
         ModalDialog::FolderOffer { offer_idx } => {
             render_folder_offer_modal(gfx, &th, state, offer_idx, &mut hits);
+        }
+        ModalDialog::WifiOff => {
+            render_wifi_off_modal(gfx, &th, state, &mut hits);
         }
     }
 

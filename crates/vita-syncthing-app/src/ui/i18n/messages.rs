@@ -68,6 +68,7 @@ pub struct Messages {
     /// `{name}`, `{short}`.
     pub added_device: &'static str,
     pub own_device_id: &'static str,
+    pub wifi_connected: &'static str,
     pub qr_not_device_id: &'static str,
     /// `{label}`.
     pub share_deleted: &'static str,
@@ -178,6 +179,7 @@ impl Strings {
             UiText::LinkDeviceFirst => m.link_device_first,
             UiText::OwnDeviceId => m.own_device_id,
             UiText::QrNotDeviceId => m.qr_not_device_id,
+            UiText::WifiConnected => m.wifi_connected,
             UiText::NoDeclinedFolders => m.no_declined_folders,
             UiText::NoDevicesLinked => m.no_devices_linked,
             UiText::InvalidDeviceId(err) => return Cow::Owned(self.device_id_error(*err)),

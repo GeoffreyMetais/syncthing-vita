@@ -8,6 +8,7 @@ pub mod interaction;
 pub mod models;
 pub mod navigation;
 pub mod ui_text;
+pub mod wifi;
 
 pub use app_state::AppState;
 pub use initial_sync::InitialSyncPeers;
@@ -23,3 +24,4 @@ pub use navigation::{
     SETTINGS_ROW_DISPLAY, SETTINGS_ROW_LANGUAGE, TAB_ORDER,
 };
 pub use ui_text::UiText;
+pub use wifi::{WifiLink, WifiState};

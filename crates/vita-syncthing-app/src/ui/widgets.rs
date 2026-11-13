@@ -334,7 +334,8 @@ pub fn draw_chrome(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut Hit
 
     // Sidebar bottom Wi-Fi & version status
     let base = HINT_Y - 18;
-    let wifi_ok = state.status_line != UiText::ScanningLan;
+    let wifi_off = state.wifi.is_offline();
+    let wifi_ok = !wifi_off && state.status_line != UiText::ScanningLan;
     gfx.icon(
         Icon::Wifi,
         30.0,
@@ -342,7 +343,9 @@ pub fn draw_chrome(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut Hit
         18.0,
         if wifi_ok { C_GOOD } else { C_WARN },
     );
-    let net_txt = if wifi_ok {
+    let net_txt = if wifi_off {
+        s.sidebar_wifi_off
+    } else if wifi_ok {
         s.protocol_tls
     } else {
         s.protocol_discovery

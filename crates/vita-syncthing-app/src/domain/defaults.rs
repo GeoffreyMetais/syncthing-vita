@@ -28,6 +28,11 @@ pub const RETRY_AFTER_ERROR: Duration = Duration::from_secs(3);
 pub const NO_ADDRESS_POLL: Duration = Duration::from_millis(300);
 /// Delay before the main loop restarts a sync worker that stopped on its own.
 pub const AUTO_RECONNECT_DELAY: Duration = Duration::from_secs(2);
+/// Interval at which the Wi-Fi link state is polled.
+pub const WIFI_POLL_INTERVAL: Duration = Duration::from_secs(1);
+/// How long the console must stay disconnected before the user is asked to turn Wi-Fi on
+/// (a short drop while roaming or resuming from standby does not prompt).
+pub const WIFI_PROMPT_DELAY: Duration = Duration::from_secs(2);
 /// How long quitting waits for the sync worker to stop cleanly.
 pub const QUIT_WORKER_WAIT: Duration = Duration::from_secs(3);
 
