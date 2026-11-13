@@ -19,7 +19,7 @@ syncthing-vita
 ├── Cargo.toml                        # Workspace manifest (Edition 2021, LTO + opt-level = "z")
 ├── Justfile                          # Task runner (test-host, check-vita, build-vita, vpk)
 ├── scripts/build_vpk.sh              # Full VPK build pipeline (vita-elf-create, vita-make-fself, vita-mksfoex, vita-pack-vpk)
-├── scripts/gen_icon.py               # Generates the LiveArea icon (assets/sce_sys/icon0.png: PS Vita + Syncthing emblem)
+├── scripts/gen_livearea.py           # Generates the LiveArea images (assets/sce_sys/: icon, background, gate — PS Vita + Syncthing emblem)
 └── crates/
     ├── syncthing-core/               # Platform-independent Syncthing BEP/1.0 & Discovery engine
     │   ├── src/
@@ -38,7 +38,7 @@ syncthing-vita
     │   └── tests/                    # Integration tests, one file per module (+ common/ helpers)
     └── vita-syncthing-app/           # Native PlayStation Vita GUI application (Title ID: SYNCTHING, Clean Architecture)
         ├── assets/fonts/             # Embedded Poppins TrueType fonts (Regular, Medium, Bold — SIL OFL 1.1)
-        ├── assets/sce_sys/icon0.png  # LiveArea bubble icon (128x128, 8-bit indexed PNG, packed into the VPK)
+        ├── assets/sce_sys/           # Packed into the VPK: icon0.png (128x128), livearea/contents/{bg.png (840x500), startup.png (280x158), template.xml}; 8-bit indexed PNGs
         ├── tests/                    # Integration tests, one file per use case / component (+ common/ helpers)
         └── src/
             ├── lib.rs                # Library target: declares the four layers ONLY (no logic, no tests)
