@@ -14,7 +14,7 @@ use syncthing_core::SyncControl;
 use vita_syncthing_app::application::power_policy::{cpu_clock, should_block_standby, CpuClock};
 use vita_syncthing_app::application::{
     DevicesScan, FolderOfferService, FramePacer, FrameSignals, InputController, QrScanFlow,
-    ShareService, SyncCoordinator, UserCommand,
+    ShareService, SyncCoordinator, UploadActivity, UserCommand,
 };
 use vita_syncthing_app::domain::defaults::{
     AUTO_RECONNECT_DELAY, POWER_TICK_INTERVAL, QUIT_WORKER_WAIT, SCREENSAVER_TIMEOUT_IDLE,
@@ -142,6 +142,7 @@ fn main() {
     let mut last_power_tick = Instant::now() - POWER_TICK_INTERVAL;
     let mut seen_transfer_activity = state.transfer_activity;
     let mut last_transfer_at: Option<Instant> = None;
+    let mut uploads = UploadActivity::new();
     let mut pacer = FramePacer::new();
     let mut cpu = CpuClock::Full;
 
@@ -287,6 +288,7 @@ fn main() {
         let was_running = worker_rx.is_some();
         signals.background_change |=
             SyncCoordinator::process_worker_messages(&mut state, &repo, &mut worker_rx);
+        signals.background_change |= uploads.update(&mut state, Instant::now());
         FolderOfferService::prompt_next(&mut state);
         if was_running && worker_rx.is_none() {
             worker_ctl = None;

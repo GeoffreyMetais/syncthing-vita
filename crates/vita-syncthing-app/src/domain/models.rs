@@ -111,6 +111,20 @@ impl LanguagePreference {
     }
 }
 
+/// Current activity of the sync engine, as summarized by the sidebar transfer card and the
+/// OLED screensaver (`AppState::sync_activity`).
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SyncActivity {
+    /// Blocks are being downloaded from a peer.
+    Downloading,
+    /// Blocks are being served to a peer (persistent session, nothing to download).
+    Uploading,
+    /// A persistent session is connected and every linked peer is up to date.
+    Ready,
+    /// No connected session (connecting, retrying, stopped or never started).
+    Idle,
+}
+
 /// Colour theme modes supported by the UI.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum ThemeMode {

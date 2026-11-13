@@ -57,6 +57,7 @@ impl SyncCoordinator {
                         allow_auto_reconnect,
                     } => {
                         state.sync_in_progress = false;
+                        state.uploading = false;
                         state.session_connected = false;
                         state.initial_sync.clear();
                         state.auto_reconnect_enabled = allow_auto_reconnect;
@@ -189,6 +190,7 @@ impl SyncCoordinator {
                 name, offset, size, ..
             } => {
                 state.blocks_uploaded += 1;
+                state.uploading = true;
                 state.transfer_activity += 1;
                 state.bytes_transferred += size;
                 state.current_file = UiText::Raw(name.clone());

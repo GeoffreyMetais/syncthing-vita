@@ -298,10 +298,7 @@ pub fn fmt_saver_syncing(pct: Option<u32>, current_file: &str) -> String {
     }
 }
 
-/// Formats the screensaver idle status line.
-pub fn fmt_saver_idle(pct: Option<u32>, status_line: &str) -> String {
-    match pct {
-        Some(p) => format!("Idle ({p}%) · {status_line}"),
-        None => format!("Idle · {status_line}"),
-    }
+/// Formats the screensaver status line while blocks are served to a peer.
+pub fn fmt_saver_uploading(current_file: &str) -> String {
+    format!("Uploading · {current_file}")
 }

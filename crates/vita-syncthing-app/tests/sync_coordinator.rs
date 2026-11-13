@@ -1,10 +1,12 @@
 mod common;
 
 use std::sync::mpsc;
+use std::time::{Duration, Instant};
 
 use syncthing_core::{DeviceId, SyncEvent};
-use vita_syncthing_app::application::SyncCoordinator;
-use vita_syncthing_app::domain::{AppState, UiText};
+use vita_syncthing_app::application::upload_activity::UPLOAD_DISPLAY_GRACE;
+use vita_syncthing_app::application::{SyncCoordinator, UploadActivity};
+use vita_syncthing_app::domain::{AppState, SyncActivity, UiText};
 use vita_syncthing_app::infrastructure::{ConfigRepository, WorkerMsg};
 
 #[test]
@@ -142,4 +144,79 @@ fn test_sidebar_ready_only_once_the_session_is_connected_and_idle() {
     .unwrap();
     SyncCoordinator::process_worker_messages(&mut state, &repo, &mut worker_rx);
     assert!(!state.is_sync_ready());
+}
+
+#[test]
+fn test_serving_blocks_in_a_ready_session_is_shown_as_uploading_then_ready() {
+    let repo = ConfigRepository::new(&common::temp_test_dir("sync-coordinator-uploading"));
+    let mut state = AppState::new(Vec::new(), Vec::new(), "ux0:");
+    let (tx, rx) = mpsc::channel();
+    let mut worker_rx = Some(rx);
+    let mut uploads = UploadActivity::new();
+    let start = Instant::now();
+
+    tx.send(WorkerMsg::SyncEvent(SyncEvent::SyncCycleCompleted {
+        peer_device_id: DeviceId([5; 32]),
+        active_connections: 1,
+        files_up_to_date: 1,
+        files_downloaded: 0,
+        bytes_downloaded: 0,
+        blocks_uploaded: 0,
+        bytes_uploaded: 0,
+    }))
+    .unwrap();
+    SyncCoordinator::process_worker_messages(&mut state, &repo, &mut worker_rx);
+    assert_eq!(state.sync_activity(), SyncActivity::Ready);
+
+    // The peer requests a block: uploading, never "idle" with a stale 100%.
+    tx.send(WorkerMsg::SyncEvent(SyncEvent::BlockUploaded {
+        folder: "vita-savedata".to_owned(),
+        name: "save.bin".to_owned(),
+        offset: 0,
+        size: 10,
+    }))
+    .unwrap();
+    SyncCoordinator::process_worker_messages(&mut state, &repo, &mut worker_rx);
+    assert!(!uploads.update(&mut state, start));
+    assert_eq!(state.sync_activity(), SyncActivity::Uploading);
+
+    // Still uploading within the grace period...
+    assert!(!uploads.update(&mut state, start + UPLOAD_DISPLAY_GRACE));
+    assert_eq!(state.sync_activity(), SyncActivity::Uploading);
+
+    // ...then back to Ready once the peer stopped requesting blocks.
+    let later = start + UPLOAD_DISPLAY_GRACE + Duration::from_secs(1);
+    assert!(uploads.update(&mut state, later));
+    assert_eq!(state.sync_activity(), SyncActivity::Ready);
+    assert!(!uploads.update(&mut state, later));
+
+    // A download takes precedence over serving blocks.
+    for event in [
+        SyncEvent::BlockUploaded {
+            folder: "vita-savedata".to_owned(),
+            name: "a.bin".to_owned(),
+            offset: 0,
+            size: 10,
+        },
+        SyncEvent::BlockDownloaded {
+            folder: "vita-savedata".to_owned(),
+            name: "b.bin".to_owned(),
+            offset: 0,
+            size: 10,
+            total_size: 100,
+        },
+    ] {
+        tx.send(WorkerMsg::SyncEvent(event)).unwrap();
+    }
+    SyncCoordinator::process_worker_messages(&mut state, &repo, &mut worker_rx);
+    assert_eq!(state.sync_activity(), SyncActivity::Downloading);
+
+    // The worker ending clears every activity.
+    tx.send(WorkerMsg::Finished {
+        summary: UiText::SyncFinished,
+        allow_auto_reconnect: true,
+    })
+    .unwrap();
+    SyncCoordinator::process_worker_messages(&mut state, &repo, &mut worker_rx);
+    assert_eq!(state.sync_activity(), SyncActivity::Idle);
 }

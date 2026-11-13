@@ -81,6 +81,7 @@ pub struct Strings {
     pub app_title: &'static str,
     pub app_version_label: &'static str,
     pub sidebar_syncing: &'static str,
+    pub sidebar_uploading: &'static str,
     pub sidebar_last_sync: &'static str,
     pub protocol_tls: &'static str,
     pub protocol_discovery: &'static str,
@@ -345,19 +346,14 @@ impl Strings {
         }
     }
 
-    /// Formats the screensaver idle status line.
-    pub fn fmt_saver_idle(&self, pct: Option<u32>, status_line: &str) -> String {
-        match (self.language, pct) {
-            (Language::French, Some(p)) => format!("Inactif ({p}%) · {status_line}"),
-            (Language::French, None) => format!("Inactif · {status_line}"),
-            (Language::Spanish, Some(p)) => format!("Inactivo ({p}%) · {status_line}"),
-            (Language::Spanish, None) => format!("Inactivo · {status_line}"),
-            (Language::German, Some(p)) => format!("Inaktiv ({p}%) · {status_line}"),
-            (Language::German, None) => format!("Inaktiv · {status_line}"),
-            (Language::Italian, Some(p)) => format!("Inattivo ({p}%) · {status_line}"),
-            (Language::Italian, None) => format!("Inattivo · {status_line}"),
-            (Language::English, Some(p)) => format!("Idle ({p}%) · {status_line}"),
-            (Language::English, None) => format!("Idle · {status_line}"),
+    /// Formats the screensaver status line while blocks are served to a peer.
+    pub fn fmt_saver_uploading(&self, current_file: &str) -> String {
+        match self.language {
+            Language::French => format!("Envoi · {current_file}"),
+            Language::Spanish => format!("Enviando · {current_file}"),
+            Language::German => format!("Sende · {current_file}"),
+            Language::Italian => format!("Invio · {current_file}"),
+            Language::English => format!("Uploading · {current_file}"),
         }
     }
 }
