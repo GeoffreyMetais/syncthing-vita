@@ -14,7 +14,6 @@
 //! The main loop still wakes up on every VBlank (60 Hz) to poll input, which is cheap compared
 //! to rendering a frame.
 
-
 pub use crate::domain::defaults::{
     ANIMATION_INTERVAL, BACKGROUND_INTERVAL, IDLE_REFRESH_INTERVAL, VBLANK_HZ,
 };

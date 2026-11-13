@@ -66,8 +66,8 @@ pub const TAB_SHARES: &str = "Shares";
 pub const TAB_FILES: &str = "Files";
 pub const TAB_SETTINGS: &str = "Settings";
 pub const APP_TITLE: &str = "VitaSync";
-pub const APP_VERSION_LABEL: &str = "v0.1.0 · Pure Rust";
-pub const SIDEBAR_SYNCING: &str = "Syncing BEP/1.0...";
+pub const APP_VERSION_LABEL: &str = "v0.1.0";
+pub const SIDEBAR_SYNCING: &str = "Syncing...";
 pub const SIDEBAR_LAST_SYNC: &str = "Last sync session";
 pub const PROTOCOL_TLS: &str = "BEP/1.0 TLS 1.3";
 pub const PROTOCOL_DISCOVERY: &str = "UDP 21027...";
@@ -145,16 +145,14 @@ pub const SETTINGS_TITLE: &str = "Settings & Log";
 pub const SETTINGS_SUBTITLE: &str = "Display & BEP/1.0";
 pub const SETTINGS_SEC_DISPLAY: &str = "DISPLAY AND OLED SAVER";
 pub const SETTINGS_LABEL_COLOUR_THEME: &str = "Colour Theme";
-pub const SETTINGS_DESC_THEME_DARK: &str =
-    "Dark — VitaSend slate blue-grey look with teal accent";
+pub const SETTINGS_DESC_THEME_DARK: &str = "Dark — VitaSend slate blue-grey look with teal accent";
 pub const SETTINGS_DESC_THEME_OLED: &str =
-    "OLED — Pure #000000 black background (saves PS Vita OLED battery)";
+    "OLED — Pure black background (saves PS Vita OLED battery)";
 pub const SETTINGS_SAVER_AUTO_HINT: &str =
     "OLED Screensaver activates automatically after 12s during sync (or press SELECT anytime).";
 pub const SETTINGS_SEC_LOG: &str = "BEP/1.0 & TLS 1.3 PROTOCOL LOG";
 pub const SETTINGS_SEC_DECLINED: &str = "DECLINED FOLDERS";
-pub const SETTINGS_NO_DECLINED: &str =
-    "None · folders offered by peers are always asked first";
+pub const SETTINGS_NO_DECLINED: &str = "None · folders offered by peers are always asked first";
 
 // ============================================================================
 // Screensaver
@@ -170,8 +168,7 @@ pub const SAVER_WAKE_HINT: &str = "Touch screen or press any button to wake";
 pub const MODAL_CREATE_SHARE_TITLE: &str = "Create New Share";
 pub const MODAL_CREATE_SHARE_SUBTITLE: &str =
     "Choose a PS Vita folder preset or browse ux0: to create a new Syncthing share";
-pub const MODAL_CREATE_SHARE_BROWSE_SUB: &str =
-    "Open the interactive ux0: directory browser";
+pub const MODAL_CREATE_SHARE_BROWSE_SUB: &str = "Open the interactive ux0: directory browser";
 
 // Manage Devices Modal
 pub const MODAL_MANAGE_DEVICES_DEFAULT_TITLE: &str = "Share";
@@ -189,8 +186,7 @@ pub const MODAL_MANAGE_DEVICES_EMPTY_HINT: &str =
 pub const MODAL_ADD_DEVICE_TITLE: &str = "Add Remote Device by ID";
 pub const MODAL_ADD_DEVICE_SUBTITLE: &str =
     "Enter the 7-character Short ID (recommended) or full 56-character Syncthing Device ID";
-pub const MODAL_ADD_DEVICE_EXAMPLE: &str =
-    "e.g. MFZWI3D  or  MFZWI3D-BONSGYC-... (tap to type)";
+pub const MODAL_ADD_DEVICE_EXAMPLE: &str = "e.g. MFZWI3D  or  MFZWI3D-BONSGYC-... (tap to type)";
 pub const MODAL_ADD_DEVICE_TIP: &str =
     "Tip: You only need the first 7 characters (Short ID shown in Syncthing Web UI).";
 pub const MODAL_ADD_DEVICE_PLACEHOLDER: &str = "Enter 7-char Short ID or 56-char Full ID...";
@@ -209,10 +205,8 @@ pub const MODAL_DELETE_SHARE_DECLINE_HINT: &str =
 pub const MODAL_QUIT_TITLE: &str = "Quit VitaSync?";
 pub const MODAL_QUIT_SUBTITLE: &str =
     "Confirm whether to close the application and return to LiveArea";
-pub const MODAL_QUIT_SYNCING_WARN: &str =
-    "A BEP/1.0 synchronization is currently in progress.";
-pub const MODAL_QUIT_SYNCING_HINT: &str =
-    "Quitting now will interrupt active file transfers.";
+pub const MODAL_QUIT_SYNCING_WARN: &str = "A BEP/1.0 synchronization is currently in progress.";
+pub const MODAL_QUIT_SYNCING_HINT: &str = "Quitting now will interrupt active file transfers.";
 pub const MODAL_QUIT_IDLE_READY: &str = "Are you sure you want to exit VitaSync?";
 pub const MODAL_QUIT_IDLE_HINT: &str =
     "All share configurations and device settings are saved on ux0:.";
@@ -222,10 +216,8 @@ pub const MODAL_DEVICE_ID_TITLE: &str = "PS Vita Syncthing Device ID";
 pub const MODAL_DEVICE_ID_SUBTITLE: &str =
     "Scan this QR code in Syncthing (Add Remote Device) or enter the 56-character ID";
 pub const MODAL_DEVICE_ID_SCAN_WEB: &str = "Scan QR in Syncthing Web / Mobile UI";
-pub const MODAL_DEVICE_ID_DEV_NAME: &str =
-    "Device Name: PlayStation Vita (vita-syncthing)";
-pub const MODAL_DEVICE_ID_CERT_PATH: &str =
-    "Identity Cert: ux0:data/syncthing/cert.der";
+pub const MODAL_DEVICE_ID_DEV_NAME: &str = "Device Name: PlayStation Vita (vita-syncthing)";
+pub const MODAL_DEVICE_ID_CERT_PATH: &str = "Identity Cert: ux0:data/syncthing/cert.der";
 pub const MODAL_DEVICE_ID_SHORT_LABEL: &str = "Short ID (LAN discovery):";
 pub const MODAL_DEVICE_ID_FULL_LABEL: &str = "Full 56-Character Device ID:";
 pub const MODAL_DEVICE_ID_SCAN_HINT: &str =

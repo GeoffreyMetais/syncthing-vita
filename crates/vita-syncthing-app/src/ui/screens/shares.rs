@@ -13,8 +13,13 @@ use crate::ui::widgets::{action_width, draw_action_hotspot, draw_card, draw_chip
 /// Shares visible at once; the list scrolls with the selection beyond that.
 const VISIBLE_SHARES: usize = 4;
 /// Height of a share card and vertical distance between two cards.
-const SHARE_CARD_H: i32 = 64;
-const SHARE_CARD_STEP: i32 = 72;
+/// Three text lines (title, target path, linked devices); four cards fit in the content area.
+const SHARE_CARD_H: i32 = 68;
+const SHARE_CARD_STEP: i32 = 73;
+/// Vertical centre of each text line, from the top of the card.
+const TITLE_DY: i32 = 17;
+const PATH_DY: i32 = 37;
+const DEVICES_DY: i32 = 54;
 /// Height of the card shown when no share is configured.
 const EMPTY_CARD_H: i32 = 118;
 
@@ -103,11 +108,11 @@ fn draw_share_card(
     });
 
     let lx = CONTENT_X + 14;
-    gfx.rrect(lx, ry + 10, 44, 44, 12, th.accent_bg);
+    gfx.rrect(lx, ry + (SHARE_CARD_H - 44) / 2, 44, 44, 12, th.accent_bg);
     gfx.icon(
         Icon::Folder,
         (lx + 22) as f32,
-        (ry + 32) as f32,
+        (ry + SHARE_CARD_H / 2) as f32,
         24.0,
         if share.enabled { th.accent_hi } else { th.dim },
     );
@@ -167,11 +172,11 @@ fn draw_share_card(
     } else {
         (s.status_paused, C_WARN)
     };
-    let chip_w = draw_chip(gfx, tx + max_w, ry + 21, status_txt, status_col);
+    let chip_w = draw_chip(gfx, tx + max_w, ry + TITLE_DY, status_txt, status_col);
     let title = s.fmt_share_title(&share.label, &share.folder_id);
     gfx.text_fit(
         tx,
-        ry + 21,
+        ry + TITLE_DY,
         max_w - chip_w - 10,
         16,
         FontWeight::Bold,
@@ -180,36 +185,31 @@ fn draw_share_card(
         &title,
     );
 
-    // Line 2: target path, then the linked devices. The path keeps its full width unless the
-    // devices need more than what is left (they get at least 40% of the line).
-    let summary = state.share_devices_summary(share);
-    let devices = s.text(&summary);
-    let devices_w = gfx.text_width(13, FontWeight::Regular, &devices);
-    let path_max = max_w - 14 - devices_w.min(max_w * 2 / 5);
-    let path_w = gfx.text_fit(
+    // Line 2: target path. Line 3: the linked devices ("Shared with: ...").
+    gfx.text_fit(
         tx,
-        ry + 45,
-        path_max,
+        ry + PATH_DY,
+        max_w,
         13,
         FontWeight::Medium,
         th.accent_hi,
         Align::Left,
         &share.target_path,
     );
+    let summary = state.share_devices_summary(share);
     let dev_col = if share.shared_devices.is_empty() {
         C_WARN
     } else {
         th.dim
     };
-    let dev_x = tx + path_w + 14;
     gfx.text_fit(
-        dev_x,
-        ry + 45,
-        tx + max_w - dev_x,
-        13,
+        tx,
+        ry + DEVICES_DY,
+        max_w,
+        12,
         FontWeight::Regular,
         dev_col,
         Align::Left,
-        &devices,
+        &s.text(&summary),
     );
 }

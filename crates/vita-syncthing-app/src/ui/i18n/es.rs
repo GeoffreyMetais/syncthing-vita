@@ -1,7 +1,7 @@
 //! Spanish (`es`) string catalog for VitaSyncthing.
 
-use crate::domain::Language;
 use super::{Messages, Strings};
+use crate::domain::Language;
 
 pub static STRINGS_ES: Strings = Strings {
     messages: &MESSAGES_ES,
@@ -57,8 +57,8 @@ pub static STRINGS_ES: Strings = Strings {
     tab_files: "Archivos",
     tab_settings: "Ajustes",
     app_title: "VitaSync",
-    app_version_label: "v0.1.0 · Pure Rust",
-    sidebar_syncing: "Sincronizando BEP/1.0...",
+    app_version_label: "v0.1.0",
+    sidebar_syncing: "Sincronizando...",
     sidebar_last_sync: "Última sesión",
     protocol_tls: "BEP/1.0 TLS 1.3",
     protocol_discovery: "UDP 21027...",
@@ -101,7 +101,8 @@ pub static STRINGS_ES: Strings = Strings {
 
     // Screen 2: Shared Folders
     msg_no_shares: "No hay carpetas compartidas configuradas aún",
-    msg_no_shares_hint_1: "Pulsa Triángulo (Nueva carpeta) para crear una carpeta y vincular un dispositivo,",
+    msg_no_shares_hint_1:
+        "Pulsa Triángulo (Nueva carpeta) para crear una carpeta y vincular un dispositivo,",
     msg_no_shares_hint_2: "o toca la tarjeta de sincronización para importar carpetas compartidas.",
 
     // Screen 3: Files & Folder Picker
@@ -116,8 +117,9 @@ pub static STRINGS_ES: Strings = Strings {
     settings_sec_display: "PANTALLA Y SALVAPANTALLAS OLED",
     settings_label_colour_theme: "Tema de color",
     settings_desc_theme_dark: "Oscuro — Diseño azul pizarra VitaSend con acento turquesa",
-    settings_desc_theme_oled: "OLED — Fondo negro puro #000000 (ahorra batería en PS Vita OLED)",
-    settings_saver_auto_hint: "El salvapantallas OLED se activa tras 12s al sincronizar (o botón SELECT).",
+    settings_desc_theme_oled: "OLED — Fondo negro puro (ahorra batería en PS Vita OLED)",
+    settings_saver_auto_hint:
+        "El salvapantallas OLED se activa tras 12s al sincronizar (o botón SELECT).",
     settings_sec_devices: "DISPOSITIVOS Y VINCULACIÓN",
     settings_desc_devices: "Añadir un dispositivo o ver el ID de esta PS Vita",
     settings_sec_log: "REGISTRO DE PROTOCOLO BEP/1.0 Y TLS 1.3",
@@ -137,15 +139,19 @@ pub static STRINGS_ES: Strings = Strings {
 
     // Modals: Manage Devices
     modal_manage_devices_default_title: "Carpeta",
-    modal_manage_devices_subtitle_incomplete: "Vincula al menos un dispositivo para crear esta carpeta",
-    modal_manage_devices_subtitle: "Marca los dispositivos Syncthing que deben sincronizar esta carpeta",
+    modal_manage_devices_subtitle_incomplete:
+        "Vincula al menos un dispositivo para crear esta carpeta",
+    modal_manage_devices_subtitle:
+        "Marca los dispositivos Syncthing que deben sincronizar esta carpeta",
     modal_manage_devices_scanning: "Buscando pares Syncthing en LAN (UDP 21027 + TCP 22000)...",
     modal_manage_devices_empty: "No se descubrieron dispositivos Syncthing remotos aún.",
-    modal_manage_devices_empty_hint: "Pulsa Cuadrado (Añadir por ID) o Triángulo para escanear LAN.",
+    modal_manage_devices_empty_hint:
+        "Pulsa Cuadrado (Añadir por ID) o Triángulo para escanear LAN.",
 
     // Modals: Add Device
     modal_add_device_title: "Añadir dispositivo remoto por ID",
-    modal_add_device_subtitle: "Introduce el ID corto de 7 caracteres o el ID completo de 56 caracteres",
+    modal_add_device_subtitle:
+        "Introduce el ID corto de 7 caracteres o el ID completo de 56 caracteres",
     modal_add_device_example: "ej. MFZWI3D  o  MFZWI3D-BONSGYC-... (toca para escribir)",
     modal_add_device_tip: "Consejo: Solo necesitas los primeros 7 caracteres (ID corto).",
     modal_add_device_placeholder: "Introduce ID corto de 7 car. o completo de 56 car...",
@@ -155,8 +161,10 @@ pub static STRINGS_ES: Strings = Strings {
 
     // Modals: Confirm Delete
     modal_delete_share_title: "¿Eliminar esta carpeta?",
-    modal_delete_share_subtitle: "La carpeta dejará de sincronizarse con todos los dispositivos vinculados",
-    modal_delete_share_decline_hint: "Las ofertas futuras de pares se rechazarán (deshacer en Ajustes).",
+    modal_delete_share_subtitle:
+        "La carpeta dejará de sincronizarse con todos los dispositivos vinculados",
+    modal_delete_share_decline_hint:
+        "Las ofertas futuras de pares se rechazarán (deshacer en Ajustes).",
 
     // Modals: Confirm Quit
     modal_quit_title: "¿Salir de VitaSync?",
@@ -168,7 +176,8 @@ pub static STRINGS_ES: Strings = Strings {
 
     // Modals: Device ID
     modal_device_id_title: "ID del dispositivo PS Vita Syncthing",
-    modal_device_id_subtitle: "Escanea este código QR en Syncthing o introduce el ID de 56 caracteres",
+    modal_device_id_subtitle:
+        "Escanea este código QR en Syncthing o introduce el ID de 56 caracteres",
     modal_device_id_scan_web: "Escanea en Syncthing (Web / Móvil)",
     modal_device_id_dev_name: "Nombre del dispositivo: PlayStation Vita (vita-syncthing)",
     modal_device_id_cert_path: "Certificado de identidad: ux0:data/syncthing/cert.der",
@@ -178,7 +187,8 @@ pub static STRINGS_ES: Strings = Strings {
 
     // Modals: Folder Offer
     modal_folder_offer_title: "Nueva carpeta compartida",
-    modal_folder_offer_hint: "Acepta para elegir una carpeta en ux0:. Nada se sincroniza hasta activarla.",
+    modal_folder_offer_hint:
+        "Acepta para elegir una carpeta en ux0:. Nada se sincroniza hasta activarla.",
 
     // Modals: Scan QR
     modal_scan_qr_title: "Escanear código QR del dispositivo",

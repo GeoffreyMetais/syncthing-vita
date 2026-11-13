@@ -61,7 +61,6 @@ pub fn draw_frame(gfx: &mut Gfx, state: &mut AppState) {
         state.clamp_picker_scroll();
     }
 
-
     if state.oled_saver_active {
         render_oled_screensaver(gfx, &th, state);
         state.hit_map = hits;

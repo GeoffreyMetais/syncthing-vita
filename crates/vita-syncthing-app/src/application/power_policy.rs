@@ -11,7 +11,6 @@ use std::time::Duration;
 
 pub use crate::domain::defaults::{CPU_INTERACTIVE_GRACE, CPU_TRANSFER_GRACE, TRANSFER_GRACE};
 
-
 /// Returns `true` if automatic standby should be blocked right now.
 ///
 /// - `sync_active`: a sync worker is running or allowed to reconnect.
@@ -27,7 +26,6 @@ pub fn should_block_standby(
     }
     charging || since_last_transfer.is_some_and(|d| d <= TRANSFER_GRACE)
 }
-
 
 /// ARM CPU clock level of the PS Vita.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

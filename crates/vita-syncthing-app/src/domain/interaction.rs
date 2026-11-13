@@ -175,8 +175,16 @@ impl HitMap {
     /// Action triggered by face button `key`: an element of the selected list row
     /// `selected_row` first (it is the one the user is looking at), else a page-level element
     /// (page header, hint bar). Elements of the other rows never answer.
-    pub fn shortcut_action(&self, key: ShortcutKey, selected_row: Option<usize>) -> Option<UiAction> {
-        let with_key = || self.hotspots.iter().filter(move |h| h.shortcut == Some(key));
+    pub fn shortcut_action(
+        &self,
+        key: ShortcutKey,
+        selected_row: Option<usize>,
+    ) -> Option<UiAction> {
+        let with_key = || {
+            self.hotspots
+                .iter()
+                .filter(move |h| h.shortcut == Some(key))
+        };
         let row_of = |h: &Hotspot| h.focus.and_then(|f| f.row());
         selected_row
             .and_then(|selected| with_key().find(|h| row_of(h) == Some(selected)))

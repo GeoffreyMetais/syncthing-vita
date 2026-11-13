@@ -104,7 +104,9 @@ impl InputController {
         // `Overview`, the buttons of a share row answer only while that row has the focus
         // (`Triangle` is `Folder` there, `New Share` elsewhere).
         let selected_row = match state.active_tab {
-            ActiveTab::Dashboard => state.is_share_row_focused().then_some(state.selected_share_idx),
+            ActiveTab::Dashboard => state
+                .is_share_row_focused()
+                .then_some(state.selected_share_idx),
             ActiveTab::FolderPicker => Some(state.selected_picker_idx),
             ActiveTab::Settings => Some(0),
         };
