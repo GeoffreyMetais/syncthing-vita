@@ -10,7 +10,9 @@ use crate::domain::models::{
 };
 use crate::domain::initial_sync::InitialSyncPeers;
 use crate::domain::interaction::{FocusSlot, HitMap};
-use crate::domain::navigation::{default_col, NavFocus, NavState};
+use crate::domain::navigation::{
+    default_col, starts_on_header, NavFocus, NavState, DASHBOARD_HEADER_ACTIONS,
+};
 use crate::domain::ui_text::UiText;
 
 /// Pure application state for PS Vita Syncthing.
@@ -213,23 +215,23 @@ impl AppState {
     /// Resets the focused page element after the active tab changed (focus side is kept).
     pub fn reset_nav_for_tab(&mut self) {
         self.nav.col = default_col(self.active_tab);
-        self.nav.header = false;
+        self.nav.header = starts_on_header(self.active_tab);
         self.nav.row = 0;
     }
 
     /// D-pad focus position on the current page (meaningful while the page has focus).
     pub fn focus_slot(&self) -> FocusSlot {
         match self.active_tab {
+            ActiveTab::Dashboard if self.nav.header || self.shares.is_empty() => {
+                FocusSlot::Header {
+                    col: self.nav.col.min(DASHBOARD_HEADER_ACTIONS - 1),
+                }
+            }
             ActiveTab::Dashboard => FocusSlot::RowAction {
-                row: 0,
-                col: self.nav.col,
-            },
-            ActiveTab::Shares if self.nav.header => FocusSlot::Header,
-            ActiveTab::Shares => FocusSlot::RowAction {
                 row: self.selected_share_idx,
                 col: self.nav.col,
             },
-            ActiveTab::FolderPicker if self.nav.header => FocusSlot::Header,
+            ActiveTab::FolderPicker if self.nav.header => FocusSlot::Header { col: 0 },
             ActiveTab::FolderPicker => FocusSlot::RowAction {
                 row: self.selected_picker_idx,
                 col: 0,

@@ -102,9 +102,9 @@ impl InputController {
 
         // 5. Face buttons trigger the element (button or hint) that displays them
         let selected_row = match state.active_tab {
-            ActiveTab::Shares => state.selected_share_idx,
+            ActiveTab::Dashboard => state.selected_share_idx,
             ActiveTab::FolderPicker => state.selected_picker_idx,
-            ActiveTab::Dashboard | ActiveTab::Settings => 0,
+            ActiveTab::Settings => 0,
         };
         let shortcut = SHORTCUT_BUTTONS
             .iter()
@@ -133,9 +133,7 @@ impl InputController {
             | UiAction::SelectShare(_)
             | UiAction::ManageDevices(_)
             | UiAction::DeleteShare(_)
-            | UiAction::ChangeShareFolder(_)
-            | UiAction::ToggleSelectedShare
-            | UiAction::ChangeSelectedShareFolder => SharesController::apply(state, repo, action),
+            | UiAction::ChangeShareFolder(_) => SharesController::apply(state, repo, action),
             UiAction::PickerUp | UiAction::PickerSelect(_) | UiAction::PickerOpen(_) => {
                 FilesController::apply(state, repo, action)
             }

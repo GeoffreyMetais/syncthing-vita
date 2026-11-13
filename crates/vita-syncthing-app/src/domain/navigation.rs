@@ -1,6 +1,7 @@
 //! D-pad focus model: the focus is either on the sidebar tabs or on the current page.
 //! Page rows reuse `AppState::selected_share_idx` / `selected_picker_idx`; `col` is the focused
-//! action button within a row and `header` the page's top button (`+ New Share`, `Up`).
+//! action button within a row and `header` the page's top element (`Overview`: the device card
+//! buttons, `Files`: the `Up` button).
 
 use crate::domain::models::ActiveTab;
 
@@ -17,7 +18,7 @@ pub struct NavState {
     pub focus: NavFocus,
     /// Focused action button (left to right) in the current row.
     pub col: usize,
-    /// True when the page's top button is focused instead of a row.
+    /// True when the page's top element is focused instead of a row.
     pub header: bool,
     /// Focused card on pages with fixed rows (Settings: `SETTINGS_ROW_*`).
     pub row: usize,
@@ -28,28 +29,26 @@ impl NavState {
         Self {
             focus: NavFocus::Sidebar,
             col: default_col(tab),
-            header: false,
+            header: starts_on_header(tab),
             row: 0,
         }
     }
 }
 
 /// Sidebar order of the tabs.
-pub const TAB_ORDER: [ActiveTab; 4] = [
+pub const TAB_ORDER: [ActiveTab; 3] = [
     ActiveTab::Dashboard,
-    ActiveTab::Shares,
     ActiveTab::FolderPicker,
     ActiveTab::Settings,
 ];
 
 /// Number of focusable action buttons per row, left to right:
-/// Dashboard `[QR / ID, Sync Now]`, Shares `[Devices, Delete, Folder]`, Settings
-/// `[Switch Theme]` on Display (row 0) and `[QR / ID, + Add Device]` on Devices (row 1).
+/// Overview share rows `[Devices, Delete, Folder]`, Settings `[Switch Theme]` on Display
+/// (row 0) and `[QR / ID, + Add Device]` on Devices (row 1).
 /// Files rows have no buttons (the row is the target).
 pub const fn action_count(tab: ActiveTab) -> usize {
     match tab {
-        ActiveTab::Dashboard => 2,
-        ActiveTab::Shares => 3,
+        ActiveTab::Dashboard => 3,
         ActiveTab::FolderPicker => 0,
         ActiveTab::Settings => 1,
     }
@@ -74,11 +73,15 @@ pub const SETTINGS_ROW_DECLINED: usize = 3;
 /// Number of focusable cards on the Settings page.
 pub const SETTINGS_ROWS: usize = 4;
 
-/// Button focused when entering a tab: the one `Cross` triggered before D-pad navigation.
-pub const fn default_col(tab: ActiveTab) -> usize {
-    match tab {
-        ActiveTab::Dashboard => 0,
-        ActiveTab::Settings => 0,
-        ActiveTab::Shares | ActiveTab::FolderPicker => 0,
-    }
+/// Focusable buttons of the `Overview` device card (`[QR / ID, Sync Now]`), its header row.
+pub const DASHBOARD_HEADER_ACTIONS: usize = 2;
+
+/// Button focused when entering a tab: the first one of the row.
+pub const fn default_col(_tab: ActiveTab) -> usize {
+    0
+}
+
+/// True when entering `tab` focuses its top element: the device card buttons of `Overview`.
+pub const fn starts_on_header(tab: ActiveTab) -> bool {
+    matches!(tab, ActiveTab::Dashboard)
 }

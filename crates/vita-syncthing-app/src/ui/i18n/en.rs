@@ -55,7 +55,6 @@ pub static STRINGS_EN: Strings = Strings {
 
     // Navigation & Sidebar
     tab_overview: "Overview",
-    tab_shares: "Shares",
     tab_files: "Files",
     tab_settings: "Settings",
     app_title: "VitaSync",
@@ -100,14 +99,11 @@ pub static STRINGS_EN: Strings = Strings {
     hero_this_device: "This device",
     hero_device_name: "PlayStation Vita",
     hero_device_id_label: "Device ID",
-    section_recent_activity: "Recent activity",
-    msg_no_sync_events: "No synchronization events recorded yet.",
 
     // Screen 2: Shared Folders
-    shares_title: "Shared Folders",
     msg_no_shares: "No shared folders configured yet",
-    msg_no_shares_hint_1: "Press Circle (New Share) to create a share on your PS Vita and link a device,",
-    msg_no_shares_hint_2: "or press Overview -> Sync Now to import folders shared by a remote peer.",
+    msg_no_shares_hint_1: "Press Triangle (New Share) to create a share on your PS Vita and link a device,",
+    msg_no_shares_hint_2: "or press Sync Now to import folders shared by a remote peer.",
 
     // Screen 3: Files & Folder Picker
     picker_title_create: "Share a Folder",
@@ -195,7 +191,7 @@ pub static MESSAGES_EN: Messages = Messages {
     ready_press_cross: "Ready · Press Cross to synchronize",
     ready_manual_pairing: "Ready (manual LAN pairing)",
     no_peer_linked: "No peer linked",
-    select_device_to_connect: "Select or add a device in Shares -> Devices to connect",
+    select_device_to_connect: "Select or add a device in a share's Devices to connect",
     no_folders_synced: "No folders synced yet",
     no_remote_folders: "No remote folders shared",
     starting_sync: "Starting synchronization...",
@@ -210,8 +206,8 @@ pub static MESSAGES_EN: Messages = Messages {
     connections_one: "Connected (1 connection)",
     connections_many: "Connected (1+{secondary} connections)",
     sync_summary: "{connections} · {up_to_date} up to date | {downloaded} DL ({kb} KB) | {uploaded} UL ({bytes} B)",
-    found_lan_peers: "Found {count} LAN peer(s). Select a device in Shares -> Devices to connect.",
-    no_peer_add_device: "No peer linked. Add a device in Shares -> Devices or Settings.",
+    found_lan_peers: "Found {count} LAN peer(s). Select a device in a share's Devices to connect.",
+    no_peer_add_device: "No peer linked. Add a device in a share's Devices or Settings.",
     discovery_error: "LAN discovery error: {error}",
     syncing_with_peers: "Synchronizing with LAN peers...",
     theme_dark: "Theme: Dark (blue-grey)",

@@ -12,7 +12,7 @@ use crate::ui::modals::{
 };
 use crate::ui::screens::{
     render_dashboard_tab, render_folder_picker_tab, render_oled_screensaver, render_settings_tab,
-    render_shares_tab, SAVER_H, SAVER_W,
+    SAVER_H, SAVER_W,
 };
 use crate::ui::strings;
 use crate::ui::theme::UiTheme;
@@ -72,7 +72,6 @@ pub fn draw_frame(gfx: &mut Gfx, state: &mut AppState) {
 
     match state.active_tab {
         ActiveTab::Dashboard => render_dashboard_tab(gfx, &th, state, &mut hits),
-        ActiveTab::Shares => render_shares_tab(gfx, &th, state, &mut hits),
         ActiveTab::FolderPicker => {
             render_folder_picker_tab(gfx, &th, state, &mut hits);
         }

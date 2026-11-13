@@ -55,7 +55,6 @@ pub static STRINGS_ES: Strings = Strings {
 
     // Navigation & Sidebar
     tab_overview: "Resumen",
-    tab_shares: "Carpetas",
     tab_files: "Archivos",
     tab_settings: "Ajustes",
     app_title: "VitaSync",
@@ -100,14 +99,11 @@ pub static STRINGS_ES: Strings = Strings {
     hero_this_device: "Este dispositivo",
     hero_device_name: "PlayStation Vita",
     hero_device_id_label: "ID del dispositivo",
-    section_recent_activity: "Actividad reciente",
-    msg_no_sync_events: "Sin eventos de sincronización registrados aún.",
 
     // Screen 2: Shared Folders
-    shares_title: "Carpetas compartidas",
     msg_no_shares: "No hay carpetas compartidas configuradas aún",
-    msg_no_shares_hint_1: "Pulsa Círculo (Nueva carpeta) para crear una carpeta y vincular un dispositivo,",
-    msg_no_shares_hint_2: "o pulsa Resumen -> Sincronizar para importar carpetas compartidas.",
+    msg_no_shares_hint_1: "Pulsa Triángulo (Nueva carpeta) para crear una carpeta y vincular un dispositivo,",
+    msg_no_shares_hint_2: "o pulsa Sincronizar para importar carpetas compartidas.",
 
     // Screen 3: Files & Folder Picker
     picker_title_create: "Compartir una carpeta",
@@ -195,7 +191,7 @@ pub static MESSAGES_ES: Messages = Messages {
     ready_press_cross: "Listo · Pulsa Cruz para sincronizar",
     ready_manual_pairing: "Listo (LAN manual)",
     no_peer_linked: "Ningún par vinculado",
-    select_device_to_connect: "Vincula un dispositivo en Carpetas -> Dispositivos",
+    select_device_to_connect: "Vincula un dispositivo en Dispositivos de una carpeta",
     no_folders_synced: "Ninguna carpeta sincronizada aún",
     no_remote_folders: "Ninguna carpeta remota compartida",
     starting_sync: "Iniciando sincronización...",
@@ -210,8 +206,8 @@ pub static MESSAGES_ES: Messages = Messages {
     connections_one: "Conectado (1 conexión)",
     connections_many: "Conectado (1+{secondary} conexiones)",
     sync_summary: "{connections} · {up_to_date} al día | {downloaded} descargados ({kb} KB) | {uploaded} enviados ({bytes} B)",
-    found_lan_peers: "{count} par(es) encontrado(s) en la LAN. Elige un dispositivo en Carpetas -> Dispositivos.",
-    no_peer_add_device: "Ningún par vinculado. Añade un dispositivo en Carpetas -> Dispositivos o Ajustes.",
+    found_lan_peers: "{count} par(es) encontrado(s) en la LAN. Elige un dispositivo en Dispositivos de una carpeta.",
+    no_peer_add_device: "Ningún par vinculado. Añade un dispositivo en Dispositivos de una carpeta o Ajustes.",
     discovery_error: "Error de descubrimiento LAN: {error}",
     syncing_with_peers: "Sincronizando con pares de la LAN...",
     theme_dark: "Tema: Oscuro (gris azulado)",

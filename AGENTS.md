@@ -90,7 +90,7 @@ syncthing-vita
                 ├── theme.rs          # UiTheme (Dark & OLED palettes) and layout constants
                 ├── strings.rs        # Factorized UI string resources, labels, controller hints & formatting helpers
                 ├── widgets.rs        # Reusable VitaSend UI components (cards, chips, actions, checkboxes, chrome, toast)
-                ├── screens/          # Feature-split screen views (Overview, Shares, Files, Settings, OLED Screensaver)
+                ├── screens/          # Feature-split screen views (Overview + its share list, Files, Settings, OLED Screensaver)
                 │   ├── mod.rs
                 │   ├── dashboard.rs
                 │   ├── shares.rs
@@ -156,7 +156,7 @@ Dependencies strictly point **inward**. Inner layers never import or depend on o
      - `share_creation.rs`: Share creation workflow — a new share is discarded if `ManageDevices` closes with no linked device.
      - `folder_offers.rs`: Consent for folders offered by peers (`FolderOffer` modal); declined offers persisted.
      - `sync_coordinator.rs`: Maps background `WorkerMsg` protocol events into `AppState` updates.
-     - `controllers/`: `input.rs` (`InputController`: translates main-screen button/touch inputs into actions, modal triggers, and commands) and one controller per page (`dashboard.rs`, `shares.rs`, `files.rs`, `settings.rs`; see §3.4).
+     - `controllers/`: `input.rs` (`InputController`: translates main-screen button/touch inputs into actions, modal triggers, and commands) and one controller per page (`dashboard.rs` with the share list's `shares.rs`, `files.rs`, `settings.rs`; see §3.4).
      - `modal_input/`: Input handling for open modals, one file per modal (mirrors `ui/modals/`).
      - `dpad_navigation.rs`: D-pad focus between the sidebar and the page elements.
      - **No screen coordinate and no `crate::ui` import in this layer**: what is interactive, and where, is declared by the views (§3.4).
@@ -182,7 +182,7 @@ Dependencies strictly point **inward**. Inner layers never import or depend on o
    - **Key Modules**:
      - `i18n/`: Zero-allocation multi-language catalogs (`Strings`) supporting English (`en`), French (`fr`), Spanish (`es`), German (`de`), and Italian (`it`).
      - `strings.rs`: Centralized user-facing strings, action constants, button hints, and zero-allocation formatting helpers re-exporting `ui::i18n`.
-     - `screens/`: Independent full-screen views (`dashboard.rs`, `shares.rs`, `folder_picker.rs`, `settings.rs`, `screensaver.rs`).
+     - `screens/`: Independent full-screen views (`dashboard.rs` drawing the share list of `shares.rs`, `folder_picker.rs`, `settings.rs`, `screensaver.rs`).
      - `modals/`: Isolated modal dialogs (`create_share.rs`, `manage_devices.rs`, `add_device.rs`, `device_id.rs`, `confirm_quit.rs`, `confirm_delete_share.rs`, `fallback_keyboard.rs`).
      - `widgets.rs`: Reusable UI elements (cards, chips, checkboxes, buttons, chrome, toast).
      - `gfx.rs`: Software 2D rendering primitives, anti-aliased geometry, and TrueType rasterization.
@@ -332,7 +332,7 @@ Emulators like Vita3K are permissive HLE environments that run with host PC RAM 
    - Never hardcode the contents of `ux0:data/syncthing/device_seed.bin`.
    - On a clean installation (when `device_seed.bin` does not exist), generate 32 random bytes via `sceKernelGetRandomNumber` (`SceLibKernel_stub`) so every PS Vita gets a unique Syncthing `DeviceId`.
    - Consent is enforced by `syncthing-core`, not only by the UI: `spawn_sync_worker` declares each share's linked devices with `FsSyncStorage::set_folder_devices`, and sessions ignore every other folder (see §3.3 **Folder authorization**).
-   - Remote folders received via `ClusterConfig` never become shares on their own: `FolderOfferService::receive` queues them as `FolderOffer`s and the `FolderOffer` modal asks for consent. An accepted folder defaults to `enabled: false` (**Paused**) until the user selects a target folder and enables it in the **Shares** tab; a declined one is saved in `ignored_folders.cfg`.
+   - Remote folders received via `ClusterConfig` never become shares on their own: `FolderOfferService::receive` queues them as `FolderOffer`s and the `FolderOffer` modal asks for consent. An accepted folder defaults to `enabled: false` (**Paused**) until the user selects a target folder and enables it in the **Overview** share list; a declined one is saved in `ignored_folders.cfg`.
 
 ---
 
@@ -379,17 +379,17 @@ cargo test --workspace
 - `folder_offers.rs`: offered folders need consent, accept / decline / later, a crafted folder label cannot inject a share, declined offers persisted, deleted shares are declined and do not come back, `Settings` · `Clear Declined` (D-pad and touch)
 - `share_service.rs`: share deletion, share creation, device linking, paused accepted folders, `ConfigRepository` roundtrip, manual LAN pairing
 - `input_controller.rs`: global routing — an active screensaver swallows input and wakes on a button press or touch only
-- `main_screens.rs`: sidebar tabs and transfer card, `Overview` card / buttons / hints, `Files` rows and `Open` chip, `Settings` hints; geometry of every page in all 5 languages (elements on screen, hints not overlapping)
+- `main_screens.rs`: sidebar tabs and transfer card, `Overview` device card / share list / hints, `Files` rows and `Open` chip, `Settings` hints; geometry of every page in all 5 languages (elements on screen, hints not overlapping)
 - `modal_touch.rs`: modal touch resolved from declared elements (template rows, device rows, pause / done buttons, text box -> system keyboard, keypad keys, folder offer buttons, outside / inside touches); geometry of every modal in all 5 languages (on screen, hints and buttons not overlapping)
-- `dialogs.rs`: `START` -> `ConfirmQuit` -> `Cross` quits, `ConfirmQuit` touch targets, `ConfirmDeleteShare` (`Square` on Shares, cancel / confirm)
+- `dialogs.rs`: `START` -> `ConfirmQuit` -> `Cross` quits, `ConfirmQuit` touch targets, `ConfirmDeleteShare` (`Square` on the Overview, cancel / confirm)
 - `add_device.rs`: add-device-by-short-ID via system keyboard (placeholder upgraded on discovery), virtual keyboard hidden until requested
 - `theme_settings.rs`: theme toggle (D-pad `Cross`, `Square`, touch) and `theme.cfg` persistence
 - `folder_picker.rs`: `Files` tab `Circle` walks up device-root paths, then leaves the tab
-- `dpad_navigation.rs`: sidebar <-> page focus, Shares rows / buttons / header, Files rows / Up button
+- `dpad_navigation.rs`: sidebar <-> page focus, Overview device card buttons / share rows / buttons, Files rows / Up button
 - `qr_scan.rs`: Device ID extraction from QR payloads, `quircs` decoding of a rendered QR code, scanner modal navigation, adding the scanned device
 - `power_policy.rs`: standby blocking while syncing (charging / battery / transfer grace period), CPU clock level (full speed only during the initial sync phase and transfers), initial sync phase tracked per peer from `SyncEvent`s
 - `ui_text.rs`: every `UiText` message renders in all 5 languages with its placeholders filled, translated Device ID errors
-- `shares_screen.rs`: `Shares` page input resolved from the drawn frame (touch targets in all 5 languages, card selection, face-button shortcuts, `Cross` on the focused element, stale element ignored, nothing declared behind the screensaver)
+- `shares_screen.rs`: `Overview` share list input resolved from the drawn frame (touch targets in all 5 languages, card selection, face-button shortcuts, `Cross` on the focused element, stale element ignored, nothing declared behind the screensaver)
 - `frame_pacing.rs`: dynamic frame rate (input -> next VBlank, animations 30 FPS, background updates 10 FPS, static 1 FPS), toast expiry and screensaver speed independent of the frame rate
 - `worker_slot.rs`: a new worker starts only after the previous one ended, bounded wait on quit
 - `config_fields.rs`: interrupted `.cfg` replacement restored from its backup, `.cfg` field escaping roundtrip, legacy `%` text kept, hostile names / labels through `devices.cfg` / `shares.cfg` / `ignored_folders.cfg`, invalid linked-device entries dropped
@@ -441,19 +441,18 @@ PNGs land in `target/ui-shots/`; the Vita3K app data directory is backed up and 
 The UI (`gfx.rs` + `ui/screens/*` + `ui/modals/*` + `ui/renderer.rs`) renders at native `960x544` with a `212px` left sidebar (`SIDEBAR_W = 212`), main content area (`x = 236..936`, `y = 86..488`), and bottom button hint bar (`y = 500..544`):
 
 - **Dynamic frame rate** (`application/frame_pacing.rs`): the main loop wakes up on every display VBlank (60 Hz) to poll input, but a frame is only rendered when needed — on the next VBlank after user input (press, tap, IME, dialog, toast expiry), at 30 FPS for animations (OLED screensaver, QR viewfinder), at most 10 FPS for background updates (sync progress, logs), and once per second when static. When adding a time-based animation, set `FrameSignals::animating` in `main.rs` and scale its motion by the elapsed VBlanks passed to `VitaUiRenderer::render`; never count time in rendered frames.
-- **D-pad focus** (`domain/navigation.rs` + `application/dpad_navigation.rs`): focus is on the sidebar or on the page. Sidebar: `Up`/`Down` switch tabs, `Right`/`Cross` enter the page. Page: `Up`/`Down` move between rows (including the top `+ New Share` / `Up` button), `Left`/`Right` between a row's buttons, `Left` on the first one returns to the sidebar, `Cross` activates the focused element (drawn with `draw_focus_ring`). On `Files`, `Right` opens the folder. Face buttons remain direct shortcuts.
+- **D-pad focus** (`domain/navigation.rs` + `application/dpad_navigation.rs`): focus is on the sidebar or on the page. Sidebar: `Up`/`Down` switch tabs, `Right`/`Cross` enter the page. Page: `Up`/`Down` move between rows (including the top row: the `Overview` device card buttons, the `Files` `Up` button), `Left`/`Right` between a row's buttons, `Left` on the first one returns to the sidebar, `Cross` activates the focused element (drawn with `draw_focus_ring`). On `Files`, `Right` opens the folder. Face buttons remain direct shortcuts.
 - **Left Sidebar Tabs** (`L` / `R` shoulder buttons, D-pad from the sidebar, or touch tap):
-  1. `Overview` (`ActiveTab::Dashboard`): Device status card, `QR / ID` modal button (`Circle`), `Sync Now` button (`Cross`), transfer statistics, and recent activity feed.
-  2. `Shares` (`ActiveTab::Shares`): List of shared folders, `+ New Share` modal (`Circle`), `Devices` assignment modal (`Cross`), `Delete` with confirmation (`Square`), and `Folder` path picker (`Triangle`).
-  3. `Files` (`ActiveTab::FolderPicker`): Interactive `ux0:` directory browser. Selecting a folder (`Cross` or tap) starts creating a share of it (folders already shared are greyed out and cannot be selected or opened); `Triangle` (or tapping the `Open` chip) enters a subfolder, `Circle` goes up/back. The `Shares` tab `Folder` action reuses this browser to change a share's target path.
-  4. `Settings` (`ActiveTab::Settings`): Dark / Pure-Black OLED theme switcher (`Cross`), `QR / ID` modal (`Circle`), `Language` card (D-pad `Down` + `Cross` or tap: System -> English -> Français -> Español -> Deutsch -> Italiano, saved in `language.cfg`), `Declined folders` card (D-pad `Down` + `Cross` or tap `Clear Declined` to forget declined folder offers so peers can offer them again), and BEP/1.0 protocol log viewer.
+  1. `Overview` (`ActiveTab::Dashboard`): compact device status card (the page header row: `QR / ID` modal button (`Circle`), `Sync Now` button), then the list of shared folders (4 visible, scrolling with the selection): `Devices` assignment modal, `Delete` with confirmation (`Square`) and `Folder` path picker (D-pad `Cross` or touch) on each card; `New Share` modal (`Triangle`). The protocol log is only on `Settings`.
+  2. `Files` (`ActiveTab::FolderPicker`): Interactive `ux0:` directory browser. Selecting a folder (`Cross` or tap) starts creating a share of it (folders already shared are greyed out and cannot be selected or opened); `Triangle` (or tapping the `Open` chip) enters a subfolder, `Circle` goes up/back. The `Overview` share `Folder` action reuses this browser to change a share's target path.
+  3. `Settings` (`ActiveTab::Settings`): Dark / Pure-Black OLED theme switcher (`Cross`), `QR / ID` modal (`Circle`), `Language` card (D-pad `Down` + `Cross` or tap: System -> English -> Français -> Español -> Deutsch -> Italiano, saved in `language.cfg`), `Declined folders` card (D-pad `Down` + `Cross` or tap `Clear Declined` to forget declined folder offers so peers can offer them again), and BEP/1.0 protocol log viewer.
 - **Modal Dialogs** (`ModalDialog` in `domain/models.rs`, rendered by `ui/modals/*`):
   - `CreateShare`: Create a share from PS Vita folder presets (`ux0:user/00/savedata`, `ux0:picture`, `ux0:music`, RetroArch saves) or browse `ux0:`. The share is only kept once a device is linked in the `ManageDevices` modal that follows.
   - `ManageDevices`: Link/unlink discovered Syncthing peers to a share with circular checkboxes (`draw_row_tick`), add one by ID (`Square`) or by QR code (`R · Scan QR`) and trigger immediate `ClusterConfig` advertising (`Triangle · Apply & Sync`); `SELECT` pauses / enables the share.
   - `AddDeviceById`: Enter a remote Short / Full Device ID with the PS Vita system keyboard (opened on entry or by tapping the text box). The fallback Base32 keypad is hidden by default; `Triangle · Virtual Keyboard` shows / hides it.
   - `ScanDeviceQr`: Rear-camera (`SceCamera`) viewfinder opened with `R · Scan QR` from `AddDeviceById` or from `ManageDevices` (next to `+ Add by ID`). The camera runs only while the modal is open; a decoded full Device ID is added like a typed one, `Circle` goes back to the ID form. Vita3K's emulated camera only delivers blank frames, so decoding must be tested on hardware.
   - `ShowDeviceId`: Displays a scannable QR code (`qrcodegen`) alongside the 8-group Syncthing Device ID.
-  - `ConfirmDeleteShare`: Triggered by `Square` on the `Shares` tab; removes the share from `shares.cfg` (files on `ux0:` are kept) and registers the folder as declined for its linked devices (`ignored_folders.cfg`), so peers do not offer it back until `Settings` · `Clear Declined`.
+  - `ConfirmDeleteShare`: Triggered by `Square` on the `Overview` share list; removes the share from `shares.cfg` (files on `ux0:` are kept) and registers the folder as declined for its linked devices (`ignored_folders.cfg`), so peers do not offer it back until `Settings` · `Clear Declined`.
   - `FolderOffer`: Opens when a peer's `ClusterConfig` lists a folder that is not shared with it yet (including a deleted share). `Cross · Accept` creates a paused share and opens `Files` to choose its target, `Square · Decline` ignores it (`ignored_folders.cfg`, cleared from `Settings` · `Clear Declined`), `Circle · Later` postpones it until the app restarts.
   - `ConfirmQuit`: Triggered by `START` (or tapping `Quit`), warns if a sync is in progress before exiting to LiveArea.
 - **OLED Screensaver**: Activates automatically after 12s of inactivity during active sync (or 45s when idle, or immediately via `SELECT`), rendering a pure `#000000` black background with a bouncing progress widget to protect PS Vita 1000 OLED screens.

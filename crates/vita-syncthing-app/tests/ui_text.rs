@@ -129,7 +129,7 @@ fn test_messages_are_translated_and_parameters_filled() {
 
     assert_eq!(
         en.text(&UiText::SelectDeviceToConnect),
-        "Select or add a device in Shares -> Devices to connect"
+        "Select or add a device in a share's Devices to connect"
     );
     assert_eq!(fr.text(&UiText::NoPeerLinked), "Aucun pair lié");
     assert_eq!(

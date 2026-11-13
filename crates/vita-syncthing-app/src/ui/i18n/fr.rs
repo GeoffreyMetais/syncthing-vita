@@ -55,7 +55,6 @@ pub static STRINGS_FR: Strings = Strings {
 
     // Navigation & Sidebar
     tab_overview: "Aperçu",
-    tab_shares: "Partages",
     tab_files: "Fichiers",
     tab_settings: "Paramètres",
     app_title: "VitaSync",
@@ -100,14 +99,11 @@ pub static STRINGS_FR: Strings = Strings {
     hero_this_device: "Cet appareil",
     hero_device_name: "PlayStation Vita",
     hero_device_id_label: "ID de l'appareil",
-    section_recent_activity: "Activité récente",
-    msg_no_sync_events: "Aucun événement de synchronisation enregistré.",
 
     // Screen 2: Shared Folders
-    shares_title: "Dossiers partagés",
     msg_no_shares: "Aucun dossier partagé configuré",
-    msg_no_shares_hint_1: "Appuyez sur Rond (Nouveau partage) pour créer un partage sur votre PS Vita,",
-    msg_no_shares_hint_2: "ou appuyez sur Aperçu -> Synchroniser pour importer les dossiers d'un pair.",
+    msg_no_shares_hint_1: "Appuyez sur Triangle (Nouveau partage) pour créer un partage sur votre PS Vita,",
+    msg_no_shares_hint_2: "ou appuyez sur Synchroniser pour importer les dossiers d'un pair.",
 
     // Screen 3: Files & Folder Picker
     picker_title_create: "Partager un dossier",
@@ -195,7 +191,7 @@ pub static MESSAGES_FR: Messages = Messages {
     ready_press_cross: "Prêt · Appuyez sur Croix pour synchroniser",
     ready_manual_pairing: "Prêt (appairage LAN manuel)",
     no_peer_linked: "Aucun pair lié",
-    select_device_to_connect: "Liez un appareil dans Partages -> Appareils",
+    select_device_to_connect: "Liez un appareil dans les Appareils d'un partage",
     no_folders_synced: "Aucun dossier synchronisé",
     no_remote_folders: "Aucun dossier distant partagé",
     starting_sync: "Démarrage de la synchronisation...",
@@ -210,8 +206,8 @@ pub static MESSAGES_FR: Messages = Messages {
     connections_one: "Connecté (1 connexion)",
     connections_many: "Connecté (1+{secondary} connexions)",
     sync_summary: "{connections} · {up_to_date} à jour | {downloaded} reçus ({kb} Ko) | {uploaded} envoyés ({bytes} o)",
-    found_lan_peers: "{count} pair(s) trouvé(s) sur le LAN. Choisissez un appareil dans Partages -> Appareils.",
-    no_peer_add_device: "Aucun pair lié. Ajoutez un appareil dans Partages -> Appareils ou Paramètres.",
+    found_lan_peers: "{count} pair(s) trouvé(s) sur le LAN. Choisissez un appareil dans les Appareils d'un partage.",
+    no_peer_add_device: "Aucun pair lié. Ajoutez un appareil dans les Appareils d'un partage ou Paramètres.",
     discovery_error: "Erreur de découverte LAN : {error}",
     syncing_with_peers: "Synchronisation avec les pairs du LAN...",
     theme_dark: "Thème : Sombre (bleu-gris)",

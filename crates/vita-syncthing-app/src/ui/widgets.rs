@@ -196,7 +196,6 @@ pub fn draw_chrome(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut Hit
     let s = strings::strings(state.language);
     let tabs = [
         (s.tab_overview, Icon::Vita, ActiveTab::Dashboard),
-        (s.tab_shares, Icon::Folder, ActiveTab::Shares),
         (s.tab_files, Icon::Receive, ActiveTab::FolderPicker),
         (s.tab_settings, Icon::Settings, ActiveTab::Settings),
     ];

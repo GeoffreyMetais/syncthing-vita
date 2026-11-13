@@ -125,7 +125,7 @@ impl FolderOfferService {
                 label: offer.label.clone(),
                 id: offer.folder_id.clone(),
             });
-            state.active_tab = ActiveTab::Shares;
+            state.active_tab = ActiveTab::Dashboard;
         } else {
             state.picker_mode = PickerMode::ChangeShareTarget;
             ShareService::refresh_picker_items(state, repo);

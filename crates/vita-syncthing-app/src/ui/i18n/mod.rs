@@ -74,7 +74,6 @@ pub struct Strings {
 
     // Navigation & Sidebar
     pub tab_overview: &'static str,
-    pub tab_shares: &'static str,
     pub tab_files: &'static str,
     pub tab_settings: &'static str,
     pub app_title: &'static str,
@@ -119,11 +118,8 @@ pub struct Strings {
     pub hero_this_device: &'static str,
     pub hero_device_name: &'static str,
     pub hero_device_id_label: &'static str,
-    pub section_recent_activity: &'static str,
-    pub msg_no_sync_events: &'static str,
 
     // Screen 2: Shared Folders
-    pub shares_title: &'static str,
     pub msg_no_shares: &'static str,
     pub msg_no_shares_hint_1: &'static str,
     pub msg_no_shares_hint_2: &'static str,
@@ -220,22 +216,6 @@ impl Strings {
             Language::Italian => format!("{active} condivisione/i attiva/e · {devices} dispositivo/i noto/i"),
             Language::English => format!("{active} active share(s) · {devices} known device(s)"),
         }
-    }
-
-    /// Formats the peer and folder label string for the hero card.
-    pub fn fmt_peer_and_folders(&self, peer: &str, folders: &str) -> String {
-        match self.language {
-            Language::French => format!("Pair : {peer} · Dossiers : {folders}"),
-            Language::Spanish => format!("Par: {peer} · Carpetas: {folders}"),
-            Language::German => format!("Peer: {peer} · Ordner: {folders}"),
-            Language::Italian => format!("Peer: {peer} · Cartelle: {folders}"),
-            Language::English => format!("Peer: {peer} · Folders: {folders}"),
-        }
-    }
-
-    /// Formats the recent statistics chip on the dashboard.
-    pub fn fmt_recent_stats(&self, ok: usize, dl: usize, ul: usize, bytes_str: &str) -> String {
-        format!("Delta OK: {ok}  ·  DL: {dl}  ·  UL: {ul}  ·  {bytes_str}")
     }
 
     /// Formats a share card title: `"{label}  ·  {folder_id}"`.

@@ -251,16 +251,6 @@ pub fn fmt_active_shares_devices(active: usize, devices: usize) -> String {
     format!("{active} active share(s) · {devices} known device(s)")
 }
 
-/// Formats the peer and folder label string for the hero card.
-pub fn fmt_peer_and_folders(peer: &str, folders: &str) -> String {
-    format!("Peer: {peer} · Folders: {folders}")
-}
-
-/// Formats the recent statistics chip on the dashboard.
-pub fn fmt_recent_stats(ok: usize, dl: usize, ul: usize, bytes_str: &str) -> String {
-    format!("Delta OK: {ok}  ·  DL: {dl}  ·  UL: {ul}  ·  {bytes_str}")
-}
-
 /// Formats a share card title: `"{label}  ·  {folder_id}"`.
 pub fn fmt_share_title(label: &str, folder_id: &str) -> String {
     format!("{label}  ·  {folder_id}")
