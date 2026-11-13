@@ -19,18 +19,10 @@ const BROWSER_ROW_H: i32 = 38;
 const CHIP_TOUCH_MARGIN: i32 = 16;
 
 /// Renders Tab 3: **Files** (`FolderPicker`).
-pub fn render_folder_picker_tab(
-    gfx: &mut Gfx,
-    th: &UiTheme,
-    state: &AppState,
-    hits: &mut HitMap,
-) {
+pub fn render_folder_picker_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut HitMap) {
     let s = strings::strings(state.language);
     let (page_title, share_name) = if state.picker_mode == PickerMode::CreateNewShare {
-        (
-            s.picker_title_create,
-            s.picker_subtitle_create.to_owned(),
-        )
+        (s.picker_title_create, s.picker_subtitle_create.to_owned())
     } else {
         let title_sub = state
             .shares
@@ -68,10 +60,7 @@ pub fn render_folder_picker_tab(
     let mut right = CONTENT_R - 18 - uw;
 
     if !state.picker_items.is_empty() {
-        let cnt = s.fmt_item_counter(
-            state.selected_picker_idx + 1,
-            state.picker_items.len(),
-        );
+        let cnt = s.fmt_item_counter(state.selected_picker_idx + 1, state.picker_items.len());
         right -= gfx.text(
             right,
             101,
@@ -108,7 +97,14 @@ pub fn render_folder_picker_tab(
         let cur = idx == state.selected_picker_idx;
 
         if cur {
-            gfx.rrect(CONTENT_X, y, CONTENT_W - 14, BROWSER_ROW_H, 10, th.accent_bg);
+            gfx.rrect(
+                CONTENT_X,
+                y,
+                CONTENT_W - 14,
+                BROWSER_ROW_H,
+                10,
+                th.accent_bg,
+            );
             gfx.rrect(CONTENT_X, y + 8, 4, 22, 2, th.accent);
         }
 

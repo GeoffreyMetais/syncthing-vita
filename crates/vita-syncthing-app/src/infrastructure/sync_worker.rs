@@ -359,7 +359,12 @@ pub fn spawn_sync_worker(
         }
 
         // Spawn a concurrent persistent `1+2` session worker for each user-approved device (up to `MAX_PEER_SESSIONS`)
-        for (idx, kd) in approved_devices.iter().take(MAX_PEER_SESSIONS).cloned().enumerate() {
+        for (idx, kd) in approved_devices
+            .iter()
+            .take(MAX_PEER_SESSIONS)
+            .cloned()
+            .enumerate()
+        {
             let peer_name = kd.name.clone();
             let peer_id_clone = identity.clone();
             let peer_hello_clone = our_hello.clone();
@@ -399,11 +404,9 @@ pub fn spawn_sync_worker(
         // 3. New LAN peers appear in the `Shares -> Devices` modal even while connected to another peer.
         let mut first_pass = true;
         while !worker_control.is_stop_requested() {
-            if let Ok(mut res) = run_discovery_cycle(
-                &announce,
-                DISCOVERY_BROADCAST_ADDR,
-                DISCOVERY_LISTEN,
-            ) {
+            if let Ok(mut res) =
+                run_discovery_cycle(&announce, DISCOVERY_BROADCAST_ADDR, DISCOVERY_LISTEN)
+            {
                 let needs_dynamic_resolution = approved_devices
                     .iter()
                     .any(|kd| kd.address == "dynamic" || kd.device_id.is_short_placeholder());

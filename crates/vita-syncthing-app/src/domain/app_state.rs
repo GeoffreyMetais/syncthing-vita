@@ -3,13 +3,13 @@
 
 use syncthing_core::DeviceId;
 
+use crate::domain::initial_sync::InitialSyncPeers;
+use crate::domain::interaction::{FocusSlot, HitMap};
 use crate::domain::models::{
     ActiveTab, CameraPreview, FolderOffer, IgnoredFolder, KnownDevice, Language,
     LanguagePreference, ModalDialog, PickerItem, PickerMode, ShareConfigEntry, ThemeMode,
     BROWSER_ROWS,
 };
-use crate::domain::initial_sync::InitialSyncPeers;
-use crate::domain::interaction::{FocusSlot, HitMap};
 use crate::domain::navigation::{
     default_col, starts_on_header, NavFocus, NavState, DASHBOARD_HEADER_ACTIONS,
 };
@@ -244,9 +244,10 @@ impl AppState {
             },
             ActiveTab::Settings => FocusSlot::RowAction {
                 row: self.nav.row,
-                col: self.nav.col.min(
-                    crate::domain::settings_row_action_count(self.nav.row).saturating_sub(1),
-                ),
+                col: self
+                    .nav
+                    .col
+                    .min(crate::domain::settings_row_action_count(self.nav.row).saturating_sub(1)),
             },
         }
     }

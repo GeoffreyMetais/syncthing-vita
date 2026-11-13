@@ -1,7 +1,7 @@
 //! Italian (`it`) string catalog for VitaSyncthing.
 
-use crate::domain::Language;
 use super::{Messages, Strings};
+use crate::domain::Language;
 
 pub static STRINGS_IT: Strings = Strings {
     messages: &MESSAGES_IT,
@@ -101,7 +101,8 @@ pub static STRINGS_IT: Strings = Strings {
 
     // Screen 2: Shared Folders
     msg_no_shares: "Nessuna cartella condivisa configurata",
-    msg_no_shares_hint_1: "Premi Triangolo (Nuova condivisione) per creare una cartella su PS Vita,",
+    msg_no_shares_hint_1:
+        "Premi Triangolo (Nuova condivisione) per creare una cartella su PS Vita,",
     msg_no_shares_hint_2: "o tocca la scheda di sincronizzazione per importare cartelle condivise.",
 
     // Screen 3: Files & Folder Picker
@@ -117,7 +118,8 @@ pub static STRINGS_IT: Strings = Strings {
     settings_label_colour_theme: "Tema colori",
     settings_desc_theme_dark: "Scuro — Design blu ardesia VitaSend con accento turchese",
     settings_desc_theme_oled: "OLED — Fondo nero puro (risparmia batteria OLED)",
-    settings_saver_auto_hint: "Il salvaschermo OLED si attiva dopo 12s di sincronizzazione (o tasto SELECT).",
+    settings_saver_auto_hint:
+        "Il salvaschermo OLED si attiva dopo 12s di sincronizzazione (o tasto SELECT).",
     settings_sec_devices: "DISPOSITIVI E ABBINAMENTO",
     settings_desc_devices: "Aggiungi un dispositivo o vedi l'ID di questa PS Vita",
     settings_sec_log: "REGISTRO PROTOCOLLO BEP/1.0 E TLS 1.3",
@@ -137,11 +139,15 @@ pub static STRINGS_IT: Strings = Strings {
 
     // Modals: Manage Devices
     modal_manage_devices_default_title: "Condivisione",
-    modal_manage_devices_subtitle_incomplete: "Collega almeno un dispositivo per completare la condivisione",
-    modal_manage_devices_subtitle: "Seleziona i dispositivi Syncthing che devono sincronizzare questa cartella",
-    modal_manage_devices_scanning: "Ricerca peer Syncthing sulla rete locale (UDP 21027 + TCP 22000)...",
+    modal_manage_devices_subtitle_incomplete:
+        "Collega almeno un dispositivo per completare la condivisione",
+    modal_manage_devices_subtitle:
+        "Seleziona i dispositivi Syncthing che devono sincronizzare questa cartella",
+    modal_manage_devices_scanning:
+        "Ricerca peer Syncthing sulla rete locale (UDP 21027 + TCP 22000)...",
     modal_manage_devices_empty: "Nessun dispositivo Syncthing remoto ancora rilevato.",
-    modal_manage_devices_empty_hint: "Premi Quadrato (Aggiungi con ID) o Triangolo per scansionare.",
+    modal_manage_devices_empty_hint:
+        "Premi Quadrato (Aggiungi con ID) o Triangolo per scansionare.",
 
     // Modals: Add Device
     modal_add_device_title: "Aggiungi dispositivo remoto tramite ID",
@@ -155,8 +161,10 @@ pub static STRINGS_IT: Strings = Strings {
 
     // Modals: Confirm Delete
     modal_delete_share_title: "Eliminare questa condivisione?",
-    modal_delete_share_subtitle: "La cartella non sarà più sincronizzata con i dispositivi collegati",
-    modal_delete_share_decline_hint: "Le future offerte dei peer verranno rifiutate (modificabile in Impostazioni).",
+    modal_delete_share_subtitle:
+        "La cartella non sarà più sincronizzata con i dispositivi collegati",
+    modal_delete_share_decline_hint:
+        "Le future offerte dei peer verranno rifiutate (modificabile in Impostazioni).",
 
     // Modals: Confirm Quit
     modal_quit_title: "Uscire da VitaSync?",
@@ -168,21 +176,25 @@ pub static STRINGS_IT: Strings = Strings {
 
     // Modals: Device ID
     modal_device_id_title: "ID dispositivo PS Vita Syncthing",
-    modal_device_id_subtitle: "Scansiona questo codice QR in Syncthing o inserisci l'ID a 56 caratteri",
+    modal_device_id_subtitle:
+        "Scansiona questo codice QR in Syncthing o inserisci l'ID a 56 caratteri",
     modal_device_id_scan_web: "Scansiona in Syncthing (Web / App)",
     modal_device_id_dev_name: "Nome dispositivo: PlayStation Vita (vita-syncthing)",
     modal_device_id_cert_path: "Certificato identità: ux0:data/syncthing/cert.der",
     modal_device_id_short_label: "ID breve (rilevamento LAN):",
     modal_device_id_full_label: "ID dispositivo completo a 56 caratteri:",
-    modal_device_id_scan_hint: "Su smartphone/PC: Syncthing > Dispositivi > Aggiungi > Scansiona QR",
+    modal_device_id_scan_hint:
+        "Su smartphone/PC: Syncthing > Dispositivi > Aggiungi > Scansiona QR",
 
     // Modals: Folder Offer
     modal_folder_offer_title: "Nuova cartella condivisa",
-    modal_folder_offer_hint: "Accetta per scegliere una cartella su ux0:. Nessun sync prima dell'attivazione.",
+    modal_folder_offer_hint:
+        "Accetta per scegliere una cartella su ux0:. Nessun sync prima dell'attivazione.",
 
     // Modals: Scan QR
     modal_scan_qr_title: "Scansiona codice QR del dispositivo",
-    modal_scan_qr_subtitle: "Syncthing: Azioni > Mostra ID, poi inquadra con la fotocamera posteriore",
+    modal_scan_qr_subtitle:
+        "Syncthing: Azioni > Mostra ID, poi inquadra con la fotocamera posteriore",
 };
 
 /// IT templates for `UiText` messages.

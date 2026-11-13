@@ -1,7 +1,7 @@
 //! German (`de`) string catalog for VitaSyncthing.
 
-use crate::domain::Language;
 use super::{Messages, Strings};
+use crate::domain::Language;
 
 pub static STRINGS_DE: Strings = Strings {
     messages: &MESSAGES_DE,
@@ -137,15 +137,20 @@ pub static STRINGS_DE: Strings = Strings {
 
     // Modals: Manage Devices
     modal_manage_devices_default_title: "Freigabe",
-    modal_manage_devices_subtitle_incomplete: "Verknüpfe mindestens ein Gerät, um die Freigabe zu erstellen",
-    modal_manage_devices_subtitle: "Wähle die Remote-Geräte aus, die diesen Ordner synchronisieren sollen",
-    modal_manage_devices_scanning: "Suche nach Syncthing-Peers im lokalen Netzwerk (UDP 21027 + TCP 22000)...",
+    modal_manage_devices_subtitle_incomplete:
+        "Verknüpfe mindestens ein Gerät, um die Freigabe zu erstellen",
+    modal_manage_devices_subtitle:
+        "Wähle die Remote-Geräte aus, die diesen Ordner synchronisieren sollen",
+    modal_manage_devices_scanning:
+        "Suche nach Syncthing-Peers im lokalen Netzwerk (UDP 21027 + TCP 22000)...",
     modal_manage_devices_empty: "Noch keine Syncthing-Geräte im Netzwerk entdeckt.",
-    modal_manage_devices_empty_hint: "Drücke Quadrat (Über ID hinzufügen) oder Dreieck zum Scannen.",
+    modal_manage_devices_empty_hint:
+        "Drücke Quadrat (Über ID hinzufügen) oder Dreieck zum Scannen.",
 
     // Modals: Add Device
     modal_add_device_title: "Remote-Gerät über ID hinzufügen",
-    modal_add_device_subtitle: "Gib die 7-stellige Kurz-ID oder die vollständige 56-stellige Geräte-ID ein",
+    modal_add_device_subtitle:
+        "Gib die 7-stellige Kurz-ID oder die vollständige 56-stellige Geräte-ID ein",
     modal_add_device_example: "z.B. MFZWI3D oder MFZWI3D-BONSGYC-... (tippen zum Eingeben)",
     modal_add_device_tip: "Tipp: Die ersten 7 Zeichen reichen aus (Kurz-ID in Syncthing).",
     modal_add_device_placeholder: "7-stellige Kurz-ID oder 56-stellige Voll-ID eingeben...",
@@ -155,12 +160,15 @@ pub static STRINGS_DE: Strings = Strings {
 
     // Modals: Confirm Delete
     modal_delete_share_title: "Diese Freigabe löschen?",
-    modal_delete_share_subtitle: "Der Ordner wird nicht mehr mit verknüpften Geräten synchronisiert",
-    modal_delete_share_decline_hint: "Angebote von Peers werden abgelehnt (in Einstellungen änderbar).",
+    modal_delete_share_subtitle:
+        "Der Ordner wird nicht mehr mit verknüpften Geräten synchronisiert",
+    modal_delete_share_decline_hint:
+        "Angebote von Peers werden abgelehnt (in Einstellungen änderbar).",
 
     // Modals: Confirm Quit
     modal_quit_title: "VitaSync beenden?",
-    modal_quit_subtitle: "Bestätige, ob du die Anwendung schließen und zum LiveArea zurückkehren möchtest",
+    modal_quit_subtitle:
+        "Bestätige, ob du die Anwendung schließen und zum LiveArea zurückkehren möchtest",
     modal_quit_syncing_warn: "Eine BEP/1.0-Synchronisation läuft derzeit.",
     modal_quit_syncing_hint: "Ein Beenden unterbricht aktive Dateiübertragungen.",
     modal_quit_idle_ready: "Möchtest du VitaSync wirklich beenden?",
@@ -178,7 +186,8 @@ pub static STRINGS_DE: Strings = Strings {
 
     // Modals: Folder Offer
     modal_folder_offer_title: "Neuer freigegebener Ordner",
-    modal_folder_offer_hint: "Annehmen, um einen Pfad auf ux0: zu wählen. Vor Aktivierung erfolgt kein Sync.",
+    modal_folder_offer_hint:
+        "Annehmen, um einen Pfad auf ux0: zu wählen. Vor Aktivierung erfolgt kein Sync.",
 
     // Modals: Scan QR
     modal_scan_qr_title: "Geräte-ID QR-Code scannen",

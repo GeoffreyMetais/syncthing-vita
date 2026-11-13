@@ -1,7 +1,7 @@
 //! French (`fr`) string catalog for VitaSyncthing.
 
-use crate::domain::Language;
 use super::{Messages, Strings};
+use crate::domain::Language;
 
 pub static STRINGS_FR: Strings = Strings {
     messages: &MESSAGES_FR,
@@ -101,12 +101,14 @@ pub static STRINGS_FR: Strings = Strings {
 
     // Screen 2: Shared Folders
     msg_no_shares: "Aucun dossier partagé configuré",
-    msg_no_shares_hint_1: "Appuyez sur Triangle (Nouveau partage) pour créer un partage sur votre PS Vita,",
+    msg_no_shares_hint_1:
+        "Appuyez sur Triangle (Nouveau partage) pour créer un partage sur votre PS Vita,",
     msg_no_shares_hint_2: "ou touchez la carte de synchro pour importer les dossiers d'un pair.",
 
     // Screen 3: Files & Folder Picker
     picker_title_create: "Partager un dossier",
-    picker_subtitle_create: "Sélectionnez un dossier à partager, ouvrez-le pour explorer ses sous-dossiers",
+    picker_subtitle_create:
+        "Sélectionnez un dossier à partager, ouvrez-le pour explorer ses sous-dossiers",
     picker_title_choose: "Choisir le dossier cible",
     picker_default_share: "Partage par défaut",
 
@@ -117,7 +119,8 @@ pub static STRINGS_FR: Strings = Strings {
     settings_label_colour_theme: "Thème de couleur",
     settings_desc_theme_dark: "Sombre — Aspect bleu ardoise VitaSend avec accent turquoise",
     settings_desc_theme_oled: "OLED — Fond noir pur (économise la batterie PS Vita OLED)",
-    settings_saver_auto_hint: "L'économiseur d'écran OLED s'active après 12s en sync (ou touche SELECT).",
+    settings_saver_auto_hint:
+        "L'économiseur d'écran OLED s'active après 12s en sync (ou touche SELECT).",
     settings_sec_devices: "APPAREILS & APPAIRAGE",
     settings_desc_devices: "Associer un appareil ou afficher l'ID de la PS Vita",
     settings_sec_log: "JOURNAL PROTOCOLE BEP/1.0 & TLS 1.3",
@@ -132,20 +135,26 @@ pub static STRINGS_FR: Strings = Strings {
 
     // Modals: Create Share
     modal_create_share_title: "Créer un nouveau partage",
-    modal_create_share_subtitle: "Choisissez un dossier prédéfini ou explorez ux0: pour créer un partage",
+    modal_create_share_subtitle:
+        "Choisissez un dossier prédéfini ou explorez ux0: pour créer un partage",
     modal_create_share_browse_sub: "Ouvrir l'explorateur interactif de répertoires ux0:",
 
     // Modals: Manage Devices
     modal_manage_devices_default_title: "Partage",
-    modal_manage_devices_subtitle_incomplete: "Liez au moins un appareil pour finaliser la création de ce partage",
-    modal_manage_devices_subtitle: "Cochez les appareils Syncthing distants qui doivent synchroniser ce dossier",
-    modal_manage_devices_scanning: "Recherche de pairs Syncthing sur le réseau local (UDP 21027 + TCP 22000)...",
+    modal_manage_devices_subtitle_incomplete:
+        "Liez au moins un appareil pour finaliser la création de ce partage",
+    modal_manage_devices_subtitle:
+        "Cochez les appareils Syncthing distants qui doivent synchroniser ce dossier",
+    modal_manage_devices_scanning:
+        "Recherche de pairs Syncthing sur le réseau local (UDP 21027 + TCP 22000)...",
     modal_manage_devices_empty: "Aucun appareil Syncthing distant découvert pour le moment.",
-    modal_manage_devices_empty_hint: "Appuyez sur Carré (Ajouter par ID) ou Triangle pour scanner le réseau.",
+    modal_manage_devices_empty_hint:
+        "Appuyez sur Carré (Ajouter par ID) ou Triangle pour scanner le réseau.",
 
     // Modals: Add Device
     modal_add_device_title: "Ajouter un appareil distant par ID",
-    modal_add_device_subtitle: "Saisissez l'ID court à 7 caractères (recommandé) ou l'ID complet à 56 caractères",
+    modal_add_device_subtitle:
+        "Saisissez l'ID court à 7 caractères (recommandé) ou l'ID complet à 56 caractères",
     modal_add_device_example: "ex. MFZWI3D  ou  MFZWI3D-BONSGYC-... (toucher pour saisir)",
     modal_add_device_tip: "Astuce : seuls les 7 premiers caractères (ID court) sont nécessaires.",
     modal_add_device_placeholder: "Saisir ID court 7 car. ou complet 56 car...",
@@ -156,7 +165,8 @@ pub static STRINGS_FR: Strings = Strings {
     // Modals: Confirm Delete
     modal_delete_share_title: "Supprimer ce partage ?",
     modal_delete_share_subtitle: "Le dossier cesse de se synchroniser avec tous les appareils liés",
-    modal_delete_share_decline_hint: "Les offres futures des pairs seront refusées (modifiable dans Paramètres).",
+    modal_delete_share_decline_hint:
+        "Les offres futures des pairs seront refusées (modifiable dans Paramètres).",
 
     // Modals: Confirm Quit
     modal_quit_title: "Quitter VitaSync ?",
@@ -164,11 +174,13 @@ pub static STRINGS_FR: Strings = Strings {
     modal_quit_syncing_warn: "Une synchronisation BEP/1.0 est actuellement en cours.",
     modal_quit_syncing_hint: "Quitter maintenant interrompra les transferts de fichiers actifs.",
     modal_quit_idle_ready: "Toutes les synchronisations sont actuellement inactives.",
-    modal_quit_idle_hint: "Toutes les configurations de partage et paramètres sont enregistrés sur ux0:.",
+    modal_quit_idle_hint:
+        "Toutes les configurations de partage et paramètres sont enregistrés sur ux0:.",
 
     // Modals: Device ID
     modal_device_id_title: "ID de l'appareil PS Vita Syncthing",
-    modal_device_id_subtitle: "Scannez ce QR code dans Syncthing (Ajouter un appareil) ou saisissez l'ID",
+    modal_device_id_subtitle:
+        "Scannez ce QR code dans Syncthing (Ajouter un appareil) ou saisissez l'ID",
     modal_device_id_scan_web: "Scannez dans Syncthing (Web / Mobile)",
     modal_device_id_dev_name: "Nom de l'appareil : PlayStation Vita (vita-syncthing)",
     modal_device_id_cert_path: "Certificat d'identité : ux0:data/syncthing/cert.der",
@@ -178,11 +190,13 @@ pub static STRINGS_FR: Strings = Strings {
 
     // Modals: Folder Offer
     modal_folder_offer_title: "Nouveau dossier partagé",
-    modal_folder_offer_hint: "Acceptez pour choisir un dossier sur ux0:. Rien ne se synchronise avant activation.",
+    modal_folder_offer_hint:
+        "Acceptez pour choisir un dossier sur ux0:. Rien ne se synchronise avant activation.",
 
     // Modals: Scan QR
     modal_scan_qr_title: "Scanner le QR code de l'appareil",
-    modal_scan_qr_subtitle: "Syncthing : Actions > Afficher l'ID, puis visez avec la caméra arrière",
+    modal_scan_qr_subtitle:
+        "Syncthing : Actions > Afficher l'ID, puis visez avec la caméra arrière",
 };
 
 /// FR templates for `UiText` messages.

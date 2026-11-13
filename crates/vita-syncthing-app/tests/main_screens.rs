@@ -126,7 +126,10 @@ fn test_overview_card_buttons_and_hints() {
     let share_card = rect_of(&mut state, UiAction::SelectShare(0));
     assert!(share_card.y >= card.y + card.h);
     press(&mut state, &repo, BTN_SQUARE);
-    assert_eq!(state.modal, ModalDialog::ConfirmDeleteShare { share_idx: 0 });
+    assert_eq!(
+        state.modal,
+        ModalDialog::ConfirmDeleteShare { share_idx: 0 }
+    );
     state.modal = ModalDialog::None;
 
     // `Triangle` and its hint both open the share creation dialog.

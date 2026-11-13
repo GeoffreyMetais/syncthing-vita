@@ -52,15 +52,7 @@ pub fn render_oled_screensaver(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         &status_line,
     );
     match pct {
-        Some(p) => draw_progress(
-            gfx,
-            bx + 2,
-            by + 104,
-            (SAVER_W as i32) - 8,
-            8,
-            p,
-            th.accent,
-        ),
+        Some(p) => draw_progress(gfx, bx + 2, by + 104, (SAVER_W as i32) - 8, 8, p, th.accent),
         None => draw_indeterminate_progress(
             gfx,
             bx + 2,
