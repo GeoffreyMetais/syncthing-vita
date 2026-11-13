@@ -1,5 +1,5 @@
 //! `ManageDevices` modal input: link devices to a share, pause it, switch its read-only mode,
-//! revert its local changes (read only), apply & sync.
+//! revert its local changes (read only), scan the LAN while no device is known.
 
 use super::open_add_device_modal;
 use crate::application::{QrScanFlow, ShareCreation, ShareModeService, ShareService, UserCommand};
@@ -61,8 +61,10 @@ pub fn handle(
         state.modal = ModalDialog::ConfirmRevertShare { share_idx };
         return UserCommand::None;
     }
-    if (input.pressed & BTN_TRIANGLE) != 0 {
-        return apply_and_sync(state, repo, share_idx);
+    // Changes apply when the dialog closes (`config_dirty` restarts the worker). With no known
+    // device yet, `Triangle` scans the LAN for Syncthing peers while the dialog stays open.
+    if (input.pressed & BTN_TRIANGLE) != 0 && state.devices.is_empty() && !state.sync_in_progress {
+        return UserCommand::StartSync;
     }
 
     let mut toggle_dev = (input.pressed & BTN_CROSS) != 0;
@@ -104,27 +106,4 @@ pub fn handle(
 fn close_manage_devices(state: &mut AppState, repo: &ConfigRepository) {
     state.modal = ModalDialog::None;
     ShareCreation::finish(state, repo);
-}
-
-/// `Apply & Sync` in `ManageDevices`: offers the share to its devices and (re)starts the sync.
-/// With no known device yet, keeps the modal open while the LAN is scanned.
-fn apply_and_sync(state: &mut AppState, repo: &ConfigRepository, share_idx: usize) -> UserCommand {
-    if state.is_share_creation_incomplete(share_idx) && !state.devices.is_empty() {
-        state.show_toast(UiText::LinkDeviceFirst);
-        return UserCommand::None;
-    }
-    if let Some(share) = state.shares.get(share_idx) {
-        if share.enabled && !share.shared_devices.is_empty() {
-            let fid = share.folder_id.clone();
-            state.queue_folder_offer(&fid);
-            state.config_dirty = true;
-        }
-    }
-    if !state.devices.is_empty() {
-        close_manage_devices(state, repo);
-    }
-    if !state.sync_in_progress {
-        return UserCommand::StartSync;
-    }
-    UserCommand::None
 }

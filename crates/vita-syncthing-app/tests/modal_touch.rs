@@ -261,3 +261,62 @@ fn test_folder_offer_buttons_and_inert_outside() {
     assert!(state.shares.iter().all(|s| s.folder_id != "docs"));
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn test_manage_devices_shows_scan_qr_in_every_language() {
+    let (dir, repo, mut state) = setup("modal-manage-scan-qr");
+    state.modal = ModalDialog::ManageDevices {
+        share_idx: 0,
+        selected_dev_idx: 0,
+    };
+    for language in Language::ALL {
+        state.set_language_preference(LanguagePreference::Fixed(language));
+        draw(&mut state);
+        let in_card = |key| {
+            state
+                .hit_map
+                .hotspots()
+                .iter()
+                .filter(|h| h.action == UiAction::Press(key) && h.rect.y < HINT_Y)
+                .count()
+        };
+        // `Scan QR` is a button of the dialog; there is no `Apply & Sync` any more.
+        assert_eq!(in_card(PadKey::R), 1, "{language:?}");
+        assert_eq!(in_card(PadKey::Triangle), 0, "{language:?}");
+    }
+
+    // Closing applies the changes: no separate step is needed.
+    let done = rects_of(&mut state, UiAction::Press(PadKey::Circle));
+    tap_rect(&mut state, &repo, done[1]);
+    assert_eq!(state.modal, ModalDialog::None);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_manage_devices_triangle_scans_the_lan_without_devices() {
+    let dir = temp_test_dir("modal-manage-scan-lan");
+    let repo = ConfigRepository::new(&dir);
+    let mut state = AppState::new(Vec::new(), Vec::new(), &dir);
+    ShareService::create_share(&mut state, &repo, "saves", "Saves", &format!("{dir}/saves"));
+    state.modal = ModalDialog::ManageDevices {
+        share_idx: 0,
+        selected_dev_idx: 0,
+    };
+    state.sync_in_progress = false;
+
+    // The `Scan LAN` hint is shown and starts a sync; the dialog stays open meanwhile.
+    let scan = rect_of(&mut state, UiAction::Press(PadKey::Triangle));
+    assert!(scan.y >= HINT_Y);
+    assert_eq!(
+        press(&mut state, &repo, BTN_TRIANGLE),
+        UserCommand::StartSync
+    );
+    assert!(matches!(state.modal, ModalDialog::ManageDevices { .. }));
+
+    // While scanning, the hint is gone and `Triangle` does nothing.
+    state.sync_in_progress = true;
+    draw(&mut state);
+    assert!(rects_of(&mut state, UiAction::Press(PadKey::Triangle)).is_empty());
+    assert_eq!(press(&mut state, &repo, BTN_TRIANGLE), UserCommand::None);
+    let _ = std::fs::remove_dir_all(&dir);
+}

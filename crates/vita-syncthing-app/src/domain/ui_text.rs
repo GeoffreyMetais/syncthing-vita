@@ -82,7 +82,6 @@ pub enum UiText {
         device: String,
         share: String,
     },
-    LinkDeviceFirst,
     AddedShortId {
         prefix: String,
     },

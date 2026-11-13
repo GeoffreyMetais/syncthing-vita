@@ -62,7 +62,6 @@ pub struct Messages {
     pub device_linked: &'static str,
     /// `{device}`, `{share}`.
     pub device_unlinked: &'static str,
-    pub link_device_first: &'static str,
     /// `{prefix}`.
     pub added_short_id: &'static str,
     /// `{name}`, `{short}`.
@@ -183,7 +182,6 @@ impl Strings {
             UiText::SyncingWithPeers => m.syncing_with_peers,
             UiText::ThemeDark => m.theme_dark,
             UiText::ThemeOled => m.theme_oled,
-            UiText::LinkDeviceFirst => m.link_device_first,
             UiText::OwnDeviceId => m.own_device_id,
             UiText::QrNotDeviceId => m.qr_not_device_id,
             UiText::NoDeclinedFolders => m.no_declined_folders,

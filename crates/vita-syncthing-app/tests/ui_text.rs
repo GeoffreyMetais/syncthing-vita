@@ -60,7 +60,6 @@ fn all_messages() -> Vec<UiText> {
             device: s("PC"),
             share: s("Saves"),
         },
-        UiText::LinkDeviceFirst,
         UiText::AddedShortId {
             prefix: s("MFZWI3D"),
         },
@@ -180,7 +179,6 @@ fn test_messages_are_translated_and_parameters_filled() {
             UiText::ReadyTapSyncCard,
             UiText::NoFoldersSynced,
             UiText::SyncFinished,
-            UiText::LinkDeviceFirst,
             UiText::QrNotDeviceId,
             UiText::NoDevicesLinked,
         ] {
