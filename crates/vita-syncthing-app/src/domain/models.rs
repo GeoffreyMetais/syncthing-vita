@@ -189,6 +189,11 @@ pub enum ModalDialog {
     ConfirmDeleteShare {
         share_idx: usize,
     },
+    /// Confirmation dialog before reverting the local changes of the read-only
+    /// `shares[share_idx]` (opened from `ManageDevices`, which it returns to).
+    ConfirmRevertShare {
+        share_idx: usize,
+    },
     /// A remote device offers to share a folder: the user accepts, declines or postpones it.
     FolderOffer {
         offer_idx: usize,

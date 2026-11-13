@@ -182,6 +182,13 @@ pub struct Strings {
     pub modal_delete_share_subtitle: &'static str,
     pub modal_delete_share_decline_hint: &'static str,
 
+    // Modals: Confirm Revert (read-only share)
+    pub action_revert: &'static str,
+    pub modal_revert_title: &'static str,
+    pub modal_revert_subtitle: &'static str,
+    pub modal_revert_added_hint: &'static str,
+    pub modal_revert_restored_hint: &'static str,
+
     // Modals: Confirm Quit
     pub modal_quit_title: &'static str,
     pub modal_quit_subtitle: &'static str,

@@ -90,6 +90,9 @@ impl ModalInput {
             ModalDialog::ConfirmDeleteShare { share_idx } => {
                 dialogs::confirm_delete_share(state, repo, input, share_idx)
             }
+            ModalDialog::ConfirmRevertShare { share_idx } => {
+                dialogs::confirm_revert_share(state, repo, input, share_idx)
+            }
             ModalDialog::ConfirmQuit => dialogs::confirm_quit(state, input),
             ModalDialog::FolderOffer { offer_idx } => {
                 folder_offer::handle(state, repo, input, offer_idx)

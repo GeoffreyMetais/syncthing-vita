@@ -59,7 +59,7 @@ pub fn build_initial_local_indexes(
 /// Sends what the peer does not know yet of `index` (see
 /// [`FolderSyncState::take_unpublished`]), if the peer shares that folder with us.
 /// Returns `true` if at least one message was sent.
-fn publish_index(
+pub(super) fn publish_index(
     stream: &mut BepTlsStream,
     ctx: &mut SessionContext<'_>,
     folders: &mut FolderSyncState,

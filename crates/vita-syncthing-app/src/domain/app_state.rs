@@ -69,6 +69,9 @@ pub struct AppState {
     /// Folder IDs explicitly created, enabled, or linked to a device by the user during this session
     /// that should be advertised as new folder offers in the next BEP `ClusterConfig`.
     pub pending_folder_offers: Vec<String>,
+    /// Read-only shares whose local changes the user asked to revert, waiting to be handed to
+    /// the running sync worker.
+    pub pending_reverts: Vec<String>,
     /// Folder ID of a share being created: it is discarded unless a device gets linked before
     /// the `ManageDevices` modal closes.
     pub pending_share_creation: Option<String>,
@@ -137,6 +140,7 @@ impl AppState {
             transfer_activity: 0,
             config_dirty: false,
             pending_folder_offers: Vec::new(),
+            pending_reverts: Vec::new(),
             pending_share_creation: None,
             folder_offers: Vec::new(),
             ignored_folders: Vec::new(),

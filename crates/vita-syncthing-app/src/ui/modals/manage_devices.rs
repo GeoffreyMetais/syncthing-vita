@@ -58,14 +58,33 @@ pub fn render_manage_devices_modal(
         th.accent_hi,
     );
     // Header right: the share's access mode; touching it (or `L`) switches to the other one.
-    let mode_lbl = match state.shares.get(share_idx).map(|sh| sh.mode) {
-        Some(ShareMode::ReadOnly) => s.share_mode_read_only,
-        _ => s.share_mode_read_write,
+    // A read-only share can also revert its local changes (`START`, confirmed first).
+    let read_only = state
+        .shares
+        .get(share_idx)
+        .is_some_and(|sh| sh.mode == ShareMode::ReadOnly);
+    let mode_lbl = if read_only {
+        s.share_mode_read_only
+    } else {
+        s.share_mode_read_write
     };
     let w_mode = action_width(gfx, PadButton::L, mode_lbl);
-    let bx_mode = dx + w - 28 - w_mode;
-    draw_press_button(gfx, th, hits, bx_mode, dy + 40, PadButton::L, mode_lbl);
-    let header_w = bx_mode - 12 - (lx + 52);
+    let mut header_right = dx + w - 28 - w_mode;
+    draw_press_button(gfx, th, hits, header_right, dy + 40, PadButton::L, mode_lbl);
+    if read_only {
+        let w_revert = action_width(gfx, PadButton::Start, s.action_revert);
+        header_right -= 10 + w_revert;
+        draw_press_button(
+            gfx,
+            th,
+            hits,
+            header_right,
+            dy + 40,
+            PadButton::Start,
+            s.action_revert,
+        );
+    }
+    let header_w = header_right - 12 - (lx + 52);
 
     let header_title = s.fmt_devices_for_share(&share_title);
     gfx.text_fit(

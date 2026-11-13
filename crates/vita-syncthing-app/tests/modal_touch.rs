@@ -54,6 +54,7 @@ fn test_every_modal_element_is_on_screen_and_hints_do_not_overlap() {
         },
         ModalDialog::ShowDeviceId,
         ModalDialog::ConfirmDeleteShare { share_idx: 0 },
+        ModalDialog::ConfirmRevertShare { share_idx: 0 },
         ModalDialog::ConfirmQuit,
         ModalDialog::FolderOffer { offer_idx: 0 },
     ];

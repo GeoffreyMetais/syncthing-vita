@@ -1,7 +1,8 @@
 //! Share access mode: read & write (Syncthing "Send & Receive") or read only ("Receive Only":
-//! the PS Vita receives its peers' changes but never sends its own).
+//! the PS Vita receives its peers' changes but never sends its own), and revert of a read-only
+//! share's local changes.
 
-use super::ShareService;
+use super::{ShareService, UserCommand};
 use crate::domain::{AppState, ShareMode, UiText};
 use crate::infrastructure::ConfigRepository;
 
@@ -29,5 +30,38 @@ impl ShareModeService {
             ShareMode::ReadWrite => UiText::ShareReadWrite { id },
         });
         ShareService::log_event(state, repo, &log);
+    }
+
+    /// Asks the sync worker to revert the local changes of the read-only `shares[share_idx]`
+    /// (Syncthing "Revert Local Changes"): files added on the PS Vita are deleted, edited or
+    /// deleted ones are downloaded again. The request waits in `pending_reverts` until a sync
+    /// worker runs; a sync is started if none is.
+    pub fn request_revert(
+        state: &mut AppState,
+        repo: &ConfigRepository,
+        share_idx: usize,
+    ) -> UserCommand {
+        let Some(share) = state.shares.get(share_idx) else {
+            return UserCommand::None;
+        };
+        if share.mode != ShareMode::ReadOnly {
+            return UserCommand::None;
+        }
+        let id = share.folder_id.clone();
+        if !state.pending_reverts.contains(&id) {
+            state.pending_reverts.push(id.clone());
+        }
+        state.auto_reconnect_enabled = true;
+        ShareService::log_event(
+            state,
+            repo,
+            &format!("Revert of local changes requested for {}", id),
+        );
+        state.show_toast(UiText::RevertRequested { id });
+        if state.sync_in_progress || state.session_connected {
+            UserCommand::None
+        } else {
+            UserCommand::StartSync
+        }
     }
 }

@@ -120,6 +120,13 @@ pub enum UiText {
     ShareReadWrite {
         id: String,
     },
+    RevertRequested {
+        id: String,
+    },
+    LocalChangesReverted {
+        id: String,
+        count: usize,
+    },
     OfferAccepted {
         label: String,
         id: String,

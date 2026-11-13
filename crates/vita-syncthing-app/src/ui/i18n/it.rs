@@ -168,6 +168,13 @@ pub static STRINGS_IT: Strings = Strings {
     modal_delete_share_decline_hint:
         "Le future offerte dei peer verranno rifiutate (modificabile in Impostazioni).",
 
+    // Modals: Confirm Revert (read-only share)
+    action_revert: "Ripristina",
+    modal_revert_title: "Annullare le modifiche locali?",
+    modal_revert_subtitle: "La versione dei dispositivi sostituisce quella della PS Vita",
+    modal_revert_added_hint: "I file aggiunti sulla PS Vita vengono eliminati.",
+    modal_revert_restored_hint: "I file modificati o eliminati vengono riscaricati.",
+
     // Modals: Confirm Quit
     modal_quit_title: "Uscire da VitaSync?",
     modal_quit_subtitle: "Conferma per chiudere l'applicazione e tornare alla LiveArea",
@@ -242,6 +249,8 @@ pub static MESSAGES_IT: Messages = Messages {
     share_paused: "La condivisione {id} è ora in pausa",
     share_read_only: "La condivisione {id} è ora in sola lettura",
     share_read_write: "La condivisione {id} è ora in lettura e scrittura",
+    revert_requested: "Annullamento delle modifiche locali di {id}...",
+    local_changes_reverted: "Modifiche locali di {id} annullate ({count})",
     offer_accepted: "Condivisione '{label}' accettata ({id})",
     choose_where_to_store: "Scegli dove salvare '{label}'",
     offer_declined: "Condivisione '{label}' rifiutata ({id})",

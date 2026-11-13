@@ -67,6 +67,12 @@ pub enum SyncEvent {
         folder: String,
         description: String,
     },
+    /// The local changes of a receive-only folder were reverted to the peer's version
+    /// (`reverted` entries deleted or reset, then pulled again).
+    LocalChangesReverted {
+        folder: String,
+        reverted: usize,
+    },
     /// A single file could not be synchronized (e.g. local filesystem error); the session continues.
     FileError {
         folder: String,

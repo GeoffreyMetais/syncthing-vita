@@ -1,14 +1,19 @@
-//! Share access mode: read & write or read only (peers never modify the PS Vita's files).
+//! Share access mode: read & write or read only (Syncthing "Receive Only"), and revert of a
+//! read-only share's local changes.
 
 mod common;
 
 use common::{draw, press, rects_of, tap_rect, temp_test_dir};
-use syncthing_core::DeviceId;
-use vita_syncthing_app::application::{ShareModeService, ShareService};
+use syncthing_core::{DeviceId, SyncEvent};
+use vita_syncthing_app::application::{
+    ShareModeService, ShareService, SyncCoordinator, UserCommand,
+};
 use vita_syncthing_app::domain::{
     AppState, Language, LanguagePreference, ModalDialog, PadKey, Rect, ShareMode, UiAction, UiText,
 };
-use vita_syncthing_app::infrastructure::{ConfigRepository, BTN_L};
+use vita_syncthing_app::infrastructure::{
+    ConfigRepository, WorkerMsg, BTN_CIRCLE, BTN_CROSS, BTN_L, BTN_START,
+};
 use vita_syncthing_app::ui::gfx::{GFX_H, GFX_W};
 use vita_syncthing_app::ui::theme::HINT_Y;
 
@@ -119,5 +124,87 @@ fn test_mode_button_fits_in_every_language() {
             }
         }
     }
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_revert_needs_a_read_only_share_and_a_confirmation() {
+    let (dir, repo, mut state) = setup("share-mode-revert-confirm");
+
+    // A read & write share has nothing to revert: `START` does nothing and no button is shown.
+    draw(&mut state);
+    assert!(rects_of(&mut state, UiAction::Press(PadKey::Start)).is_empty());
+    press(&mut state, &repo, BTN_START);
+    assert!(matches!(state.modal, ModalDialog::ManageDevices { .. }));
+
+    // Read only: `START` asks for confirmation; `Circle` cancels back to the devices dialog.
+    ShareModeService::toggle(&mut state, &repo, 0);
+    press(&mut state, &repo, BTN_START);
+    assert_eq!(
+        state.modal,
+        ModalDialog::ConfirmRevertShare { share_idx: 0 }
+    );
+    press(&mut state, &repo, BTN_CIRCLE);
+    assert!(matches!(
+        state.modal,
+        ModalDialog::ManageDevices { share_idx: 0, .. }
+    ));
+    assert!(state.pending_reverts.is_empty());
+
+    // `Cross` confirms: the request waits for the worker, and a sync starts if none runs.
+    press(&mut state, &repo, BTN_START);
+    state.sync_in_progress = false;
+    state.session_connected = false;
+    assert_eq!(press(&mut state, &repo, BTN_CROSS), UserCommand::StartSync);
+    assert!(matches!(
+        state.modal,
+        ModalDialog::ManageDevices { share_idx: 0, .. }
+    ));
+    assert_eq!(state.pending_reverts, vec!["saves".to_owned()]);
+    assert!(matches!(
+        &state.toast_msg,
+        Some((UiText::RevertRequested { id }, _)) if id == "saves"
+    ));
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_revert_by_touch() {
+    let (dir, repo, mut state) = setup("share-mode-revert-touch");
+    ShareModeService::toggle(&mut state, &repo, 0);
+    state.sync_in_progress = true;
+
+    let revert = rects_of(&mut state, UiAction::Press(PadKey::Start))[0];
+    tap_rect(&mut state, &repo, revert);
+    assert_eq!(
+        state.modal,
+        ModalDialog::ConfirmRevertShare { share_idx: 0 }
+    );
+    let confirm = rects_of(&mut state, UiAction::Press(PadKey::Cross))[0];
+    assert_eq!(tap_rect(&mut state, &repo, confirm), UserCommand::None);
+    assert_eq!(state.pending_reverts, vec!["saves".to_owned()]);
+    // A stale or read & write share is never reverted.
+    assert_eq!(
+        ShareModeService::request_revert(&mut state, &repo, 9),
+        UserCommand::None
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_reverted_event_shows_a_toast() {
+    let (dir, repo, mut state) = setup("share-mode-reverted-event");
+    let (tx, rx) = std::sync::mpsc::channel();
+    let mut worker_rx = Some(rx);
+    tx.send(WorkerMsg::SyncEvent(SyncEvent::LocalChangesReverted {
+        folder: "saves".to_owned(),
+        reverted: 3,
+    }))
+    .unwrap();
+    SyncCoordinator::process_worker_messages(&mut state, &repo, &mut worker_rx);
+    assert!(matches!(
+        &state.toast_msg,
+        Some((UiText::LocalChangesReverted { id, count: 3 }, _)) if id == "saves"
+    ));
     let _ = std::fs::remove_dir_all(&dir);
 }

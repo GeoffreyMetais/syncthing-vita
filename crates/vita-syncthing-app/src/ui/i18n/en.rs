@@ -169,6 +169,13 @@ pub static STRINGS_EN: Strings = Strings {
     modal_delete_share_decline_hint:
         "Peers' offers of it are declined (undo in Settings · Clear Declined).",
 
+    // Modals: Confirm Revert (read-only share)
+    action_revert: "Revert",
+    modal_revert_title: "Revert local changes?",
+    modal_revert_subtitle: "The peers' version replaces the PS Vita's",
+    modal_revert_added_hint: "Files added on the PS Vita are deleted.",
+    modal_revert_restored_hint: "Edited or deleted files are downloaded again.",
+
     // Modals: Confirm Quit
     modal_quit_title: "Quit VitaSync?",
     modal_quit_subtitle: "Confirm whether to close the application and return to LiveArea",
@@ -242,6 +249,8 @@ pub static MESSAGES_EN: Messages = Messages {
     share_paused: "Share {id} is now paused",
     share_read_only: "Share {id} is now read only",
     share_read_write: "Share {id} is now read & write",
+    revert_requested: "Reverting local changes of {id}...",
+    local_changes_reverted: "Local changes of {id} reverted ({count})",
     offer_accepted: "Accepted share '{label}' ({id})",
     choose_where_to_store: "Choose where to store '{label}'",
     offer_declined: "Declined share '{label}' ({id})",

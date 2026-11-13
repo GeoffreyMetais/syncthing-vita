@@ -82,6 +82,11 @@ fn all_messages() -> Vec<UiText> {
         UiText::SharePaused { id: s("saves") },
         UiText::ShareReadOnly { id: s("saves") },
         UiText::ShareReadWrite { id: s("saves") },
+        UiText::RevertRequested { id: s("saves") },
+        UiText::LocalChangesReverted {
+            id: s("saves"),
+            count: 3,
+        },
         UiText::OfferAccepted {
             label: s("Saves"),
             id: s("saves"),

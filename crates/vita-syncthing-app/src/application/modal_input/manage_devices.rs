@@ -1,12 +1,12 @@
 //! `ManageDevices` modal input: link devices to a share, pause it, switch its read-only mode,
-//! apply & sync.
+//! revert its local changes (read only), apply & sync.
 
 use super::open_add_device_modal;
 use crate::application::{QrScanFlow, ShareCreation, ShareModeService, ShareService, UserCommand};
-use crate::domain::{AppState, ModalDialog, UiText, VISIBLE_DEVICES};
+use crate::domain::{AppState, ModalDialog, ShareMode, UiText, VISIBLE_DEVICES};
 use crate::infrastructure::{
     ConfigRepository, InputFrame, BTN_CIRCLE, BTN_CROSS, BTN_DOWN, BTN_L, BTN_R, BTN_SELECT,
-    BTN_SQUARE, BTN_TRIANGLE, BTN_UP,
+    BTN_SQUARE, BTN_START, BTN_TRIANGLE, BTN_UP,
 };
 
 /// Handles input in the `ManageDevices` modal; `row` is the device row touched, if any.
@@ -51,6 +51,14 @@ pub fn handle(
     }
     if (input.pressed & BTN_L) != 0 {
         ShareModeService::toggle(state, repo, share_idx);
+        return UserCommand::None;
+    }
+    let read_only = state
+        .shares
+        .get(share_idx)
+        .is_some_and(|sh| sh.mode == ShareMode::ReadOnly);
+    if (input.pressed & BTN_START) != 0 && read_only {
+        state.modal = ModalDialog::ConfirmRevertShare { share_idx };
         return UserCommand::None;
     }
     if (input.pressed & BTN_TRIANGLE) != 0 {

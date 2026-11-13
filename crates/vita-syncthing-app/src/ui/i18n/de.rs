@@ -167,6 +167,13 @@ pub static STRINGS_DE: Strings = Strings {
     modal_delete_share_decline_hint:
         "Angebote von Peers werden abgelehnt (in Einstellungen änderbar).",
 
+    // Modals: Confirm Revert (read-only share)
+    action_revert: "Zurücksetzen",
+    modal_revert_title: "Lokale Änderungen zurücksetzen?",
+    modal_revert_subtitle: "Die Version der Geräte ersetzt die der PS Vita",
+    modal_revert_added_hint: "Auf der PS Vita hinzugefügte Dateien werden gelöscht.",
+    modal_revert_restored_hint: "Geänderte oder gelöschte Dateien werden neu geladen.",
+
     // Modals: Confirm Quit
     modal_quit_title: "VitaSync beenden?",
     modal_quit_subtitle:
@@ -239,6 +246,8 @@ pub static MESSAGES_DE: Messages = Messages {
     share_paused: "Freigabe {id} ist jetzt pausiert",
     share_read_only: "Freigabe {id} ist jetzt schreibgeschützt",
     share_read_write: "Freigabe {id} ist jetzt beschreibbar",
+    revert_requested: "Lokale Änderungen von {id} werden zurückgesetzt...",
+    local_changes_reverted: "Lokale Änderungen von {id} zurückgesetzt ({count})",
     offer_accepted: "Freigabe „{label}“ angenommen ({id})",
     choose_where_to_store: "Speicherort für „{label}“ wählen",
     offer_declined: "Freigabe „{label}“ abgelehnt ({id})",

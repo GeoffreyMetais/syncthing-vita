@@ -10,6 +10,7 @@ use super::dispatch::{dispatch_primary_message, next_primary_message, Dispatched
 use super::events::SyncEvent;
 use super::folders::FolderSyncState;
 use super::index_exchange::rescan_and_publish;
+use super::revert::handle_revert_requests;
 use super::secondary::{
     open_secondary_bep_stream, ping_all_secondaries, poll_all_secondaries, SecondaryBepConn,
 };
@@ -117,6 +118,13 @@ fn session_loop(
             if published {
                 ctx.emit_cycle_completed(links.active_connections());
             }
+        }
+
+        // F. Revert of a receive-only folder's local changes (UI-requested)
+        if handle_revert_requests(stream, ctx, folders, control)
+            .map_err(|e| format!("revert of local changes failed: {e}"))?
+        {
+            ctx.emit_cycle_completed(links.active_connections());
         }
     }
     Ok(())

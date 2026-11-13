@@ -234,6 +234,14 @@ fn main() {
         signals.user_change |= ime_open != state.ime_active;
         state.ime_active = ime_open;
 
+        // Revert requests of read-only shares go to the running worker (its sessions take them),
+        // unless that worker is about to be replaced by one with the new configuration.
+        if let (Some(ref ctl), false) = (&worker_ctl, state.config_dirty) {
+            for folder_id in std::mem::take(&mut state.pending_reverts) {
+                ctl.request_revert(&folder_id);
+            }
+        }
+
         // Reload persistent worker if share/device configuration was changed and modals are closed
         if state.config_dirty && state.modal == ModalDialog::None {
             signals.background_change = true;

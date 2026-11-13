@@ -168,6 +168,13 @@ pub static STRINGS_ES: Strings = Strings {
     modal_delete_share_decline_hint:
         "Las ofertas futuras de pares se rechazarán (deshacer en Ajustes).",
 
+    // Modals: Confirm Revert (read-only share)
+    action_revert: "Revertir",
+    modal_revert_title: "¿Revertir los cambios locales?",
+    modal_revert_subtitle: "La versión de los pares reemplaza la de la PS Vita",
+    modal_revert_added_hint: "Los archivos añadidos en la PS Vita se eliminan.",
+    modal_revert_restored_hint: "Los archivos modificados o eliminados se descargan de nuevo.",
+
     // Modals: Confirm Quit
     modal_quit_title: "¿Salir de VitaSync?",
     modal_quit_subtitle: "Confirma si deseas cerrar la aplicación y volver a LiveArea",
@@ -240,6 +247,8 @@ pub static MESSAGES_ES: Messages = Messages {
     share_paused: "La carpeta {id} está en pausa",
     share_read_only: "La carpeta {id} es ahora de solo lectura",
     share_read_write: "La carpeta {id} es ahora de lectura y escritura",
+    revert_requested: "Revirtiendo los cambios locales de {id}...",
+    local_changes_reverted: "Cambios locales de {id} revertidos ({count})",
     offer_accepted: "Carpeta '{label}' aceptada ({id})",
     choose_where_to_store: "Elige dónde guardar '{label}'",
     offer_declined: "Carpeta '{label}' rechazada ({id})",
