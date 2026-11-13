@@ -66,8 +66,8 @@ pub const TAB_SHARES: &str = "Shares";
 pub const TAB_FILES: &str = "Files";
 pub const TAB_SETTINGS: &str = "Settings";
 pub const APP_TITLE: &str = "VitaSync";
-pub const APP_VERSION_LABEL: &str = "v0.1.0 · Pure Rust";
-pub const SIDEBAR_SYNCING: &str = "Syncing BEP/1.0...";
+pub const APP_VERSION_LABEL: &str = "v0.1.0";
+pub const SIDEBAR_SYNCING: &str = "Syncing...";
 pub const SIDEBAR_LAST_SYNC: &str = "Last sync session";
 pub const PROTOCOL_TLS: &str = "BEP/1.0 TLS 1.3";
 pub const PROTOCOL_DISCOVERY: &str = "UDP 21027...";
@@ -148,7 +148,7 @@ pub const SETTINGS_LABEL_COLOUR_THEME: &str = "Colour Theme";
 pub const SETTINGS_DESC_THEME_DARK: &str =
     "Dark — VitaSend slate blue-grey look with teal accent";
 pub const SETTINGS_DESC_THEME_OLED: &str =
-    "OLED — Pure #000000 black background (saves PS Vita OLED battery)";
+    "OLED — Pure black background (saves PS Vita OLED battery)";
 pub const SETTINGS_SAVER_AUTO_HINT: &str =
     "OLED Screensaver activates automatically after 12s during sync (or press SELECT anytime).";
 pub const SETTINGS_SEC_LOG: &str = "BEP/1.0 & TLS 1.3 PROTOCOL LOG";

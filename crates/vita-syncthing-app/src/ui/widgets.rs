@@ -257,58 +257,73 @@ pub fn draw_chrome(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut Hit
         shortcut: None,
     });
     gfx.rrect_outline(12, card_y, SIDEBAR_W - 24, 82, 12, 1, th.border);
-    let xfer_title = if state.sync_in_progress {
-        s.sidebar_syncing
+    if state.is_sync_ready() {
+        // Connected and up to date: just a green check and "Ready".
+        gfx.icon(Icon::Check, 44.0, (card_y + 41) as f32, 26.0, C_GOOD);
+        gfx.text_fit(
+            66,
+            card_y + 41,
+            SIDEBAR_W - 90,
+            18,
+            FontWeight::Medium,
+            C_GOOD,
+            Align::Left,
+            s.status_ready,
+        );
     } else {
-        s.sidebar_last_sync
-    };
-    gfx.text(
-        24,
-        card_y + 20,
-        13,
-        FontWeight::Regular,
-        th.dim,
-        Align::Left,
-        xfer_title,
-    );
-    gfx.text_fit(
-        24,
-        card_y + 42,
-        SIDEBAR_W - 48,
-        14,
-        FontWeight::Medium,
-        th.text,
-        Align::Left,
-        &s.text(&state.peer_label),
-    );
-    let pct_str = match state.progress_pct {
-        Some(p) => {
-            let p = p.min(100);
-            draw_progress(gfx, 24, card_y + 58, SIDEBAR_W - 88, 8, p, th.accent);
-            format!("{}%", p)
-        }
-        None => {
-            draw_indeterminate_progress(
-                gfx,
-                24,
-                card_y + 58,
-                SIDEBAR_W - 88,
-                8,
-                state.progress_anim_tick,
-                th.accent,
-            );
-            "...".to_owned()
-        }
-    };
-    gfx.text(
-        SIDEBAR_W - 24,
-        card_y + 62,
-        12,
-        FontWeight::Medium,
-        th.dim,
-        Align::Right,
-        &pct_str,
-    );
+        let xfer_title = if state.sync_in_progress {
+            s.sidebar_syncing
+        } else {
+            s.sidebar_last_sync
+        };
+        gfx.text(
+            24,
+            card_y + 20,
+            13,
+            FontWeight::Regular,
+            th.dim,
+            Align::Left,
+            xfer_title,
+        );
+        gfx.text_fit(
+            24,
+            card_y + 42,
+            SIDEBAR_W - 48,
+            14,
+            FontWeight::Medium,
+            th.text,
+            Align::Left,
+            &s.text(&state.peer_label),
+        );
+        let pct_str = match state.progress_pct {
+            Some(p) => {
+                let p = p.min(100);
+                draw_progress(gfx, 24, card_y + 58, SIDEBAR_W - 88, 8, p, th.accent);
+                format!("{}%", p)
+            }
+            None => {
+                draw_indeterminate_progress(
+                    gfx,
+                    24,
+                    card_y + 58,
+                    SIDEBAR_W - 88,
+                    8,
+                    state.progress_anim_tick,
+                    th.accent,
+                );
+                "...".to_owned()
+            }
+        };
+        gfx.text(
+            SIDEBAR_W - 24,
+            card_y + 62,
+            12,
+            FontWeight::Medium,
+            th.dim,
+            Align::Right,
+            &pct_str,
+        );
+    }
 
     // Sidebar bottom Wi-Fi & version status
     let base = HINT_Y - 18;
