@@ -132,7 +132,7 @@ pub static STRINGS_IT: Strings = Strings {
     action_change_language: "Cambia lingua",
 
     // Log viewer
-    logs_title: "Registro del protocollo",
+    logs_title: "Registro",
     logs_scope_session: "Questa sessione",
     logs_scope_history: "Cronologia completa · syncthing.log",
     logs_empty: "Nessuna voce per ora",

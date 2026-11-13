@@ -152,7 +152,7 @@ pub struct Strings {
     pub action_change_language: &'static str,
 
     // Screen: full-screen protocol log viewer
-    /// Title of the full-screen protocol log viewer.
+    /// Title of the full-screen log viewer.
     pub logs_title: &'static str,
     /// Log viewer showing this session's lines.
     pub logs_scope_session: &'static str,
