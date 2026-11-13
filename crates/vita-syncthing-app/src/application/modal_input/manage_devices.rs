@@ -1,5 +1,6 @@
 //! `ManageDevices` modal input: link devices to a share, pause it, switch its read-only mode,
-//! revert its local changes (read only), scan the LAN while no device is known.
+//! revert its local changes (read only), scan the LAN while no device is known (automatically
+//! when the dialog opens, again with `Triangle`).
 
 use super::open_add_device_modal;
 use crate::application::{QrScanFlow, ShareCreation, ShareModeService, ShareService, UserCommand};
@@ -100,6 +101,18 @@ pub fn handle(
         }
     }
     UserCommand::None
+}
+
+/// Scans the LAN when `ManageDevices` has just opened (`before` was another dialog) with no
+/// known device and no sync running, so peers appear without pressing `Triangle`.
+pub(crate) fn scan_on_open(before: ModalDialog, state: &AppState) -> UserCommand {
+    let was_open = matches!(before, ModalDialog::ManageDevices { .. });
+    let is_open = matches!(state.modal, ModalDialog::ManageDevices { .. });
+    if is_open && !was_open && state.devices.is_empty() && !state.sync_in_progress {
+        UserCommand::StartSync
+    } else {
+        UserCommand::None
+    }
 }
 
 /// Closes `ManageDevices`, discarding a share being created that still has no linked device.

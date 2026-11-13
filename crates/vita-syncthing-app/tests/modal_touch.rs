@@ -11,7 +11,7 @@ use vita_syncthing_app::domain::{
     AppState, Language, LanguagePreference, ModalDialog, PadKey, Rect, UiAction, ADD_DEVICE_KEYPAD,
     NEW_SHARE_TEMPLATES,
 };
-use vita_syncthing_app::infrastructure::{ConfigRepository, BTN_TRIANGLE};
+use vita_syncthing_app::infrastructure::{ConfigRepository, BTN_CIRCLE, BTN_TRIANGLE};
 use vita_syncthing_app::ui::gfx::{GFX_H, GFX_W};
 use vita_syncthing_app::ui::theme::HINT_Y;
 
@@ -318,5 +318,45 @@ fn test_manage_devices_triangle_scans_the_lan_without_devices() {
     draw(&mut state);
     assert!(rects_of(&mut state, UiAction::Press(PadKey::Triangle)).is_empty());
     assert_eq!(press(&mut state, &repo, BTN_TRIANGLE), UserCommand::None);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_manage_devices_scans_the_lan_when_opened_without_devices() {
+    let dir = temp_test_dir("modal-manage-scan-on-open");
+    let repo = ConfigRepository::new(&dir);
+    let mut state = AppState::new(Vec::new(), Vec::new(), &dir);
+    ShareService::create_share(&mut state, &repo, "saves", "Saves", &format!("{dir}/saves"));
+    state.modal = ModalDialog::None;
+    state.sync_in_progress = false;
+
+    // Opening the devices dialog of a share with no known device starts a LAN scan...
+    assert_eq!(
+        tap_action(&mut state, &repo, UiAction::ManageDevices(0)),
+        UserCommand::StartSync
+    );
+    assert!(matches!(state.modal, ModalDialog::ManageDevices { .. }));
+    // ...once: staying in the dialog does not scan again.
+    state.sync_in_progress = false;
+    assert_eq!(press(&mut state, &repo, 0), UserCommand::None);
+
+    // No scan while a sync already runs.
+    press(&mut state, &repo, BTN_CIRCLE);
+    state.sync_in_progress = true;
+    assert_eq!(
+        tap_action(&mut state, &repo, UiAction::ManageDevices(0)),
+        UserCommand::None
+    );
+
+    // No scan when a device is already known.
+    press(&mut state, &repo, BTN_CIRCLE);
+    state.sync_in_progress = false;
+    ShareService::upsert_device(&mut state, &repo, PEER, "MacBook", "192.168.1.10:22000");
+    state.modal = ModalDialog::None;
+    assert_eq!(
+        tap_action(&mut state, &repo, UiAction::ManageDevices(0)),
+        UserCommand::None
+    );
+    assert!(matches!(state.modal, ModalDialog::ManageDevices { .. }));
     let _ = std::fs::remove_dir_all(&dir);
 }

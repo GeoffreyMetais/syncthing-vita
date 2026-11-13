@@ -5,7 +5,7 @@
 //! Open modals are handled by `ModalInput`, D-pad focus by `DpadNavigation`.
 
 use crate::application::dpad_navigation::DpadNavigation;
-use crate::application::modal_input::{open_add_device_modal, ModalInput};
+use crate::application::modal_input::{open_add_device_modal, scan_on_open, ModalInput};
 use crate::application::{FilesController, SettingsController, ShareService, SharesController};
 use crate::domain::{
     ActiveTab, AppState, ModalDialog, PickerMode, ShortcutKey, UiAction, TAB_ORDER,
@@ -41,9 +41,13 @@ impl InputController {
         input: InputFrame,
     ) -> UserCommand {
         let prev_tab = state.active_tab;
-        let cmd = Self::handle_frame(state, repo, input);
+        let prev_modal = state.modal;
+        let mut cmd = Self::handle_frame(state, repo, input);
         if state.active_tab != prev_tab {
             state.reset_nav_for_tab();
+        }
+        if cmd == UserCommand::None {
+            cmd = scan_on_open(prev_modal, state);
         }
         cmd
     }
