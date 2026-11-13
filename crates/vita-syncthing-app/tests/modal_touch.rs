@@ -156,11 +156,11 @@ fn test_create_share_template_row_and_outside_touch() {
     state.modal = ModalDialog::CreateShare { selected_idx: 0 };
     let music = NEW_SHARE_TEMPLATES
         .iter()
-        .position(|&(id, _, _)| id == "vita-music")
+        .position(|&(id, _, _)| id == "retroarch-saves")
         .unwrap();
     tap_action(&mut state, &repo, UiAction::ModalRow(music));
     assert!(matches!(state.modal, ModalDialog::ManageDevices { .. }));
-    assert!(state.shares.iter().any(|s| s.folder_id == "vita-music"));
+    assert!(state.shares.iter().any(|s| s.folder_id == "retroarch-saves"));
     let _ = std::fs::remove_dir_all(&dir);
 }
 
