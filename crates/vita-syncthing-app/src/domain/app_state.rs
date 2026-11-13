@@ -7,8 +7,8 @@ use crate::domain::initial_sync::InitialSyncPeers;
 use crate::domain::interaction::{FocusSlot, HitMap};
 use crate::domain::models::{
     ActiveTab, CameraPreview, FolderOffer, IgnoredFolder, KnownDevice, Language,
-    LanguagePreference, ModalDialog, PickerItem, PickerMode, ShareConfigEntry, ThemeMode,
-    BROWSER_ROWS,
+    LanguagePreference, ModalDialog, PickerItem, PickerMode, ShareConfigEntry, SyncActivity,
+    ThemeMode, BROWSER_ROWS,
 };
 use crate::domain::navigation::{
     default_col, starts_on_header, NavFocus, NavState, DASHBOARD_HEADER_ACTIONS,
@@ -38,6 +38,9 @@ pub struct AppState {
     pub saver_vx: f32,
     pub saver_vy: f32,
     pub sync_in_progress: bool,
+    /// True while blocks are being served to a peer (set on every `BlockUploaded`, cleared by
+    /// `application::UploadActivity` once no block was served for `UPLOAD_DISPLAY_GRACE`).
+    pub uploading: bool,
     pub vita_device_id: String,
     pub peer_label: UiText,
     pub folder_label: UiText,
@@ -117,6 +120,7 @@ impl AppState {
             saver_vx: 0.65,
             saver_vy: 0.45,
             sync_in_progress: false,
+            uploading: false,
             vita_device_id: "Initializing...".to_owned(),
             peer_label: UiText::ReadyManualPairing,
             folder_label: UiText::NoFoldersSynced,
@@ -188,6 +192,20 @@ impl AppState {
     /// linked peer is up to date and nothing is transferring (sidebar card shows "Ready").
     pub fn is_sync_ready(&self) -> bool {
         self.session_connected && !self.sync_in_progress
+    }
+
+    /// What the sync engine is doing right now, as shown by the sidebar transfer card and the
+    /// OLED screensaver (a download takes precedence over serving blocks).
+    pub fn sync_activity(&self) -> SyncActivity {
+        if self.sync_in_progress {
+            SyncActivity::Downloading
+        } else if self.uploading {
+            SyncActivity::Uploading
+        } else if self.is_sync_ready() {
+            SyncActivity::Ready
+        } else {
+            SyncActivity::Idle
+        }
     }
 
     /// Marks `folder_id` as explicitly offered by the user so the next BEP `ClusterConfig`

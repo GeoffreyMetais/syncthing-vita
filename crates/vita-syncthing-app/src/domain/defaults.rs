@@ -49,6 +49,9 @@ pub const TRANSFER_GRACE: Duration = Duration::from_secs(120);
 pub const CPU_TRANSFER_GRACE: Duration = Duration::from_secs(10);
 /// How long the CPU stays at medium speed after the last user input (smooth navigation).
 pub const CPU_INTERACTIVE_GRACE: Duration = Duration::from_secs(3);
+/// How long the sidebar card and the screensaver keep showing "Uploading" after the last block
+/// served to a peer (uploads have no end event: a peer simply stops requesting blocks).
+pub const UPLOAD_DISPLAY_GRACE: Duration = Duration::from_secs(5);
 /// Interval at which the standby block and the CPU clock are re-applied.
 pub const POWER_TICK_INTERVAL: Duration = Duration::from_secs(10);
 

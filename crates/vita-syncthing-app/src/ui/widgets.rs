@@ -2,8 +2,8 @@
 //! `draw_progress`, `draw_scrollbar`, `draw_page_title`, `draw_chrome`, `draw_hints`, `draw_toast`).
 
 use crate::domain::{
-    ActiveTab, AppState, FocusSlot, HitMap, Hotspot, NavFocus, PadKey, Rect, ShortcutKey, UiAction,
-    UiText,
+    ActiveTab, AppState, FocusSlot, HitMap, Hotspot, NavFocus, PadKey, Rect, ShortcutKey,
+    SyncActivity, UiAction, UiText,
 };
 use crate::ui::gfx::{
     rgb, with_alpha, Align, Color, FontWeight, Gfx, Icon, PadButton, GFX_H, GFX_W,
@@ -257,7 +257,8 @@ pub fn draw_chrome(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut Hit
         shortcut: None,
     });
     gfx.rrect_outline(12, card_y, SIDEBAR_W - 24, 82, 12, 1, th.border);
-    if state.is_sync_ready() {
+    let activity = state.sync_activity();
+    if activity == SyncActivity::Ready {
         // Connected and up to date: just a green check and "Ready".
         gfx.icon(Icon::Check, 44.0, (card_y + 41) as f32, 26.0, C_GOOD);
         gfx.text_fit(
@@ -271,10 +272,16 @@ pub fn draw_chrome(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut Hit
             s.status_ready,
         );
     } else {
-        let xfer_title = if state.sync_in_progress {
-            s.sidebar_syncing
+        let xfer_title = match activity {
+            SyncActivity::Downloading => s.sidebar_syncing,
+            SyncActivity::Uploading => s.sidebar_uploading,
+            SyncActivity::Ready | SyncActivity::Idle => s.sidebar_last_sync,
+        };
+        // Uploads have no known total: an indeterminate bar instead of a stale percentage.
+        let progress = if activity == SyncActivity::Uploading {
+            None
         } else {
-            s.sidebar_last_sync
+            state.progress_pct
         };
         gfx.text(
             24,
@@ -295,7 +302,7 @@ pub fn draw_chrome(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut Hit
             Align::Left,
             &s.text(&state.peer_label),
         );
-        let pct_str = match state.progress_pct {
+        let pct_str = match progress {
             Some(p) => {
                 let p = p.min(100);
                 draw_progress(gfx, 24, card_y + 58, SIDEBAR_W - 88, 8, p, th.accent);

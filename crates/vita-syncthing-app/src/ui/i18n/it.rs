@@ -59,6 +59,7 @@ pub static STRINGS_IT: Strings = Strings {
     app_title: "VitaSync",
     app_version_label: "v0.1.0",
     sidebar_syncing: "Sincronizzazione...",
+    sidebar_uploading: "Invio...",
     sidebar_last_sync: "Ultima sessione",
     protocol_tls: "BEP/1.0 TLS 1.3",
     protocol_discovery: "UDP 21027...",
