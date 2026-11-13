@@ -3,13 +3,13 @@
 
 use syncthing_core::DeviceId;
 
+use crate::domain::initial_sync::InitialSyncPeers;
+use crate::domain::interaction::{FocusSlot, HitMap};
 use crate::domain::models::{
     ActiveTab, CameraPreview, FolderOffer, IgnoredFolder, KnownDevice, Language,
     LanguagePreference, ModalDialog, PickerItem, PickerMode, ShareConfigEntry, ThemeMode,
     BROWSER_ROWS,
 };
-use crate::domain::initial_sync::InitialSyncPeers;
-use crate::domain::interaction::{FocusSlot, HitMap};
 use crate::domain::navigation::{
     default_col, starts_on_header, NavFocus, NavState, DASHBOARD_HEADER_ACTIONS,
 };
@@ -184,6 +184,12 @@ impl AppState {
         !self.approved_devices().is_empty()
     }
 
+    /// True once a persistent session is connected and its sync cycle completed: every
+    /// linked peer is up to date and nothing is transferring (sidebar card shows "Ready").
+    pub fn is_sync_ready(&self) -> bool {
+        self.session_connected && !self.sync_in_progress
+    }
+
     /// Marks `folder_id` as explicitly offered by the user so the next BEP `ClusterConfig`
     /// advertises it to linked devices.
     pub fn queue_folder_offer(&mut self, folder_id: &str) {
@@ -238,9 +244,10 @@ impl AppState {
             },
             ActiveTab::Settings => FocusSlot::RowAction {
                 row: self.nav.row,
-                col: self.nav.col.min(
-                    crate::domain::settings_row_action_count(self.nav.row).saturating_sub(1),
-                ),
+                col: self
+                    .nav
+                    .col
+                    .min(crate::domain::settings_row_action_count(self.nav.row).saturating_sub(1)),
             },
         }
     }

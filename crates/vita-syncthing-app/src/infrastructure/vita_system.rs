@@ -193,7 +193,7 @@ pub fn set_cpu_clock_mhz(_mhz: u32) {}
 pub fn detect_system_language() -> Language {
     use vita_ffi::{
         sceAppUtilInit, sceAppUtilShutdown, sceAppUtilSystemParamGetInt, sceSysmoduleLoadModule,
-        SceAppUtilBootParam, SceAppUtilInitParam, SCE_SYSTEM_PARAM_ID_LANG, SCE_SYSMODULE_APPUTIL,
+        SceAppUtilBootParam, SceAppUtilInitParam, SCE_SYSMODULE_APPUTIL, SCE_SYSTEM_PARAM_ID_LANG,
     };
 
     unsafe {

@@ -31,7 +31,15 @@ pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: 
     draw_page_title(gfx, th, s.settings_title, Some(s.settings_subtitle));
 
     // 1. Display & Theme Settings Card
-    draw_card(gfx, th, CONTENT_X, CONTENT_Y, CONTENT_W, DISPLAY_CARD_H, true);
+    draw_card(
+        gfx,
+        th,
+        CONTENT_X,
+        CONTENT_Y,
+        CONTENT_W,
+        DISPLAY_CARD_H,
+        true,
+    );
     // Touching the card (outside its button) or pressing `Square` switches the theme.
     hits.add(Hotspot {
         rect: Rect::new(CONTENT_X, CONTENT_Y, CONTENT_W, DISPLAY_CARD_H),
@@ -160,8 +168,16 @@ pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: 
         &[
             Hint::info(PadButton::Dpad, Some(PadButton::Cross), s.hint_navigate),
             Hint::action(PadButton::Circle, s.action_qr_id, UiAction::ShowDeviceId),
-            Hint::action(PadButton::Triangle, s.action_add_device_id, UiAction::AddDevice),
-            Hint::action(PadButton::Select, s.hint_screensaver, UiAction::StartScreensaver),
+            Hint::action(
+                PadButton::Triangle,
+                s.action_add_device_id,
+                UiAction::AddDevice,
+            ),
+            Hint::action(
+                PadButton::Select,
+                s.hint_screensaver,
+                UiAction::StartScreensaver,
+            ),
             Hint::action(PadButton::Start, s.action_quit, UiAction::ConfirmQuit),
         ],
     );
@@ -202,7 +218,12 @@ fn render_devices(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut HitM
     );
 
     let buttons = [
-        (bx_qr, PadButton::Cross, s.action_qr_id, UiAction::ShowDeviceId),
+        (
+            bx_qr,
+            PadButton::Cross,
+            s.action_qr_id,
+            UiAction::ShowDeviceId,
+        ),
         (
             bx_add,
             PadButton::Triangle,

@@ -1,7 +1,7 @@
 //! English (`en`) string catalog for VitaSyncthing.
 
-use crate::domain::Language;
 use super::{Messages, Strings};
+use crate::domain::Language;
 
 pub static STRINGS_EN: Strings = Strings {
     messages: &MESSAGES_EN,
@@ -57,8 +57,8 @@ pub static STRINGS_EN: Strings = Strings {
     tab_files: "Files",
     tab_settings: "Settings",
     app_title: "VitaSync",
-    app_version_label: "v0.1.0 · Pure Rust",
-    sidebar_syncing: "Syncing BEP/1.0...",
+    app_version_label: "v0.1.0",
+    sidebar_syncing: "Syncing...",
     sidebar_last_sync: "Last sync session",
     protocol_tls: "BEP/1.0 TLS 1.3",
     protocol_discovery: "UDP 21027...",
@@ -101,7 +101,8 @@ pub static STRINGS_EN: Strings = Strings {
 
     // Screen 2: Shared Folders
     msg_no_shares: "No shared folders configured yet",
-    msg_no_shares_hint_1: "Press Triangle (New Share) to create a share on your PS Vita and link a device,",
+    msg_no_shares_hint_1:
+        "Press Triangle (New Share) to create a share on your PS Vita and link a device,",
     msg_no_shares_hint_2: "or tap the sync card to import folders shared by a remote peer.",
 
     // Screen 3: Files & Folder Picker
@@ -116,8 +117,9 @@ pub static STRINGS_EN: Strings = Strings {
     settings_sec_display: "DISPLAY AND OLED SAVER",
     settings_label_colour_theme: "Colour Theme",
     settings_desc_theme_dark: "Dark — Blue-grey look with teal accent",
-    settings_desc_theme_oled: "OLED — Pure #000000 black background (saves PS Vita OLED battery)",
-    settings_saver_auto_hint: "OLED Screensaver activates automatically after 12s during sync (or press SELECT anytime).",
+    settings_desc_theme_oled: "OLED — Pure black background (saves PS Vita OLED battery)",
+    settings_saver_auto_hint:
+        "OLED Screensaver activates automatically after 12s during sync (or press SELECT anytime).",
     settings_sec_devices: "DEVICES & PAIRING",
     settings_desc_devices: "Pair a remote device or view this PS Vita's ID",
     settings_sec_log: "BEP/1.0 & TLS 1.3 PROTOCOL LOG",
@@ -132,22 +134,28 @@ pub static STRINGS_EN: Strings = Strings {
 
     // Modals: Create Share
     modal_create_share_title: "Create New Share",
-    modal_create_share_subtitle: "Choose a PS Vita folder preset or browse ux0: to create a new Syncthing share",
+    modal_create_share_subtitle:
+        "Choose a PS Vita folder preset or browse ux0: to create a new Syncthing share",
     modal_create_share_browse_sub: "Open the interactive ux0: directory browser",
 
     // Modals: Manage Devices
     modal_manage_devices_default_title: "Share",
-    modal_manage_devices_subtitle_incomplete: "Link at least one device to finish creating this share",
-    modal_manage_devices_subtitle: "Tick the remote Syncthing devices that should synchronize this folder",
+    modal_manage_devices_subtitle_incomplete:
+        "Link at least one device to finish creating this share",
+    modal_manage_devices_subtitle:
+        "Tick the remote Syncthing devices that should synchronize this folder",
     modal_manage_devices_scanning: "Scanning LAN (UDP 21027 + TCP 22000) for Syncthing peers...",
     modal_manage_devices_empty: "No remote Syncthing devices discovered yet.",
-    modal_manage_devices_empty_hint: "Press Square (Add by ID) to enter a Short/Full ID, or Triangle to scan LAN.",
+    modal_manage_devices_empty_hint:
+        "Press Square (Add by ID) to enter a Short/Full ID, or Triangle to scan LAN.",
 
     // Modals: Add Device
     modal_add_device_title: "Add Remote Device by ID",
-    modal_add_device_subtitle: "Enter the 7-character Short ID (recommended) or full 56-character Syncthing Device ID",
+    modal_add_device_subtitle:
+        "Enter the 7-character Short ID (recommended) or full 56-character Syncthing Device ID",
     modal_add_device_example: "e.g. MFZWI3D  or  MFZWI3D-BONSGYC-... (tap to type)",
-    modal_add_device_tip: "Tip: You only need the first 7 characters (Short ID shown in Syncthing Web UI).",
+    modal_add_device_tip:
+        "Tip: You only need the first 7 characters (Short ID shown in Syncthing Web UI).",
     modal_add_device_placeholder: "Enter 7-char Short ID or 56-char Full ID...",
     modal_add_device_name_label: "Device Name (optional):",
     modal_add_device_name_empty: "(tap to enter name)",
@@ -156,7 +164,8 @@ pub static STRINGS_EN: Strings = Strings {
     // Modals: Confirm Delete
     modal_delete_share_title: "Delete this share?",
     modal_delete_share_subtitle: "The folder stops synchronizing with all linked devices",
-    modal_delete_share_decline_hint: "Peers' offers of it are declined (undo in Settings · Clear Declined).",
+    modal_delete_share_decline_hint:
+        "Peers' offers of it are declined (undo in Settings · Clear Declined).",
 
     // Modals: Confirm Quit
     modal_quit_title: "Quit VitaSync?",
@@ -168,17 +177,20 @@ pub static STRINGS_EN: Strings = Strings {
 
     // Modals: Device ID
     modal_device_id_title: "PS Vita Syncthing Device ID",
-    modal_device_id_subtitle: "Scan this QR code in Syncthing (Add Remote Device) or enter the 56-character ID",
+    modal_device_id_subtitle:
+        "Scan this QR code in Syncthing (Add Remote Device) or enter the 56-character ID",
     modal_device_id_scan_web: "Scan QR in Syncthing Web / Mobile UI",
     modal_device_id_dev_name: "Device Name: PlayStation Vita (vita-syncthing)",
     modal_device_id_cert_path: "Identity Cert: ux0:data/syncthing/cert.der",
     modal_device_id_short_label: "Short ID (LAN discovery):",
     modal_device_id_full_label: "Full 56-Character Device ID:",
-    modal_device_id_scan_hint: "On phone/PC: Syncthing > Devices > Add Device > Tap QR icon to scan",
+    modal_device_id_scan_hint:
+        "On phone/PC: Syncthing > Devices > Add Device > Tap QR icon to scan",
 
     // Modals: Folder Offer
     modal_folder_offer_title: "New shared folder",
-    modal_folder_offer_hint: "Accept to pick a folder on ux0:. Nothing syncs until you enable the share.",
+    modal_folder_offer_hint:
+        "Accept to pick a folder on ux0:. Nothing syncs until you enable the share.",
 
     // Modals: Scan QR
     modal_scan_qr_title: "Scan Device ID QR Code",

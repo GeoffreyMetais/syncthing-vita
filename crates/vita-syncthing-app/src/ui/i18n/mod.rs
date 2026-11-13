@@ -209,10 +209,18 @@ impl Strings {
     /// Formats the overview subtitle: `"{active} active share(s) · {devices} known device(s)"`.
     pub fn fmt_active_shares_devices(&self, active: usize, devices: usize) -> String {
         match self.language {
-            Language::French => format!("{active} partage(s) actif(s) · {devices} appareil(s) connu(s)"),
-            Language::Spanish => format!("{active} carpeta(s) activa(s) · {devices} dispositivo(s) conocido(s)"),
-            Language::German => format!("{active} aktive Freigabe(n) · {devices} bekannte(s) Gerät(e)"),
-            Language::Italian => format!("{active} condivisione/i attiva/e · {devices} dispositivo/i noto/i"),
+            Language::French => {
+                format!("{active} partage(s) actif(s) · {devices} appareil(s) connu(s)")
+            }
+            Language::Spanish => {
+                format!("{active} carpeta(s) activa(s) · {devices} dispositivo(s) conocido(s)")
+            }
+            Language::German => {
+                format!("{active} aktive Freigabe(n) · {devices} bekannte(s) Gerät(e)")
+            }
+            Language::Italian => {
+                format!("{active} condivisione/i attiva/e · {devices} dispositivo/i noto/i")
+            }
             Language::English => format!("{active} active share(s) · {devices} known device(s)"),
         }
     }
@@ -293,7 +301,9 @@ impl Strings {
             Language::French => format!("{device} souhaite partager un dossier avec cette PS Vita"),
             Language::Spanish => format!("{device} quiere compartir una carpeta con esta PS Vita"),
             Language::German => format!("{device} möchte einen Ordner mit dieser PS Vita teilen"),
-            Language::Italian => format!("{device} vuole condividere una cartella con questa PS Vita"),
+            Language::Italian => {
+                format!("{device} vuole condividere una cartella con questa PS Vita")
+            }
             Language::English => format!("{device} wants to share a folder with this PS Vita"),
         }
     }

@@ -97,3 +97,49 @@ fn test_indeterminate_init_progress_until_bytes_received() {
     assert_eq!(state.progress_pct, Some(100));
     assert!(matches!(state.status_line, UiText::SyncSummary { .. }));
 }
+
+#[test]
+fn test_sidebar_ready_only_once_the_session_is_connected_and_idle() {
+    let repo = ConfigRepository::new(&common::temp_test_dir("sync-coordinator-ready"));
+    let mut state = AppState::new(Vec::new(), Vec::new(), "ux0:");
+    let (tx, rx) = mpsc::channel();
+    let mut worker_rx = Some(rx);
+    let peer = DeviceId([7; 32]);
+
+    state.prepare_manual_sync();
+    assert!(!state.is_sync_ready());
+
+    tx.send(WorkerMsg::SyncEvent(SyncEvent::SyncCycleCompleted {
+        peer_device_id: peer,
+        active_connections: 1,
+        files_up_to_date: 1,
+        files_downloaded: 0,
+        bytes_downloaded: 0,
+        blocks_uploaded: 0,
+        bytes_uploaded: 0,
+    }))
+    .unwrap();
+    SyncCoordinator::process_worker_messages(&mut state, &repo, &mut worker_rx);
+    assert!(state.is_sync_ready());
+
+    // A new transfer leaves the Ready state.
+    tx.send(WorkerMsg::SyncEvent(SyncEvent::BlockDownloaded {
+        folder: "vita-savedata".to_owned(),
+        name: "save.bin".to_owned(),
+        offset: 0,
+        size: 10,
+        total_size: 100,
+    }))
+    .unwrap();
+    SyncCoordinator::process_worker_messages(&mut state, &repo, &mut worker_rx);
+    assert!(!state.is_sync_ready());
+
+    // The worker ending (session dropped) shows the last session again, not Ready.
+    tx.send(WorkerMsg::Finished {
+        summary: UiText::SyncFinished,
+        allow_auto_reconnect: true,
+    })
+    .unwrap();
+    SyncCoordinator::process_worker_messages(&mut state, &repo, &mut worker_rx);
+    assert!(!state.is_sync_ready());
+}
