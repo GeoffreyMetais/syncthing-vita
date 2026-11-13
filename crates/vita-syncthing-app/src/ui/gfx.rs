@@ -849,18 +849,18 @@ impl Gfx {
                 // analog sticks just below them, on the screen side.
                 let tb = (t * 0.72 + 0.5).max(1.0) as i32;
                 let px = |v: f32| (v + 0.5).floor() as i32;
-                let (bw, bh) = (px(1.0 * s), px(0.44 * s));
-                self.rrect_outline(px(cx - 0.5 * s), px(cy - 0.22 * s), bw, bh, bh / 2, tb, c);
+                let (bw, bh) = (px(1.0 * s), px(0.52 * s));
+                self.rrect_outline(px(cx - 0.5 * s), px(cy - 0.26 * s), bw, bh, bh / 2, tb, c);
 
-                let (sw, sh) = (px(0.44 * s), px(0.28 * s));
+                let (sw, sh) = (px(0.46 * s), px(0.29 * s));
                 let (sx, sy) = (px(cx) - sw / 2, px(cy) - sh / 2);
                 self.rrect(sx, sy, sw, sh, (0.02 * s) as i32, with_alpha(c, 70));
                 self.rrect_outline(sx, sy, sw, sh, (0.02 * s) as i32, 1, with_alpha(c, 160));
 
                 // Control clusters, mirrored on both sides of the screen.
-                let gap = 0.05 * s;
-                let dot = (0.023 * s).max(0.9);
-                let (lx, rx, ky) = (cx - 0.335 * s, cx + 0.335 * s, cy - 0.05 * s);
+                let gap = 0.056 * s;
+                let dot = (0.026 * s).max(0.9);
+                let (lx, rx, ky) = (cx - 0.33 * s, cx + 0.33 * s, cy - 0.06 * s);
                 for (dx, dy) in [(0.0, -gap), (0.0, gap), (-gap, 0.0), (gap, 0.0)] {
                     // D-pad: four square buttons around an empty centre.
                     let half = dot * 0.95;
@@ -879,9 +879,9 @@ impl Gfx {
                         self.circle(rx + dx, ky + dy, dot, c);
                     }
                 }
-                let stick_r = (0.032 * s).max(1.2);
-                self.circle(cx - 0.275 * s, cy + 0.11 * s, stick_r, c);
-                self.circle(cx + 0.275 * s, cy + 0.11 * s, stick_r, c);
+                let stick_r = (0.036 * s).max(1.2);
+                self.circle(cx - 0.28 * s, cy + 0.135 * s, stick_r, c);
+                self.circle(cx + 0.28 * s, cy + 0.135 * s, stick_r, c);
             }
             Icon::ArrowDown => {
                 l(self, 0.0, -0.36, 0.0, 0.36);
