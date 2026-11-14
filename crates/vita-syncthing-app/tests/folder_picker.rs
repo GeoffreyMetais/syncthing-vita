@@ -206,7 +206,10 @@ fn test_app_data_folders_cannot_be_shared() {
     state.selected_picker_idx = 1;
     ShareService::apply_picker_selection(&mut state, &repo, false);
     assert!(state.shares.is_empty());
-    assert_eq!(state.toast_msg.map(|(msg, _)| msg), Some(UiText::FolderProtected));
+    assert_eq!(
+        state.toast_msg.map(|(msg, _)| msg),
+        Some(UiText::FolderProtected)
+    );
     state.selected_picker_idx = 0;
     state.toast_msg = None;
     ShareService::apply_picker_selection(&mut state, &repo, false);

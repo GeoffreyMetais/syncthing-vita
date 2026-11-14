@@ -290,8 +290,15 @@ fn test_pulled_dot_st_file_is_not_announced_as_deleted() {
     let (local, _) = storage
         .build_local_index("f", dev_id, std::slice::from_ref(&rf))
         .unwrap();
-    let entry = local.files.iter().find(|f| f.name == ".stylelintrc").unwrap();
-    assert!(!entry.deleted, "a pulled `.st*` file was announced as deleted");
+    let entry = local
+        .files
+        .iter()
+        .find(|f| f.name == ".stylelintrc")
+        .unwrap();
+    assert!(
+        !entry.deleted,
+        "a pulled `.st*` file was announced as deleted"
+    );
     let _ = std::fs::remove_dir_all(&tmp_dir);
 }
 

@@ -175,7 +175,9 @@ fn read_xdr_opaque(buf: &[u8], pos: &mut usize) -> io::Result<Vec<u8>> {
     let end = pos
         .checked_add(len)
         .filter(|end| *end <= buf.len())
-        .ok_or_else(|| io::Error::new(io::ErrorKind::UnexpectedEof, "Truncated relay XDR opaque"))?;
+        .ok_or_else(|| {
+            io::Error::new(io::ErrorKind::UnexpectedEof, "Truncated relay XDR opaque")
+        })?;
     let out = buf[*pos..end].to_vec();
     let pad = (4 - (len % 4)) % 4;
     *pos = (*pos + len + pad).min(buf.len());
@@ -201,7 +203,10 @@ pub fn decode_payload(msg_type: RelayMsgType, payload: &[u8]) -> io::Result<Rela
             let address = read_xdr_opaque(payload, &mut pos)?;
             let port_u32 = read_u32(payload, &mut pos)?;
             let port = u16::try_from(port_u32).map_err(|_| {
-                io::Error::new(io::ErrorKind::InvalidData, format!("Invalid port: {port_u32}"))
+                io::Error::new(
+                    io::ErrorKind::InvalidData,
+                    format!("Invalid port: {port_u32}"),
+                )
             })?;
             let server_socket = read_u32(payload, &mut pos)? != 0;
             Ok(RelayMessage::SessionInvitation(SessionInvitation {

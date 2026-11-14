@@ -214,7 +214,10 @@ fn test_crafted_folder_id_cannot_escape_the_sync_directory() {
     let target = &state.shares[0].target_path;
     assert_eq!(target, &format!("{dir}/sync/outside"));
     assert!(!target.contains(".."));
-    assert_eq!(repo.default_share_dir("../.."), format!("{dir}/sync/folder"));
+    assert_eq!(
+        repo.default_share_dir("../.."),
+        format!("{dir}/sync/folder")
+    );
 
     let _ = std::fs::remove_dir_all(&dir);
 }

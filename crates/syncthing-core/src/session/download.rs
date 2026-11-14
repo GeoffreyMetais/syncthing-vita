@@ -121,12 +121,14 @@ fn download_file(
 ) -> io::Result<bool> {
     let storage = ctx.storage;
     // The local content is only worth copying when some of its blocks are kept.
-    let prepared = storage.find_outdated_blocks(folder_id, file).and_then(|outdated| {
-        let reuse_local = outdated.len() < file.blocks.len();
-        storage.prepare_download_seeded(folder_id, &file.name, reuse_local)?;
-        let tmp = storage.open_download(folder_id, &file.name)?;
-        Ok((outdated, tmp))
-    });
+    let prepared = storage
+        .find_outdated_blocks(folder_id, file)
+        .and_then(|outdated| {
+            let reuse_local = outdated.len() < file.blocks.len();
+            storage.prepare_download_seeded(folder_id, &file.name, reuse_local)?;
+            let tmp = storage.open_download(folder_id, &file.name)?;
+            Ok((outdated, tmp))
+        });
     let (outdated_blocks, mut tmp) = match prepared {
         Ok(p) => p,
         Err(e) => {

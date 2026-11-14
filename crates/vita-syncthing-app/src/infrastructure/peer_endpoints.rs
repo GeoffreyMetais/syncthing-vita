@@ -144,13 +144,8 @@ pub fn refresh_global_endpoints(
                 }
             }
             Err(e) => {
-                let msg = format!(
-                    "Global discovery lookup for {} failed: {}",
-                    kd.name, e
-                );
-                let prev = last_errors
-                    .iter_mut()
-                    .find(|(id, _)| *id == kd.device_id);
+                let msg = format!("Global discovery lookup for {} failed: {}", kd.name, e);
+                let prev = last_errors.iter_mut().find(|(id, _)| *id == kd.device_id);
                 match prev {
                     Some(slot) if slot.1 == msg => {}
                     Some(slot) => {
@@ -355,4 +350,3 @@ pub fn run_peer_session_loop(
         }
     }
 }
-

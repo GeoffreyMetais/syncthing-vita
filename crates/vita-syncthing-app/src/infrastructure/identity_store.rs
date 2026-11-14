@@ -38,7 +38,9 @@ impl IdentityStore {
         if filled && seed.iter().any(|&b| b != 0) {
             Ok(seed)
         } else {
-            Err(io::Error::other("system random number generator unavailable"))
+            Err(io::Error::other(
+                "system random number generator unavailable",
+            ))
         }
     }
 

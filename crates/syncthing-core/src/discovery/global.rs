@@ -51,9 +51,7 @@ pub fn parse_endpoint_uri(uri: &str) -> Option<PeerEndpoint> {
             None => return None,
         };
         let addr = resolve_socket_addr(authority)?;
-        let id_str = query
-            .split('&')
-            .find_map(|kv| kv.strip_prefix("id="))?;
+        let id_str = query.split('&').find_map(|kv| kv.strip_prefix("id="))?;
         let device_id = DeviceId::parse_user_id(id_str).ok()?;
         return Some(PeerEndpoint::Relay { addr, device_id });
     }
@@ -104,9 +102,10 @@ fn extract_http_body(raw: &str) -> Option<(u16, String)> {
     let (headers, body) = raw.split_once("\r\n\r\n")?;
     let status_line = headers.lines().next()?;
     let status: u16 = status_line.split_whitespace().nth(1)?.parse().ok()?;
-    let is_chunked = headers
-        .lines()
-        .any(|l| l.to_ascii_lowercase().contains("transfer-encoding: chunked"));
+    let is_chunked = headers.lines().any(|l| {
+        l.to_ascii_lowercase()
+            .contains("transfer-encoding: chunked")
+    });
     if !is_chunked {
         return Some((status, body.to_owned()));
     }
@@ -153,7 +152,9 @@ pub fn lookup_global_peer(device_id: DeviceId, timeout: Duration) -> io::Result<
                     break;
                 }
             }
-            Err(e) if e.kind() == io::ErrorKind::WouldBlock || e.kind() == io::ErrorKind::TimedOut => {
+            Err(e)
+                if e.kind() == io::ErrorKind::WouldBlock || e.kind() == io::ErrorKind::TimedOut =>
+            {
                 if !raw.is_empty() {
                     break;
                 }
@@ -171,15 +172,16 @@ pub fn lookup_global_peer(device_id: DeviceId, timeout: Duration) -> io::Result<
 
     let text = String::from_utf8_lossy(&raw);
     let (status, body) = extract_http_body(&text).ok_or_else(|| {
-        io::Error::new(io::ErrorKind::InvalidData, "Invalid HTTP response from Global Discovery")
+        io::Error::new(
+            io::ErrorKind::InvalidData,
+            "Invalid HTTP response from Global Discovery",
+        )
     })?;
     if status == 404 {
         return Ok(Vec::new());
     }
     if status != 200 {
-        return Err(io::Error::other(format!(
-            "Global Discovery HTTP {status}"
-        )));
+        return Err(io::Error::other(format!("Global Discovery HTTP {status}")));
     }
 
     let uris = parse_global_discovery_json(&body);

@@ -49,7 +49,10 @@ pub fn request_relay_session(
         RelayMessage::SessionInvitation(inv) => Ok(inv),
         RelayMessage::Response(resp) => Err(io::Error::new(
             io::ErrorKind::NotFound,
-            format!("Relay rejected ConnectRequest ({}): {}", resp.code, resp.message),
+            format!(
+                "Relay rejected ConnectRequest ({}): {}",
+                resp.code, resp.message
+            ),
         )),
         RelayMessage::RelayFull => Err(io::Error::new(
             io::ErrorKind::ConnectionRefused,
@@ -105,7 +108,13 @@ pub fn connect_via_relay(
     target_device_id: DeviceId,
     timeout: Duration,
 ) -> io::Result<TcpStream> {
-    let inv = request_relay_session(identity, relay_addr, relay_device_id, target_device_id, timeout)?;
+    let inv = request_relay_session(
+        identity,
+        relay_addr,
+        relay_device_id,
+        target_device_id,
+        timeout,
+    )?;
     if inv.server_socket {
         return Err(io::Error::other(
             "Relay requested ServerSocket=true for initiator",
