@@ -216,8 +216,7 @@ fn main() {
                         ctl.request_stop();
                     }
                     state.config_dirty = false;
-                    state.session_connected = false;
-                    state.initial_sync.clear();
+                    state.reset_sessions();
                     state.prepare_manual_sync();
                     ShareService::log_event(
                         &mut state,
@@ -269,8 +268,7 @@ fn main() {
             }
             worker_rx = None;
             worker_ctl = None;
-            state.session_connected = false;
-            state.initial_sync.clear();
+            state.reset_sessions();
             state.sync_in_progress = false;
             let peers = state.sync_peers();
             if !peers.is_empty() {

@@ -58,8 +58,7 @@ impl SyncCoordinator {
                     } => {
                         state.sync_in_progress = false;
                         state.uploading = false;
-                        state.session_connected = false;
-                        state.initial_sync.clear();
+                        state.reset_sessions();
                         state.auto_reconnect_enabled = allow_auto_reconnect;
                         state.progress_pct = Some(100);
                         state.current_file = UiText::SyncFinished;
@@ -216,6 +215,7 @@ impl SyncCoordinator {
             } => {
                 state.initial_sync.end(peer_device_id);
                 state.sync_in_progress = state.initial_sync.is_active();
+                state.connected_peers.begin(peer_device_id);
                 state.session_connected = true;
                 state.auto_reconnect_enabled = true;
                 state.progress_pct = Some(100);
@@ -293,6 +293,17 @@ impl SyncCoordinator {
                 state.initial_sync.end(peer_device_id);
                 if !state.initial_sync.is_active() {
                     state.sync_in_progress = false;
+                }
+                // The last connected peer left: the app is offline until a peer loop
+                // reconnects (its `Progress` messages are shown again from 0%).
+                let was_connected = state.session_connected;
+                state.connected_peers.end(peer_device_id);
+                state.session_connected = state.connected_peers.is_active();
+                if was_connected && !state.session_connected {
+                    state.uploading = false;
+                    state.progress_pct = Some(0);
+                    state.current_file = UiText::raw("-");
+                    state.status_line = UiText::WaitingForLan;
                 }
                 ShareService::log_event(
                     state,

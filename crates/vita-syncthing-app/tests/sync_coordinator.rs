@@ -328,3 +328,65 @@ fn test_multi_peer_sync_in_progress_clears_only_when_all_peers_finish() {
     assert!(!state.sync_in_progress);
     assert_eq!(state.sync_activity(), SyncActivity::Ready);
 }
+
+fn cycle_completed(peer: DeviceId) -> WorkerMsg {
+    WorkerMsg::SyncEvent(SyncEvent::SyncCycleCompleted {
+        peer_device_id: peer,
+        active_connections: 1,
+        files_up_to_date: 0,
+        files_downloaded: 0,
+        bytes_downloaded: 0,
+        blocks_uploaded: 0,
+        bytes_uploaded: 0,
+    })
+}
+
+fn session_ended(peer: DeviceId) -> WorkerMsg {
+    WorkerMsg::SyncEvent(SyncEvent::SessionEnded {
+        peer_device_id: peer,
+        reason: "primary connection lost".to_owned(),
+    })
+}
+
+/// The app is "Ready" only while at least one peer session is established: once the last one
+/// ended it is offline again, and a reconnecting peer's status is displayed.
+#[test]
+fn test_session_connected_follows_the_connected_peers() {
+    let repo = ConfigRepository::new(&common::temp_test_dir("sync-coordinator-disconnect"));
+    let mut state = AppState::new(Vec::new(), Vec::new(), "ux0:");
+    let (tx, rx) = mpsc::channel();
+    let mut worker_rx = Some(rx);
+    let (nas, mac) = (DeviceId([1; 32]), DeviceId([2; 32]));
+
+    tx.send(cycle_completed(nas)).unwrap();
+    tx.send(cycle_completed(mac)).unwrap();
+    SyncCoordinator::process_worker_messages(&mut state, &repo, &mut worker_rx);
+    assert_eq!(state.sync_activity(), SyncActivity::Ready);
+
+    // One of two peers leaves: still connected.
+    tx.send(session_ended(nas)).unwrap();
+    SyncCoordinator::process_worker_messages(&mut state, &repo, &mut worker_rx);
+    assert!(state.session_connected);
+    assert!(matches!(state.status_line, UiText::SyncSummary { .. }));
+
+    // The last one leaves: offline, not "Ready".
+    tx.send(session_ended(mac)).unwrap();
+    SyncCoordinator::process_worker_messages(&mut state, &repo, &mut worker_rx);
+    assert!(!state.session_connected);
+    assert_eq!(state.sync_activity(), SyncActivity::Idle);
+    assert_eq!(state.status_line, UiText::WaitingForLan);
+
+    // The reconnection attempt is shown.
+    let connecting = UiText::ConnectingTo {
+        name: "Mac".to_owned(),
+        addr: "192.168.1.39:22000".to_owned(),
+    };
+    tx.send(WorkerMsg::Progress {
+        pct: None,
+        status: connecting.clone(),
+        file: UiText::raw("-"),
+    })
+    .unwrap();
+    SyncCoordinator::process_worker_messages(&mut state, &repo, &mut worker_rx);
+    assert_eq!(state.status_line, connecting);
+}

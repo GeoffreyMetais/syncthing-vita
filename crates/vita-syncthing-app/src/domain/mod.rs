@@ -11,7 +11,7 @@ pub mod navigation;
 pub mod ui_text;
 
 pub use app_state::AppState;
-pub use initial_sync::InitialSyncPeers;
+pub use initial_sync::{ConnectedPeers, InitialSyncPeers, PeerSet};
 pub use interaction::{
     FocusSlot, HitMap, Hotspot, PadKey, Rect, ScrollArea, ScrollTarget, ShortcutKey, UiAction,
 };

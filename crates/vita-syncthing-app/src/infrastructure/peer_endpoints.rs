@@ -264,6 +264,7 @@ pub fn run_peer_session_loop(
                         connected_once = true;
                         logged_awaiting = false;
                         report_unreachable = true;
+                        report_connecting = true;
                         last_error.clear();
                         break;
                     }
