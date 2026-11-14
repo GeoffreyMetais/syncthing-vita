@@ -70,9 +70,16 @@ pub const BACKGROUND_INTERVAL: u32 = 6;
 /// VBlanks between safety refreshes of a static screen (1 FPS).
 pub const IDLE_REFRESH_INTERVAL: u32 = VBLANK_HZ;
 /// Inactivity before the OLED screensaver starts while a sync is in progress.
-pub const SCREENSAVER_TIMEOUT_SYNCING: Duration = Duration::from_secs(12);
+pub const SCREENSAVER_TIMEOUT_SYNCING: Duration = Duration::from_secs(10);
 /// Inactivity before the OLED screensaver starts when idle.
 pub const SCREENSAVER_TIMEOUT_IDLE: Duration = Duration::from_secs(45);
+
+// --- Protocol log ----------------------------------------------------------------------------
+
+/// Lines of this session's protocol log kept in memory (`AppState::logs`, log viewer).
+pub const LOG_BUFFER_LINES: usize = 200;
+/// Newest `syncthing.log` lines loaded by the log viewer's `Show All` (bounds its memory use).
+pub const LOG_HISTORY_MAX_LINES: usize = 2000;
 
 // --- Shares --------------------------------------------------------------------------------
 
@@ -91,7 +98,7 @@ pub const NEW_SHARE_TEMPLATES: &[(&str, &str, &str)] = &[
     ),
     (
         "retroarch-savetate",
-        "RetroArch Savestates filess",
+        "RetroArch Savestates files",
         "ux0:data/retroarch/savestates",
     ),
     (

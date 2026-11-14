@@ -5,6 +5,7 @@ pub mod app_state;
 pub mod defaults;
 pub mod initial_sync;
 pub mod interaction;
+pub mod log_view;
 pub mod models;
 pub mod navigation;
 pub mod ui_text;
@@ -12,6 +13,7 @@ pub mod ui_text;
 pub use app_state::AppState;
 pub use initial_sync::InitialSyncPeers;
 pub use interaction::{FocusSlot, HitMap, Hotspot, PadKey, Rect, ShortcutKey, UiAction};
+pub use log_view::{sanitize_log_line, LogScope, LogView, LOG_VIEW_PAGE, LOG_VIEW_ROWS};
 pub use models::{
     fmt_size, ActiveTab, CameraPreview, FolderOffer, IgnoredFolder, KnownDevice, Language,
     LanguagePreference, ModalDialog, PickerItem, PickerMode, ShareConfigEntry, ShareMode,
@@ -20,6 +22,6 @@ pub use models::{
 pub use navigation::{
     action_count, default_col, settings_row_action_count, starts_on_header, NavFocus, NavState,
     DASHBOARD_HEADER_ACTIONS, SETTINGS_ROWS, SETTINGS_ROW_DECLINED, SETTINGS_ROW_DEVICES,
-    SETTINGS_ROW_DISPLAY, SETTINGS_ROW_LANGUAGE, TAB_ORDER,
+    SETTINGS_ROW_DISPLAY, SETTINGS_ROW_LANGUAGE, SETTINGS_ROW_LOG, TAB_ORDER,
 };
 pub use ui_text::UiText;
