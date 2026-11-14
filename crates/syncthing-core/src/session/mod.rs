@@ -10,7 +10,7 @@
 //!
 //! Shared building blocks: [`context`] (identity, storage, stats, event sink), [`folders`]
 //! (per-session folder state), [`download`] / [`upload`] (block transfers), [`keepalive`],
-//! [`tuning`] (timings chosen by the application),
+//! [`params`] (what the application provides), [`tuning`] (timings it chooses),
 //! [`index_exchange`] (local index publication, runtime `ClusterConfig` / `Index`) and
 //! [`dispatch`] (primary-connection message routing).
 
@@ -25,6 +25,7 @@ pub mod index_exchange;
 pub mod initial_sync;
 pub mod keepalive;
 pub mod outcome;
+pub mod params;
 pub mod persistent;
 pub mod revert;
 pub mod secondary;
@@ -33,12 +34,12 @@ pub mod upload;
 
 use std::io;
 use std::net::SocketAddr;
-use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 pub use control::SyncControl;
 pub use events::SyncEvent;
 pub use outcome::{PeerHandshakeResult, SyncSessionStatus};
+pub use params::SessionParams;
 pub use tuning::SyncTuning;
 
 use cluster_exchange::{exchange_cluster_config, ClusterExchange};
@@ -49,10 +50,6 @@ use initial_sync::{run_initial_sync, InitialSync};
 use persistent::{run_persistent_session, PersistentLinks};
 use secondary::{desired_secondary_count, open_secondary_bep_stream, SecondaryBepConn};
 
-use crate::bep::BepHello;
-use crate::cert::VitaIdentity;
-use crate::device_id::DeviceId;
-use crate::storage::FsSyncStorage;
 use std::net::TcpStream;
 
 use crate::tls::client::{open_bep_tls_stream, wrap_bep_tls_stream};
@@ -62,126 +59,94 @@ use crate::tls::BepTlsStream;
 /// Timeout used when opening the initial secondary connections.
 const SECONDARY_OPEN_TIMEOUT: Duration = Duration::from_millis(2000);
 
-/// Establishes a single-cycle TLS 1.3 + BEP/1.0 session without persistent background keepalive.
+/// Connects to `peer_addr` (TLS 1.3 + BEP/1.0) and synchronizes the folders shared with that
+/// peer:
+/// 1. primary connection, plus up to 2 secondary data connections when both sides support
+///    them (`1+2 connections` in Syncthing v2.x);
+/// 2. delta-sync download with streaming disk writes;
+/// 3. scan of the local folders and publication of the local `Index`;
+/// 4. with [`SessionParams::control`], a persistent loop serving block requests, answering
+///    `Ping`s, applying live `IndexUpdate`s and rescanning until a stop is requested or the
+///    connection ends. Without it, the call returns after one sync cycle.
 pub fn connect_and_sync<F>(
-    identity: &VitaIdentity,
+    params: &SessionParams<'_>,
     peer_addr: SocketAddr,
-    expected_device_id: Option<DeviceId>,
-    our_hello: &BepHello,
-    storage: &FsSyncStorage,
-    timeout: Duration,
     on_event: F,
 ) -> io::Result<PeerHandshakeResult>
 where
     F: FnMut(SyncEvent),
 {
-    connect_and_sync_with_control(
-        identity,
+    let (stream, observed_device_id) = open_bep_tls_stream(
+        params.identity,
         peer_addr,
-        expected_device_id,
-        our_hello,
-        storage,
-        timeout,
-        None,
-        on_event,
+        params.expected_device_id,
+        params.timeout,
     )
-}
-
-/// Establishes TLS 1.3 + BEP/1.0 `1+2` multi-connection session and executes:
-/// 1. Primary metadata connection + 2 secondary data connections (`1+2 connections` in Syncthing v2.x).
-/// 2. Delta Sync download with 128 KiB streaming disk writes.
-/// 3. Local indexing of target folder and publishing Vita's local `Index`.
-/// 4. Persistent session loop (when `control` is `Some`), serving block requests, answering `Ping`s,
-///    applying live remote `IndexUpdate`s, and rescanning local folders without disconnecting.
-#[allow(clippy::too_many_arguments)]
-pub fn connect_and_sync_with_control<F>(
-    identity: &VitaIdentity,
-    peer_addr: SocketAddr,
-    expected_device_id: Option<DeviceId>,
-    our_hello: &BepHello,
-    storage: &FsSyncStorage,
-    timeout: Duration,
-    control: Option<Arc<SyncControl>>,
-    on_event: F,
-) -> io::Result<PeerHandshakeResult>
-where
-    F: FnMut(SyncEvent),
-{
-    let (stream, observed_device_id) =
-        open_bep_tls_stream(identity, peer_addr, expected_device_id, timeout)
-            .map_err(|e| with_context("TCP connect", e))?;
+    .map_err(|e| with_context("TCP connect", e))?;
     run_bep_session(
-        identity,
+        params,
         stream,
         observed_device_id,
         peer_addr,
-        our_hello,
-        storage,
         true,
-        control,
         on_event,
     )
 }
 
-/// Runs a BEP/1.0 TLS 1.3 session over an already-connected `TcpStream` (e.g. a Syncthing Relay
-/// session tunnel). Secondary connections are disabled (`1+0`) since the tunnel is single-stream.
-#[allow(clippy::too_many_arguments)]
-pub fn connect_and_sync_stream_with_control<F>(
-    identity: &VitaIdentity,
+/// Same as [`connect_and_sync`] over an already-connected `TcpStream` (e.g. a Syncthing Relay
+/// session tunnel). No secondary connection is opened: the tunnel is a single stream.
+pub fn connect_and_sync_stream<F>(
+    params: &SessionParams<'_>,
     tcp: TcpStream,
     peer_addr: SocketAddr,
-    expected_device_id: Option<DeviceId>,
-    our_hello: &BepHello,
-    storage: &FsSyncStorage,
-    timeout: Duration,
-    control: Option<Arc<SyncControl>>,
     on_event: F,
 ) -> io::Result<PeerHandshakeResult>
 where
     F: FnMut(SyncEvent),
 {
-    let (stream, observed_device_id) =
-        wrap_bep_tls_stream(identity, tcp, expected_device_id, timeout)
-            .map_err(|e| with_context("TLS wrap", e))?;
+    let (stream, observed_device_id) = wrap_bep_tls_stream(
+        params.identity,
+        tcp,
+        params.expected_device_id,
+        params.timeout,
+    )
+    .map_err(|e| with_context("TLS wrap", e))?;
     run_bep_session(
-        identity,
+        params,
         stream,
         observed_device_id,
         peer_addr,
-        our_hello,
-        storage,
         false,
-        control,
         on_event,
     )
 }
 
-#[allow(clippy::too_many_arguments)]
 fn run_bep_session<F>(
-    identity: &VitaIdentity,
+    params: &SessionParams<'_>,
     mut stream: BepTlsStream,
     observed_device_id: ObservedDeviceId,
     peer_addr: SocketAddr,
-    our_hello: &BepHello,
-    storage: &FsSyncStorage,
     allow_secondary: bool,
-    control: Option<Arc<SyncControl>>,
     mut on_event: F,
 ) -> io::Result<PeerHandshakeResult>
 where
     F: FnMut(SyncEvent),
 {
     let observed = || observed_device_id.lock().ok().and_then(|g| *g);
+    let control = params.control.as_deref();
 
     // 1. `Hello` exchange on the primary connection
-    let peer_hello = match our_hello.exchange(&mut stream) {
+    let peer_hello = match params.hello.exchange(&mut stream) {
         Ok(hello) => hello,
         Err(e) => {
             // TLS succeeded but the peer refused BEP: it does not know this device yet.
             return match observed() {
-                Some(peer_device_id) => {
-                    Ok(awaiting_pairing_without_hello(peer_addr, peer_device_id))
-                }
+                Some(peer_device_id) => Ok(PeerHandshakeResult {
+                    peer_addr,
+                    peer_device_id,
+                    peer_hello: None,
+                    session_status: SyncSessionStatus::AwaitingPairing,
+                }),
                 None => Err(e),
             };
         }
@@ -191,33 +156,24 @@ where
         peer_addr,
         peer_device_id: observed()
             .ok_or_else(|| io::Error::other("Peer certificate was not observed"))?,
-        peer_hello,
-        tls_version: stream
-            .conn
-            .protocol_version()
-            .map(|v| format!("{v:?}"))
-            .unwrap_or_else(|| "Unknown".to_owned()),
-        alpn: stream
-            .conn
-            .alpn_protocol()
-            .map(|p| String::from_utf8_lossy(p).into_owned()),
+        peer_hello: Some(peer_hello.clone()),
         session_status: SyncSessionStatus::AwaitingPairing,
     };
 
-    let mut ctx = SessionContext::new(identity, storage, result.peer_device_id, &mut on_event);
-    if let Some(ctrl) = control.as_deref() {
+    let mut ctx = SessionContext::new(
+        params.identity,
+        params.hello,
+        params.storage,
+        result.peer_device_id,
+        &mut on_event,
+    );
+    if let Some(ctrl) = control {
         ctx.set_control(ctrl);
     }
     let mut folders = FolderSyncState::default();
 
     // 2. `ClusterConfig` exchange and initial remote `Index`
-    match exchange_cluster_config(
-        &mut stream,
-        &mut ctx,
-        &mut folders,
-        peer_addr,
-        &result.peer_hello,
-    )? {
+    match exchange_cluster_config(&mut stream, &mut ctx, &mut folders, peer_addr, &peer_hello)? {
         ClusterExchange::Established => {}
         ClusterExchange::AwaitingPairing => return Ok(result),
         ClusterExchange::ClosedByPeer(reason) => {
@@ -228,15 +184,13 @@ where
 
     // 3. `+2` secondary data connections, if the peer supports them and direct TCP is used
     let desired_secondary = if allow_secondary {
-        desired_secondary_count(&result.peer_hello, our_hello)
+        desired_secondary_count(&peer_hello, params.hello)
     } else {
         0
     };
     let secondaries_opened_at = Instant::now();
     let mut secondaries: Vec<SecondaryBepConn> = (0..desired_secondary)
-        .filter_map(|_| {
-            open_secondary_bep_stream(&ctx, peer_addr, our_hello, SECONDARY_OPEN_TIMEOUT).ok()
-        })
+        .filter_map(|_| open_secondary_bep_stream(&ctx, peer_addr, SECONDARY_OPEN_TIMEOUT).ok())
         .collect();
 
     // 4. Initial download, local index publication and request draining
@@ -254,10 +208,9 @@ where
     }
 
     // 5. Persistent session loop
-    if let Some(ctrl) = control.as_deref() {
+    if let Some(ctrl) = control {
         let links = PersistentLinks {
             peer_addr,
-            our_hello,
             secondaries,
             desired_secondary,
         };
@@ -274,25 +227,4 @@ where
         bytes_uploaded: stats.bytes_uploaded,
     };
     Ok(result)
-}
-
-/// Result reported when TLS succeeded but the peer refused the BEP `Hello`.
-fn awaiting_pairing_without_hello(
-    peer_addr: SocketAddr,
-    peer_device_id: DeviceId,
-) -> PeerHandshakeResult {
-    PeerHandshakeResult {
-        peer_addr,
-        peer_device_id,
-        peer_hello: BepHello {
-            device_name: format!("Syncthing ({})", peer_addr.ip()),
-            client_name: "syncthing".to_owned(),
-            client_version: "TLS 1.3".to_owned(),
-            num_connections: 0,
-            timestamp: 0,
-        },
-        tls_version: "TLSv1_3".to_owned(),
-        alpn: Some("bep/1.0".to_owned()),
-        session_status: SyncSessionStatus::AwaitingPairing,
-    }
 }

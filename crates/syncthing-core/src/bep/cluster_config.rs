@@ -114,6 +114,7 @@ impl BepClusterConfig {
     pub fn encode_for_peers(
         folders: &[(BepFolder, FolderIndexState)],
         own_id: DeviceId,
+        own_name: &str,
         peer_id: DeviceId,
     ) -> Vec<u8> {
         let mut out = Vec::new();
@@ -131,12 +132,14 @@ impl BepClusterConfig {
                 encode_varint_field(&mut folder_buf, 7, 1);
             }
 
-            // Device entry for PS Vita (with index_id and max_sequence from local index)
+            // Our own device entry (with index_id and max_sequence from local index)
             // BEP v1 Device fields: 1=id, 2=name, 3=addresses, 4=compression, 6=max_sequence, 8=index_id
             {
                 let mut dev_buf = Vec::new();
                 encode_bytes_field(&mut dev_buf, 1, &own_id.0);
-                encode_bytes_field(&mut dev_buf, 2, b"PS-Vita");
+                if !own_name.is_empty() {
+                    encode_bytes_field(&mut dev_buf, 2, own_name.as_bytes());
+                }
                 encode_bytes_field(&mut dev_buf, 3, b"dynamic");
                 encode_varint_field(&mut dev_buf, 4, 1); // COMPRESSION_NEVER
                 if state.max_sequence > 0 {

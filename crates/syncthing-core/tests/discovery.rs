@@ -95,10 +95,10 @@ fn test_https_client_rejects_untrusted_server_certificate() {
     use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
     use rustls::{ServerConfig, ServerConnection, StreamOwned};
     use syncthing_core::tls::client::open_https_tls_stream;
-    use syncthing_core::VitaIdentity;
+    use syncthing_core::DeviceIdentity;
 
     // An HTTPS server presenting a self-signed certificate.
-    let identity = VitaIdentity::from_seed(&[0x51; 32]).unwrap();
+    let identity = DeviceIdentity::from_seed(&[0x51; 32]).unwrap();
     let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
     let port = listener.local_addr().unwrap().port();
     let server = std::thread::spawn(move || {

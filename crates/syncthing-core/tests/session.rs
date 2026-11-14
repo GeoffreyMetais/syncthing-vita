@@ -11,9 +11,9 @@ use syncthing_core::session::context::SessionContext;
 use syncthing_core::session::folders::{FolderSyncState, INDEX_BATCH_FILES};
 use syncthing_core::session::upload::serve_block_request;
 use syncthing_core::{
-    connect_and_sync, connect_and_sync_with_control, read_bep_message, BepClusterConfig,
-    BepFileInfo, BepHello, BepIndex, BepMessageType, BepRequest, BepResponse, DeviceId, FolderType,
-    FsSyncStorage, SyncControl, SyncEvent, SyncSessionStatus, SyncTuning, VitaIdentity,
+    connect_and_sync, read_bep_message, BepClusterConfig, BepFileInfo, BepHello, BepIndex,
+    BepMessageType, BepRequest, BepResponse, DeviceId, DeviceIdentity, FolderType, FsSyncStorage,
+    SessionParams, SyncControl, SyncEvent, SyncSessionStatus, SyncTuning,
 };
 
 const LINKED_PEER: DeviceId = DeviceId([0x22; 32]);
@@ -33,9 +33,10 @@ fn storage_with_shared_file(name: &str) -> FsSyncStorage {
 
 /// Sends a block `Request` for `folder/slot0.bin` as `peer` and returns the `Response`.
 fn request_block(storage: &FsSyncStorage, peer: DeviceId, folder: &str) -> BepResponse {
-    let identity = VitaIdentity::from_seed(&[7u8; 32]).unwrap();
+    let identity = DeviceIdentity::from_seed(&[7u8; 32]).unwrap();
+    let hello = test_hello();
     let mut sink = |_event: SyncEvent| {};
-    let mut ctx = SessionContext::new(&identity, storage, peer, &mut sink);
+    let mut ctx = SessionContext::new(&identity, &hello, storage, peer, &mut sink);
     let req = BepRequest {
         id: 5,
         folder: folder.to_owned(),
@@ -97,20 +98,39 @@ fn test_block_is_refused_for_paused_folder() {
 }
 
 /// Identity of the device under test in end-to-end sessions.
-fn vita_identity() -> VitaIdentity {
-    VitaIdentity::from_seed(&[7u8; 32]).unwrap()
+fn test_hello() -> BepHello {
+    BepHello::new("Test device", "syncthing-core-tests", "0.0.0")
+}
+
+fn session_params<'a>(
+    identity: &'a DeviceIdentity,
+    hello: &'a BepHello,
+    storage: &'a FsSyncStorage,
+    peer: DeviceId,
+    control: Option<std::sync::Arc<SyncControl>>,
+) -> SessionParams<'a> {
+    SessionParams {
+        identity,
+        hello,
+        storage,
+        expected_device_id: Some(peer),
+        timeout: Duration::from_secs(4),
+        control,
+    }
+}
+
+fn vita_identity() -> DeviceIdentity {
+    DeviceIdentity::from_seed(&[7u8; 32]).unwrap()
 }
 
 /// Runs one single-cycle session against `peer` and returns the emitted events.
 fn sync_once(peer: &FakePeer, storage: &FsSyncStorage) -> (SyncSessionStatus, Vec<SyncEvent>) {
     let mut events = Vec::new();
+    let hello = test_hello();
+    let identity = vita_identity();
     let result = connect_and_sync(
-        &vita_identity(),
+        &session_params(&identity, &hello, storage, peer.device_id, None),
         peer.addr,
-        Some(peer.device_id),
-        &BepHello::new_vita_default(),
-        storage,
-        Duration::from_secs(4),
         |event| events.push(event),
     )
     .expect("session failed");
@@ -228,14 +248,10 @@ fn test_local_change_is_published_as_an_incremental_index_update() {
     let (peer_addr, peer_id) = (peer.addr, peer.device_id);
     let session_control = std::sync::Arc::clone(&control);
     let session = std::thread::spawn(move || {
-        connect_and_sync_with_control(
-            &vita_identity(),
+        let (identity, hello) = (vita_identity(), test_hello());
+        connect_and_sync(
+            &session_params(&identity, &hello, &storage, peer_id, Some(session_control)),
             peer_addr,
-            Some(peer_id),
-            &BepHello::new_vita_default(),
-            &storage,
-            Duration::from_secs(4),
-            Some(session_control),
             move |event| {
                 let _ = events_tx.send(event);
             },
@@ -351,14 +367,10 @@ fn test_failed_download_is_retried_at_the_next_rescan() {
     let (peer_addr, peer_id) = (peer.addr, peer.device_id);
     let session_control = std::sync::Arc::clone(&control);
     let session = std::thread::spawn(move || {
-        connect_and_sync_with_control(
-            &vita_identity(),
+        let (identity, hello) = (vita_identity(), test_hello());
+        connect_and_sync(
+            &session_params(&identity, &hello, &storage, peer_id, Some(session_control)),
             peer_addr,
-            Some(peer_id),
-            &BepHello::new_vita_default(),
-            &storage,
-            Duration::from_secs(4),
-            Some(session_control),
             move |event| {
                 let _ = events_tx.send(event);
             },
@@ -452,8 +464,9 @@ fn test_scan_reports_progress_for_keepalives() {
 
     // A session with a zero keepalive interval is always due for a `Ping`.
     let identity = vita_identity();
+    let hello = test_hello();
     let mut sink = |_event: SyncEvent| {};
-    let mut ctx = SessionContext::new(&identity, &storage, LINKED_PEER, &mut sink);
+    let mut ctx = SessionContext::new(&identity, &hello, &storage, LINKED_PEER, &mut sink);
     assert!(!ctx.keepalive_due());
     ctx.tuning.keepalive_interval = Duration::ZERO;
     assert!(ctx.keepalive_due());
@@ -565,14 +578,10 @@ fn test_revert_request_restores_a_receive_only_folder() {
     let (peer_addr, peer_id) = (peer.addr, peer.device_id);
     let session_control = std::sync::Arc::clone(&control);
     let session = std::thread::spawn(move || {
-        connect_and_sync_with_control(
-            &vita_identity(),
+        let (identity, hello) = (vita_identity(), test_hello());
+        connect_and_sync(
+            &session_params(&identity, &hello, &storage, peer_id, Some(session_control)),
             peer_addr,
-            Some(peer_id),
-            &BepHello::new_vita_default(),
-            &storage,
-            Duration::from_secs(4),
-            Some(session_control),
             move |event| {
                 let _ = events_tx.send(event);
             },

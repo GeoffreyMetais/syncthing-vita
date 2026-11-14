@@ -9,6 +9,11 @@ use std::time::Duration;
 
 // --- Synchronization -----------------------------------------------------------------------
 
+/// Device name announced to peers (`Hello`, `ClusterConfig`); peers show it until renamed.
+pub const DEVICE_NAME: &str = "PS-Vita";
+/// Client name announced to peers (`Hello`).
+pub const CLIENT_NAME: &str = "vita-syncthing";
+
 /// Interval between automatic rescans of the shared folders (the sidebar sync card rescans immediately).
 /// A rescan walks every shared folder for each connected device.
 pub const RESCAN_INTERVAL: Duration = Duration::from_secs(60);

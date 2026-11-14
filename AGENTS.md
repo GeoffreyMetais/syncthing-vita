@@ -28,7 +28,7 @@ syncthing-vita
     │   │   ├── lib.rs                # Module declarations & public API re-exports ONLY (no logic, no tests)
     │   │   ├── proto.rs              # Protobuf wire primitives (varint, fields, WireIter)
     │   │   ├── device_id/            # DeviceId: mod.rs (format, hex, short-ID matching), parse.rs (user input), base32.rs (Base32 + Luhn mod 32)
-    │   │   ├── cert.rs               # Deterministic ECDSA P-256 X.509 identity (VitaIdentity) & DER builder
+    │   │   ├── cert.rs               # Deterministic ECDSA P-256 X.509 identity (DeviceIdentity) & DER builder
     │   │   ├── version_vector.rs     # Version vector arithmetic (ge / merge / bump, short device ID)
     │   │   ├── bep/                  # BEP/1.0 pure codecs: header, framing, lz4, hello, cluster_config, index, request, close
     │   │   ├── discovery/            # announce.rs (codec), addresses.rs, local_ip.rs, udp.rs (broadcast cycle), lan_scan.rs (TCP 22000 + TLS probe)
@@ -297,7 +297,7 @@ Timings, limits and presets that govern the app's behaviour (rescan interval, re
   - `dispatch.rs` — routing of primary-connection messages in an established session
   - `index_exchange.rs` — local index publication and runtime `ClusterConfig` / `Index` handling
   - `download.rs` / `upload.rs` — block transfers (pull / serve)
-  - `folders.rs` — per-session folder state (pure); `context.rs` — `SessionContext` (identity, storage, stats, event sink, deferred messages); `control.rs`, `events.rs`, `outcome.rs` — public API types
+  - `folders.rs` — per-session folder state (pure); `context.rs` — `SessionContext` (identity, storage, stats, event sink, deferred messages); `params.rs` (`SessionParams`), `control.rs`, `events.rs`, `outcome.rs` — public API types
   - `keepalive.rs` — `Ping` when the keepalive interval elapsed; `tuning.rs` — `SyncTuning` (rescan / keepalive intervals chosen by the app, passed through `SyncControl::with_tuning`)
 - **Session invariants** (covered by `tests/session.rs` with the fake peer):
   - *No message is dropped during a download*: while waiting for a block `Response`, `Index` / `IndexUpdate` / `ClusterConfig` / `Close` are deferred (`SessionContext::defer_message`) and the session loops read through `dispatch::next_primary_message`, never `try_read_bep_message` directly.
@@ -306,7 +306,8 @@ Timings, limits and presets that govern the app's behaviour (rescan interval, re
 
 #### Rules for new code
 
-- **No long parameter lists**: pass `SessionContext` (identity, storage, peer, stats, `emit`) and `FolderSyncState` instead of threading counters and maps through functions. A new `#[allow(clippy::too_many_arguments)]` in `syncthing-core` is a design smell (the public `connect_and_sync_with_control` signature is the only accepted exception).
+- **No long parameter lists**: pass `SessionContext` (identity, our `Hello`, storage, peer, stats, `emit`) and `FolderSyncState` instead of threading counters and maps through functions. The public entry points (`connect_and_sync`, `connect_and_sync_stream`) take a `SessionParams` (`session/params.rs`). `#[allow(clippy::too_many_arguments)]` is a design smell in both crates.
+- **Nothing application-specific in the crate**: no device or client name (the app passes its `BepHello`), no fabricated values in results (`PeerHandshakeResult::peer_hello` is `None` when the peer refused BEP).
 - **Named constants for timings**: protocol timeouts and intervals are `const` items at the top of the file that uses them, never inline magic `Duration`s.
 - **New BEP message** → new file in `bep/`; **new session phase** → new file in `session/`; **new storage concern** → new file in `storage/` with its own `impl FsSyncStorage` block.
 

@@ -14,7 +14,7 @@ use super::revert::handle_revert_requests;
 use super::secondary::{
     open_secondary_bep_stream, ping_all_secondaries, poll_all_secondaries, SecondaryBepConn,
 };
-use crate::bep::{write_bep_message, BepClose, BepHello, BepMessageType};
+use crate::bep::{write_bep_message, BepClose, BepMessageType};
 use crate::tls::BepTlsStream;
 
 const PRIMARY_POLL: Duration = Duration::from_millis(150);
@@ -22,14 +22,13 @@ const SECONDARY_RETRY_INTERVAL: Duration = Duration::from_secs(15);
 const SECONDARY_RETRY_TIMEOUT: Duration = Duration::from_millis(1500);
 
 /// Connections and peer information owned by the persistent loop.
-pub struct PersistentLinks<'h> {
+pub struct PersistentLinks {
     pub peer_addr: SocketAddr,
-    pub our_hello: &'h BepHello,
     pub secondaries: Vec<SecondaryBepConn>,
     pub desired_secondary: usize,
 }
 
-impl PersistentLinks<'_> {
+impl PersistentLinks {
     fn active_connections(&self) -> usize {
         1 + self.secondaries.len()
     }
@@ -41,7 +40,7 @@ pub fn run_persistent_session(
     stream: &mut BepTlsStream,
     ctx: &mut SessionContext<'_>,
     folders: &mut FolderSyncState,
-    mut links: PersistentLinks<'_>,
+    mut links: PersistentLinks,
     control: &SyncControl,
 ) {
     let reason = match session_loop(stream, ctx, folders, &mut links, control) {
@@ -69,7 +68,7 @@ fn session_loop(
     stream: &mut BepTlsStream,
     ctx: &mut SessionContext<'_>,
     folders: &mut FolderSyncState,
-    links: &mut PersistentLinks<'_>,
+    links: &mut PersistentLinks,
     control: &SyncControl,
 ) -> Result<(), String> {
     let mut last_local_scan = Instant::now();
@@ -90,12 +89,9 @@ fn session_loop(
             && last_secondary_retry.elapsed() >= SECONDARY_RETRY_INTERVAL
         {
             last_secondary_retry = Instant::now();
-            if let Ok(sec) = open_secondary_bep_stream(
-                ctx,
-                links.peer_addr,
-                links.our_hello,
-                SECONDARY_RETRY_TIMEOUT,
-            ) {
+            if let Ok(sec) =
+                open_secondary_bep_stream(ctx, links.peer_addr, SECONDARY_RETRY_TIMEOUT)
+            {
                 links.secondaries.push(sec);
             }
         }
@@ -138,7 +134,7 @@ fn poll_primary(
     stream: &mut BepTlsStream,
     ctx: &mut SessionContext<'_>,
     folders: &mut FolderSyncState,
-    links: &PersistentLinks<'_>,
+    links: &PersistentLinks,
     control: &SyncControl,
 ) -> Result<bool, String> {
     loop {

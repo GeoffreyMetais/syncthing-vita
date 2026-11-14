@@ -12,7 +12,7 @@ use rustls::{ClientConfig, ClientConnection, ConfigBuilder, RootCertStore, Strea
 
 use super::verifier::{ObservedDeviceId, SyncthingServerVerifier};
 use super::{BepTlsStream, BEP_ALPN};
-use crate::cert::VitaIdentity;
+use crate::cert::DeviceIdentity;
 use crate::device_id::DeviceId;
 
 /// TLS server name sent to peers (Syncthing ignores it; identity is the certificate hash).
@@ -63,7 +63,7 @@ fn new_bep_connection(config: ClientConfig) -> io::Result<ClientConnection> {
 /// Wraps an already-connected `TcpStream` in a client-authenticated TLS 1.3 stream
 /// (`ALPN = "bep/1.0"`). Used for both direct TCP and relayed BEP sessions.
 pub fn wrap_bep_tls_stream(
-    identity: &VitaIdentity,
+    identity: &DeviceIdentity,
     tcp: TcpStream,
     expected_device_id: Option<DeviceId>,
     timeout: Duration,
@@ -73,7 +73,7 @@ pub fn wrap_bep_tls_stream(
 
 /// Wraps an already-connected `TcpStream` in a client-authenticated TLS stream with `alpn`.
 pub fn wrap_tls_stream_with_alpn(
-    identity: &VitaIdentity,
+    identity: &DeviceIdentity,
     tcp: TcpStream,
     alpn: &[u8],
     expected_device_id: Option<DeviceId>,
@@ -102,7 +102,7 @@ pub fn wrap_tls_stream_with_alpn(
 /// Opens a client-authenticated TLS 1.3 stream (`ALPN = "bep/1.0"`) to `peer_addr`.
 /// Returns the stream and the slot that receives the peer's `DeviceId` once the handshake ran.
 pub fn open_bep_tls_stream(
-    identity: &VitaIdentity,
+    identity: &DeviceIdentity,
     peer_addr: SocketAddr,
     expected_device_id: Option<DeviceId>,
     timeout: Duration,
@@ -113,7 +113,7 @@ pub fn open_bep_tls_stream(
 
 /// Opens a client-authenticated TLS stream with a custom `alpn` (e.g. `b"bep-relay"`).
 pub fn open_tls_stream_with_alpn(
-    identity: &VitaIdentity,
+    identity: &DeviceIdentity,
     peer_addr: SocketAddr,
     alpn: &[u8],
     expected_device_id: Option<DeviceId>,

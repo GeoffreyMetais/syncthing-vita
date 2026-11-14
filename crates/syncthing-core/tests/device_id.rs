@@ -1,6 +1,6 @@
 //! `DeviceId` formatting (Luhn mod 32), parsing of user input and short-ID matching.
 
-use syncthing_core::{DeviceId, VitaIdentity};
+use syncthing_core::{DeviceId, DeviceIdentity};
 
 #[test]
 fn test_device_id_formatting() {
@@ -14,7 +14,7 @@ fn test_device_id_formatting() {
 #[test]
 fn test_device_id_parse_full_and_short() {
     let seed = *b"VITA_SYNCTHING_ECDSA_SEED_000001";
-    let full_id = VitaIdentity::from_seed(&seed).unwrap().device_id;
+    let full_id = DeviceIdentity::from_seed(&seed).unwrap().device_id;
     let full_str = full_id.to_syncthing_string();
     let short_str = full_id.short();
 

@@ -7,8 +7,8 @@ use std::time::Instant;
 use super::control::SyncControl;
 use super::events::SyncEvent;
 use super::tuning::SyncTuning;
-use crate::bep::BepMessageType;
-use crate::cert::VitaIdentity;
+use crate::bep::{BepHello, BepMessageType};
+use crate::cert::DeviceIdentity;
 use crate::device_id::DeviceId;
 use crate::storage::FsSyncStorage;
 
@@ -44,7 +44,9 @@ impl SyncStats {
 /// Mutable state and dependencies shared by the session phases (never the TLS streams, which
 /// are passed separately so they can be borrowed alongside the context).
 pub struct SessionContext<'a> {
-    pub identity: &'a VitaIdentity,
+    pub identity: &'a DeviceIdentity,
+    /// The `Hello` this device sends on every connection of the session.
+    pub hello: &'a BepHello,
     pub storage: &'a FsSyncStorage,
     pub peer_device_id: DeviceId,
     pub stats: SyncStats,
@@ -64,13 +66,15 @@ pub struct SessionContext<'a> {
 
 impl<'a> SessionContext<'a> {
     pub fn new(
-        identity: &'a VitaIdentity,
+        identity: &'a DeviceIdentity,
+        hello: &'a BepHello,
         storage: &'a FsSyncStorage,
         peer_device_id: DeviceId,
         on_event: &'a mut dyn FnMut(SyncEvent),
     ) -> Self {
         Self {
             identity,
+            hello,
             storage,
             peer_device_id,
             stats: SyncStats::default(),
