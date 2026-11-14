@@ -49,3 +49,24 @@ fn test_lz4_output_is_bounded_by_announced_size() {
     literals.extend_from_slice(b"VITA");
     assert!(decompress_bep_lz4(&literals).is_err());
 }
+
+/// A symlink entry (BEP type 4) is decoded as invalid: it is never pulled as an empty file.
+#[test]
+fn test_symlink_entries_are_decoded_as_invalid() {
+    use syncthing_core::proto::{encode_bytes_field, encode_varint_field};
+    use syncthing_core::BepIndex;
+    let entry = |file_type: u64| {
+        let mut file = Vec::new();
+        encode_bytes_field(&mut file, 1, b"link");
+        encode_varint_field(&mut file, 2, file_type);
+        let mut index = Vec::new();
+        encode_bytes_field(&mut index, 1, b"f");
+        encode_bytes_field(&mut index, 2, &file);
+        BepIndex::decode(&index).unwrap().files.remove(0)
+    };
+    assert!(!entry(0).invalid && !entry(0).is_dir);
+    assert!(!entry(1).invalid && entry(1).is_dir);
+    for symlink in [2, 3, 4] {
+        assert!(entry(symlink).invalid && !entry(symlink).is_dir);
+    }
+}

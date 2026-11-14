@@ -5,6 +5,12 @@ use std::io;
 use super::BEP_BLOCK_SIZE;
 use crate::proto::{decode_varint, encode_bytes_field, encode_varint_field, WireIter};
 
+/// BEP `FileInfoType::FILE`.
+const FILE_TYPE_FILE: u64 = 0;
+/// BEP `FileInfoType::DIRECTORY`. Every other type is a symlink (`SYMLINK = 4` and the
+/// deprecated `SYMLINK_FILE = 2` / `SYMLINK_DIRECTORY = 3`).
+const FILE_TYPE_DIRECTORY: u64 = 1;
+
 /// BEP version vector counter (`Counter { uint64 id = 1; uint64 value = 2; }`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct BepVersionCounter {
@@ -144,6 +150,7 @@ impl BepIndex {
         let mut sequence = 0i64;
         let mut versions = Vec::new();
         let mut blocks = Vec::new();
+        let mut unsupported_type = false;
 
         for item in WireIter::new(bytes) {
             let (field_num, wire_type, data) = item?;
@@ -151,7 +158,8 @@ impl BepIndex {
                 (1, 2) => name = String::from_utf8_lossy(data).into_owned(),
                 (2, 0) => {
                     let (v, _) = decode_varint(data)?;
-                    is_dir = v == 1;
+                    is_dir = v == FILE_TYPE_DIRECTORY;
+                    unsupported_type = v != FILE_TYPE_FILE && v != FILE_TYPE_DIRECTORY;
                 }
                 (3, 0) => {
                     let (v, _) = decode_varint(data)?;
@@ -208,7 +216,9 @@ impl BepIndex {
             size,
             modified_s,
             deleted,
-            invalid,
+            // A symlink cannot exist on PS Vita storage: like an invalid entry, it is known
+            // but never pulled (it must not become an empty regular file).
+            invalid: invalid || unsupported_type,
             sequence,
             versions,
             blocks,

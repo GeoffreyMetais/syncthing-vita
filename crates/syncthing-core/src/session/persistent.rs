@@ -9,7 +9,7 @@ use super::control::SyncControl;
 use super::dispatch::{dispatch_primary_message, next_primary_message, Dispatched};
 use super::events::SyncEvent;
 use super::folders::FolderSyncState;
-use super::index_exchange::rescan_and_publish;
+use super::index_exchange::{rescan_and_publish, retry_incomplete_pulls};
 use super::revert::handle_revert_requests;
 use super::secondary::{
     open_secondary_bep_stream, ping_all_secondaries, poll_all_secondaries, SecondaryBepConn,
@@ -107,12 +107,15 @@ fn session_loop(
             ping_all_secondaries(&mut links.secondaries);
         }
 
-        // E. Periodic or manual (UI-requested) local folder rescan
+        // E. Periodic or manual (UI-requested) local folder rescan, after another attempt at
+        //    the files that could not be downloaded
         let cur_epoch = control.rescan_epoch();
         let manual_rescan = cur_epoch != seen_rescan_epoch || control.take_rescan_request();
         seen_rescan_epoch = cur_epoch;
         if manual_rescan || last_local_scan.elapsed() >= ctx.tuning.rescan_interval {
             last_local_scan = Instant::now();
+            retry_incomplete_pulls(stream, ctx, folders)
+                .map_err(|e| format!("download retry failed: {e}"))?;
             let published = rescan_and_publish(stream, ctx, folders, manual_rescan)
                 .map_err(|e| format!("index update send failed: {e}"))?;
             if published {

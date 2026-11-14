@@ -185,6 +185,23 @@ pub fn handle_runtime_index(
     Ok(true)
 }
 
+/// Pulls again the folders in which a file could not be downloaded (see
+/// [`SessionContext::mark_folder_incomplete`]), against everything the peer announced so far.
+/// The caller publishes the result with [`rescan_and_publish`].
+pub fn retry_incomplete_pulls(
+    stream: &mut BepTlsStream,
+    ctx: &mut SessionContext<'_>,
+    folders: &FolderSyncState,
+) -> io::Result<()> {
+    for folder_id in ctx.take_incomplete_folders() {
+        if folders.is_shared_folder(&folder_id) {
+            let remote = folders.remote_files(&folder_id);
+            download_folder(stream, ctx, &folder_id, remote, false)?;
+        }
+    }
+    Ok(())
+}
+
 /// Rescans every non-paused shared folder and publishes the entries that changed since the
 /// last publication. Returns `true` if a publication round happened (something was sent, or
 /// the rescan was `manual`); the caller then reports a sync cycle.
