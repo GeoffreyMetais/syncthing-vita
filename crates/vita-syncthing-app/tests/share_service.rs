@@ -145,8 +145,20 @@ fn test_sync_peers_excludes_devices_without_active_share() {
     let paused_only = DeviceId([0x22; 32]);
     let active = DeviceId([0x33; 32]);
 
-    ShareService::upsert_device(&mut state, &repo, unlinked, "Mac Deezer", "192.168.1.50:22000");
-    ShareService::upsert_device(&mut state, &repo, paused_only, "Old PC", "192.168.1.51:22000");
+    ShareService::upsert_device(
+        &mut state,
+        &repo,
+        unlinked,
+        "Mac Deezer",
+        "192.168.1.50:22000",
+    );
+    ShareService::upsert_device(
+        &mut state,
+        &repo,
+        paused_only,
+        "Old PC",
+        "192.168.1.51:22000",
+    );
     ShareService::upsert_device(&mut state, &repo, active, "NAS", "192.168.1.52:22000");
 
     // With no shares yet, approved devices are eligible so folder offers can arrive.

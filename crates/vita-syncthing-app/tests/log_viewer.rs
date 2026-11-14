@@ -258,10 +258,17 @@ fn test_log_file_is_rotated_and_history_spans_both_files() {
     for i in 0..lines {
         repo.write_log(&format!("{i} {line}"));
     }
-    let current = std::fs::metadata(format!("{dir}/syncthing.log")).unwrap().len();
-    let rotated = std::fs::metadata(format!("{dir}/syncthing.log.1")).unwrap().len();
+    let current = std::fs::metadata(format!("{dir}/syncthing.log"))
+        .unwrap()
+        .len();
+    let rotated = std::fs::metadata(format!("{dir}/syncthing.log.1"))
+        .unwrap()
+        .len();
     assert!(current < LOG_MAX_BYTES, "current log: {current} bytes");
-    assert!(rotated <= LOG_MAX_BYTES + 2048, "rotated log: {rotated} bytes");
+    assert!(
+        rotated <= LOG_MAX_BYTES + 2048,
+        "rotated log: {rotated} bytes"
+    );
 
     let history = repo.read_log_history(lines);
     assert_eq!(history.len(), lines);

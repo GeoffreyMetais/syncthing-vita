@@ -85,7 +85,6 @@ fn test_parse_endpoint_uri_supports_tcp_and_relay_and_filters_unspecified() {
     assert_eq!(parse_endpoint_uri("relay://198.51.100.5:22067/"), None);
 }
 
-
 /// The Global Discovery HTTPS client authenticates the server: a self-signed certificate (what
 /// anyone intercepting the connection can present) is refused.
 #[test]
@@ -104,15 +103,16 @@ fn test_https_client_rejects_untrusted_server_certificate() {
     let port = listener.local_addr().unwrap().port();
     let server = std::thread::spawn(move || {
         let (tcp, _) = listener.accept().unwrap();
-        let mut config = ServerConfig::builder_with_provider(Arc::new(rustls_rustcrypto::provider()))
-            .with_safe_default_protocol_versions()
-            .unwrap()
-            .with_no_client_auth()
-            .with_single_cert(
-                vec![CertificateDer::from(identity.cert_der.clone())],
-                PrivateKeyDer::Pkcs8(PrivatePkcs8KeyDer::from(identity.key_pkcs8_der.clone())),
-            )
-            .unwrap();
+        let mut config =
+            ServerConfig::builder_with_provider(Arc::new(rustls_rustcrypto::provider()))
+                .with_safe_default_protocol_versions()
+                .unwrap()
+                .with_no_client_auth()
+                .with_single_cert(
+                    vec![CertificateDer::from(identity.cert_der.clone())],
+                    PrivateKeyDer::Pkcs8(PrivatePkcs8KeyDer::from(identity.key_pkcs8_der.clone())),
+                )
+                .unwrap();
         config.alpn_protocols = vec![b"http/1.1".to_vec()];
         let mut stream = StreamOwned::new(ServerConnection::new(Arc::new(config)).unwrap(), tcp);
         let mut request = [0u8; 64];

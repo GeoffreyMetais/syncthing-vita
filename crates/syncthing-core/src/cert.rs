@@ -27,14 +27,15 @@ impl VitaIdentity {
         })?;
         let signing_key = SigningKey::from(&secret_key);
 
-        let pkcs8_doc = secret_key.to_pkcs8_der().map_err(|e| {
-            io::Error::other(format!("PKCS#8 encoding error: {e}"))
-        })?;
+        let pkcs8_doc = secret_key
+            .to_pkcs8_der()
+            .map_err(|e| io::Error::other(format!("PKCS#8 encoding error: {e}")))?;
         let key_pkcs8_der = pkcs8_doc.as_bytes().to_vec();
 
-        let spki_doc = secret_key.public_key().to_public_key_der().map_err(|e| {
-            io::Error::other(format!("SPKI encoding error: {e}"))
-        })?;
+        let spki_doc = secret_key
+            .public_key()
+            .to_public_key_der()
+            .map_err(|e| io::Error::other(format!("SPKI encoding error: {e}")))?;
         let spki_der = spki_doc.as_bytes();
 
         let cert_der = build_self_signed_x509_der(&signing_key, spki_der);

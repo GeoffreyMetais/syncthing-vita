@@ -333,8 +333,7 @@ pub fn spawn_sync_worker(
             }
             first_pass = false;
 
-            if last_global_lookup
-                .is_none_or(|t| t.elapsed() >= GLOBAL_DISCOVERY_INTERVAL)
+            if last_global_lookup.is_none_or(|t| t.elapsed() >= GLOBAL_DISCOVERY_INTERVAL)
                 && !worker_control.is_stop_requested()
             {
                 refresh_global_endpoints(
