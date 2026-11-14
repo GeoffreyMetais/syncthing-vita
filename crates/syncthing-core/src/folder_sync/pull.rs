@@ -10,6 +10,7 @@ use super::{mtime_secs, PullPlan};
 use crate::bep::{BepFileInfo, BepVersionCounter};
 use crate::device_id::DeviceId;
 use crate::local_db::{with_folder_db, FolderDb, LocalEntry};
+use crate::storage::names::is_syncable_name;
 use crate::storage::vita_fs::ensure_dir_exists;
 use crate::storage::FsSyncStorage;
 use crate::version_vector::{short_device_id, version_ge, version_merge};
@@ -37,10 +38,11 @@ impl FsSyncStorage {
         on_progress: &mut dyn FnMut(),
     ) -> io::Result<PullPlan> {
         let short_id = short_device_id(own_id);
+        // Names that do not designate a plain entry inside the folder are ignored.
         // Parents before children for creations; children before parents for deletions.
         let mut ordered: Vec<&BepFileInfo> = remote
             .iter()
-            .filter(|rf| !rf.invalid && !rf.versions.is_empty())
+            .filter(|rf| !rf.invalid && !rf.versions.is_empty() && is_syncable_name(&rf.name))
             .collect();
         ordered.sort_by(|a, b| match (a.deleted, b.deleted) {
             (false, false) => a.name.cmp(&b.name),

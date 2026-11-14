@@ -116,7 +116,8 @@ impl DeviceId {
     /// Parses a 64-character hex string back into a 32-byte `DeviceId`.
     pub fn from_hex(hex: &str) -> Option<Self> {
         let clean = hex.trim();
-        if clean.len() != 64 {
+        // ASCII only: the two-character slices below must fall on character boundaries.
+        if clean.len() != 64 || !clean.bytes().all(|b| b.is_ascii_hexdigit()) {
             return None;
         }
         let mut raw = [0u8; 32];

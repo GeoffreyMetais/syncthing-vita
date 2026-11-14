@@ -444,7 +444,6 @@ impl ShareService {
 
     /// Refreshes presets and `ux0:` subdirectories for the currently selected share or new share creation.
     pub fn refresh_picker_items(state: &mut AppState, repo: &ConfigRepository) {
-        let base_data_dir = repo.base_data_dir();
         let folder_id = if state.picker_mode == PickerMode::CreateNewShare {
             let tail = state
                 .picker_current_dir
@@ -522,9 +521,9 @@ impl ShareService {
                 },
                 PickerItem {
                     label: UiText::PickerDefaultFolder {
-                        path: format!("{}/sync/{}", base_data_dir, folder_id),
+                        path: repo.default_share_dir(&folder_id),
                     },
-                    path: format!("{}/sync/{}", base_data_dir, folder_id),
+                    path: repo.default_share_dir(&folder_id),
                     is_preset: true,
                     template: None,
                     is_shared: false,

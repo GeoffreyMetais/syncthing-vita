@@ -45,6 +45,18 @@ impl ConfigRepository {
         "/tmp/syncthing-vita"
     }
 
+    /// Default directory of a share: `<base_data_dir>/sync/<folder_id>`. Folder IDs come from
+    /// remote peers, so only `A-Z a-z 0-9 - _` are kept: an ID such as `../..` can never point
+    /// the share outside the `sync` directory.
+    pub fn default_share_dir(&self, folder_id: &str) -> String {
+        let clean: String = folder_id
+            .chars()
+            .filter(|c| c.is_ascii_alphanumeric() || *c == '-' || *c == '_')
+            .collect();
+        let dir = if clean.is_empty() { "folder" } else { &clean };
+        format!("{}/sync/{}", self.base_data_dir, dir)
+    }
+
     /// Appends a diagnostic log line to stdout and `<base_data_dir>/syncthing.log`.
     pub fn write_log(&self, msg: &str) {
         println!("{LOG_LINE_PREFIX}{msg}");
@@ -139,7 +151,7 @@ impl ConfigRepository {
                     };
                     let folder_id = unescape_field(parts[0]);
                     let mut target_path = unescape_field(parts[2]);
-                    let default_sync_path = format!("{}/sync/{}", self.base_data_dir, folder_id);
+                    let default_sync_path = self.default_share_dir(&folder_id);
                     if target_path == default_sync_path {
                         if let Some(&(_, _, tpl_path)) = NEW_SHARE_TEMPLATES
                             .iter()
