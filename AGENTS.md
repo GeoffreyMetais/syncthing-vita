@@ -20,6 +20,7 @@ syncthing-vita
 ├── Cargo.toml                        # Workspace manifest (Edition 2021, LTO + opt-level = "z")
 ├── Justfile                          # Task runner (test-host, check-vita, build-vita, vpk)
 ├── scripts/build_vpk.sh              # Full VPK build pipeline (vita-elf-create, vita-make-fself, vita-mksfoex, vita-pack-vpk); APP_VER from the Cargo version
+├── docs/screenshots/<branch>/        # Vita3K screenshots of visual changes, embedded in PR descriptions (see §6)
 ├── scripts/gen_livearea.py           # Generates the LiveArea images (assets/sce_sys/: icon, background, gate — PS Vita + Syncthing emblem)
 └── crates/
     ├── syncthing-core/               # Platform-independent Syncthing BEP/1.0 & Discovery engine
@@ -470,16 +471,14 @@ DISPLAY=:0 SDL_VIDEODRIVER=x11 QT_QPA_PLATFORM=xcb ./scripts/vita3k_scenario.sh 
 Every change that alters what is drawn goes through these steps before it is reported done or proposed in a PR:
 1. **Run it in the emulator**: write a `ui-script` scenario reaching every affected screen / modal / state (focus rings, scrolled lists, both themes or several languages when the change depends on them) and run it with `just ui-scenario`. Host tests do not replace this.
 2. **Take screenshots**: one `shot` per affected state, named in order (`1_settings`, `2_log_viewer`, ...). Look at each PNG and check the change is visible and nothing is clipped or overlapping. Show them to the user.
-3. **Put them in the PR description**: commit the PNGs to the `pr-screenshots` branch (an orphan branch holding only images, never merged), under a folder named after the PR branch:
+3. **Put them in the PR description**: commit the PNGs on the PR branch itself, in `docs/screenshots/<branch>/` (one folder per branch, `target/` is not committed):
    ```bash
-   git worktree add --orphan -b pr-screenshots /tmp/pr-shots 2>/dev/null || git worktree add /tmp/pr-shots pr-screenshots
-   mkdir -p /tmp/pr-shots/<branch> && cp target/ui-shots/*.png /tmp/pr-shots/<branch>/
-   git -C /tmp/pr-shots add . && git -C /tmp/pr-shots commit -m "Screenshots for <branch>" && git -C /tmp/pr-shots push -u origin pr-screenshots
-   git worktree remove /tmp/pr-shots
+   mkdir -p docs/screenshots/<branch> && cp target/ui-shots/*.png docs/screenshots/<branch>/
+   git add docs/screenshots/<branch> && git commit -m "Screenshots of <change>" && git push
    ```
-   (fetch `origin pr-screenshots` first when it already exists remotely), then embed each one in a `## Screenshots` section of the PR description with a one-line caption:
-   `![Settings](https://github.com/GeoffreyMetais/syncthing-vita/blob/pr-screenshots/<branch>/1_settings.png?raw=true)`.
-   When the PR is updated with another visual change, add the new screenshots and update the section.
+   then embed each one in a `## Screenshots` section of the PR description with a one-line caption:
+   `![Settings](https://github.com/GeoffreyMetais/syncthing-vita/blob/<branch>/docs/screenshots/<branch>/1_settings.png?raw=true)`.
+   When the PR is updated with another visual change, replace the outdated screenshots (same names) or add new ones, and update the section.
 
 ---
 
