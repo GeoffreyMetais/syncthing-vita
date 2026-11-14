@@ -72,16 +72,19 @@ impl FsSyncStorage {
         rf: &BepFileInfo,
         plan: &mut PullPlan,
     ) {
-        let local = db.entries.get(&rf.name).cloned();
         let is_regular = !rf.deleted && !rf.is_dir;
-
-        if let Some(e) = &local {
+        // The common case (nothing newer on the peer) is decided on a borrowed entry.
+        if let Some(e) = db.entries.get(&rf.name) {
             if version_ge(&e.version, &rf.versions) {
                 if is_regular && e.content_equals(rf) {
                     plan.up_to_date.push(rf.clone());
                 }
                 return;
             }
+        }
+        let local = db.entries.get(&rf.name).cloned();
+
+        if let Some(e) = &local {
             if e.content_equals(rf) {
                 db.put(LocalEntry {
                     version: version_merge(&e.version, &rf.versions),

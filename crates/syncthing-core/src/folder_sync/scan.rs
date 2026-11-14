@@ -57,15 +57,17 @@ impl FsSyncStorage {
             let size = if is_dir { 0 } else { meta.len() as i64 };
             seen.insert(name.clone());
 
-            let prev = db.entries.get(&name).cloned();
-            if let Some(e) = &prev {
-                let unchanged = !e.deleted
+            // Most entries are unchanged: decide that on a borrowed entry, and only copy the
+            // previous one (with its block list) when it has to be replaced.
+            let unchanged = db.entries.get(&name).is_some_and(|e| {
+                !e.deleted
                     && e.is_dir == is_dir
-                    && (is_dir || (e.size == size && e.disk_mtime == mtime));
-                if unchanged {
-                    continue;
-                }
+                    && (is_dir || (e.size == size && e.disk_mtime == mtime))
+            });
+            if unchanged {
+                continue;
             }
+            let prev = db.entries.get(&name).cloned();
             let prev_version = prev.as_ref().map(|e| e.version.clone()).unwrap_or_default();
 
             if is_dir {

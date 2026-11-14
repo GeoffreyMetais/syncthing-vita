@@ -1,6 +1,7 @@
 //! Download side: pulls a peer's newer files block by block (128 KiB delta sync with streaming
 //! disk writes) over the primary connection, while still answering the peer's own requests.
 
+use std::fs::File;
 use std::io;
 use std::time::Duration;
 
@@ -14,6 +15,7 @@ use crate::bep::{
     read_bep_message, write_bep_message, BepBlockInfo, BepFileInfo, BepMessageType, BepRequest,
     BepResponse,
 };
+use crate::storage::download::write_block_at;
 use crate::tls::BepTlsStream;
 
 /// Generous per-response timeout: servers on NAS / Docker hosts may take several seconds
@@ -118,42 +120,56 @@ fn download_file(
     file: &BepFileInfo,
 ) -> io::Result<bool> {
     let storage = ctx.storage;
-    let outdated_blocks = match storage
-        .find_outdated_blocks(folder_id, file)
-        .and_then(|b| storage.prepare_download(folder_id, &file.name).map(|_| b))
-    {
-        Ok(b) => b,
+    // The local content is only worth copying when some of its blocks are kept.
+    let prepared = storage.find_outdated_blocks(folder_id, file).and_then(|outdated| {
+        let reuse_local = outdated.len() < file.blocks.len();
+        storage.prepare_download_seeded(folder_id, &file.name, reuse_local)?;
+        let tmp = storage.open_download(folder_id, &file.name)?;
+        Ok((outdated, tmp))
+    });
+    let (outdated_blocks, mut tmp) = match prepared {
+        Ok(p) => p,
         Err(e) => {
+            storage.abort_download(folder_id, &file.name);
             emit_file_error(ctx, folder_id, file, &e);
             return Ok(false);
         }
     };
 
-    let mut file_bytes = 0usize;
-    let mut file_blocks = 0usize;
-    for block in &outdated_blocks {
-        if ctx.is_stop_requested() {
+    // Fetches every outdated block: `Ok(None)` if the file must be skipped.
+    let mut fetch_all = || -> io::Result<Option<(usize, usize)>> {
+        let (mut blocks, mut bytes) = (0usize, 0usize);
+        for block in &outdated_blocks {
+            if ctx.is_stop_requested() {
+                return Err(io::Error::new(
+                    io::ErrorKind::Interrupted,
+                    "stopped locally during a download",
+                ));
+            }
+            match fetch_block(stream, ctx, folder_id, file, block, &mut tmp)? {
+                Some(len) => {
+                    blocks += 1;
+                    bytes += len;
+                }
+                None => return Ok(None),
+            }
+        }
+        Ok(Some((blocks, bytes)))
+    };
+    let fetched = fetch_all();
+    // The temp file must be closed before it is removed or renamed into place.
+    drop(tmp);
+    let (file_blocks, file_bytes) = match fetched {
+        Ok(Some(counts)) => counts,
+        Ok(None) => {
             storage.abort_download(folder_id, &file.name);
-            return Err(io::Error::new(
-                io::ErrorKind::Interrupted,
-                "stopped locally during a download",
-            ));
+            return Ok(false);
         }
-        match fetch_block(stream, ctx, folder_id, file, block) {
-            Ok(Some(len)) => {
-                file_blocks += 1;
-                file_bytes += len;
-            }
-            Ok(None) => {
-                storage.abort_download(folder_id, &file.name);
-                return Ok(false);
-            }
-            Err(e) => {
-                storage.abort_download(folder_id, &file.name);
-                return Err(e);
-            }
+        Err(e) => {
+            storage.abort_download(folder_id, &file.name);
+            return Err(e);
         }
-    }
+    };
 
     let total_size = file.size.max(0) as u64;
     if let Err(e) = storage.commit_download(folder_id, &file.name, total_size) {
@@ -181,6 +197,7 @@ fn fetch_block(
     folder_id: &str,
     file: &BepFileInfo,
     block: &BepBlockInfo,
+    tmp: &mut File,
 ) -> io::Result<Option<usize>> {
     let req_id = ctx.next_request_id();
     let req = BepRequest {
@@ -236,10 +253,7 @@ fn fetch_block(
     }
     let offset = block.offset.max(0) as u64;
     let total_size = file.size.max(0) as u64;
-    if let Err(e) = ctx
-        .storage
-        .write_block_streaming(folder_id, &file.name, offset, &resp.data, total_size)
-    {
+    if let Err(e) = write_block_at(tmp, offset, &resp.data) {
         // Local filesystem error (invalid name on exFAT, path clash, ...):
         // skip this file but keep the BEP session alive.
         emit_file_error(ctx, folder_id, file, &e);
