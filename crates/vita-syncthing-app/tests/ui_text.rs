@@ -24,6 +24,7 @@ fn all_messages() -> Vec<UiText> {
             name: s("PC"),
             addr: s("192.168.1.2:22000"),
         },
+        UiText::WaitingForLan,
         UiText::ExchangingIndex,
         UiText::FileUpToDate { file: s("a.sav") },
         UiText::Downloading {

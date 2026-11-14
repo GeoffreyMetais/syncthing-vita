@@ -20,6 +20,7 @@ pub mod discovery;
 pub mod folder_sync;
 pub mod local_db;
 pub mod proto;
+pub mod relay;
 pub mod session;
 pub mod storage;
 pub mod tls;
@@ -34,13 +35,15 @@ pub use bep::{
 pub use cert::VitaIdentity;
 pub use device_id::{DeviceId, DeviceIdParseError};
 pub use discovery::{
-    detect_local_ipv4, resolve_peer_tcp_addrs, run_discovery_cycle, scan_lan_bep_peers, Announce,
-    DiscoveryCycleResult, DISCOVERY_BROADCAST_ADDR, DISCOVERY_MAGIC, DISCOVERY_PORT,
+    detect_local_ipv4, lookup_global_peer, parse_endpoint_uri, parse_global_discovery_json,
+    resolve_peer_tcp_addrs, run_discovery_cycle, scan_lan_bep_peers, Announce,
+    DiscoveryCycleResult, PeerEndpoint, DISCOVERY_BROADCAST_ADDR, DISCOVERY_MAGIC, DISCOVERY_PORT,
 };
 pub use folder_sync::PullPlan;
+pub use relay::{connect_via_relay, RelayMessage, RelayResponse, SessionInvitation};
 pub use session::{
-    connect_and_sync, connect_and_sync_with_control, PeerHandshakeResult, SyncControl, SyncEvent,
-    SyncSessionStatus, SyncTuning,
+    connect_and_sync, connect_and_sync_stream_with_control, connect_and_sync_with_control,
+    PeerHandshakeResult, SyncControl, SyncEvent, SyncSessionStatus, SyncTuning,
 };
 pub use storage::FsSyncStorage;
 pub use tls::{probe_bep_peer_device_id, BEP_ALPN};

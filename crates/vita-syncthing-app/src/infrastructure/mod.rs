@@ -6,6 +6,7 @@ pub mod config_repo;
 pub mod framebuffer;
 pub mod identity_store;
 pub mod input;
+pub mod peer_endpoints;
 pub mod qr_camera;
 pub mod qr_decoder;
 pub mod sync_worker;

@@ -3,19 +3,21 @@
 use std::net::SocketAddr;
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex, OnceLock};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use syncthing_core::{
-    connect_and_sync_with_control, resolve_peer_tcp_addrs, run_discovery_cycle, scan_lan_bep_peers,
-    Announce, BepFolder, BepHello, DeviceId, FolderType, FsSyncStorage, SyncControl, SyncEvent,
-    SyncSessionStatus, SyncTuning, VitaIdentity, BEP_DEFAULT_PORT, DISCOVERY_BROADCAST_ADDR,
+    resolve_peer_tcp_addrs, run_discovery_cycle, scan_lan_bep_peers, Announce, BepFolder, BepHello,
+    DeviceId, FolderType, FsSyncStorage, SyncControl, SyncEvent, SyncTuning, VitaIdentity,
+    BEP_DEFAULT_PORT, DISCOVERY_BROADCAST_ADDR,
 };
 
+use super::peer_endpoints::{
+    refresh_global_endpoints, run_peer_session_loop, SharedDiscoveredAddrs, SharedGlobalEndpoints,
+};
 use super::worker_slot::spawn_after_previous;
 use crate::domain::defaults::{
-    CONNECT_TIMEOUT, DISCOVERY_INTERVAL, DISCOVERY_LISTEN, DISCOVERY_SCAN_LISTEN,
-    KEEPALIVE_INTERVAL, MAX_PEER_SESSIONS, NO_ADDRESS_POLL, RESCAN_INTERVAL, RETRY_AFTER_ERROR,
-    RETRY_AFTER_SESSION, RETRY_AWAITING_PAIRING,
+    DISCOVERY_INTERVAL, DISCOVERY_LISTEN, DISCOVERY_SCAN_LISTEN, GLOBAL_DISCOVERY_INTERVAL,
+    KEEPALIVE_INTERVAL, MAX_PEER_SESSIONS, RESCAN_INTERVAL,
 };
 use crate::domain::{KnownDevice, ShareConfigEntry, ShareMode, UiText};
 
@@ -55,22 +57,6 @@ pub enum WorkerMsg {
     },
 }
 
-type SharedDiscoveredAddrs = Arc<Mutex<Vec<(DeviceId, Vec<SocketAddr>)>>>;
-
-fn sleep_interruptible(control: &SyncControl, duration: Duration) -> bool {
-    let step = STOP_CHECK_STEP;
-    let mut elapsed = Duration::ZERO;
-    while elapsed < duration {
-        if control.is_stop_requested() {
-            return false;
-        }
-        let rem = (duration - elapsed).min(step);
-        std::thread::sleep(rem);
-        elapsed += rem;
-    }
-    !control.is_stop_requested()
-}
-
 /// Waits up to `duration` before the next discovery cycle. Returns early when the UI asks for a
 /// LAN scan (`SyncControl::request_discovery`); `false` if a stop was requested.
 fn wait_for_next_discovery(control: &SyncControl, duration: Duration) -> bool {
@@ -87,150 +73,6 @@ fn wait_for_next_discovery(control: &SyncControl, duration: Duration) -> bool {
         elapsed += rem;
     }
     !control.is_stop_requested()
-}
-
-fn candidate_addrs_for_peer(
-    kd: &KnownDevice,
-    discovered: &SharedDiscoveredAddrs,
-) -> (DeviceId, Vec<SocketAddr>) {
-    let mut resolved_id = kd.device_id;
-    let mut addrs = Vec::new();
-    if let Ok(sock) = kd.address.parse::<SocketAddr>() {
-        addrs.push(sock);
-    }
-    if let Ok(guard) = discovered.lock() {
-        for (disc_id, disc_socks) in guard.iter() {
-            if kd.device_id.matches_peer(disc_id) {
-                resolved_id = *disc_id;
-                for &s in disc_socks {
-                    if !addrs.contains(&s) {
-                        addrs.push(s);
-                    }
-                }
-            }
-        }
-    }
-    (resolved_id, addrs)
-}
-
-fn run_peer_session_loop(
-    kd: KnownDevice,
-    identity: VitaIdentity,
-    our_hello: BepHello,
-    storage: FsSyncStorage,
-    discovered: SharedDiscoveredAddrs,
-    control: Arc<SyncControl>,
-    tx: Sender<WorkerMsg>,
-) {
-    let mut logged_awaiting = false;
-    let mut logged_no_addr = false;
-    let mut report_connecting = true;
-    let mut last_error = String::new();
-    while !control.is_stop_requested() {
-        let (target_id, addrs) = candidate_addrs_for_peer(&kd, &discovered);
-        if addrs.is_empty() {
-            if !logged_no_addr {
-                logged_no_addr = true;
-                let _ = tx.send(WorkerMsg::Log(format!(
-                    "No address for {} (configured: '{}'). Waiting for LAN discovery...",
-                    kd.name, kd.address
-                )));
-            }
-            if !sleep_interruptible(&control, NO_ADDRESS_POLL) {
-                break;
-            }
-            continue;
-        }
-
-        let mut connected_once = false;
-        let mut awaiting_pairing = false;
-
-        for tcp_addr in addrs {
-            if control.is_stop_requested() {
-                return;
-            }
-            if report_connecting {
-                report_connecting = false;
-                let _ = tx.send(WorkerMsg::Progress {
-                    pct: None,
-                    status: UiText::ConnectingTo {
-                        name: kd.name.clone(),
-                        addr: tcp_addr.to_string(),
-                    },
-                    file: UiText::raw("-"),
-                });
-            }
-            let tx_ev = tx.clone();
-            match connect_and_sync_with_control(
-                &identity,
-                tcp_addr,
-                Some(target_id),
-                &our_hello,
-                &storage,
-                CONNECT_TIMEOUT,
-                Some(Arc::clone(&control)),
-                move |event| {
-                    let _ = tx_ev.send(WorkerMsg::SyncEvent(event));
-                },
-            ) {
-                Ok(hs) => match hs.session_status {
-                    SyncSessionStatus::Active { .. } => {
-                        connected_once = true;
-                        logged_awaiting = false;
-                        last_error.clear();
-                        break;
-                    }
-                    SyncSessionStatus::AwaitingPairing => {
-                        awaiting_pairing = true;
-                        if !logged_awaiting {
-                            logged_awaiting = true;
-                            let _ = tx.send(WorkerMsg::Log(format!(
-                                "Peer {} ({}) awaiting device acceptance in Syncthing GUI.",
-                                kd.name, tcp_addr
-                            )));
-                        }
-                    }
-                    SyncSessionStatus::ClosedByPeer(reason) => {
-                        awaiting_pairing = true;
-                        if !logged_awaiting {
-                            logged_awaiting = true;
-                            let _ = tx.send(WorkerMsg::Log(format!(
-                                "Session with {} ({}) closed by peer: {}",
-                                kd.name, tcp_addr, reason
-                            )));
-                        }
-                    }
-                },
-                Err(e) => {
-                    // Log each distinct failure once, so a retry loop does not flood the log
-                    // but a new cause is never hidden.
-                    let msg = format!(
-                        "Connection attempt to {} ({}) failed: {}",
-                        kd.name, tcp_addr, e
-                    );
-                    if msg != last_error {
-                        let _ = tx.send(WorkerMsg::Log(msg.clone()));
-                        last_error = msg;
-                    }
-                }
-            }
-        }
-
-        if control.is_stop_requested() {
-            break;
-        }
-
-        let retry_delay = if connected_once {
-            RETRY_AFTER_SESSION
-        } else if awaiting_pairing {
-            RETRY_AWAITING_PAIRING
-        } else {
-            RETRY_AFTER_ERROR
-        };
-        if !sleep_interruptible(&control, retry_delay) {
-            break;
-        }
-    }
 }
 
 /// Spawns UDP 21027 discovery + concurrent persistent `1+2` TLS 1.3 / BEP sessions for all
@@ -364,6 +206,7 @@ pub fn spawn_sync_worker(
         }
 
         let discovered_addrs: SharedDiscoveredAddrs = Arc::new(Mutex::new(Vec::new()));
+        let global_endpoints: SharedGlobalEndpoints = Arc::new(Mutex::new(Vec::new()));
         let mut peer_handles = Vec::new();
 
         let peer_list: Vec<String> = approved_devices
@@ -396,6 +239,7 @@ pub fn spawn_sync_worker(
             let peer_hello_clone = our_hello.clone();
             let peer_storage_clone = storage.clone();
             let peer_disc_clone = Arc::clone(&discovered_addrs);
+            let peer_glob_clone = Arc::clone(&global_endpoints);
             let peer_ctrl_clone = Arc::clone(&worker_control);
             let peer_tx_clone = tx.clone();
 
@@ -410,6 +254,7 @@ pub fn spawn_sync_worker(
                     peer_hello_clone,
                     peer_storage_clone,
                     peer_disc_clone,
+                    peer_glob_clone,
                     peer_ctrl_clone,
                     peer_tx_clone,
                 );
@@ -424,11 +269,13 @@ pub fn spawn_sync_worker(
             }
         }
 
-        // Continuously run UDP 21027 local discovery in the coordinator thread so:
-        // 1. All LAN peers (e.g. both Linux and MacOS) receive the Vita's Announce packet.
+        // Continuously run UDP 21027 local discovery + periodic Global Discovery v2 in the coordinator thread so:
+        // 1. All LAN peers receive the Vita's Announce packet.
         // 2. Approved peers with `dynamic` or Short-ID addresses have their IP:port resolved.
-        // 3. New LAN peers appear in the `Shares -> Devices` modal even while connected to another peer.
+        // 3. Peers outside the LAN have their WAN direct & relay endpoints resolved via Global Discovery v2.
         let mut first_pass = true;
+        let mut last_global_lookup: Option<Instant> = None;
+        let mut global_errors = Vec::new();
         while !worker_control.is_stop_requested() {
             if let Ok(mut res) =
                 run_discovery_cycle(&announce, DISCOVERY_BROADCAST_ADDR, DISCOVERY_LISTEN)
@@ -469,6 +316,20 @@ pub fn spawn_sync_worker(
                 }
             }
             first_pass = false;
+
+            if last_global_lookup
+                .is_none_or(|t| t.elapsed() >= GLOBAL_DISCOVERY_INTERVAL)
+                && !worker_control.is_stop_requested()
+            {
+                refresh_global_endpoints(
+                    &approved_devices,
+                    &global_endpoints,
+                    &worker_control,
+                    &tx,
+                    &mut global_errors,
+                );
+                last_global_lookup = Some(Instant::now());
+            }
 
             if !wait_for_next_discovery(&worker_control, DISCOVERY_INTERVAL) {
                 break;

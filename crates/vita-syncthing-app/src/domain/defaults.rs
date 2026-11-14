@@ -43,6 +43,10 @@ pub const DISCOVERY_SCAN_LISTEN: Duration = Duration::from_secs(2);
 /// before the LAN is scanned (3 s; cancelled when the dialog closes). A share without a linked
 /// device scans as soon as the dialog opens.
 pub const DEVICES_DIALOG_SCAN_DELAY: u32 = 3 * VBLANK_HZ;
+/// Interval between Global Discovery v2 lookups for WAN / relay endpoints.
+pub const GLOBAL_DISCOVERY_INTERVAL: Duration = Duration::from_secs(60);
+/// Timeout for HTTPS Global Discovery v2 lookups and Relay Protocol v1 handshakes.
+pub const GLOBAL_DISCOVERY_TIMEOUT: Duration = Duration::from_secs(6);
 
 // --- Power ---------------------------------------------------------------------------------
 

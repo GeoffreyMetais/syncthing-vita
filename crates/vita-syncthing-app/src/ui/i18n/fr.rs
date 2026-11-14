@@ -46,6 +46,7 @@ pub static STRINGS_FR: Strings = Strings {
 
     // Status Badges & Chips
     status_ready: "Prêt",
+    status_offline: "Hors ligne",
     status_syncing: "Synchronisation",
     status_scanning: "Analyse...",
     status_active: "Actif",
@@ -229,6 +230,7 @@ pub static MESSAGES_FR: Messages = Messages {
     starting_sync: "Démarrage de la synchronisation...",
     scanning_lan: "Recherche de pairs Syncthing sur le LAN (UDP 21027)...",
     connecting_to: "Connexion TLS 1.3 à {name} ({addr})...",
+    waiting_for_lan: "Pair inaccessible (en attente du LAN)",
     exchanging_index: "Échange du ClusterConfig et de l'index BEP...",
     file_up_to_date: "À jour : {file}",
     downloading: "Téléchargement de {file} ({pct} %)",
