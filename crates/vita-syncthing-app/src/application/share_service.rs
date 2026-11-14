@@ -472,17 +472,7 @@ impl ShareService {
             .unwrap_or_else(|| "ux0:user/00/savedata".to_owned());
 
         let mut items = if state.picker_mode == PickerMode::CreateNewShare {
-            let mut items = Self::unshared_template_items(state);
-            items.push(PickerItem {
-                label: UiText::PickerShareThisFolder {
-                    path: state.picker_current_dir.clone(),
-                },
-                path: state.picker_current_dir.clone(),
-                is_preset: true,
-                template: None,
-                is_shared: false,
-            });
-            items
+            Self::unshared_template_items(state)
         } else {
             vec![
                 PickerItem {

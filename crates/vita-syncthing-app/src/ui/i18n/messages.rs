@@ -114,8 +114,6 @@ pub struct Messages {
     /// `{label}`, `{path}`.
     pub picker_template: &'static str,
     /// `{path}`.
-    pub picker_share_this_folder: &'static str,
-    /// `{path}`.
     pub picker_keep_current: &'static str,
     /// `{path}`.
     pub picker_save_data: &'static str,
@@ -267,9 +265,6 @@ impl Strings {
             UiText::SharedWith { devices } => fill(m.shared_with, &[("devices", devices)]),
             UiText::PickerTemplate { label, path } => {
                 fill(m.picker_template, &[("label", label), ("path", path)])
-            }
-            UiText::PickerShareThisFolder { path } => {
-                fill(m.picker_share_this_folder, &[("path", path)])
             }
             UiText::PickerKeepCurrent { path } => fill(m.picker_keep_current, &[("path", path)]),
             UiText::PickerSaveData { path } => fill(m.picker_save_data, &[("path", path)]),

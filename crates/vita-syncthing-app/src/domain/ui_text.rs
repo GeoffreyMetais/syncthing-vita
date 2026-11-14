@@ -156,9 +156,6 @@ pub enum UiText {
         label: String,
         path: String,
     },
-    PickerShareThisFolder {
-        path: String,
-    },
     PickerKeepCurrent {
         path: String,
     },

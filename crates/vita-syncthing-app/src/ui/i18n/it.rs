@@ -274,7 +274,6 @@ pub static MESSAGES_IT: Messages = Messages {
     no_devices_linked: "Nessun dispositivo collegato (Croce per aggiungerne uno)",
     shared_with: "Condivisa con: {devices}",
     picker_template: "{label} ({path})",
-    picker_share_this_folder: "Condividi questa cartella ({path})",
     picker_keep_current: "Mantieni la cartella attuale ({path})",
     picker_save_data: "Salvataggi ({path})",
     picker_pictures: "Immagini PS Vita ({path})",

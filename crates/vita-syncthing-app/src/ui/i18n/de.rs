@@ -271,7 +271,6 @@ pub static MESSAGES_DE: Messages = Messages {
     no_devices_linked: "Keine Geräte verknüpft (Kreuz zum Hinzufügen)",
     shared_with: "Geteilt mit: {devices}",
     picker_template: "{label} ({path})",
-    picker_share_this_folder: "Diesen Ordner freigeben ({path})",
     picker_keep_current: "Aktuellen Ordner behalten ({path})",
     picker_save_data: "Spielstände ({path})",
     picker_pictures: "PS Vita-Bilder ({path})",

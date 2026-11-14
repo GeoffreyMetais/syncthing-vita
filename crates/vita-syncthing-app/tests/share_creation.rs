@@ -74,7 +74,7 @@ fn test_reopening_existing_share_never_discards_it() {
 #[test]
 fn test_selecting_a_folder_in_files_tab_starts_share_creation() {
     use vita_syncthing_app::domain::{ActiveTab, PickerMode};
-    use vita_syncthing_app::infrastructure::{BTN_DOWN, BTN_R, BTN_RIGHT};
+    use vita_syncthing_app::infrastructure::{BTN_R, BTN_RIGHT};
 
     let dir = temp_test_dir("files-tab-create");
     std::fs::create_dir_all(format!("{}/saves", dir)).unwrap();
@@ -85,13 +85,12 @@ fn test_selecting_a_folder_in_files_tab_starts_share_creation() {
     press(&mut state, &repo, BTN_R);
     assert_eq!(state.active_tab, ActiveTab::FolderPicker);
     assert_eq!(state.picker_mode, PickerMode::CreateNewShare);
-    assert_eq!(state.picker_items[1].path, format!("{}/saves", dir));
+    assert_eq!(state.picker_items[0].path, format!("{}/saves", dir));
 
     // Right enters page content from sidebar
     press(&mut state, &repo, BTN_RIGHT);
 
     // Cross on the "saves/" folder opens device linking for a new pending share
-    press(&mut state, &repo, BTN_DOWN);
     press(&mut state, &repo, BTN_CROSS);
     assert_eq!(state.active_tab, ActiveTab::Dashboard);
     assert_eq!(state.shares.len(), 1);
@@ -109,8 +108,6 @@ fn test_selecting_a_folder_in_files_tab_starts_share_creation() {
 #[test]
 fn test_already_shared_folders_are_not_selectable_in_files_tab() {
     use vita_syncthing_app::domain::{ActiveTab, PickerMode};
-    use vita_syncthing_app::infrastructure::BTN_DOWN;
-
     let dir = temp_test_dir("files-tab-shared");
     let repo = ConfigRepository::new(&dir);
     let mut state = AppState::new(Vec::new(), Vec::new(), &dir);
@@ -122,12 +119,10 @@ fn test_already_shared_folders_are_not_selectable_in_files_tab() {
     state.reset_nav_for_tab();
     state.nav.focus = vita_syncthing_app::domain::NavFocus::Content;
     ShareService::refresh_picker_items(&mut state, &repo);
-    assert_eq!(state.picker_items[1].path, saves);
-    assert!(state.picker_items[1].is_shared);
-    assert!(!state.picker_items[0].is_shared);
+    assert_eq!(state.picker_items[0].path, saves);
+    assert!(state.picker_items[0].is_shared);
 
     // Neither selecting nor opening the shared folder does anything
-    press(&mut state, &repo, BTN_DOWN);
     press(&mut state, &repo, BTN_CROSS);
     press(&mut state, &repo, BTN_TRIANGLE);
     assert_eq!(state.modal, ModalDialog::None);
@@ -166,9 +161,10 @@ fn test_default_share_presets_are_listed_first_at_files_root() {
         assert_eq!(item.path, *path);
         assert!(item.is_preset && item.template.is_some() && !item.is_shared);
     }
-    // Then "Share this folder" for the browsed root.
-    assert_eq!(state.picker_items[presets.len()].path, "ux0:");
-    assert!(state.picker_items[presets.len()].template.is_none());
+    // Then the root's subfolders, without a "Share this folder" row.
+    assert!(state.picker_items[presets.len()..]
+        .iter()
+        .all(|i| i.template.is_none() && !i.is_preset));
 
     // Presets are not repeated in subfolders.
     state.picker_current_dir = dir.clone();

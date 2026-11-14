@@ -105,7 +105,6 @@ fn all_messages() -> Vec<UiText> {
             label: s("RetroArch Savefiles"),
             path: s("ux0:"),
         },
-        UiText::PickerShareThisFolder { path: s("ux0:") },
         UiText::PickerKeepCurrent { path: s("ux0:") },
         UiText::PickerSaveData { path: s("ux0:") },
         UiText::PickerPictures { path: s("ux0:") },
@@ -165,8 +164,8 @@ fn test_messages_are_translated_and_parameters_filled() {
         "Langue : Italiano"
     );
     assert_eq!(
-        fr.text(&UiText::PickerShareThisFolder { path: s("ux0:") }),
-        "Partager ce dossier (ux0:)"
+        fr.text(&UiText::PickerKeepCurrent { path: s("ux0:") }),
+        "Garder le dossier actuel (ux0:)"
     );
     // Data is shown as-is in every language
     assert_eq!(fr.text(&UiText::raw("picture/")), "picture/");
