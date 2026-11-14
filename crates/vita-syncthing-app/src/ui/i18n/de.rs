@@ -121,12 +121,23 @@ pub static STRINGS_DE: Strings = Strings {
     settings_saver_auto_hint: "OLED-Schoner aktiviert sich nach 10s Sync (45s im Leerlauf).",
     settings_sec_devices: "GERÄTE & KOPPLUNG",
     settings_desc_devices: "Gerät hinzufügen oder PS-Vita-ID anzeigen",
-    settings_sec_log: "BEP/1.0 & TLS 1.3 PROTOKOLL",
+    settings_sec_log: "PROTOKOLL",
     settings_sec_declined: "ABGELEHNTE ORDNER",
     settings_no_declined: "Keine · von Peers angebotene Ordner werden stets abgefragt",
     settings_sec_language: "SPRACHE",
     settings_language_system: "Systemsprache",
     action_change_language: "Sprache ändern",
+
+    // Log viewer
+    logs_title: "Protokoll",
+    logs_scope_session: "Diese Sitzung",
+    logs_scope_history: "Gesamter Verlauf · syncthing.log",
+    logs_empty: "Noch keine Einträge",
+    action_show_all: "Alle anzeigen",
+    action_show_session: "Diese Sitzung",
+    hint_scroll: "Scrollen",
+    hint_older: "Älter",
+    hint_newer: "Neuer",
 
     // Screensaver
     saver_wake_hint: "Tippe auf den Bildschirm oder drücke eine Taste",

@@ -3,8 +3,10 @@
 
 use syncthing_core::DeviceId;
 
+use crate::domain::defaults::LOG_BUFFER_LINES;
 use crate::domain::initial_sync::InitialSyncPeers;
 use crate::domain::interaction::{FocusSlot, HitMap};
+use crate::domain::log_view::{sanitize_log_line, LogView};
 use crate::domain::models::{
     ActiveTab, CameraPreview, FolderOffer, IgnoredFolder, KnownDevice, Language,
     LanguagePreference, ModalDialog, PickerItem, PickerMode, ShareConfigEntry, SyncActivity,
@@ -90,7 +92,10 @@ pub struct AppState {
     pub picker_items: Vec<PickerItem>,
     pub selected_picker_idx: usize,
     pub picker_top_idx: usize,
+    /// Protocol log lines of this session, oldest first (last `LOG_BUFFER_LINES`).
     pub logs: Vec<String>,
+    /// Full-screen log viewer, open over `Settings` (`None`: closed).
+    pub log_view: Option<LogView>,
     pub toast_msg: Option<(UiText, u32)>,
     /// Current text buffer in the `AddDeviceById` modal (updated by PS Vita `SceIme` or keypad).
     pub device_id_input: String,
@@ -158,6 +163,7 @@ impl AppState {
             selected_picker_idx: 0,
             picker_top_idx: 0,
             logs: Vec::with_capacity(32),
+            log_view: None,
             toast_msg: None,
             device_id_input: String::new(),
             ime_active: false,
@@ -446,14 +452,15 @@ impl AppState {
         }
     }
 
-    /// Appends a sanitized line to the in-memory protocol log ring buffer (retaining last 14 entries).
+    /// Appends a sanitized line to the in-memory protocol log (retaining the last
+    /// `LOG_BUFFER_LINES` entries) and to the open log viewer.
     pub fn push_log(&mut self, line: &str) {
-        let clean: String = line
-            .chars()
-            .filter(|&c| c >= ' ' && c != '\u{7f}')
-            .collect();
-        self.logs.push(clean.trim().to_owned());
-        if self.logs.len() > 14 {
+        let clean = sanitize_log_line(line);
+        if let Some(view) = self.log_view.as_mut() {
+            view.on_line_logged(&clean);
+        }
+        self.logs.push(clean);
+        if self.logs.len() > LOG_BUFFER_LINES {
             self.logs.remove(0);
         }
     }

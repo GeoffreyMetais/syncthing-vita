@@ -124,12 +124,23 @@ pub static STRINGS_FR: Strings = Strings {
         "L'économiseur d'écran OLED s'active après 10s en sync (45s au repos).",
     settings_sec_devices: "APPAREILS & APPAIRAGE",
     settings_desc_devices: "Associer un appareil ou afficher l'ID de la PS Vita",
-    settings_sec_log: "JOURNAL PROTOCOLE BEP/1.0 & TLS 1.3",
+    settings_sec_log: "JOURNAL",
     settings_sec_declined: "DOSSIERS REFUSÉS",
     settings_no_declined: "Aucun · les dossiers proposés par les pairs sont toujours demandés",
     settings_sec_language: "LANGUE",
     settings_language_system: "Langue du système",
     action_change_language: "Changer de langue",
+
+    // Log viewer
+    logs_title: "Journal",
+    logs_scope_session: "Cette session",
+    logs_scope_history: "Historique complet · syncthing.log",
+    logs_empty: "Aucune entrée pour l'instant",
+    action_show_all: "Tout afficher",
+    action_show_session: "Cette session",
+    hint_scroll: "Défiler",
+    hint_older: "Plus anciens",
+    hint_newer: "Plus récents",
 
     // Screensaver
     saver_wake_hint: "Touchez l'écran ou appuyez sur une touche pour réactiver",

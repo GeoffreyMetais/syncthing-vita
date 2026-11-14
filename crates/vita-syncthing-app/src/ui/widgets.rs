@@ -277,15 +277,22 @@ pub fn draw_chrome(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut Hit
             SyncActivity::Uploading => s.sidebar_uploading,
             SyncActivity::Ready | SyncActivity::Idle => s.sidebar_last_sync,
         };
-        // Uploads have no known total: an indeterminate bar instead of a stale percentage.
-        let progress = if activity == SyncActivity::Uploading {
-            None
+        // The progress bar is only drawn while a transfer runs: `Some(None)` is an indeterminate
+        // bar (uploads have no known total), `None` no bar at all.
+        let bar = match activity {
+            SyncActivity::Downloading => Some(state.progress_pct),
+            SyncActivity::Uploading => Some(None),
+            SyncActivity::Ready | SyncActivity::Idle => None,
+        };
+        // Without a bar, the two text lines are centred vertically in the card.
+        let text_y = if bar.is_some() {
+            card_y + 20
         } else {
-            state.progress_pct
+            card_y + 28
         };
         gfx.text(
             24,
-            card_y + 20,
+            text_y,
             13,
             FontWeight::Regular,
             th.dim,
@@ -294,7 +301,7 @@ pub fn draw_chrome(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut Hit
         );
         gfx.text_fit(
             24,
-            card_y + 42,
+            text_y + 22,
             SIDEBAR_W - 48,
             14,
             FontWeight::Medium,
@@ -302,13 +309,13 @@ pub fn draw_chrome(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut Hit
             Align::Left,
             &s.text(&state.peer_label),
         );
-        let pct_str = match progress {
-            Some(p) => {
+        let pct_str = match bar {
+            Some(Some(p)) => {
                 let p = p.min(100);
                 draw_progress(gfx, 24, card_y + 58, SIDEBAR_W - 88, 8, p, th.accent);
-                format!("{}%", p)
+                Some(format!("{}%", p))
             }
-            None => {
+            Some(None) => {
                 draw_indeterminate_progress(
                     gfx,
                     24,
@@ -318,18 +325,21 @@ pub fn draw_chrome(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut Hit
                     state.progress_anim_tick,
                     th.accent,
                 );
-                "...".to_owned()
+                Some("...".to_owned())
             }
+            None => None,
         };
-        gfx.text(
-            SIDEBAR_W - 24,
-            card_y + 62,
-            12,
-            FontWeight::Medium,
-            th.dim,
-            Align::Right,
-            &pct_str,
-        );
+        if let Some(pct_str) = pct_str {
+            gfx.text(
+                SIDEBAR_W - 24,
+                card_y + 62,
+                12,
+                FontWeight::Medium,
+                th.dim,
+                Align::Right,
+                &pct_str,
+            );
+        }
     }
 
     // Sidebar bottom Wi-Fi & version status

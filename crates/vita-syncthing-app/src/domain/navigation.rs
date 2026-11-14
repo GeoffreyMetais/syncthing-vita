@@ -70,8 +70,10 @@ pub const SETTINGS_ROW_DEVICES: usize = 1;
 pub const SETTINGS_ROW_LANGUAGE: usize = 2;
 /// Settings card with the `Clear Declined` button.
 pub const SETTINGS_ROW_DECLINED: usize = 3;
+/// Settings card with the protocol log and its `Open` button (full-screen log viewer).
+pub const SETTINGS_ROW_LOG: usize = 4;
 /// Number of focusable cards on the Settings page.
-pub const SETTINGS_ROWS: usize = 4;
+pub const SETTINGS_ROWS: usize = 5;
 
 /// Focusable buttons of the `Overview` device card (`[QR / ID, New Share]`), its header row.
 pub const DASHBOARD_HEADER_ACTIONS: usize = 2;

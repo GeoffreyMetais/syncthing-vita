@@ -11,8 +11,9 @@ use vita_syncthing_app::domain::{
     TAB_ORDER,
 };
 use vita_syncthing_app::infrastructure::{ConfigRepository, BTN_SQUARE, BTN_START, BTN_TRIANGLE};
-use vita_syncthing_app::ui::gfx::{GFX_H, GFX_W};
-use vita_syncthing_app::ui::theme::HINT_Y;
+use vita_syncthing_app::ui::gfx::{Gfx, GFX_H, GFX_W};
+use vita_syncthing_app::ui::renderer::draw_frame;
+use vita_syncthing_app::ui::theme::{UiTheme, HINT_Y, SIDEBAR_W};
 
 const PEER: DeviceId = DeviceId([0x42; 32]);
 const LANGUAGES: [Language; 5] = [
@@ -105,6 +106,34 @@ fn test_sidebar_tabs_and_transfer_card() {
         tap_action(&mut state, &repo, UiAction::StartSync),
         UserCommand::None
     );
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// Draws the frame and tells whether anything is drawn where the transfer card's bar goes.
+fn transfer_bar_drawn(state: &mut AppState) -> bool {
+    let card = rect_of(state, UiAction::StartSync);
+    let mut gfx = Gfx::new();
+    draw_frame(&mut gfx, state);
+    let card_bg = UiTheme::for_mode(state.theme_mode).card;
+    (card.y + 60..card.y + 66)
+        .any(|y| (24..SIDEBAR_W - 64).any(|x| gfx.pixels[(y * GFX_W + x) as usize] != card_bg))
+}
+
+#[test]
+fn test_transfer_card_progress_bar_only_while_transferring() {
+    let (dir, _repo, mut state) = setup("screens-transfer-bar");
+    // Idle (no connected session) and Ready (connected, up to date): no bar.
+    assert!(!transfer_bar_drawn(&mut state));
+    state.session_connected = true;
+    assert!(!transfer_bar_drawn(&mut state));
+    // Uploading: indeterminate bar.
+    state.uploading = true;
+    assert!(transfer_bar_drawn(&mut state));
+    // Downloading: determinate bar, even at 0 %.
+    state.uploading = false;
+    state.sync_in_progress = true;
+    state.progress_pct = Some(0);
+    assert!(transfer_bar_drawn(&mut state));
     let _ = std::fs::remove_dir_all(&dir);
 }
 

@@ -7,7 +7,8 @@
 use crate::application::dpad_navigation::DpadNavigation;
 use crate::application::modal_input::{open_add_device_modal, ModalInput};
 use crate::application::{
-    DevicesScan, FilesController, SettingsController, ShareService, SharesController,
+    DevicesScan, FilesController, LogsController, SettingsController, ShareService,
+    SharesController,
 };
 use crate::domain::{
     ActiveTab, AppState, ModalDialog, PickerMode, ShortcutKey, UiAction, TAB_ORDER,
@@ -87,28 +88,34 @@ impl InputController {
         if (input.pressed & BTN_START) != 0 {
             return Self::execute(state, repo, UiAction::ConfirmQuit);
         }
-        let tab_pos = TAB_ORDER
-            .iter()
-            .position(|&t| t == state.active_tab)
-            .unwrap_or(0);
-        if (input.pressed & BTN_L) != 0 {
-            let tab = TAB_ORDER[(tab_pos + TAB_ORDER.len() - 1) % TAB_ORDER.len()];
-            Self::switch_tab(state, repo, tab);
-        }
-        if (input.pressed & BTN_R) != 0 {
-            Self::switch_tab(state, repo, TAB_ORDER[(tab_pos + 1) % TAB_ORDER.len()]);
-        }
-
-        // 4. D-pad focus navigation (sidebar <-> page) and `Cross` on the focused element
         let mut pressed = input.pressed;
-        if let Some(action) = DpadNavigation::handle(state, &mut pressed) {
-            return Self::execute(state, repo, action);
+        if state.log_view.is_some() {
+            // The log viewer covers the whole screen: D-pad and shoulder buttons scroll it.
+            LogsController::scroll(state, &mut pressed);
+        } else {
+            let tab_pos = TAB_ORDER
+                .iter()
+                .position(|&t| t == state.active_tab)
+                .unwrap_or(0);
+            if (input.pressed & BTN_L) != 0 {
+                let tab = TAB_ORDER[(tab_pos + TAB_ORDER.len() - 1) % TAB_ORDER.len()];
+                Self::switch_tab(state, repo, tab);
+            }
+            if (input.pressed & BTN_R) != 0 {
+                Self::switch_tab(state, repo, TAB_ORDER[(tab_pos + 1) % TAB_ORDER.len()]);
+            }
+
+            // 4. D-pad focus navigation (sidebar <-> page) and `Cross` on the focused element
+            if let Some(action) = DpadNavigation::handle(state, &mut pressed) {
+                return Self::execute(state, repo, action);
+            }
         }
 
         // 5. Face buttons trigger the element (button or hint) that displays them. On the
         // `Overview`, the buttons of a share row answer only while that row has the focus
         // (`Triangle` is `Folder` there, `New Share` elsewhere).
         let selected_row = match state.active_tab {
+            _ if state.log_view.is_some() => None,
             ActiveTab::Dashboard => state
                 .is_share_row_focused()
                 .then_some(state.selected_share_idx),
@@ -148,6 +155,11 @@ impl InputController {
             UiAction::ToggleTheme | UiAction::CycleLanguage | UiAction::ClearDeclinedFolders => {
                 SettingsController::apply(state, repo, action)
             }
+            UiAction::OpenLogs
+            | UiAction::CloseLogs
+            | UiAction::ToggleLogHistory
+            | UiAction::ScrollLogsOlder
+            | UiAction::ScrollLogsNewer => LogsController::apply(state, repo, action),
             // Elements of modal dialogs, resolved by `ModalInput`.
             UiAction::Press(_)
             | UiAction::ModalRow(_)

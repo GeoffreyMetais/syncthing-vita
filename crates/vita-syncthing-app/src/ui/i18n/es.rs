@@ -123,12 +123,23 @@ pub static STRINGS_ES: Strings = Strings {
         "El salvapantallas OLED se activa tras 10s al sincronizar (45s en reposo).",
     settings_sec_devices: "DISPOSITIVOS Y VINCULACIÓN",
     settings_desc_devices: "Añadir un dispositivo o ver el ID de esta PS Vita",
-    settings_sec_log: "REGISTRO DE PROTOCOLO BEP/1.0 Y TLS 1.3",
+    settings_sec_log: "REGISTRO",
     settings_sec_declined: "CARPETAS RECHAZADAS",
     settings_no_declined: "Ninguna · las carpetas ofrecidas por pares siempre se preguntan",
     settings_sec_language: "IDIOMA",
     settings_language_system: "Idioma del sistema",
     action_change_language: "Cambiar idioma",
+
+    // Log viewer
+    logs_title: "Registro",
+    logs_scope_session: "Esta sesión",
+    logs_scope_history: "Historial completo · syncthing.log",
+    logs_empty: "Aún no hay entradas",
+    action_show_all: "Mostrar todo",
+    action_show_session: "Esta sesión",
+    hint_scroll: "Desplazar",
+    hint_older: "Anteriores",
+    hint_newer: "Recientes",
 
     // Screensaver
     saver_wake_hint: "Toca la pantalla o presiona cualquier botón para reactivar",

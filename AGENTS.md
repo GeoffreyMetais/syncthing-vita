@@ -8,6 +8,7 @@ This document provides essential architectural context, build workflows, and **r
 
 - **English Only**: All source code comments, docstrings, UI labels, log messages, commit messages, and documentation **must be written in English**.
 - **Zero Warnings**: Both host tests (`cargo test --workspace`) and the PS Vita release build (`just vpk`) must compile with **zero compiler warnings**. Use `#[cfg(target_os = "vita")]` and `#[cfg(not(target_os = "vita"))]` cleanly so host and Vita targets both stay warning-free.
+- **Visual Changes Are Checked in the Emulator**: any change that alters what is drawn (layout, labels, translations, colours, icons, new screen or modal) must be (1) run in Vita3K, (2) captured with screenshots of every affected screen / state, and (3) shown with those screenshots in the PR description. Host tests passing is not enough. See §6 *Screenshots for Visual Changes*.
 - **No Unapproved C/ASM Crypto Dependencies**: Never add `ring`, `aws-lc-rs`, or `openssl` to the dependency tree. They do not compile for `armv7-sony-vita-newlibeabihf`. Always use pure-Rust cryptography (`rustls` with `default-features = false`, `rustls-rustcrypto`, `p256`, `sha2`, `rcgen`).
 
 ---
@@ -19,6 +20,7 @@ syncthing-vita
 ├── Cargo.toml                        # Workspace manifest (Edition 2021, LTO + opt-level = "z")
 ├── Justfile                          # Task runner (test-host, check-vita, build-vita, vpk)
 ├── scripts/build_vpk.sh              # Full VPK build pipeline (vita-elf-create, vita-make-fself, vita-mksfoex, vita-pack-vpk); APP_VER from the Cargo version
+├── docs/screenshots/<branch>/        # Vita3K screenshots of visual changes, embedded in PR descriptions (see §6)
 ├── scripts/gen_livearea.py           # Generates the LiveArea images (assets/sce_sys/: icon, background, gate — PS Vita + Syncthing emblem)
 └── crates/
     ├── syncthing-core/               # Platform-independent Syncthing BEP/1.0 & Discovery engine
@@ -50,12 +52,13 @@ syncthing-vita
             │   ├── app_state.rs      # AppState (pure state & view-model queries, zero I/O or rendering dependencies)
             │   ├── interaction.rs    # HitMap / Hotspot / UiAction / FocusSlot: interactive elements declared by the frame on screen
             │   ├── defaults.rs       # Every tunable value of the app: sync / discovery / power / display timings, limits, share presets
+            │   ├── log_view.rs       # LogView (full-screen protocol log viewer: session lines / `Show All` history, scroll window)
             │   ├── initial_sync.rs   # InitialSyncPeers (peers in their initial sync phase; full CPU speed meanwhile)
             │   └── ui_text.rs        # UiText: translatable messages (status line, labels, toasts) chosen by inner layers
             ├── application/          # Layer 2: Use Cases, Input Controller & Sync Event Coordinator
             │   ├── mod.rs
             │   ├── share_service.rs  # ShareService (create_share, upsert_device, toggle_device_for_share, refresh_picker_items)
-            │   ├── dashboard_controller.rs / shares_controller.rs / files_controller.rs / settings_controller.rs # One controller per page: D-pad focus movement, execution of the page's UiActions
+            │   ├── dashboard_controller.rs / shares_controller.rs / files_controller.rs / settings_controller.rs / logs.rs # One controller per page: D-pad focus movement, execution of the page's UiActions (`LogsController`: log viewer scrolling)
             │   ├── share_creation.rs # ShareCreation (new share kept only once a device is linked)
             │   ├── share_mode.rs     # ShareModeService (share read & write <-> read only, revert of local changes)
             │   ├── folder_offers.rs  # FolderOfferService (folders offered by peers need consent: accept / decline / later)
@@ -101,6 +104,7 @@ syncthing-vita
                 │   ├── shares.rs
                 │   ├── folder_picker.rs
                 │   ├── settings.rs
+                │   ├── logs.rs       # Full-screen protocol log viewer (opened from the Settings log card)
                 │   └── screensaver.rs
                 ├── modals/           # Modal dialog views & fallback keypad
                 │   ├── mod.rs
@@ -189,7 +193,7 @@ Dependencies strictly point **inward**. Inner layers never import or depend on o
    - **Key Modules**:
      - `i18n/`: Zero-allocation multi-language catalogs (`Strings`) supporting English (`en`), French (`fr`), Spanish (`es`), German (`de`), and Italian (`it`).
      - `strings.rs`: Centralized user-facing strings, action constants, button hints, and zero-allocation formatting helpers re-exporting `ui::i18n`.
-     - `screens/`: Independent full-screen views (`dashboard.rs` drawing the share list of `shares.rs`, `folder_picker.rs`, `settings.rs`, `screensaver.rs`).
+     - `screens/`: Independent full-screen views (`dashboard.rs` drawing the share list of `shares.rs`, `folder_picker.rs`, `settings.rs`, `logs.rs`, `screensaver.rs`).
      - `modals/`: Isolated modal dialogs (`create_share.rs`, `manage_devices.rs`, `add_device.rs`, `device_id.rs`, `confirm_quit.rs`, `confirm_delete_share.rs`, `fallback_keyboard.rs`).
      - `widgets.rs`: Reusable UI elements (cards, chips, checkboxes, buttons, chrome, toast).
      - `gfx.rs`: Software 2D rendering primitives, anti-aliased geometry, and TrueType rasterization.
@@ -388,7 +392,7 @@ cargo test --workspace
 - `folder_offers.rs`: offered folders need consent, accept / decline / later, a crafted folder label cannot inject a share, declined offers persisted, deleted shares are declined and do not come back, `Settings` · `Clear Declined` (D-pad and touch)
 - `share_service.rs`: share deletion, share creation, device linking, paused accepted folders, `ConfigRepository` roundtrip, manual LAN pairing
 - `input_controller.rs`: global routing — an active screensaver swallows input and wakes on a button press or touch only
-- `main_screens.rs`: sidebar tabs and transfer card, `Overview` device card / share list / hints, `Files` rows and `Open` chip, `Settings` hints; geometry of every page in all 5 languages (elements on screen, hints not overlapping)
+- `main_screens.rs`: sidebar tabs and transfer card (progress bar only while downloading / uploading), `Overview` device card / share list / hints, `Files` rows and `Open` chip, `Settings` hints; geometry of every page in all 5 languages (elements on screen, hints not overlapping)
 - `modal_touch.rs`: modal touch resolved from declared elements (template rows, device rows, pause / done buttons, `Scan QR` button in every language, `Triangle` LAN scan without devices, text box -> system keyboard, keypad keys, folder offer buttons, outside / inside touches); geometry of every modal in all 5 languages (on screen, hints and buttons not overlapping)
 - `dialogs.rs`: `START` -> `ConfirmQuit` -> `Cross` quits, `ConfirmQuit` touch targets, `ConfirmDeleteShare` (`Square` on the Overview, cancel / confirm)
 - `add_device.rs`: add-device-by-short-ID via system keyboard (placeholder upgraded on discovery), virtual keyboard hidden until requested
@@ -399,11 +403,13 @@ cargo test --workspace
 - `power_policy.rs`: standby blocking while syncing (charging / battery / transfer grace period), CPU clock level (full speed only during the initial sync phase and transfers), initial sync phase tracked per peer from `SyncEvent`s
 - `ui_text.rs`: every `UiText` message renders in all 5 languages with its placeholders filled, translated Device ID errors
 - `shares_screen.rs`: `Overview` share list input resolved from the drawn frame (touch targets in all 5 languages, card selection, face-button shortcuts, `Cross` on the focused element, stale element ignored, nothing declared behind the screensaver)
+- `screensaver.rs`: the OLED screensaver progress bar is drawn only while downloading / uploading
 - `frame_pacing.rs`: dynamic frame rate (input -> next VBlank, animations 30 FPS, background updates 10 FPS, static 1 FPS), toast expiry and screensaver speed independent of the frame rate
 - `worker_slot.rs`: a new worker starts only after the previous one ended, bounded wait on quit
 - `config_fields.rs`: interrupted `.cfg` replacement restored from its backup, `.cfg` field escaping roundtrip, legacy `%` text kept, hostile names / labels through `devices.cfg` / `shares.cfg` / `ignored_folders.cfg`, invalid linked-device entries dropped
 - `share_mode.rs`: read & write / read only toggle (`L` and touch in `ManageDevices`), `shares.cfg` persistence (legacy lines without a mode are read & write), mode / revert buttons geometry in all 5 languages, revert of local changes (`START` in `ManageDevices` + `ConfirmRevertShare`, pad and touch, read-only shares only), `LocalChangesReverted` toast
 - `devices_scan.rs`: `ManageDevices` LAN scan — immediate without a linked device, after the delay with one, cancelled on close (and re-armed on reopening), also while another device is connected
+- `log_viewer.rs`: log viewer opened from the `Settings` log card (touch, D-pad `Open`), closed with `Circle`, scrolling by line / page (D-pad, `L` / `R`, touch) within bounds, new lines followed at the bottom and a scrolled-back window kept, `Show All` loading `syncthing.log` and back, session buffer size, geometry in all 5 languages
 - `language_settings.rs`: language preference codec / cycle, `language.cfg` persistence (defaults to the system language), `Settings` language card (D-pad and touch)
 
 ### Cross-Check for PS Vita (`armv7-sony-vita-newlibeabihf`)
@@ -456,6 +462,26 @@ just ui-scenario /tmp/shares.txt
 ```
 PNGs land in `target/ui-shots/`; the Vita3K app data directory is backed up and restored around the run. It needs neither firmware nor a display (see above). `wait` frames count as activity (the automatic screensaver never starts during a script). `START` (or its hint on `Overview` and `Settings`) asks to quit.
 
+If `target/ui-shots/` only holds `vita3k.log` and it reports `qt.qpa.wayland: There are no outputs` (desktop session with its screen off or locked), run the scenario through XWayland instead:
+```bash
+CARGO_FEATURES=ui-script just vpk
+DISPLAY=:0 SDL_VIDEODRIVER=x11 QT_QPA_PLATFORM=xcb ./scripts/vita3k_scenario.sh /tmp/shares.txt 40
+```
+
+### Screenshots for Visual Changes (mandatory)
+Every change that alters what is drawn goes through these steps before it is reported done or proposed in a PR:
+1. **Run it in the emulator**: write a `ui-script` scenario reaching every affected screen / modal / state (focus rings, scrolled lists, both themes or several languages when the change depends on them) and run it with `just ui-scenario`. Host tests do not replace this.
+2. **Take screenshots**: one `shot` per affected state, named in order (`1_settings`, `2_log_viewer`, ...). Look at each PNG and check the change is visible and nothing is clipped or overlapping. Show them to the user.
+3. **Put them in the PR description**: commit the PNGs on the PR branch itself, in `docs/screenshots/<branch>/` (one folder per branch, `target/` is not committed):
+   ```bash
+   mkdir -p docs/screenshots/<branch> && cp target/ui-shots/*.png docs/screenshots/<branch>/
+   git add docs/screenshots/<branch> && git commit -m "Screenshots of <change>" && git push
+   git rev-parse HEAD   # full hash of the screenshots commit, used in the links
+   ```
+   then embed each one in a `## Screenshots` section of the PR description with a one-line caption, linking through **that commit hash, never the branch name** (a branch link breaks once the branch is merged and deleted):
+   `![Settings](https://github.com/GeoffreyMetais/syncthing-vita/blob/<commit sha>/docs/screenshots/<branch>/1_settings.png?raw=true)`.
+   When the PR is updated with another visual change, replace the outdated screenshots (same names) or add new ones, commit, and update the section with the new commit hash.
+
 ---
 
 ## 7. UI Layout & Controls Reference (`VitaSend` Design System)
@@ -467,7 +493,7 @@ The UI (`gfx.rs` + `ui/screens/*` + `ui/modals/*` + `ui/renderer.rs`) renders at
 - **Left Sidebar Tabs** (`L` / `R` shoulder buttons, D-pad from the sidebar, or touch tap):
   1. `Overview` (`ActiveTab::Dashboard`): compact device status card (the page header row: `QR / ID` modal (`Circle`) and `New Share` modal (`Triangle`) buttons), then the list of shared folders (4 visible, scrolling with the selection): `Devices` assignment modal (`Cross`), `Delete` with confirmation (`Square`) and `Folder` path picker (`Triangle`) on each card. A row's face buttons answer only while that row has the D-pad focus (`HitMap::shortcut_action` prefers the focused row, then page-level elements): `Triangle` is `Folder` on a share row and `New Share` anywhere else, and the hint bar shows which. A sync is started by tapping the sidebar transfer card. The protocol log is only on `Settings`.
   2. `Files` (`ActiveTab::FolderPicker`): Interactive `ux0:` directory browser. Selecting a folder (`Cross` or tap) starts creating a share of it (folders already shared are greyed out and cannot be selected or opened); `Triangle` (or tapping the `Open` chip) enters a subfolder, `Circle` goes up/back. The `Overview` share `Folder` action reuses this browser to change a share's target path.
-  3. `Settings` (`ActiveTab::Settings`): Dark / Pure-Black OLED theme switcher (`Cross`), `QR / ID` modal (`Circle`), `Language` card (D-pad `Down` + `Cross` or tap: System -> English -> Français -> Español -> Deutsch -> Italiano, saved in `language.cfg`), `Declined folders` card (D-pad `Down` + `Cross` or tap `Clear Declined` to forget declined folder offers so peers can offer them again), and BEP/1.0 protocol log viewer.
+  3. `Settings` (`ActiveTab::Settings`): Dark / Pure-Black OLED theme switcher (`Cross`), `QR / ID` modal (`Circle`), `Language` card (D-pad `Down` + `Cross` or tap: System -> English -> Français -> Español -> Deutsch -> Italiano, saved in `language.cfg`), `Declined folders` card (D-pad `Down` + `Cross` or tap `Clear Declined` to forget declined folder offers so peers can offer them again), and the protocol log card (latest lines). Tapping the log card, or `Cross` on its `Open` button, opens the **log viewer** (`AppState::log_view`, `ui/screens/logs.rs`): a full-screen page (no sidebar) listing this session's lines (`AppState::logs`, last `LOG_BUFFER_LINES`), newest at the bottom; D-pad `Up`/`Down` scroll one line, `L`/`R` (or `Left`/`Right`, or touching the upper / lower half of the list) one page, `Triangle · Show All` loads the whole `syncthing.log` history (last `LOG_HISTORY_MAX_LINES` lines) and toggles back, `Circle · Back` returns to `Settings`.
 - **Modal Dialogs** (`ModalDialog` in `domain/models.rs`, rendered by `ui/modals/*`):
   - `CreateShare`: Create a share from PS Vita folder presets (`ux0:user/00/savedata`, `ux0:picture`, `ux0:music`, RetroArch saves) or browse `ux0:`. The share is only kept once a device is linked in the `ManageDevices` modal that follows.
   - `ManageDevices`: Link/unlink discovered Syncthing peers to a share with circular checkboxes (`draw_row_tick`), add one by ID (`Square`) or by QR code (`R · Scan QR`); changes apply when the dialog closes (`Circle · Done`: `config_dirty` restarts the worker, which advertises the folder in its `ClusterConfig`); opening the dialog scans the LAN (`DevicesScan`): at once for a share with no linked device, after `DEVICES_DIALOG_SCAN_DELAY` (3 s, counted in VBlanks by `main.rs`, cancelled when the dialog closes) otherwise, also while another device is connected (`UserCommand::ScanLan`: `main.rs` asks the running worker for a discovery cycle now with `SyncControl::request_discovery`, or starts a sync when none runs); while no device is known, `Triangle` (hint `Scan LAN`) scans again; `SELECT` pauses / enables the share; `L` (header button showing the current mode) switches it between **Read & write** and **Read only** (Syncthing "Receive Only": the Vita receives its peers' changes but never sends its own). On a read-only share, `START · Revert` (header) opens `ConfirmRevertShare`. Read-only shares carry a lock badge on their `Overview` card.
@@ -478,5 +504,5 @@ The UI (`gfx.rs` + `ui/screens/*` + `ui/modals/*` + `ui/renderer.rs`) renders at
   - `ConfirmDeleteShare`: Triggered by `Square` on the `Overview` share list; removes the share from `shares.cfg` (files on `ux0:` are kept) and registers the folder as declined for its linked devices (`ignored_folders.cfg`), so peers do not offer it back until `Settings` · `Clear Declined`.
   - `FolderOffer`: Opens when a peer's `ClusterConfig` lists a folder that is not shared with it yet (including a deleted share). `Cross · Accept` creates a paused share and opens `Files` to choose its target, `Square · Decline` ignores it (`ignored_folders.cfg`, cleared from `Settings` · `Clear Declined`), `Circle · Later` postpones it until the app restarts.
   - `ConfirmQuit`: Triggered by `START` (or tapping `Quit`), warns if a sync is in progress before exiting to LiveArea.
-- **Sync activity** (`AppState::sync_activity`: `Downloading` / `Uploading` / `Ready` / `Idle`): the single source for the sidebar transfer card and the OLED screensaver status line, so they never disagree.
-- **OLED Screensaver**: Activates automatically after 10s of inactivity during active sync (or 45s when idle; there is no manual activation), rendering a pure `#000000` black background with a bouncing progress widget to protect PS Vita 1000 OLED screens.
+- **Sync activity** (`AppState::sync_activity`: `Downloading` / `Uploading` / `Ready` / `Idle`): the single source for the sidebar transfer card and the OLED screensaver status line, so they never disagree. Both draw a progress bar only while `Downloading` / `Uploading`.
+- **OLED Screensaver**: Activates automatically after 10s of inactivity during active sync (or 45s when idle; there is no manual activation), rendering a pure `#000000` black background with a bouncing status widget to protect PS Vita 1000 OLED screens. Its progress bar is only drawn while a transfer runs (`Downloading` / `Uploading`), never when `Ready` or `Idle`.

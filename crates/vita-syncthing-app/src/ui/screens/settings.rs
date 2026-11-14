@@ -1,18 +1,19 @@
 //! Tab 4 (`Settings & Log` / `Settings`): Dark / Pure-Black OLED theme switcher,
-//! `QR / ID` modal shortcut, UI language (`Change Language`), declined folder offers (`Clear Declined`), and BEP/1.0 & TLS 1.3
-//! protocol event log.
+//! `QR / ID` modal shortcut, UI language (`Change Language`), declined folder offers (`Clear Declined`), and the latest
+//! BEP/1.0 & TLS 1.3 protocol log lines (`Open`: full-screen log viewer, `ui/screens/logs.rs`).
 
 use crate::domain::{
     AppState, FocusSlot, HitMap, Hotspot, LanguagePreference, Rect, ShortcutKey, ThemeMode,
     UiAction, SETTINGS_ROW_DECLINED, SETTINGS_ROW_DEVICES, SETTINGS_ROW_DISPLAY,
-    SETTINGS_ROW_LANGUAGE,
+    SETTINGS_ROW_LANGUAGE, SETTINGS_ROW_LOG,
 };
 use crate::ui::gfx::{Align, FontWeight, Gfx, PadButton};
+use crate::ui::screens::logs::log_line_colour;
 use crate::ui::strings;
 use crate::ui::theme::{
-    UiTheme, CONTENT_B, CONTENT_R, CONTENT_W, CONTENT_X, CONTENT_Y, C_BAD, C_GOOD,
-    SETTINGS_DECLINED_B, SETTINGS_DECLINED_Y, SETTINGS_DEVICES_B, SETTINGS_DEVICES_Y,
-    SETTINGS_LANGUAGE_B, SETTINGS_LANGUAGE_Y,
+    UiTheme, CONTENT_B, CONTENT_R, CONTENT_W, CONTENT_X, CONTENT_Y, SETTINGS_DECLINED_B,
+    SETTINGS_DECLINED_Y, SETTINGS_DEVICES_B, SETTINGS_DEVICES_Y, SETTINGS_LANGUAGE_B,
+    SETTINGS_LANGUAGE_Y,
 };
 use crate::ui::widgets::{
     action_width, draw_action_hotspot, draw_card, draw_hint_bar, draw_page_title, Hint,
@@ -121,45 +122,8 @@ pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: 
     // 4. Declined Folder Offers Card
     render_declined_folders(gfx, th, state, hits);
 
-    // 5. Full Protocol Event Log Card
-    let ly = SETTINGS_DECLINED_B + 8;
-    let lh = CONTENT_B - ly;
-    draw_card(gfx, th, CONTENT_X, ly, CONTENT_W, lh, false);
-    gfx.text(
-        lx,
-        ly + 22,
-        12,
-        FontWeight::Bold,
-        th.accent_hi,
-        Align::Left,
-        s.settings_sec_log,
-    );
-
-    let max_lines = ((lh - 56) / 22).max(0) as usize;
-    for (i, line) in state.logs.iter().rev().take(max_lines).enumerate() {
-        let y = ly + 48 + (i as i32) * 22;
-        let col = if line.contains("Error") || line.contains("Failed") {
-            C_BAD
-        } else if line.contains("Synced")
-            || line.contains("Connected")
-            || line.contains("Sync OK")
-            || line.contains("up-to-date")
-        {
-            C_GOOD
-        } else {
-            th.dim
-        };
-        gfx.text_fit(
-            lx,
-            y,
-            CONTENT_W - 48,
-            13,
-            FontWeight::Regular,
-            col,
-            Align::Left,
-            line,
-        );
-    }
+    // 5. Protocol Event Log Card (latest lines; the full log opens on its own screen)
+    render_log_card(gfx, th, state, hits);
 
     draw_hint_bar(
         gfx,
@@ -368,4 +332,63 @@ fn render_declined_folders(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: 
         slot,
         state.is_focused(slot),
     );
+}
+
+/// Card with the latest protocol log lines. Touching it, or its `Open` button, opens the
+/// full-screen log viewer.
+fn render_log_card(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut HitMap) {
+    let s = strings::strings(state.language);
+    let ly = SETTINGS_DECLINED_B + 8;
+    let lh = CONTENT_B - ly;
+    draw_card(gfx, th, CONTENT_X, ly, CONTENT_W, lh, false);
+    hits.add(Hotspot {
+        rect: Rect::new(CONTENT_X, ly, CONTENT_W, lh),
+        action: UiAction::OpenLogs,
+        focus: None,
+        shortcut: None,
+    });
+    let lx = CONTENT_X + 24;
+    let label = s.action_open;
+    let w_open = action_width(gfx, PadButton::Cross, label);
+    let bx = CONTENT_R - 20 - w_open;
+    gfx.text_fit(
+        lx,
+        ly + 22,
+        bx - lx - 16,
+        12,
+        FontWeight::Bold,
+        th.accent_hi,
+        Align::Left,
+        s.settings_sec_log,
+    );
+    let slot = FocusSlot::RowAction {
+        row: SETTINGS_ROW_LOG,
+        col: 0,
+    };
+    draw_action_hotspot(
+        gfx,
+        th,
+        hits,
+        bx,
+        ly + 22,
+        PadButton::Cross,
+        label,
+        UiAction::OpenLogs,
+        slot,
+        state.is_focused(slot),
+    );
+
+    let max_lines = ((lh - 56) / 22).max(0) as usize;
+    for (i, line) in state.logs.iter().rev().take(max_lines).enumerate() {
+        gfx.text_fit(
+            lx,
+            ly + 52 + (i as i32) * 22,
+            CONTENT_W - 48,
+            13,
+            FontWeight::Regular,
+            log_line_colour(th, line),
+            Align::Left,
+            line,
+        );
+    }
 }

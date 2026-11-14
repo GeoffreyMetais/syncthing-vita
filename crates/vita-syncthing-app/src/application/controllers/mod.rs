@@ -1,16 +1,18 @@
 //! Input & Page Controllers: `InputController` routes main-screen gamepad and touch input
 //! against the frame's `HitMap`, and each page controller (`DashboardController` with the
-//! share list's `SharesController`, `FilesController`, `SettingsController`) handles D-pad
+//! share list's `SharesController`, `FilesController`, `SettingsController`, the log viewer's `LogsController`) handles D-pad
 //! focus movement and page-specific `UiAction`s.
 
 pub mod dashboard;
 pub mod files;
 pub mod input;
+pub mod logs;
 pub mod settings;
 pub mod shares;
 
 pub use dashboard::DashboardController;
 pub use files::FilesController;
 pub use input::{InputController, UserCommand};
+pub use logs::LogsController;
 pub use settings::SettingsController;
 pub use shares::SharesController;

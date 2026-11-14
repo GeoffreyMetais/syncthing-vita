@@ -35,22 +35,20 @@ pub fn render_oled_screensaver(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         s.app_title,
     );
 
-    // Same state as the sidebar transfer card (`AppState::sync_activity`).
-    let (status_line, pct, colour) = match state.sync_activity() {
+    // Same state as the sidebar transfer card (`AppState::sync_activity`). The progress bar is
+    // only drawn while a transfer runs: `Some(None)` is an indeterminate bar, `None` no bar.
+    let (status_line, bar, colour) = match state.sync_activity() {
         SyncActivity::Downloading => {
             let pct = state.progress_pct.map(|p| p.min(100));
             let line = s.fmt_saver_syncing(pct, &s.text(&state.current_file));
-            (line, pct, th.accent_hi)
+            (line, Some(pct), th.accent_hi)
         }
         SyncActivity::Uploading => {
             let line = s.fmt_saver_uploading(&s.text(&state.current_file));
-            (line, None, th.accent_hi)
+            (line, Some(None), th.accent_hi)
         }
-        SyncActivity::Ready => (s.status_ready.to_owned(), Some(100), C_GOOD),
-        SyncActivity::Idle => {
-            let pct = state.progress_pct.map(|p| p.min(100));
-            (s.text(&state.status_line).into_owned(), pct, th.accent_hi)
-        }
+        SyncActivity::Ready => (s.status_ready.to_owned(), None, C_GOOD),
+        SyncActivity::Idle => (s.text(&state.status_line).into_owned(), None, th.accent_hi),
     };
     gfx.text_fit(
         bx + 2,
@@ -62,9 +60,11 @@ pub fn render_oled_screensaver(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         Align::Left,
         &status_line,
     );
-    match pct {
-        Some(p) => draw_progress(gfx, bx + 2, by + 104, (SAVER_W as i32) - 8, 8, p, th.accent),
-        None => draw_indeterminate_progress(
+    match bar {
+        Some(Some(p)) => {
+            draw_progress(gfx, bx + 2, by + 104, (SAVER_W as i32) - 8, 8, p, th.accent)
+        }
+        Some(None) => draw_indeterminate_progress(
             gfx,
             bx + 2,
             by + 104,
@@ -73,6 +73,7 @@ pub fn render_oled_screensaver(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
             state.progress_anim_tick,
             th.accent,
         ),
+        None => {}
     }
     gfx.text(
         bx + 2,
