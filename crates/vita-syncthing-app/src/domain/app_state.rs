@@ -481,8 +481,13 @@ impl AppState {
     }
 
     /// Resets transfer counters at the beginning of a manual synchronization cycle.
+    ///
+    /// `sync_in_progress` is only raised immediately when a live peer session is already connected
+    /// (a rescan will emit `SyncCycleCompleted`) or when no peer is configured yet (a one-shot LAN
+    /// scan will emit `WorkerMsg::Finished`). When starting a persistent worker without a connected
+    /// peer, `sync_in_progress` stays `false` until a peer actually connects.
     pub fn prepare_manual_sync(&mut self) {
-        self.sync_in_progress = true;
+        self.sync_in_progress = self.session_connected || !self.has_configured_peers();
         self.files_up_to_date = 0;
         self.files_downloaded = 0;
         self.blocks_uploaded = 0;

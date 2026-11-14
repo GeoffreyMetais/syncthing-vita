@@ -119,7 +119,6 @@ fn main() {
 
     // Only auto-connect on startup if the user has already configured/paired at least one device
     if state.has_configured_peers() {
-        state.sync_in_progress = true;
         state.progress_pct = None;
         let offered = std::mem::take(&mut state.pending_folder_offers);
         let (rx, ctl) = spawn_sync_worker(
@@ -271,8 +270,8 @@ fn main() {
             worker_ctl = None;
             state.session_connected = false;
             state.initial_sync.clear();
+            state.sync_in_progress = false;
             if state.has_configured_peers() {
-                state.sync_in_progress = true;
                 state.progress_pct = None;
                 let offered = std::mem::take(&mut state.pending_folder_offers);
                 let (rx, ctl) = spawn_sync_worker(
@@ -304,7 +303,6 @@ fn main() {
             && last_sync_finished.elapsed() >= AUTO_RECONNECT_DELAY
         {
             signals.background_change = true;
-            state.sync_in_progress = true;
             state.progress_pct = None;
             let offered = std::mem::take(&mut state.pending_folder_offers);
             let (rx, ctl) = spawn_sync_worker(
