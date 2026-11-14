@@ -53,7 +53,7 @@ syncthing-vita
             │   ├── interaction.rs    # HitMap / Hotspot / UiAction / FocusSlot: interactive elements declared by the frame on screen
             │   ├── defaults.rs       # Every tunable value of the app: sync / discovery / power / display timings, limits, share presets
             │   ├── log_view.rs       # LogView (full-screen protocol log viewer: session lines / `Show All` history, scroll window)
-            │   ├── initial_sync.rs   # InitialSyncPeers (peers in their initial sync phase; full CPU speed meanwhile)
+            │   ├── initial_sync.rs   # PeerSet: InitialSyncPeers (initial sync phase; full CPU speed meanwhile) and ConnectedPeers (established sessions)
             │   └── ui_text.rs        # UiText: translatable messages (status line, labels, toasts) chosen by inner layers
             ├── application/          # Layer 2: Use Cases, Input Controller & Sync Event Coordinator
             │   ├── mod.rs
@@ -167,7 +167,7 @@ Dependencies strictly point **inward**. Inner layers never import or depend on o
      - `share_creation.rs`: Share creation workflow — a new share is discarded if `ManageDevices` closes with no linked device.
      - `share_mode.rs`: `ShareModeService::toggle` switches a share between `ShareMode::ReadWrite` and `ShareMode::ReadOnly`, saves it and restarts the worker (`config_dirty`). `ShareModeService::request_revert` queues a read-only share in `AppState::pending_reverts`; `main.rs` hands it to the running worker (`SyncControl::request_revert`) once no configuration change is pending, and a sync is started if none runs.
      - `folder_offers.rs`: Consent for folders offered by peers (`FolderOffer` modal); declined offers persisted.
-     - `sync_coordinator.rs`: Maps background `WorkerMsg` protocol events into `AppState` updates.
+     - `sync_coordinator.rs`: Maps background `WorkerMsg` protocol events into `AppState` updates. `AppState::session_connected` follows `connected_peers` (a peer enters on `SyncCycleCompleted`, leaves on `SessionEnded`). Per-file and per-block events (`FileUpToDate`, `BlockUploaded`) are never logged.
      - `controllers/`: `input.rs` (`InputController`: translates main-screen button/touch inputs into actions, modal triggers, and commands) and one controller per page (`dashboard.rs` with the share list's `shares.rs`, `files.rs`, `settings.rs`; see §3.4).
      - `modal_input/`: Input handling for open modals, one file per modal (mirrors `ui/modals/`).
      - `dpad_navigation.rs`: D-pad focus between the sidebar and the page elements.
@@ -279,6 +279,10 @@ Timings, limits and presets that govern the app's behaviour (rescan interval, re
 - **Crash-safe writes**: a file is never deleted before its replacement is in place. Use `storage::atomic::{write_file_synced, replace_file, recover_replaced_file}` (temp file, previous version kept as a backup, recovery on the next load); downloads, folder databases and the app's `.cfg` files all go through them.
 - **Scans never turn an error into a deletion**: an entry that exists but cannot be inspected (`DiskEntryKind::Unreadable`, failing `stat()`) keeps its database entry, as does everything below it. Only an entry absent from a successful directory listing becomes a tombstone.
 - **Scans and pulls agree on names** (`storage/names.rs`): only Syncthing-internal names (`is_internal_name`: `.syncthing*`, `~syncthing~*`, `.stfolder`, `.stignore`, `.stversions`) are skipped by scans, and `plan_pull` ignores every peer-announced name that is not `is_syncable_name` (empty, absolute, `.` / `..` components, backslashes, control characters, internal names). An entry that is pulled but not scanned would be announced as deleted to every peer.
+- **Folder database saves are batched during downloads**: `record_downloaded` uses `local_db::with_folder_db_deferred` (saved at most every 5 s) and the pull ends with `FsSyncStorage::flush_folder_db`. Any new code that records many entries in a row must do the same; everything else uses `with_folder_db` (saved at once).
+- **Failed downloads are retried**: a skipped file marks its folder with `SessionContext::mark_folder_incomplete`; the persistent loop pulls such folders again before each rescan (`index_exchange::retry_incomplete_pulls`).
+- **Web servers are authenticated with public roots**: `tls::client::open_https_tls_stream` (Global Discovery) verifies the certificate chain (`webpki-roots`) and the host name. Only Syncthing peers and relays are identified by their certificate hash.
+- **Symlinks are never pulled**: an entry of any type other than file / directory is decoded as `invalid`.
 - **Sizes from the network are bounded before allocating**: block sizes above `BEP_MAX_BLOCK_SIZE`, negative sizes / offsets and LZ4 output beyond the announced length are rejected.
 - **`local_db/`**: in-memory model (`mod.rs`), on-disk text format (`codec.rs`), process-wide cache + atomic save (`cache.rs`). Version arithmetic lives in `version_vector.rs`.
 - **`folder_sync/`**: disk scan → local `Index` (`scan.rs`) vs. pull planning, conflicts and deletions (`pull.rs`).
@@ -348,6 +352,9 @@ Emulators like Vita3K are permissive HLE environments that run with host PC RAM 
    - Never hardcode the contents of `ux0:data/syncthing/device_seed.bin`.
    - On a clean installation (when `device_seed.bin` does not exist), generate 32 random bytes via `sceKernelGetRandomNumber` (`SceLibKernel_stub`) so every PS Vita gets a unique Syncthing `DeviceId`.
    - Consent is enforced by `syncthing-core`, not only by the UI: `spawn_sync_worker` declares each share's linked devices with `FsSyncStorage::set_folder_devices`, and sessions ignore every other folder (see §3.3 **Folder authorization**).
+   - A LAN announcement is not authenticated: `ShareService::register_discovered_peer` only lists the peer (at most `MAX_DISCOVERED_PEERS`), and a Short ID placeholder is upgraded to a full ID only by `upsert_device`, once a TLS session proved the identity.
+   - There is no fallback random source: `IdentityStore::generate_random_seed` fails rather than derive a key from guessable values.
+   - The app's data directory and its parents can never be a share's folder (`ConfigRepository::is_protected_share_path`: refused by the `Files` browser with a toast, skipped by `spawn_sync_worker`). A share's default directory comes from `ConfigRepository::default_share_dir`, which sanitizes the peer-chosen folder ID.
    - Remote folders received via `ClusterConfig` never become shares on their own: `FolderOfferService::receive` queues them as `FolderOffer`s and the `FolderOffer` modal asks for consent. An accepted folder defaults to `enabled: false` (**Paused**) until the user selects a target folder and enables it in the **Overview** share list; a declined one is saved in `ignored_folders.cfg`.
 
 ---
@@ -367,7 +374,7 @@ Text fields of the `.cfg` files (device names, addresses, folder IDs, labels, pa
 | `ignored_folders.cfg` | Folder offers declined by the user or deleted shares (not prompted again until `Settings` · `Clear Declined`) | `<folder_id>\|<device_id_hex>\n` |
 | `theme.cfg` | Persistent colour theme mode (`dark` or `oled`) | `<dark\|oled>\n` |
 | `language.cfg` | UI language chosen in `Settings` (`system` follows the PS Vita language; a missing file means `system`) | `<system\|en\|fr\|es\|de\|it>\n` |
-| `syncthing.log` | Persistent protocol & UI event log | Plain text lines |
+| `syncthing.log`, `syncthing.log.1` | Persistent protocol & UI event log, rotated above `LOG_MAX_BYTES` (512 KiB) to `syncthing.log.1` | Plain text lines |
 | `sync/.syncthing_db_<folder>_<root hash>.txt` | Persistent folder database (`local_db/`): version vectors, sequences, blocks and tombstones per entry | `#vita-db-v1` tab-separated text |
 
 ---
