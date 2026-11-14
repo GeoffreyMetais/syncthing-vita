@@ -16,7 +16,7 @@ pub fn render_device_id_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hit
     let s = strings::strings(state.language);
     gfx.dim(180);
     let w = 720;
-    let h = 414;
+    let h = 446;
     let dx = (GFX_W - w) / 2;
     let dy = (HINT_Y - h) / 2;
 
@@ -239,15 +239,20 @@ pub fn render_device_id_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hit
         s.modal_device_id_cert_path,
     );
 
-    // Bottom buttons at bottom-right of modal
+    // Bottom buttons at bottom-right of modal: [□ Add remote device] [R Scan QR] [○ Close]
     let w_add = action_width(gfx, PadButton::Square, s.action_add_remote_device);
+    let w_scan = action_width(gfx, PadButton::R, s.action_scan_qr);
     let w_close = action_width(gfx, PadButton::Circle, s.action_close);
+    let close_x = dx + w - 28 - w_close;
+    let scan_x = close_x - 10 - w_scan;
+    let add_x = scan_x - 10 - w_add;
+    let buttons_y = dy + h - 32;
     draw_press_button(
         gfx,
         th,
         hits,
-        dx + w - 28 - w_close - 10 - w_add,
-        dy + h - 32,
+        add_x,
+        buttons_y,
         PadButton::Square,
         s.action_add_remote_device,
     );
@@ -255,8 +260,17 @@ pub fn render_device_id_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hit
         gfx,
         th,
         hits,
-        dx + w - 28 - w_close,
-        dy + h - 32,
+        scan_x,
+        buttons_y,
+        PadButton::R,
+        s.action_scan_qr,
+    );
+    draw_press_button(
+        gfx,
+        th,
+        hits,
+        close_x,
+        buttons_y,
         PadButton::Circle,
         s.action_close,
     );
@@ -267,6 +281,7 @@ pub fn render_device_id_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hit
         hits,
         &[
             (PadButton::Square, None, s.hint_add_remote_device_id),
+            (PadButton::R, None, s.hint_scan_qr),
             (
                 PadButton::Circle,
                 Some(PadButton::Cross),

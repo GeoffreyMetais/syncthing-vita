@@ -3,16 +3,21 @@
 //! Touches arrive as the pad button of the element touched (see `ModalInput`).
 
 use super::open_add_device_modal;
-use crate::application::{ShareModeService, ShareService, UserCommand};
+use crate::application::{QrScanFlow, ShareModeService, ShareService, UserCommand};
 use crate::domain::{AppState, ModalDialog, UiText};
 use crate::infrastructure::{
-    ConfigRepository, InputFrame, BTN_CIRCLE, BTN_CROSS, BTN_SQUARE, BTN_START, BTN_TRIANGLE,
+    ConfigRepository, InputFrame, BTN_CIRCLE, BTN_CROSS, BTN_R, BTN_SQUARE, BTN_START, BTN_TRIANGLE,
 };
 
-/// Handles input in the `ShowDeviceId` modal.
+/// Handles input in the `ShowDeviceId` modal: `Square` adds a remote device by ID, `R` scans
+/// its QR code, `Circle` / `Cross` / `Triangle` close.
 pub fn show_device_id(state: &mut AppState, input: InputFrame) -> UserCommand {
     if (input.pressed & BTN_SQUARE) != 0 {
         return open_add_device_modal(state, None);
+    }
+    if (input.pressed & BTN_R) != 0 {
+        QrScanFlow::open(state, None);
+        return UserCommand::None;
     }
     if (input.pressed & (BTN_CIRCLE | BTN_CROSS | BTN_TRIANGLE)) != 0 {
         state.modal = ModalDialog::None;
