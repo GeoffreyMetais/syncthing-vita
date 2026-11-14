@@ -239,13 +239,13 @@ pub fn render_device_id_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hit
         s.modal_device_id_cert_path,
     );
 
-    // Bottom buttons at bottom-right of modal: [□ Add remote device] [R Scan QR] [○ Close]
+    // Bottom buttons at bottom-right of modal: [R Scan QR] [□ Add remote device] [○ Close]
     let w_add = action_width(gfx, PadButton::Square, s.action_add_remote_device);
     let w_scan = action_width(gfx, PadButton::R, s.action_scan_qr);
     let w_close = action_width(gfx, PadButton::Circle, s.action_close);
     let close_x = dx + w - 28 - w_close;
-    let scan_x = close_x - 10 - w_scan;
-    let add_x = scan_x - 10 - w_add;
+    let add_x = close_x - 10 - w_add;
+    let scan_x = add_x - 10 - w_scan;
     let buttons_y = dy + h - 32;
     draw_press_button(
         gfx,
@@ -280,8 +280,8 @@ pub fn render_device_id_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hit
         th,
         hits,
         &[
-            (PadButton::Square, None, s.hint_add_remote_device_id),
             (PadButton::R, None, s.hint_scan_qr),
+            (PadButton::Square, None, s.hint_add_remote_device_id),
             (
                 PadButton::Circle,
                 Some(PadButton::Cross),
