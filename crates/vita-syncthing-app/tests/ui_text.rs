@@ -101,6 +101,10 @@ fn all_messages() -> Vec<UiText> {
         UiText::SharedWith {
             devices: s("PC (MFZWI3D)"),
         },
+        UiText::PickerTemplate {
+            label: s("RetroArch Savefiles"),
+            path: s("ux0:"),
+        },
         UiText::PickerShareThisFolder { path: s("ux0:") },
         UiText::PickerKeepCurrent { path: s("ux0:") },
         UiText::PickerSaveData { path: s("ux0:") },

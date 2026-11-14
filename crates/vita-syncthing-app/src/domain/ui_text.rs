@@ -151,6 +151,11 @@ pub enum UiText {
     },
 
     // Files tab rows (`PickerItem::label`)
+    /// A default share preset (`NEW_SHARE_TEMPLATES`), listed first at the browser root.
+    PickerTemplate {
+        label: String,
+        path: String,
+    },
     PickerShareThisFolder {
         path: String,
     },

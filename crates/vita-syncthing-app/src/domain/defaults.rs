@@ -83,7 +83,11 @@ pub const LOG_HISTORY_MAX_LINES: usize = 2000;
 
 // --- Shares --------------------------------------------------------------------------------
 
-/// Share presets offered in the `Create New Share` dialog: `(folder ID, label, target path)`.
+/// Folder ID of the `NEW_SHARE_TEMPLATES` entry that opens the folder browser.
+pub const BROWSE_TEMPLATE_ID: &str = "__browse__";
+
+/// Share presets offered in the `Create New Share` dialog (and listed first at the root of the
+/// `Files` browser while not shared): `(folder ID, label, target path)`.
 /// The `__browse__` entry opens the folder browser instead of creating a share.
 pub const NEW_SHARE_TEMPLATES: &[(&str, &str, &str)] = &[
     (

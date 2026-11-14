@@ -160,7 +160,10 @@ fn test_create_share_template_row_and_outside_touch() {
         .unwrap();
     tap_action(&mut state, &repo, UiAction::ModalRow(music));
     assert!(matches!(state.modal, ModalDialog::ManageDevices { .. }));
-    assert!(state.shares.iter().any(|s| s.folder_id == "retroarch-saves"));
+    assert!(state
+        .shares
+        .iter()
+        .any(|s| s.folder_id == "retroarch-saves"));
     let _ = std::fs::remove_dir_all(&dir);
 }
 

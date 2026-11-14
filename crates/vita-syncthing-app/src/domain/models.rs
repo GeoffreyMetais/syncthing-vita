@@ -317,11 +317,14 @@ pub struct PickerItem {
     pub label: UiText,
     pub path: String,
     pub is_preset: bool,
+    /// Index in `NEW_SHARE_TEMPLATES` when the row is a default share preset: selecting it
+    /// creates the share with the preset's folder ID and label.
+    pub template: Option<usize>,
     /// True if another share already targets this folder: shown greyed out and not selectable.
     pub is_shared: bool,
 }
 
-pub use crate::domain::defaults::NEW_SHARE_TEMPLATES;
+pub use crate::domain::defaults::{BROWSE_TEMPLATE_ID, NEW_SHARE_TEMPLATES};
 
 /// 36-key (9x4) Base32 quick-keypad for `ModalDialog::AddDeviceById`.
 pub const ADD_DEVICE_KEYPAD: &[&str; 36] = &[
