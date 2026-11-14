@@ -70,7 +70,7 @@ pub const BACKGROUND_INTERVAL: u32 = 6;
 /// VBlanks between safety refreshes of a static screen (1 FPS).
 pub const IDLE_REFRESH_INTERVAL: u32 = VBLANK_HZ;
 /// Inactivity before the OLED screensaver starts while a sync is in progress.
-pub const SCREENSAVER_TIMEOUT_SYNCING: Duration = Duration::from_secs(12);
+pub const SCREENSAVER_TIMEOUT_SYNCING: Duration = Duration::from_secs(10);
 /// Inactivity before the OLED screensaver starts when idle.
 pub const SCREENSAVER_TIMEOUT_IDLE: Duration = Duration::from_secs(45);
 
