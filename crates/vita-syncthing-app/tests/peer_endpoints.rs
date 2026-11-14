@@ -64,3 +64,21 @@ fn test_collect_peer_targets_orders_direct_before_relay_and_deduplicates() {
         ]
     );
 }
+
+/// Global Discovery is only asked about peers that are not connected and have a full ID.
+#[test]
+fn test_global_lookup_only_for_disconnected_full_ids() {
+    use vita_syncthing_app::infrastructure::peer_endpoints::needs_global_lookup;
+    let device = |device_id| KnownDevice {
+        device_id,
+        name: "NAS".to_owned(),
+        address: "dynamic".to_owned(),
+    };
+    let full = DeviceId([0x11; 32]);
+    let short = DeviceId::parse_user_id("MFZWI3D").unwrap();
+
+    assert!(needs_global_lookup(&device(full), &[]));
+    assert!(!needs_global_lookup(&device(full), &[full]));
+    assert!(needs_global_lookup(&device(full), &[DeviceId([0x22; 32])]));
+    assert!(!needs_global_lookup(&device(short), &[]));
+}

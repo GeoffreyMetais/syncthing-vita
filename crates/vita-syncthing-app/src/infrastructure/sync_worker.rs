@@ -12,7 +12,8 @@ use syncthing_core::{
 };
 
 use super::peer_endpoints::{
-    refresh_global_endpoints, run_peer_session_loop, SharedDiscoveredAddrs, SharedGlobalEndpoints,
+    refresh_global_endpoints, run_peer_session_loop, SharedConnectedPeers, SharedDiscoveredAddrs,
+    SharedGlobalEndpoints,
 };
 use super::worker_slot::spawn_after_previous;
 use crate::domain::defaults::{
@@ -207,6 +208,7 @@ pub fn spawn_sync_worker(
 
         let discovered_addrs: SharedDiscoveredAddrs = Arc::new(Mutex::new(Vec::new()));
         let global_endpoints: SharedGlobalEndpoints = Arc::new(Mutex::new(Vec::new()));
+        let connected_peers: SharedConnectedPeers = Arc::new(Mutex::new(Vec::new()));
         let mut peer_handles = Vec::new();
 
         let peer_list: Vec<String> = approved_devices
@@ -240,6 +242,7 @@ pub fn spawn_sync_worker(
             let peer_storage_clone = storage.clone();
             let peer_disc_clone = Arc::clone(&discovered_addrs);
             let peer_glob_clone = Arc::clone(&global_endpoints);
+            let peer_conn_clone = Arc::clone(&connected_peers);
             let peer_ctrl_clone = Arc::clone(&worker_control);
             let peer_tx_clone = tx.clone();
 
@@ -255,6 +258,7 @@ pub fn spawn_sync_worker(
                     peer_storage_clone,
                     peer_disc_clone,
                     peer_glob_clone,
+                    peer_conn_clone,
                     peer_ctrl_clone,
                     peer_tx_clone,
                 );
@@ -324,6 +328,7 @@ pub fn spawn_sync_worker(
                 refresh_global_endpoints(
                     &approved_devices,
                     &global_endpoints,
+                    &connected_peers,
                     &worker_control,
                     &tx,
                     &mut global_errors,

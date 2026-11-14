@@ -9,3 +9,4 @@ rustls = { version = "0.23", default-features = false, features = ["std", "tls12
 rustls-rustcrypto = "0.0.2-alpha"
 sha2 = "0.10"
 p256 = { version = "0.13", features = ["ecdsa", "pkcs8"] }
+webpki-roots = "1.0.12"
