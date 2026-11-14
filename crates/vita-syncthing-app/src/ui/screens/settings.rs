@@ -137,11 +137,6 @@ pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: 
                 s.action_add_device_id,
                 UiAction::AddDevice,
             ),
-            Hint::action(
-                PadButton::Select,
-                s.hint_screensaver,
-                UiAction::StartScreensaver,
-            ),
             Hint::action(PadButton::Start, s.action_quit, UiAction::ConfirmQuit),
         ],
     );

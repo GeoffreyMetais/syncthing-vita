@@ -94,7 +94,6 @@ pub struct Strings {
     pub hint_tabs: &'static str,
     pub hint_quit: &'static str,
     pub hint_move: &'static str,
-    pub hint_screensaver: &'static str,
     pub hint_folder: &'static str,
     pub hint_folder_path: &'static str,
     pub hint_share_folder: &'static str,

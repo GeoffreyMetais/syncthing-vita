@@ -39,8 +39,6 @@ pub enum UiAction {
     ShowDeviceId,
     /// Open the add-device-by-ID dialog.
     AddDevice,
-    /// Start the OLED screensaver.
-    StartScreensaver,
     /// Ask for confirmation before quitting.
     ConfirmQuit,
 
