@@ -8,6 +8,7 @@ This document provides essential architectural context, build workflows, and **r
 
 - **English Only**: All source code comments, docstrings, UI labels, log messages, commit messages, and documentation **must be written in English**.
 - **Zero Warnings**: Both host tests (`cargo test --workspace`) and the PS Vita release build (`just vpk`) must compile with **zero compiler warnings**. Use `#[cfg(target_os = "vita")]` and `#[cfg(not(target_os = "vita"))]` cleanly so host and Vita targets both stay warning-free.
+- **Visual Changes Are Checked in the Emulator**: any change that alters what is drawn (layout, labels, translations, colours, icons, new screen or modal) must be (1) run in Vita3K, (2) captured with screenshots of every affected screen / state, and (3) shown with those screenshots in the PR description. Host tests passing is not enough. See §6 *Screenshots for Visual Changes*.
 - **No Unapproved C/ASM Crypto Dependencies**: Never add `ring`, `aws-lc-rs`, or `openssl` to the dependency tree. They do not compile for `armv7-sony-vita-newlibeabihf`. Always use pure-Rust cryptography (`rustls` with `default-features = false`, `rustls-rustcrypto`, `p256`, `sha2`, `rcgen`).
 
 ---
@@ -458,6 +459,27 @@ printf 'wait 60\npress R\nwait 10\nshot shares\n' > /tmp/shares.txt
 just ui-scenario /tmp/shares.txt
 ```
 PNGs land in `target/ui-shots/`; the Vita3K app data directory is backed up and restored around the run. It needs neither firmware nor a display (see above). `wait` frames count as activity (the automatic screensaver never starts during a script) but do not wake a screensaver started with `press SELECT`.
+
+If `target/ui-shots/` only holds `vita3k.log` and it reports `qt.qpa.wayland: There are no outputs` (desktop session with its screen off or locked), run the scenario through XWayland instead:
+```bash
+CARGO_FEATURES=ui-script just vpk
+DISPLAY=:0 SDL_VIDEODRIVER=x11 QT_QPA_PLATFORM=xcb ./scripts/vita3k_scenario.sh /tmp/shares.txt 40
+```
+
+### Screenshots for Visual Changes (mandatory)
+Every change that alters what is drawn goes through these steps before it is reported done or proposed in a PR:
+1. **Run it in the emulator**: write a `ui-script` scenario reaching every affected screen / modal / state (focus rings, scrolled lists, both themes or several languages when the change depends on them) and run it with `just ui-scenario`. Host tests do not replace this.
+2. **Take screenshots**: one `shot` per affected state, named in order (`1_settings`, `2_log_viewer`, ...). Look at each PNG and check the change is visible and nothing is clipped or overlapping. Show them to the user.
+3. **Put them in the PR description**: commit the PNGs to the `pr-screenshots` branch (an orphan branch holding only images, never merged), under a folder named after the PR branch:
+   ```bash
+   git worktree add --orphan -b pr-screenshots /tmp/pr-shots 2>/dev/null || git worktree add /tmp/pr-shots pr-screenshots
+   mkdir -p /tmp/pr-shots/<branch> && cp target/ui-shots/*.png /tmp/pr-shots/<branch>/
+   git -C /tmp/pr-shots add . && git -C /tmp/pr-shots commit -m "Screenshots for <branch>" && git -C /tmp/pr-shots push -u origin pr-screenshots
+   git worktree remove /tmp/pr-shots
+   ```
+   (fetch `origin pr-screenshots` first when it already exists remotely), then embed each one in a `## Screenshots` section of the PR description with a one-line caption:
+   `![Settings](https://github.com/GeoffreyMetais/syncthing-vita/blob/pr-screenshots/<branch>/1_settings.png?raw=true)`.
+   When the PR is updated with another visual change, add the new screenshots and update the section.
 
 ---
 
