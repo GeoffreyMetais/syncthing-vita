@@ -118,7 +118,7 @@ pub static STRINGS_DE: Strings = Strings {
     settings_label_colour_theme: "Farbdesign",
     settings_desc_theme_dark: "Dunkel — Schiefergrauer VitaSend-Look mit Türkis-Akzent",
     settings_desc_theme_oled: "OLED — Reines Schwarz (spart PS Vita OLED-Akku)",
-    settings_saver_auto_hint: "OLED-Schoner aktiviert sich nach 10s Sync (45s im Leerlauf).",
+    settings_saver_auto_hint: "OLED-Schoner aktiviert sich nach 10s Sync (30s im Leerlauf).",
     settings_sec_devices: "GERÄTE & KOPPLUNG",
     settings_desc_devices: "Gerät hinzufügen oder PS-Vita-ID anzeigen",
     settings_sec_log: "PROTOKOLL",

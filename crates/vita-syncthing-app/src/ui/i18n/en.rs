@@ -120,7 +120,7 @@ pub static STRINGS_EN: Strings = Strings {
     settings_desc_theme_dark: "Dark — Blue-grey look with teal accent",
     settings_desc_theme_oled: "OLED — Pure black background (saves PS Vita OLED battery)",
     settings_saver_auto_hint:
-        "OLED Screensaver activates automatically after 10s during sync (45s when idle).",
+        "OLED Screensaver activates automatically after 10s during sync (30s when idle).",
     settings_sec_devices: "DEVICES & PAIRING",
     settings_desc_devices: "Pair a remote device or view this PS Vita's ID",
     settings_sec_log: "LOG",
