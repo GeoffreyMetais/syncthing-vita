@@ -70,8 +70,12 @@ pub fn exchange_cluster_config(
                 }
                 accept_peer_cluster_config(ctx, folders, cfg);
                 let states = initial_folder_states(stream, ctx, folders);
-                let reply =
-                    BepClusterConfig::encode_for_peers(&states, ctx.own_id(), ctx.peer_device_id);
+                let reply = BepClusterConfig::encode_for_peers(
+                    &states,
+                    ctx.own_id(),
+                    &ctx.hello.device_name,
+                    ctx.peer_device_id,
+                );
                 write_bep_message(stream, BepMessageType::ClusterConfig, &reply)?;
             }
             Ok(Some((BepMessageType::Index | BepMessageType::IndexUpdate, payload))) => {

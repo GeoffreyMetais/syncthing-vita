@@ -6,7 +6,7 @@ use std::io;
 use std::path::Path;
 
 use syncthing_core::storage::atomic::write_file_synced;
-use syncthing_core::VitaIdentity;
+use syncthing_core::DeviceIdentity;
 
 /// Manages loading or generating the unique ECDSA P-256 device identity on `ux0:`.
 pub struct IdentityStore;
@@ -46,7 +46,7 @@ impl IdentityStore {
 
     /// Loads the existing 32-byte seed from `<base_data_dir>/device_seed.bin`, or creates
     /// a fresh hardware-random seed on first launch, and exports `cert.der`.
-    pub fn load_or_create(base_data_dir: &str) -> io::Result<VitaIdentity> {
+    pub fn load_or_create(base_data_dir: &str) -> io::Result<DeviceIdentity> {
         fs::create_dir_all(base_data_dir)?;
         let seed_path = format!("{}/device_seed.bin", base_data_dir);
         let cert_path = format!("{}/cert.der", base_data_dir);
@@ -63,7 +63,7 @@ impl IdentityStore {
             }
         };
 
-        let identity = VitaIdentity::from_seed(&seed)?;
+        let identity = DeviceIdentity::from_seed(&seed)?;
         let _ = fs::write(&cert_path, &identity.cert_der);
         Ok(identity)
     }

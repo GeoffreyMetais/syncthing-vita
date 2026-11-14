@@ -7,19 +7,19 @@ use std::time::{Duration, Instant};
 
 use syncthing_core::{
     resolve_peer_tcp_addrs, run_discovery_cycle, scan_lan_bep_peers, Announce, BepFolder, BepHello,
-    DeviceId, FolderType, FsSyncStorage, SyncControl, SyncEvent, SyncTuning, VitaIdentity,
+    DeviceId, DeviceIdentity, FolderType, FsSyncStorage, SyncControl, SyncEvent, SyncTuning,
     BEP_DEFAULT_PORT, DISCOVERY_BROADCAST_ADDR,
 };
 
 use super::peer_endpoints::{
-    refresh_global_endpoints, run_peer_session_loop, SharedConnectedPeers, SharedDiscoveredAddrs,
-    SharedGlobalEndpoints,
+    refresh_global_endpoints, run_peer_session_loop, PeerSessionShared, SharedConnectedPeers,
+    SharedDiscoveredAddrs, SharedGlobalEndpoints,
 };
 use super::worker_slot::spawn_after_previous;
 use super::ConfigRepository;
 use crate::domain::defaults::{
-    DISCOVERY_INTERVAL, DISCOVERY_LISTEN, DISCOVERY_SCAN_LISTEN, GLOBAL_DISCOVERY_INTERVAL,
-    KEEPALIVE_INTERVAL, MAX_PEER_SESSIONS, RESCAN_INTERVAL,
+    CLIENT_NAME, DEVICE_NAME, DISCOVERY_INTERVAL, DISCOVERY_LISTEN, DISCOVERY_SCAN_LISTEN,
+    GLOBAL_DISCOVERY_INTERVAL, KEEPALIVE_INTERVAL, MAX_PEER_SESSIONS, RESCAN_INTERVAL,
 };
 use crate::domain::{KnownDevice, ShareConfigEntry, ShareMode, UiText};
 
@@ -82,7 +82,7 @@ fn wait_for_next_discovery(control: &SyncControl, duration: Duration) -> bool {
 /// connected simultaneously while the UI thread keeps running.
 pub fn spawn_sync_worker(
     base_data_dir: &str,
-    identity: VitaIdentity,
+    identity: DeviceIdentity,
     shares_snapshot: Vec<ShareConfigEntry>,
     approved_devices: Vec<KnownDevice>,
     offered_folder_ids: Vec<String>,
@@ -159,7 +159,7 @@ pub fn spawn_sync_worker(
             instance_id: process_instance_id(),
         };
 
-        let our_hello = BepHello::new_vita_default();
+        let our_hello = BepHello::new(DEVICE_NAME, CLIENT_NAME, env!("CARGO_PKG_VERSION"));
 
         // If no peer has been manually linked/added yet, run passive LAN discovery only (never dial TCP 22000).
         if approved_devices.is_empty() {
@@ -249,32 +249,21 @@ pub fn spawn_sync_worker(
             .enumerate()
         {
             let peer_name = kd.name.clone();
-            let peer_id_clone = identity.clone();
-            let peer_hello_clone = our_hello.clone();
-            let peer_storage_clone = storage.clone();
-            let peer_disc_clone = Arc::clone(&discovered_addrs);
-            let peer_glob_clone = Arc::clone(&global_endpoints);
-            let peer_conn_clone = Arc::clone(&connected_peers);
-            let peer_ctrl_clone = Arc::clone(&worker_control);
-            let peer_tx_clone = tx.clone();
-
+            let shared = PeerSessionShared {
+                identity: identity.clone(),
+                hello: our_hello.clone(),
+                storage: storage.clone(),
+                discovered: Arc::clone(&discovered_addrs),
+                global: Arc::clone(&global_endpoints),
+                connected: Arc::clone(&connected_peers),
+                control: Arc::clone(&worker_control),
+                tx: tx.clone(),
+            };
             let peer_builder = std::thread::Builder::new()
                 .name(format!("bep_peer_{}", idx))
                 .stack_size(WORKER_STACK_SIZE);
 
-            match peer_builder.spawn(move || {
-                run_peer_session_loop(
-                    kd,
-                    peer_id_clone,
-                    peer_hello_clone,
-                    peer_storage_clone,
-                    peer_disc_clone,
-                    peer_glob_clone,
-                    peer_conn_clone,
-                    peer_ctrl_clone,
-                    peer_tx_clone,
-                );
-            }) {
+            match peer_builder.spawn(move || run_peer_session_loop(kd, shared)) {
                 Ok(handle) => peer_handles.push(handle),
                 Err(e) => {
                     let _ = tx.send(WorkerMsg::Log(format!(

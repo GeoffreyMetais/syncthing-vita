@@ -29,11 +29,13 @@ pub struct BepHello {
 }
 
 impl BepHello {
-    pub fn new_vita_default() -> Self {
+    /// The `Hello` of a device named `device_name`, running the client `client_name` at
+    /// `client_version`, that supports the default number of connections.
+    pub fn new(device_name: &str, client_name: &str, client_version: &str) -> Self {
         Self {
-            device_name: "PS-Vita".to_owned(),
-            client_name: "vita-syncthing".to_owned(),
-            client_version: env!("CARGO_PKG_VERSION").to_owned(),
+            device_name: device_name.to_owned(),
+            client_name: client_name.to_owned(),
+            client_version: client_version.to_owned(),
             num_connections: BEP_DEFAULT_NUM_CONNECTIONS,
             timestamp: 0,
         }

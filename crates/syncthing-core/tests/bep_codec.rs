@@ -4,7 +4,7 @@ use syncthing_core::{decompress_bep_lz4, BepClusterConfig, BepHello, BEP_DEFAULT
 
 #[test]
 fn test_bep_hello_roundtrip() {
-    let mut hello = BepHello::new_vita_default();
+    let mut hello = BepHello::new("PS-Vita", "vita-syncthing", "0.1.0");
     assert_eq!(hello.num_connections, BEP_DEFAULT_NUM_CONNECTIONS);
     hello.timestamp = 1_700_000_000_123_456_789;
     let frame = hello.encode_frame();

@@ -7,9 +7,9 @@ use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use syncthing_core::{
-    connect_and_sync_stream_with_control, connect_and_sync_with_control, connect_via_relay,
-    lookup_global_peer, BepHello, DeviceId, FsSyncStorage, PeerEndpoint, SyncControl, SyncEvent,
-    SyncSessionStatus, VitaIdentity,
+    connect_and_sync, connect_and_sync_stream, connect_via_relay, lookup_global_peer, BepHello,
+    DeviceId, DeviceIdentity, FsSyncStorage, PeerEndpoint, SessionParams, SyncControl, SyncEvent,
+    SyncSessionStatus,
 };
 
 use super::sync_worker::WorkerMsg;
@@ -182,18 +182,32 @@ fn format_endpoint_label(ep: &PeerEndpoint) -> String {
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-pub fn run_peer_session_loop(
-    kd: KnownDevice,
-    identity: VitaIdentity,
-    our_hello: BepHello,
-    storage: FsSyncStorage,
-    discovered: SharedDiscoveredAddrs,
-    global: SharedGlobalEndpoints,
-    connected: SharedConnectedPeers,
-    control: Arc<SyncControl>,
-    tx: Sender<WorkerMsg>,
-) {
+/// What the peer session threads of one sync worker share.
+#[derive(Clone)]
+pub struct PeerSessionShared {
+    pub identity: DeviceIdentity,
+    pub hello: BepHello,
+    pub storage: FsSyncStorage,
+    pub discovered: SharedDiscoveredAddrs,
+    pub global: SharedGlobalEndpoints,
+    pub connected: SharedConnectedPeers,
+    pub control: Arc<SyncControl>,
+    pub tx: Sender<WorkerMsg>,
+}
+
+/// Keeps a session with `kd` running until a stop is requested: tries its known endpoints in
+/// turn (direct ones first, then relays) and retries after each failure or session end.
+pub fn run_peer_session_loop(kd: KnownDevice, shared: PeerSessionShared) {
+    let PeerSessionShared {
+        identity,
+        hello,
+        storage,
+        discovered,
+        global,
+        connected,
+        control,
+        tx,
+    } = shared;
     let mut logged_awaiting = false;
     let mut logged_no_addr = false;
     let mut report_connecting = true;
@@ -243,17 +257,16 @@ pub fn run_peer_session_loop(
                 }
                 let _ = tx_ev.send(WorkerMsg::SyncEvent(event));
             };
+            let params = SessionParams {
+                identity: &identity,
+                hello: &hello,
+                storage: &storage,
+                expected_device_id: Some(target_id),
+                timeout: CONNECT_TIMEOUT,
+                control: Some(Arc::clone(&control)),
+            };
             let result = match ep {
-                PeerEndpoint::Direct(tcp_addr) => connect_and_sync_with_control(
-                    &identity,
-                    tcp_addr,
-                    Some(target_id),
-                    &our_hello,
-                    &storage,
-                    CONNECT_TIMEOUT,
-                    Some(Arc::clone(&control)),
-                    emit,
-                ),
+                PeerEndpoint::Direct(tcp_addr) => connect_and_sync(&params, tcp_addr, emit),
                 PeerEndpoint::Relay {
                     addr: relay_addr,
                     device_id: relay_id,
@@ -264,21 +277,8 @@ pub fn run_peer_session_loop(
                     target_id,
                     GLOBAL_DISCOVERY_TIMEOUT,
                 )
-                .and_then(|tcp| {
-                    connect_and_sync_stream_with_control(
-                        &identity,
-                        tcp,
-                        relay_addr,
-                        Some(target_id),
-                        &our_hello,
-                        &storage,
-                        CONNECT_TIMEOUT,
-                        Some(Arc::clone(&control)),
-                        emit,
-                    )
-                }),
+                .and_then(|tcp| connect_and_sync_stream(&params, tcp, relay_addr, emit)),
             };
-
             set_connected(&connected, kd.device_id, false);
 
             match result {

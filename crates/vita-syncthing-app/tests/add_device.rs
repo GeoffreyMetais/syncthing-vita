@@ -41,7 +41,7 @@ fn test_add_device_by_short_id_and_system_keyboard_flow() {
 
     // 2. Simulate entering a 7-char Short ID via PS Vita System Keyboard (`SceIme`) and pressing Enter
     let peer_seed = *b"REMOTE_PC_SYNCTHING_SEED_0000001";
-    let full_peer_id = syncthing_core::VitaIdentity::from_seed(&peer_seed)
+    let full_peer_id = syncthing_core::DeviceIdentity::from_seed(&peer_seed)
         .unwrap()
         .device_id;
     let short_id = full_peer_id.short();

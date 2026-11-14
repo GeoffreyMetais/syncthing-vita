@@ -10,7 +10,7 @@ use super::wire::{
     decode_header, decode_payload, encode_connect_request, encode_join_session_request,
     RelayMessage, SessionInvitation, RELAY_ALPN,
 };
-use crate::cert::VitaIdentity;
+use crate::cert::DeviceIdentity;
 use crate::device_id::DeviceId;
 use crate::tls::client::open_tls_stream_with_alpn;
 
@@ -28,7 +28,7 @@ fn read_relay_message<R: Read>(reader: &mut R) -> io::Result<RelayMessage> {
 /// Connects to `relay_addr` (authenticating `relay_device_id` via TLS) and requests a relay
 /// session to `target_device_id`.
 pub fn request_relay_session(
-    identity: &VitaIdentity,
+    identity: &DeviceIdentity,
     relay_addr: SocketAddr,
     relay_device_id: DeviceId,
     target_device_id: DeviceId,
@@ -102,7 +102,7 @@ pub fn join_relay_session(
 
 /// Establishes a relayed TCP tunnel to `target_device_id` via `relay_addr` (`relay_device_id`).
 pub fn connect_via_relay(
-    identity: &VitaIdentity,
+    identity: &DeviceIdentity,
     relay_addr: SocketAddr,
     relay_device_id: DeviceId,
     target_device_id: DeviceId,

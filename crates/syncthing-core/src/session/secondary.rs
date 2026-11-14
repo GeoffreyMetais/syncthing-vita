@@ -41,12 +41,11 @@ pub fn desired_secondary_count(peer_hello: &BepHello, our_hello: &BepHello) -> u
 pub fn open_secondary_bep_stream(
     ctx: &SessionContext<'_>,
     peer_addr: SocketAddr,
-    our_hello: &BepHello,
     timeout: Duration,
 ) -> io::Result<SecondaryBepConn> {
     let (mut stream, _) =
         open_bep_tls_stream(ctx.identity, peer_addr, Some(ctx.peer_device_id), timeout)?;
-    let _ = our_hello.exchange(&mut stream)?;
+    let _ = ctx.hello.exchange(&mut stream)?;
     write_bep_message(
         &mut stream,
         BepMessageType::ClusterConfig,

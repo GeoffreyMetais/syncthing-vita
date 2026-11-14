@@ -25,8 +25,8 @@ pub enum SyncSessionStatus {
 pub struct PeerHandshakeResult {
     pub peer_addr: SocketAddr,
     pub peer_device_id: DeviceId,
-    pub peer_hello: BepHello,
-    pub tls_version: String,
-    pub alpn: Option<String>,
+    /// The peer's `Hello`, or `None` when it accepted the TLS connection but refused BEP (it
+    /// does not know this device yet).
+    pub peer_hello: Option<BepHello>,
     pub session_status: SyncSessionStatus,
 }

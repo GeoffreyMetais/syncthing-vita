@@ -11,13 +11,13 @@ use crate::device_id::DeviceId;
 
 /// Cryptographic identity of a Syncthing node (X.509 DER certificate + PKCS#8 DER private key + `DeviceId`).
 #[derive(Clone)]
-pub struct VitaIdentity {
+pub struct DeviceIdentity {
     pub cert_der: Vec<u8>,
     pub key_pkcs8_der: Vec<u8>,
     pub device_id: DeviceId,
 }
 
-impl VitaIdentity {
+impl DeviceIdentity {
     pub fn from_seed(seed: &[u8; 32]) -> io::Result<Self> {
         let secret_key = SecretKey::from_bytes(seed.into()).map_err(|e| {
             io::Error::new(

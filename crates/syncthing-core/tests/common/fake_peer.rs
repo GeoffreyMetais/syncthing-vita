@@ -14,7 +14,7 @@ use sha2::{Digest, Sha256};
 use syncthing_core::{
     read_bep_message, write_bep_message, BepBlockInfo, BepClusterConfig, BepFileInfo, BepFolder,
     BepHello, BepIndex, BepMessageType, BepRequest, BepResponse, BepVersionCounter, DeviceId,
-    FolderIndexState, VitaIdentity, BEP_ALPN,
+    DeviceIdentity, FolderIndexState, BEP_ALPN,
 };
 
 /// Read timeout of a single poll on the peer side.
@@ -37,7 +37,7 @@ impl FakePeer {
     where
         F: FnOnce(&mut PeerConn) + Send + 'static,
     {
-        let identity = VitaIdentity::from_seed(&[seed; 32]).expect("peer identity");
+        let identity = DeviceIdentity::from_seed(&[seed; 32]).expect("peer identity");
         let device_id = identity.device_id;
         let listener = TcpListener::bind("127.0.0.1:0").expect("bind fake peer");
         let addr = listener.local_addr().expect("fake peer address");
@@ -71,7 +71,7 @@ pub struct PeerConn {
 }
 
 impl PeerConn {
-    fn accept(identity: &VitaIdentity, tcp: TcpStream) -> Self {
+    fn accept(identity: &DeviceIdentity, tcp: TcpStream) -> Self {
         let provider = Arc::new(rustls_rustcrypto::provider());
         let mut config = ServerConfig::builder_with_provider(provider)
             .with_safe_default_protocol_versions()
@@ -147,7 +147,8 @@ impl PeerConn {
                 )
             })
             .collect();
-        let payload = BepClusterConfig::encode_for_peers(&entries, self.device_id, device);
+        let payload =
+            BepClusterConfig::encode_for_peers(&entries, self.device_id, "fake-peer", device);
         self.send(BepMessageType::ClusterConfig, &payload);
     }
 
