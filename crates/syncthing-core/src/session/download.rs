@@ -91,12 +91,14 @@ fn apply_pull_plan(
             });
         }
     }
-    for file in &plan.downloads {
-        if download_file(stream, ctx, folder_id, file)? {
-            any_changed = true;
-        }
-    }
-    Ok(any_changed)
+    // Completed files are recorded in the database as they come, saved at intervals; whatever
+    // ends the downloads (success, protocol error, stop request), the rest is saved here.
+    let downloads = plan.downloads.iter().try_for_each(|file| {
+        any_changed |= download_file(stream, ctx, folder_id, file)?;
+        Ok(())
+    });
+    storage.flush_folder_db(folder_id);
+    downloads.map(|()| any_changed)
 }
 
 /// Downloads the outdated blocks of one file into a temp file and commits it.
