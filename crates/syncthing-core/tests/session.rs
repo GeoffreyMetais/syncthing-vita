@@ -274,6 +274,42 @@ fn test_local_change_is_published_as_an_incremental_index_update() {
     );
 }
 
+/// A receive-only entry published as a local change (`invalid`) before the peer's index was
+/// known is published again as valid once it turns out the peer has it, although its sequence
+/// number did not change.
+#[test]
+fn test_entry_is_republished_when_its_invalid_flag_changes() {
+    let mut folders = FolderSyncState::default();
+    let index = |invalid: bool| BepIndex {
+        folder: "f".to_owned(),
+        files: vec![
+            BepFileInfo {
+                invalid,
+                ..indexed_file("a.bin".to_owned(), 1)
+            },
+            indexed_file("b.bin".to_owned(), 2),
+        ],
+    };
+    let names = |messages: &[(BepMessageType, BepIndex)]| -> Vec<(String, bool)> {
+        messages
+            .iter()
+            .flat_map(|(_, idx)| idx.files.iter().map(|f| (f.name.clone(), f.invalid)))
+            .collect()
+    };
+
+    assert_eq!(folders.take_unpublished(&index(true)).len(), 1);
+    assert!(folders.take_unpublished(&index(true)).is_empty());
+
+    let update = folders.take_unpublished(&index(false));
+    assert_eq!(update[0].0, BepMessageType::IndexUpdate);
+    assert_eq!(names(&update), vec![("a.bin".to_owned(), false)]);
+    assert!(folders.take_unpublished(&index(false)).is_empty());
+
+    // And the other way round.
+    let update = folders.take_unpublished(&index(true));
+    assert_eq!(names(&update), vec![("a.bin".to_owned(), true)]);
+}
+
 /// A file the peer could not serve (error `Response`) is not announced again: the session
 /// retries it at the next rescan instead of leaving it missing until a reconnection.
 #[test]
