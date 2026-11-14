@@ -54,7 +54,7 @@ pub fn handle(
     // 9x4 Keypad navigation (only while the virtual keyboard is shown)
     let keypad = state.fallback_keypad_visible;
     let pressed = if keypad { input.pressed } else { 0 };
-    if (pressed & BTN_LEFT) != 0 && keypad_idx % 9 > 0 {
+    if (pressed & BTN_LEFT) != 0 && !keypad_idx.is_multiple_of(9) {
         keypad_idx -= 1;
         state.modal = ModalDialog::AddDeviceById {
             return_share_idx,

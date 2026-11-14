@@ -121,6 +121,12 @@ pub struct Gfx {
     glyph_cache: HashMap<GlyphKey, CachedGlyph>,
 }
 
+impl Default for Gfx {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Gfx {
     pub fn new() -> Self {
         let font_reg = FontRef::try_from_slice(FONT_POPPINS_REG).expect("valid poppins regular");
@@ -407,7 +413,7 @@ impl Gfx {
 
     pub fn poly(&mut self, xy: &[(f32, f32)], c: Color) {
         let n = xy.len();
-        if n < 3 || n > 32 {
+        if !(3..=32).contains(&n) {
             return;
         }
         let mut ymin = xy[0].1;

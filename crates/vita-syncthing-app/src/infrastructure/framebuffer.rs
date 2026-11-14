@@ -65,6 +65,12 @@ pub struct VitaFramebuffer {
     back_idx: usize,
 }
 
+impl Default for VitaFramebuffer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl VitaFramebuffer {
     pub fn new() -> Self {
         #[cfg(target_os = "vita")]
