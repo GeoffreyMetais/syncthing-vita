@@ -12,7 +12,9 @@ pub mod ui_text;
 
 pub use app_state::AppState;
 pub use initial_sync::InitialSyncPeers;
-pub use interaction::{FocusSlot, HitMap, Hotspot, PadKey, Rect, ShortcutKey, UiAction};
+pub use interaction::{
+    FocusSlot, HitMap, Hotspot, PadKey, Rect, ScrollArea, ScrollTarget, ShortcutKey, UiAction,
+};
 pub use log_view::{sanitize_log_line, LogScope, LogView, LOG_VIEW_PAGE, LOG_VIEW_ROWS};
 pub use models::{
     fmt_size, ActiveTab, CameraPreview, FolderOffer, IgnoredFolder, KnownDevice, Language,

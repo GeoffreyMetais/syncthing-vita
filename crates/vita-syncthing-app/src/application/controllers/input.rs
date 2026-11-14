@@ -11,10 +11,11 @@ use crate::application::{
     SharesController,
 };
 use crate::domain::{
-    ActiveTab, AppState, ModalDialog, PickerMode, ShortcutKey, UiAction, TAB_ORDER,
+    ActiveTab, AppState, ModalDialog, PickerMode, ScrollTarget, ShortcutKey, UiAction, TAB_ORDER,
 };
 use crate::infrastructure::{
-    ConfigRepository, InputFrame, BTN_CIRCLE, BTN_L, BTN_R, BTN_SQUARE, BTN_START, BTN_TRIANGLE,
+    ConfigRepository, InputFrame, TouchDrag, BTN_CIRCLE, BTN_L, BTN_R, BTN_SQUARE, BTN_START,
+    BTN_TRIANGLE,
 };
 
 /// Face buttons an element can declare as its shortcut.
@@ -77,7 +78,12 @@ impl InputController {
             return ModalInput::handle(state, repo, input);
         }
 
-        // 2. Touch: the frame on screen declares what is under the finger (`HitMap`).
+        // 2. Touch: the frame on screen declares what is under the finger (`HitMap`): a drag
+        // scrolls the list it started on, a tap triggers the element.
+        if let Some(drag) = input.touch_drag {
+            Self::drag_scroll(state, drag);
+            return UserCommand::None;
+        }
         if let Some((tx, ty)) = input.touch_tap {
             if let Some(action) = state.hit_map.action_at(tx as i32, ty as i32) {
                 return Self::execute(state, repo, action);
@@ -167,6 +173,28 @@ impl InputController {
             | UiAction::Inert => {}
         }
         UserCommand::None
+    }
+
+    /// Scrolls the list (`ScrollArea`) the drag started on by one row per `step` pixels of
+    /// finger movement (the content follows the finger).
+    fn drag_scroll(state: &mut AppState, drag: TouchDrag) {
+        let Some(area) = state
+            .hit_map
+            .scroll_area_at(drag.start.0 as i32, drag.start.1 as i32)
+        else {
+            return;
+        };
+        if drag.started {
+            state.drag_scrolled_rows = 0;
+        }
+        let target = -drag.total_dy / area.step.max(1);
+        let rows = target - state.drag_scrolled_rows;
+        state.drag_scrolled_rows = target;
+        if rows != 0 {
+            match area.target {
+                ScrollTarget::FilesList => FilesController::scroll(state, rows),
+            }
+        }
     }
 
     /// Activates `tab`; the `Files` tab opens on the share-creation folder browser.
