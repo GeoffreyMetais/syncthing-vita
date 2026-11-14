@@ -186,3 +186,40 @@ fn test_scan_qr_action_in_manage_devices_modal() {
     tap_rect(&mut state, &repo, add);
     assert!(matches!(state.modal, ModalDialog::AddDeviceById { .. }));
 }
+
+#[test]
+fn test_scan_qr_action_in_show_device_id_modal() {
+    let dir = temp_test_dir("qr-show-id");
+    let repo = ConfigRepository::new(&dir);
+    let mut state = AppState::new(Vec::new(), Vec::new(), &dir);
+    let scanning = ModalDialog::ScanDeviceQr {
+        return_share_idx: None,
+    };
+
+    // `R` shortcut
+    state.modal = ModalDialog::ShowDeviceId;
+    press(&mut state, &repo, BTN_R);
+    assert_eq!(state.modal, scanning);
+
+    // `R · Scan QR` button next to `Add Remote Device`, and its hint in the bottom bar
+    state.modal = ModalDialog::ShowDeviceId;
+    let scan = rects_of(&mut state, UiAction::Press(PadKey::R));
+    assert_eq!(scan.len(), 2, "the dialog button and the hint");
+    for rect in scan {
+        state.modal = ModalDialog::ShowDeviceId;
+        tap_rect(&mut state, &repo, rect);
+        assert_eq!(state.modal, scanning);
+    }
+
+    // `Add Remote Device` still opens the ID form
+    state.modal = ModalDialog::ShowDeviceId;
+    let add = rects_of(&mut state, UiAction::Press(PadKey::Square))[0];
+    tap_rect(&mut state, &repo, add);
+    assert!(matches!(
+        state.modal,
+        ModalDialog::AddDeviceById {
+            return_share_idx: None,
+            ..
+        }
+    ));
+}
