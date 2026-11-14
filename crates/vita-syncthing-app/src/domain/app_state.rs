@@ -4,7 +4,7 @@
 use syncthing_core::DeviceId;
 
 use crate::domain::defaults::LOG_BUFFER_LINES;
-use crate::domain::initial_sync::InitialSyncPeers;
+use crate::domain::initial_sync::{ConnectedPeers, InitialSyncPeers};
 use crate::domain::interaction::{FocusSlot, HitMap};
 use crate::domain::log_view::{sanitize_log_line, LogView};
 use crate::domain::models::{
@@ -65,6 +65,8 @@ pub struct AppState {
     pub unpaired_lan_peers: Vec<DeviceId>,
     /// True while a persistent `1+2` BEP/1.0 connection is active in the background.
     pub session_connected: bool,
+    /// Peers with an established persistent session (`session_connected` while not empty).
+    pub connected_peers: ConnectedPeers,
     /// Peers in their initial sync phase (the CPU runs at full speed meanwhile).
     pub initial_sync: InitialSyncPeers,
     /// True when automatic background reconnection is permitted (disabled when a peer is awaiting manual pairing).
@@ -150,6 +152,7 @@ impl AppState {
             devices,
             unpaired_lan_peers: Vec::new(),
             session_connected: false,
+            connected_peers: ConnectedPeers::default(),
             initial_sync: InitialSyncPeers::default(),
             auto_reconnect_enabled: true,
             transfer_activity: 0,
@@ -174,6 +177,13 @@ impl AppState {
             qr_preview: CameraPreview::default(),
             qr_camera_error: None,
         }
+    }
+
+    /// The sync worker stopped or is being replaced: no session remains.
+    pub fn reset_sessions(&mut self) {
+        self.session_connected = false;
+        self.connected_peers.clear();
+        self.initial_sync.clear();
     }
 
     /// Returns `true` if `device_id` was only passively discovered on LAN and not yet approved by the user.
