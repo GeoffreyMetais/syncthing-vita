@@ -475,10 +475,11 @@ Every change that alters what is drawn goes through these steps before it is rep
    ```bash
    mkdir -p docs/screenshots/<branch> && cp target/ui-shots/*.png docs/screenshots/<branch>/
    git add docs/screenshots/<branch> && git commit -m "Screenshots of <change>" && git push
+   git rev-parse HEAD   # full hash of the screenshots commit, used in the links
    ```
-   then embed each one in a `## Screenshots` section of the PR description with a one-line caption:
-   `![Settings](https://github.com/GeoffreyMetais/syncthing-vita/blob/<branch>/docs/screenshots/<branch>/1_settings.png?raw=true)`.
-   When the PR is updated with another visual change, replace the outdated screenshots (same names) or add new ones, and update the section.
+   then embed each one in a `## Screenshots` section of the PR description with a one-line caption, linking through **that commit hash, never the branch name** (a branch link breaks once the branch is merged and deleted):
+   `![Settings](https://github.com/GeoffreyMetais/syncthing-vita/blob/<commit sha>/docs/screenshots/<branch>/1_settings.png?raw=true)`.
+   When the PR is updated with another visual change, replace the outdated screenshots (same names) or add new ones, commit, and update the section with the new commit hash.
 
 ---
 
