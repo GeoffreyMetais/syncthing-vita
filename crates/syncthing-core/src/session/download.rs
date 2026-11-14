@@ -93,11 +93,19 @@ fn apply_pull_plan(
     }
     // Completed files are recorded in the database as they come, saved at intervals; whatever
     // ends the downloads (success, protocol error, stop request), the rest is saved here.
+    let mut skipped = false;
     let downloads = plan.downloads.iter().try_for_each(|file| {
-        any_changed |= download_file(stream, ctx, folder_id, file)?;
+        if download_file(stream, ctx, folder_id, file)? {
+            any_changed = true;
+        } else {
+            skipped = true;
+        }
         Ok(())
     });
     storage.flush_folder_db(folder_id);
+    if skipped {
+        ctx.mark_folder_incomplete(folder_id);
+    }
     downloads.map(|()| any_changed)
 }
 

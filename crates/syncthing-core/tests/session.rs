@@ -274,6 +274,77 @@ fn test_local_change_is_published_as_an_incremental_index_update() {
     );
 }
 
+/// A file the peer could not serve (error `Response`) is not announced again: the session
+/// retries it at the next rescan instead of leaving it missing until a reconnection.
+#[test]
+fn test_failed_download_is_retried_at_the_next_rescan() {
+    let vita_id = vita_identity().device_id;
+    let peer = FakePeer::spawn(0x5B, move |conn| {
+        let file = conn.file("shared", "busy.txt", b"available later", 1);
+        conn.send_cluster_config(&["shared"], vita_id);
+        conn.wait_for(BepMessageType::ClusterConfig, Duration::from_secs(5))
+            .expect("ClusterConfig reply");
+        conn.send_index("shared", vec![file], false);
+        // First attempt: the peer cannot serve the block right now.
+        let first = conn
+            .wait_for(BepMessageType::Request, Duration::from_secs(5))
+            .expect("block request");
+        let refused = BepResponse {
+            id: BepRequest::decode(&first).unwrap().id,
+            data: Vec::new(),
+            code: 1,
+        };
+        conn.send(BepMessageType::Response, &refused.encode());
+        conn.wait_for(BepMessageType::Index, Duration::from_secs(10))
+            .expect("full Index");
+        // The retry is served, then published.
+        conn.wait_for(BepMessageType::IndexUpdate, Duration::from_secs(15))
+            .expect("IndexUpdate after the retried download");
+    });
+
+    let root = common::fresh_temp_dir("session_e2e_download_retry");
+    let mut storage = FsSyncStorage::new(&root);
+    storage.set_folder_devices("shared", vec![peer.device_id]);
+    let path = storage.resolve_safe_path("shared", "busy.txt");
+
+    let control = SyncControl::with_tuning(SyncTuning {
+        rescan_interval: Duration::from_secs(3600),
+        ..SyncTuning::default()
+    });
+    let (events_tx, events_rx) = mpsc::channel();
+    let (peer_addr, peer_id) = (peer.addr, peer.device_id);
+    let session_control = std::sync::Arc::clone(&control);
+    let session = std::thread::spawn(move || {
+        connect_and_sync_with_control(
+            &vita_identity(),
+            peer_addr,
+            Some(peer_id),
+            &BepHello::new_vita_default(),
+            &storage,
+            Duration::from_secs(4),
+            Some(session_control),
+            move |event| {
+                let _ = events_tx.send(event);
+            },
+        )
+    });
+    loop {
+        let event = events_rx
+            .recv_timeout(Duration::from_secs(20))
+            .expect("initial sync cycle");
+        if matches!(event, SyncEvent::SyncCycleCompleted { .. }) {
+            break;
+        }
+    }
+    assert!(!path.exists(), "the first attempt was refused");
+    control.request_rescan();
+
+    peer.join();
+    control.request_stop();
+    session.join().unwrap().expect("session failed");
+    assert_eq!(std::fs::read(&path).unwrap(), b"available later");
+}
+
 fn indexed_file(name: String, sequence: i64) -> BepFileInfo {
     BepFileInfo {
         name,

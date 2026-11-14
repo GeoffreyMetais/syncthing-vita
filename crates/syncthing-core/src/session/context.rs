@@ -55,6 +55,8 @@ pub struct SessionContext<'a> {
     /// Primary-connection messages received while waiting for a block `Response`; they are
     /// handled by the session loops once the download is over.
     deferred: VecDeque<(BepMessageType, Vec<u8>)>,
+    /// Folders in which a file could not be downloaded; pulled again at the next rescan.
+    incomplete_folders: Vec<String>,
     last_keepalive: Instant,
     next_request_id: i32,
     on_event: &'a mut dyn FnMut(SyncEvent),
@@ -75,6 +77,7 @@ impl<'a> SessionContext<'a> {
             control: None,
             tuning: SyncTuning::default(),
             deferred: VecDeque::new(),
+            incomplete_folders: Vec::new(),
             last_keepalive: Instant::now(),
             next_request_id: 1,
             on_event,
@@ -107,6 +110,19 @@ impl<'a> SessionContext<'a> {
     /// Takes the oldest deferred message, if any.
     pub fn take_deferred_message(&mut self) -> Option<(BepMessageType, Vec<u8>)> {
         self.deferred.pop_front()
+    }
+
+    /// Remembers that a file of `folder_id` could not be downloaded (peer error, local
+    /// filesystem error): the peer will not announce it again, so the session retries.
+    pub fn mark_folder_incomplete(&mut self, folder_id: &str) {
+        if !self.incomplete_folders.iter().any(|f| f == folder_id) {
+            self.incomplete_folders.push(folder_id.to_owned());
+        }
+    }
+
+    /// Takes the folders whose pull must be retried.
+    pub fn take_incomplete_folders(&mut self) -> Vec<String> {
+        std::mem::take(&mut self.incomplete_folders)
     }
 
     /// Returns `true` (and restarts the interval) when a keepalive `Ping` must be sent.
