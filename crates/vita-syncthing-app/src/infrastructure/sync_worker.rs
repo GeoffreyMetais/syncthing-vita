@@ -16,6 +16,7 @@ use super::peer_endpoints::{
     SharedGlobalEndpoints,
 };
 use super::worker_slot::spawn_after_previous;
+use super::ConfigRepository;
 use crate::domain::defaults::{
     DISCOVERY_INTERVAL, DISCOVERY_LISTEN, DISCOVERY_SCAN_LISTEN, GLOBAL_DISCOVERY_INTERVAL,
     KEEPALIVE_INTERVAL, MAX_PEER_SESSIONS, RESCAN_INTERVAL,
@@ -93,6 +94,7 @@ pub fn spawn_sync_worker(
     });
     let worker_control = Arc::clone(&control);
     let sync_root = format!("{}/sync", base_data_dir);
+    let worker_base_dir = base_data_dir.to_owned();
 
     let wait_tx = tx.clone();
     let on_wait = move || {
@@ -107,7 +109,17 @@ pub fn spawn_sync_worker(
             return;
         }
         let mut storage = FsSyncStorage::new(&sync_root);
+        let repo = ConfigRepository::new(&worker_base_dir);
         for s in &shares_snapshot {
+            // Defence in depth (the folder browser refuses such a target): never synchronize
+            // the app's own data, whatever `shares.cfg` says.
+            if repo.is_protected_share_path(&s.target_path) {
+                let _ = tx.send(WorkerMsg::Log(format!(
+                    "Share {} not synchronized: {} holds the app's own data.",
+                    s.folder_id, s.target_path
+                )));
+                continue;
+            }
             storage.set_folder_path(&s.folder_id, &s.target_path);
             storage.set_folder_paused(&s.folder_id, !s.enabled);
             // A read-only share is Syncthing's "Receive Only": its local changes are never sent.

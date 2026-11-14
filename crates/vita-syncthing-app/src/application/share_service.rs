@@ -4,6 +4,7 @@
 use syncthing_core::DeviceId;
 
 use crate::application::{FolderOfferService, ShareCreation};
+use crate::domain::defaults::MAX_DISCOVERED_PEERS;
 use crate::domain::{
     ActiveTab, AppState, KnownDevice, PickerItem, PickerMode, ShareConfigEntry, ShareMode, UiText,
     BROWSE_TEMPLATE_ID, NEW_SHARE_TEMPLATES,
@@ -19,37 +20,29 @@ impl ShareService {
         state.push_log(msg);
     }
 
-    /// Passively records a LAN peer discovered via UDP 21027 without automatically linking or connecting to it.
-    /// If the peer matches an existing user-added Short ID placeholder, upgrades it to the full 32-byte ID.
+    /// Passively records a LAN peer discovered via UDP 21027 without automatically linking or
+    /// connecting to it. An announcement is not authenticated (anyone on the LAN can send any
+    /// ID), so it never upgrades a Short ID placeholder: that only happens once a TLS session
+    /// proved the peer owns the ID ([`Self::upsert_device`]). At most `MAX_DISCOVERED_PEERS`
+    /// unpaired peers are listed.
     pub fn register_discovered_peer(
         state: &mut AppState,
-        repo: &ConfigRepository,
         device_id: DeviceId,
         name: &str,
         address: &str,
     ) {
-        let dev_hex = device_id.to_hex();
-        let mut upgraded_from_hex: Option<String> = None;
-
         if let Some(existing) = state
             .devices
             .iter_mut()
             .find(|d| d.device_id.matches_peer(&device_id))
         {
-            if existing.device_id != device_id && existing.device_id.is_short_placeholder() {
-                upgraded_from_hex = Some(existing.device_id.to_hex());
-                existing.device_id = device_id;
-                if existing.name.contains("(Short ID)") {
-                    existing.name = format!("Device {}", device_id.short());
-                }
-            }
             if !name.is_empty() && name != "LAN Peer" {
                 existing.name = name.to_owned();
             }
             if !address.is_empty() && address != "dynamic" {
                 existing.address = address.to_owned();
             }
-        } else {
+        } else if state.unpaired_lan_peers.len() < MAX_DISCOVERED_PEERS {
             let label = if name.is_empty() || name == "LAN Peer" {
                 format!("LAN Peer ({})", device_id.short())
             } else {
@@ -60,22 +53,20 @@ impl ShareService {
                 name: label,
                 address: address.to_owned(),
             });
-            if !state.is_unpaired_lan_peer(&device_id) {
-                state.unpaired_lan_peers.push(device_id);
-            }
+            state.unpaired_lan_peers.push(device_id);
         }
+    }
 
-        if let Some(old_hex) = upgraded_from_hex {
-            for s in &mut state.shares {
-                for h in &mut s.shared_devices {
-                    if *h == old_hex {
-                        *h = dev_hex.clone();
-                    }
+    /// Replaces a Short ID placeholder by the full ID it stood for in every share.
+    fn relink_upgraded_device(state: &mut AppState, old_hex: &str, new_id: DeviceId) {
+        let new_hex = new_id.to_hex();
+        for s in &mut state.shares {
+            for h in &mut s.shared_devices {
+                if h == old_hex {
+                    *h = new_hex.clone();
                 }
-                s.shared_devices.dedup();
             }
-            repo.save_devices(&state.approved_devices());
-            repo.save_shares(&state.shares);
+            s.shared_devices.dedup();
         }
     }
 
@@ -91,7 +82,6 @@ impl ShareService {
         state
             .unpaired_lan_peers
             .retain(|id| !id.matches_peer(&device_id));
-        let dev_hex = device_id.to_hex();
         let mut upgraded_from_hex: Option<String> = None;
 
         if let Some(existing) = state
@@ -125,16 +115,8 @@ impl ShareService {
             });
         }
 
-        // If a shortened ID placeholder was upgraded to a full 32-byte DeviceId, update all shares
         if let Some(old_hex) = upgraded_from_hex {
-            for s in &mut state.shares {
-                for h in &mut s.shared_devices {
-                    if *h == old_hex {
-                        *h = dev_hex.clone();
-                    }
-                }
-                s.shared_devices.dedup();
-            }
+            Self::relink_upgraded_device(state, &old_hex, device_id);
         }
 
         repo.save_devices(&state.approved_devices());
@@ -211,14 +193,7 @@ impl ShareService {
 
         let dev_hex = resolved_id.to_hex();
         if let Some(old_hex) = upgraded_from_hex {
-            for s in &mut state.shares {
-                for h in &mut s.shared_devices {
-                    if *h == old_hex {
-                        *h = dev_hex.clone();
-                    }
-                }
-                s.shared_devices.dedup();
-            }
+            Self::relink_upgraded_device(state, &old_hex, resolved_id);
         }
 
         let mut offered_fid: Option<String> = None;
@@ -636,6 +611,11 @@ impl ShareService {
             state.picker_current_dir = item.path;
             state.selected_picker_idx = 0;
             Self::refresh_picker_items(state, repo);
+            return;
+        }
+        // Browsing through the app's data is fine, sharing it is not.
+        if repo.is_protected_share_path(&item.path) {
+            state.show_toast(UiText::FolderProtected);
             return;
         }
 

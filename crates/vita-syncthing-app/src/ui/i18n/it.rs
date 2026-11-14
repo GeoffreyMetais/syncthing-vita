@@ -251,6 +251,7 @@ pub static MESSAGES_IT: Messages = Messages {
     added_device: "Dispositivo {name} aggiunto ({short})",
     own_device_id: "Impossibile aggiungere l'ID di questa PS Vita",
     qr_not_device_id: "Questo codice QR non è un ID dispositivo Syncthing",
+    folder_protected: "Questa cartella contiene i dati di Syncthing e non può essere condivisa",
     share_deleted: "Condivisione '{label}' eliminata",
     link_device_to_share: "Collega un dispositivo per condividere '{label}'",
     share_created: "Condivisione '{label}' creata",

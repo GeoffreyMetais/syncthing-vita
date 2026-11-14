@@ -67,6 +67,16 @@ impl ConfigRepository {
         format!("{}/syncthing.log.1", self.base_data_dir)
     }
 
+    /// Returns `true` if `path` must never be a share's folder: the app's data directory
+    /// (identity seed, `.cfg` files) or a folder containing it (`ux0:`, `ux0:data`). A peer of
+    /// such a share could read the device's private key or rewrite the configuration.
+    /// Folders inside the data directory (`sync/<id>`, `shared`) hold none of that.
+    pub fn is_protected_share_path(&self, path: &str) -> bool {
+        let base = path_components(&self.base_data_dir);
+        let target = path_components(path);
+        target.len() <= base.len() && base.iter().zip(&target).all(|(a, b)| a == b)
+    }
+
     /// Appends a diagnostic log line to stdout and `<base_data_dir>/syncthing.log`. Above
     /// `LOG_MAX_BYTES` the file becomes `syncthing.log.1` and a new one is started.
     pub fn write_log(&self, msg: &str) {
@@ -315,6 +325,15 @@ impl ConfigRepository {
         }
         subdirs
     }
+}
+
+/// Components of a path, comparable whatever its spelling (`ux0:data`, `ux0:/data/`, letter
+/// case: PS Vita storage is case-insensitive).
+fn path_components(path: &str) -> Vec<String> {
+    path.split(['/', ':'])
+        .filter(|c| !c.is_empty() && *c != ".")
+        .map(str::to_lowercase)
+        .collect()
 }
 
 /// Replaces `path` with `content` through a temp file, keeping the previous version as

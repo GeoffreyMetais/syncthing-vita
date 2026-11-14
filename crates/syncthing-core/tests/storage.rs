@@ -94,12 +94,19 @@ fn test_peer_supplied_block_sizes_are_bounded() {
         b"data"
     );
 
-    // So is an index announcing an oversized or negative block.
-    for size in [i32::MAX, -1] {
+    // So is an index announcing an oversized or negative block, a block beyond the end of
+    // the file, or a file larger than what its blocks cover.
+    for (offset, size, file_size) in [
+        (0, i32::MAX, 4),
+        (0, -1, 4),
+        (1 << 40, 4, 4),
+        (i64::MAX, 4, 4),
+        (0, 4, 1 << 40),
+    ] {
         let remote = BepFileInfo {
             name: "a.bin".to_owned(),
             is_dir: false,
-            size: 4,
+            size: file_size,
             modified_s: 1,
             deleted: false,
             invalid: false,
@@ -109,7 +116,7 @@ fn test_peer_supplied_block_sizes_are_bounded() {
                 value: 1,
             }],
             blocks: vec![BepBlockInfo {
-                offset: 0,
+                offset,
                 size,
                 hash: vec![0; 32],
             }],

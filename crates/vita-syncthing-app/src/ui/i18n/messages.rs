@@ -69,6 +69,7 @@ pub struct Messages {
     pub added_device: &'static str,
     pub own_device_id: &'static str,
     pub qr_not_device_id: &'static str,
+    pub folder_protected: &'static str,
     /// `{label}`.
     pub share_deleted: &'static str,
     /// `{label}`.
@@ -186,6 +187,7 @@ impl Strings {
             UiText::ThemeOled => m.theme_oled,
             UiText::OwnDeviceId => m.own_device_id,
             UiText::QrNotDeviceId => m.qr_not_device_id,
+            UiText::FolderProtected => m.folder_protected,
             UiText::NoDeclinedFolders => m.no_declined_folders,
             UiText::NoDevicesLinked => m.no_devices_linked,
             UiText::InvalidDeviceId(err) => return Cow::Owned(self.device_id_error(*err)),

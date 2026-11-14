@@ -30,7 +30,7 @@ fn setup(name: &str) -> (String, ConfigRepository, AppState) {
     for sub in ["alpha", "beta", "gamma"] {
         std::fs::create_dir_all(format!("{dir}/{sub}/inner")).unwrap();
     }
-    let repo = ConfigRepository::new(&dir);
+    let repo = ConfigRepository::new(&format!("{dir}/.appdata"));
     let mut state = AppState::new(Vec::new(), Vec::new(), &dir);
     ShareService::upsert_device(&mut state, &repo, PEER, "MacBook", "192.168.1.10:22000");
     ShareService::create_share(&mut state, &repo, "saves", "Saves", &format!("{dir}/gamma"));

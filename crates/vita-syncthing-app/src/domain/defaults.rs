@@ -14,6 +14,9 @@ use std::time::Duration;
 pub const RESCAN_INTERVAL: Duration = Duration::from_secs(60);
 /// Maximum silence on a connection before a keepalive `Ping` is sent.
 pub const KEEPALIVE_INTERVAL: Duration = Duration::from_secs(20);
+/// Maximum number of unpaired LAN peers listed from discovery announcements (which are not
+/// authenticated: anyone on the LAN can announce any number of IDs).
+pub const MAX_DISCOVERED_PEERS: usize = 32;
 /// Maximum number of devices synchronized at the same time (one session thread each).
 pub const MAX_PEER_SESSIONS: usize = 4;
 /// TCP connect / TLS handshake timeout when dialing a device.

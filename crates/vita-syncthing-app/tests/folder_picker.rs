@@ -37,7 +37,9 @@ fn files_tab_with_subfolders(name: &str, count: usize) -> (String, ConfigReposit
     for i in 0..count {
         std::fs::create_dir_all(format!("{}/sub{:02}", dir, i)).unwrap();
     }
-    let repo = ConfigRepository::new(&dir);
+    // As on the console, the app's data lives apart from the browsed folders (in a hidden
+    // directory, which the browser does not list).
+    let repo = ConfigRepository::new(&format!("{dir}/.appdata"));
     let mut state = AppState::new(Vec::new(), Vec::new(), &dir);
     state.active_tab = ActiveTab::FolderPicker;
     state.picker_mode = PickerMode::CreateNewShare;
@@ -166,5 +168,48 @@ fn test_touch_tap_through_gestures_still_selects_a_row() {
     assert_eq!(state.shares.len(), 1);
     assert!(state.shares[0].target_path.ends_with("/sub01"));
 
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// The app's data directory (identity seed, configuration) and the folders containing it
+/// cannot become shares; the folders inside it can.
+#[test]
+fn test_app_data_folders_cannot_be_shared() {
+    let repo = ConfigRepository::new("ux0:data/syncthing");
+    for path in [
+        "ux0:",
+        "ux0:/",
+        "ux0:data",
+        "ux0:/data/",
+        "UX0:DATA/Syncthing",
+        "ux0:data/syncthing",
+    ] {
+        assert!(repo.is_protected_share_path(path), "{path}");
+    }
+    for path in [
+        "ux0:data/syncthing/sync/docs",
+        "ux0:data/syncthing/shared",
+        "ux0:data/syncthingX",
+        "ux0:data/retroarch/savefiles",
+        "ux0:user/00/savedata",
+        "ux0:picture",
+        "ur0:",
+    ] {
+        assert!(!repo.is_protected_share_path(path), "{path}");
+    }
+
+    // Selecting such a folder in the browser explains why instead of creating a share.
+    use vita_syncthing_app::application::ShareService;
+    use vita_syncthing_app::domain::UiText;
+    let (dir, _, mut state) = files_tab_with_subfolders("picker-protected", 2);
+    let repo = ConfigRepository::new(&format!("{dir}/sub01"));
+    state.selected_picker_idx = 1;
+    ShareService::apply_picker_selection(&mut state, &repo, false);
+    assert!(state.shares.is_empty());
+    assert_eq!(state.toast_msg.map(|(msg, _)| msg), Some(UiText::FolderProtected));
+    state.selected_picker_idx = 0;
+    state.toast_msg = None;
+    ShareService::apply_picker_selection(&mut state, &repo, false);
+    assert_eq!(state.shares.len(), 1);
     let _ = std::fs::remove_dir_all(&dir);
 }

@@ -14,24 +14,42 @@ impl FsSyncStorage {
     /// **Step 1 (Delta Sync)**:
     /// Inspects the local file block by block (fixed 128 KiB buffer in RAM) and returns
     /// only the list of blocks that are missing or have a differing SHA-256 compared to the remote `Index`.
-    /// Read-only: the local file is never modified here. Block sizes come from the peer and
-    /// are rejected when negative or above [`BEP_MAX_BLOCK_SIZE`].
+    /// Read-only: the local file is never modified here. Block sizes and offsets come from the
+    /// peer: they are rejected when negative, above [`BEP_MAX_BLOCK_SIZE`], beyond the announced
+    /// file size, or when the blocks do not add up to that size.
     pub fn find_outdated_blocks(
         &self,
         folder_id: &str,
         remote_file: &BepFileInfo,
     ) -> io::Result<Vec<BepBlockInfo>> {
         let full_path = self.resolve_safe_path(folder_id, &remote_file.name);
-        if let Some(bad) = remote_file
-            .blocks
-            .iter()
-            .find(|b| b.size < 0 || b.size as usize > BEP_MAX_BLOCK_SIZE || b.offset < 0)
-        {
+        let file_size = remote_file.size;
+        let out_of_bounds = |b: &&BepBlockInfo| {
+            b.size < 0
+                || b.size as usize > BEP_MAX_BLOCK_SIZE
+                || b.offset < 0
+                || b.offset
+                    .checked_add(i64::from(b.size))
+                    .is_none_or(|end| end > file_size)
+        };
+        if let Some(bad) = remote_file.blocks.iter().find(out_of_bounds) {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 format!(
                     "invalid block (offset {}, size {}) announced for {}",
                     bad.offset, bad.size, remote_file.name
+                ),
+            ));
+        }
+        // The blocks must cover the announced size exactly: the file is created with that
+        // size, which a peer must not be able to inflate without sending the data.
+        let covered: i64 = remote_file.blocks.iter().map(|b| i64::from(b.size)).sum();
+        if covered != file_size {
+            return Err(io::Error::new(
+                io::ErrorKind::InvalidData,
+                format!(
+                    "{} announced with {} bytes but blocks covering {}",
+                    remote_file.name, file_size, covered
                 ),
             ));
         }

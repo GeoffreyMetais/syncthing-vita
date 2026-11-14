@@ -78,7 +78,7 @@ fn test_selecting_a_folder_in_files_tab_starts_share_creation() {
 
     let dir = temp_test_dir("files-tab-create");
     std::fs::create_dir_all(format!("{}/saves", dir)).unwrap();
-    let repo = ConfigRepository::new(&dir);
+    let repo = ConfigRepository::new(&format!("{dir}/.appdata"));
     let mut state = AppState::new(Vec::new(), Vec::new(), &dir);
 
     // Overview -> Files
