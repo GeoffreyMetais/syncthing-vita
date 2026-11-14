@@ -96,6 +96,8 @@ fn draw_device_card(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut Hi
         (s.status_syncing, th.accent_hi)
     } else if state.status_line == UiText::ScanningLan {
         (s.status_scanning, C_WARN)
+    } else if !state.session_connected && !state.sync_peers().is_empty() {
+        (s.status_offline, C_WARN)
     } else {
         (s.status_ready, C_GOOD)
     };

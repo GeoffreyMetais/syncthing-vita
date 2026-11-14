@@ -51,6 +51,7 @@ pub const ACTION_BACKSPACE: &str = "Backspace";
 // ============================================================================
 
 pub const STATUS_READY: &str = "Ready";
+pub const STATUS_OFFLINE: &str = "Offline";
 pub const STATUS_SYNCING: &str = "Syncing";
 pub const STATUS_SCANNING: &str = "Scanning";
 pub const STATUS_ACTIVE: &str = "Active";

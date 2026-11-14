@@ -65,6 +65,7 @@ pub struct Strings {
 
     // Status Badges & Chips
     pub status_ready: &'static str,
+    pub status_offline: &'static str,
     pub status_syncing: &'static str,
     pub status_scanning: &'static str,
     pub status_active: &'static str,

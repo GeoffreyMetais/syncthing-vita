@@ -53,7 +53,11 @@ use crate::bep::BepHello;
 use crate::cert::VitaIdentity;
 use crate::device_id::DeviceId;
 use crate::storage::FsSyncStorage;
-use crate::tls::client::open_bep_tls_stream;
+use std::net::TcpStream;
+
+use crate::tls::client::{open_bep_tls_stream, wrap_bep_tls_stream};
+use crate::tls::verifier::ObservedDeviceId;
+use crate::tls::BepTlsStream;
 
 /// Timeout used when opening the initial secondary connections.
 const SECONDARY_OPEN_TIMEOUT: Duration = Duration::from_millis(2000);
@@ -98,14 +102,75 @@ pub fn connect_and_sync_with_control<F>(
     storage: &FsSyncStorage,
     timeout: Duration,
     control: Option<Arc<SyncControl>>,
+    on_event: F,
+) -> io::Result<PeerHandshakeResult>
+where
+    F: FnMut(SyncEvent),
+{
+    let (stream, observed_device_id) =
+        open_bep_tls_stream(identity, peer_addr, expected_device_id, timeout)
+            .map_err(|e| with_context("TCP connect", e))?;
+    run_bep_session(
+        identity,
+        stream,
+        observed_device_id,
+        peer_addr,
+        our_hello,
+        storage,
+        true,
+        control,
+        on_event,
+    )
+}
+
+/// Runs a BEP/1.0 TLS 1.3 session over an already-connected `TcpStream` (e.g. a Syncthing Relay
+/// session tunnel). Secondary connections are disabled (`1+0`) since the tunnel is single-stream.
+#[allow(clippy::too_many_arguments)]
+pub fn connect_and_sync_stream_with_control<F>(
+    identity: &VitaIdentity,
+    tcp: TcpStream,
+    peer_addr: SocketAddr,
+    expected_device_id: Option<DeviceId>,
+    our_hello: &BepHello,
+    storage: &FsSyncStorage,
+    timeout: Duration,
+    control: Option<Arc<SyncControl>>,
+    on_event: F,
+) -> io::Result<PeerHandshakeResult>
+where
+    F: FnMut(SyncEvent),
+{
+    let (stream, observed_device_id) =
+        wrap_bep_tls_stream(identity, tcp, expected_device_id, timeout)
+            .map_err(|e| with_context("TLS wrap", e))?;
+    run_bep_session(
+        identity,
+        stream,
+        observed_device_id,
+        peer_addr,
+        our_hello,
+        storage,
+        false,
+        control,
+        on_event,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn run_bep_session<F>(
+    identity: &VitaIdentity,
+    mut stream: BepTlsStream,
+    observed_device_id: ObservedDeviceId,
+    peer_addr: SocketAddr,
+    our_hello: &BepHello,
+    storage: &FsSyncStorage,
+    allow_secondary: bool,
+    control: Option<Arc<SyncControl>>,
     mut on_event: F,
 ) -> io::Result<PeerHandshakeResult>
 where
     F: FnMut(SyncEvent),
 {
-    let (mut stream, observed_device_id) =
-        open_bep_tls_stream(identity, peer_addr, expected_device_id, timeout)
-            .map_err(|e| with_context("TCP connect", e))?;
     let observed = || observed_device_id.lock().ok().and_then(|g| *g);
 
     // 1. `Hello` exchange on the primary connection
@@ -161,8 +226,12 @@ where
         }
     }
 
-    // 3. `+2` secondary data connections, if the peer supports them
-    let desired_secondary = desired_secondary_count(&result.peer_hello, our_hello);
+    // 3. `+2` secondary data connections, if the peer supports them and direct TCP is used
+    let desired_secondary = if allow_secondary {
+        desired_secondary_count(&result.peer_hello, our_hello)
+    } else {
+        0
+    };
     let secondaries_opened_at = Instant::now();
     let mut secondaries: Vec<SecondaryBepConn> = (0..desired_secondary)
         .filter_map(|_| {

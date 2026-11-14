@@ -31,6 +31,7 @@ pub struct Messages {
     pub scanning_lan: &'static str,
     /// `{name}`, `{addr}`.
     pub connecting_to: &'static str,
+    pub waiting_for_lan: &'static str,
     pub exchanging_index: &'static str,
     /// `{file}`.
     pub file_up_to_date: &'static str,
@@ -176,6 +177,7 @@ impl Strings {
             UiText::NoRemoteFolders => m.no_remote_folders,
             UiText::StartingSync => m.starting_sync,
             UiText::ScanningLan => m.scanning_lan,
+            UiText::WaitingForLan => m.waiting_for_lan,
             UiText::ExchangingIndex => m.exchanging_index,
             UiText::SyncFinished => m.sync_finished,
             UiText::NoPeerAddDevice => m.no_peer_add_device,

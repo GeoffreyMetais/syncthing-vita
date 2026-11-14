@@ -40,24 +40,45 @@ fn verified_config_builder(
     Ok((builder, observed_device_id))
 }
 
-/// Creates a client connection for `config` with the BEP ALPN.
-fn new_bep_connection(mut config: ClientConfig) -> io::Result<ClientConnection> {
-    config.alpn_protocols = vec![BEP_ALPN.to_vec()];
-    let server_name = ServerName::try_from(SYNCTHING_SERVER_NAME)
+/// Creates a client connection for `config` with the given `alpn` and `server_name`.
+fn new_alpn_connection(
+    mut config: ClientConfig,
+    alpn: &[u8],
+    server_name: &str,
+) -> io::Result<ClientConnection> {
+    if !alpn.is_empty() {
+        config.alpn_protocols = vec![alpn.to_vec()];
+    }
+    let server_name = ServerName::try_from(server_name.to_owned())
         .map_err(|e| io::Error::new(io::ErrorKind::InvalidInput, format!("ServerName: {e}")))?;
     ClientConnection::new(Arc::new(config), server_name)
         .map_err(|e| io::Error::other(format!("TLS init failed: {e}")))
 }
 
-/// Opens a client-authenticated TLS 1.3 stream (`ALPN = "bep/1.0"`) to `peer_addr`.
-/// Returns the stream and the slot that receives the peer's `DeviceId` once the handshake ran.
-pub fn open_bep_tls_stream(
+/// Creates a client connection for `config` with the BEP ALPN.
+fn new_bep_connection(config: ClientConfig) -> io::Result<ClientConnection> {
+    new_alpn_connection(config, BEP_ALPN, SYNCTHING_SERVER_NAME)
+}
+
+/// Wraps an already-connected `TcpStream` in a client-authenticated TLS 1.3 stream
+/// (`ALPN = "bep/1.0"`). Used for both direct TCP and relayed BEP sessions.
+pub fn wrap_bep_tls_stream(
     identity: &VitaIdentity,
-    peer_addr: SocketAddr,
+    tcp: TcpStream,
     expected_device_id: Option<DeviceId>,
     timeout: Duration,
 ) -> io::Result<(BepTlsStream, ObservedDeviceId)> {
-    let tcp = TcpStream::connect_timeout(&peer_addr, timeout)?;
+    wrap_tls_stream_with_alpn(identity, tcp, BEP_ALPN, expected_device_id, timeout)
+}
+
+/// Wraps an already-connected `TcpStream` in a client-authenticated TLS stream with `alpn`.
+pub fn wrap_tls_stream_with_alpn(
+    identity: &VitaIdentity,
+    tcp: TcpStream,
+    alpn: &[u8],
+    expected_device_id: Option<DeviceId>,
+    timeout: Duration,
+) -> io::Result<(BepTlsStream, ObservedDeviceId)> {
     let _ = tcp.set_nodelay(true);
     tcp.set_read_timeout(Some(timeout))?;
     tcp.set_write_timeout(Some(timeout))?;
@@ -74,8 +95,60 @@ pub fn open_bep_tls_stream(
             )
         })?;
 
-    let conn = new_bep_connection(config)?;
+    let conn = new_alpn_connection(config, alpn, SYNCTHING_SERVER_NAME)?;
     Ok((StreamOwned::new(conn, tcp), observed_device_id))
+}
+
+/// Opens a client-authenticated TLS 1.3 stream (`ALPN = "bep/1.0"`) to `peer_addr`.
+/// Returns the stream and the slot that receives the peer's `DeviceId` once the handshake ran.
+pub fn open_bep_tls_stream(
+    identity: &VitaIdentity,
+    peer_addr: SocketAddr,
+    expected_device_id: Option<DeviceId>,
+    timeout: Duration,
+) -> io::Result<(BepTlsStream, ObservedDeviceId)> {
+    let tcp = TcpStream::connect_timeout(&peer_addr, timeout)?;
+    wrap_bep_tls_stream(identity, tcp, expected_device_id, timeout)
+}
+
+/// Opens a client-authenticated TLS stream with a custom `alpn` (e.g. `b"bep-relay"`).
+pub fn open_tls_stream_with_alpn(
+    identity: &VitaIdentity,
+    peer_addr: SocketAddr,
+    alpn: &[u8],
+    expected_device_id: Option<DeviceId>,
+    timeout: Duration,
+) -> io::Result<(BepTlsStream, ObservedDeviceId)> {
+    let tcp = TcpStream::connect_timeout(&peer_addr, timeout)?;
+    wrap_tls_stream_with_alpn(identity, tcp, alpn, expected_device_id, timeout)
+}
+
+/// Opens an HTTPS (`http/1.1`) TLS stream to `host:port` (resolving DNS via `ToSocketAddrs`).
+pub fn open_https_tls_stream(host: &str, port: u16, timeout: Duration) -> io::Result<BepTlsStream> {
+    use std::net::ToSocketAddrs;
+
+    let addrs: Vec<SocketAddr> = (host, port).to_socket_addrs()?.collect();
+    let mut last_err = None;
+    let mut tcp = None;
+    for addr in addrs {
+        match TcpStream::connect_timeout(&addr, timeout) {
+            Ok(s) => {
+                tcp = Some(s);
+                break;
+            }
+            Err(e) => last_err = Some(e),
+        }
+    }
+    let tcp = tcp.ok_or_else(|| {
+        last_err.unwrap_or_else(|| io::Error::new(io::ErrorKind::NotFound, "No address resolved"))
+    })?;
+    tcp.set_read_timeout(Some(timeout))?;
+    tcp.set_write_timeout(Some(timeout))?;
+
+    let (builder, _) = verified_config_builder(None)?;
+    let config = builder.with_no_client_auth();
+    let conn = new_alpn_connection(config, b"http/1.1", host)?;
+    Ok(StreamOwned::new(conn, tcp))
 }
 
 /// Probes a TCP endpoint with a TLS 1.3 (`bep/1.0` ALPN) handshake and returns its Syncthing `DeviceId`

@@ -220,3 +220,111 @@ fn test_serving_blocks_in_a_ready_session_is_shown_as_uploading_then_ready() {
     SyncCoordinator::process_worker_messages(&mut state, &repo, &mut worker_rx);
     assert_eq!(state.sync_activity(), SyncActivity::Idle);
 }
+
+#[test]
+fn test_off_lan_configured_peers_do_not_stay_stuck_syncing() {
+    use vita_syncthing_app::domain::KnownDevice;
+
+    let repo = ConfigRepository::new(&common::temp_test_dir("sync-coordinator-off-lan"));
+    let peer = DeviceId([3; 32]);
+    let mut state = AppState::new(
+        Vec::new(),
+        vec![KnownDevice {
+            device_id: peer,
+            name: "NAS".to_owned(),
+            address: "192.168.1.67:22000".to_owned(),
+        }],
+        "ux0:",
+    );
+    assert!(state.has_configured_peers());
+
+    // Manual sync / worker start with configured peers but no live session stays Idle until a peer connects.
+    state.prepare_manual_sync();
+    assert!(!state.sync_in_progress);
+    assert_eq!(state.sync_activity(), SyncActivity::Idle);
+
+    let (tx, rx) = mpsc::channel();
+    let mut worker_rx = Some(rx);
+    tx.send(WorkerMsg::Progress {
+        pct: None,
+        status: UiText::ConnectingTo {
+            name: "NAS".to_owned(),
+            addr: "192.168.1.67:22000".to_owned(),
+        },
+        file: UiText::raw("-"),
+    })
+    .unwrap();
+    SyncCoordinator::process_worker_messages(&mut state, &repo, &mut worker_rx);
+    assert!(!state.sync_in_progress);
+    assert_eq!(state.sync_activity(), SyncActivity::Idle);
+
+    // Once a peer actually connects, sync_in_progress becomes true; if it drops mid-sync, it clears.
+    tx.send(WorkerMsg::SyncEvent(SyncEvent::PeerConnected {
+        peer_addr: "192.168.1.67:22000".parse().unwrap(),
+        peer_device_id: peer,
+        peer_name: "NAS".to_owned(),
+        client_version: "v2.1.7".to_owned(),
+    }))
+    .unwrap();
+    SyncCoordinator::process_worker_messages(&mut state, &repo, &mut worker_rx);
+    assert!(state.sync_in_progress);
+    assert_eq!(state.sync_activity(), SyncActivity::Downloading);
+
+    tx.send(WorkerMsg::SyncEvent(SyncEvent::SessionEnded {
+        peer_device_id: peer,
+        reason: "connection reset".to_owned(),
+    }))
+    .unwrap();
+    SyncCoordinator::process_worker_messages(&mut state, &repo, &mut worker_rx);
+    assert!(!state.sync_in_progress);
+    assert_eq!(state.sync_activity(), SyncActivity::Idle);
+}
+
+#[test]
+fn test_multi_peer_sync_in_progress_clears_only_when_all_peers_finish() {
+    let repo = ConfigRepository::new(&common::temp_test_dir("sync-coordinator-multi-peer"));
+    let mut state = AppState::new(Vec::new(), Vec::new(), "ux0:");
+    let (tx, rx) = mpsc::channel();
+    let mut worker_rx = Some(rx);
+    let peer_a = DeviceId([1; 32]);
+    let peer_b = DeviceId([2; 32]);
+
+    for (peer, name) in [(peer_a, "Desktop"), (peer_b, "NAS")] {
+        tx.send(WorkerMsg::SyncEvent(SyncEvent::PeerConnected {
+            peer_addr: "192.168.1.10:22000".parse().unwrap(),
+            peer_device_id: peer,
+            peer_name: name.to_owned(),
+            client_version: "v2.1.7".to_owned(),
+        }))
+        .unwrap();
+    }
+    SyncCoordinator::process_worker_messages(&mut state, &repo, &mut worker_rx);
+    assert!(state.sync_in_progress);
+
+    tx.send(WorkerMsg::SyncEvent(SyncEvent::SyncCycleCompleted {
+        peer_device_id: peer_a,
+        active_connections: 2,
+        files_up_to_date: 1,
+        files_downloaded: 0,
+        bytes_downloaded: 0,
+        blocks_uploaded: 0,
+        bytes_uploaded: 0,
+    }))
+    .unwrap();
+    SyncCoordinator::process_worker_messages(&mut state, &repo, &mut worker_rx);
+    assert!(state.sync_in_progress);
+
+    tx.send(WorkerMsg::SyncEvent(SyncEvent::SyncCycleCompleted {
+        peer_device_id: peer_b,
+        active_connections: 2,
+        files_up_to_date: 1,
+        files_downloaded: 0,
+        bytes_downloaded: 0,
+        blocks_uploaded: 0,
+        bytes_uploaded: 0,
+    }))
+    .unwrap();
+    SyncCoordinator::process_worker_messages(&mut state, &repo, &mut worker_rx);
+    assert!(!state.sync_in_progress);
+    assert_eq!(state.sync_activity(), SyncActivity::Ready);
+}

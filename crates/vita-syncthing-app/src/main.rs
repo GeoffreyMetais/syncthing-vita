@@ -117,16 +117,16 @@ fn main() {
     let mut worker_rx: Option<Receiver<WorkerMsg>> = None;
     let mut worker_ctl: Option<Arc<SyncControl>> = None;
 
-    // Only auto-connect on startup if the user has already configured/paired at least one device
-    if state.has_configured_peers() {
-        state.sync_in_progress = true;
+    // Only auto-connect on startup if at least one peer has an active share (or no share exists yet)
+    let startup_peers = state.sync_peers();
+    if !startup_peers.is_empty() {
         state.progress_pct = None;
         let offered = std::mem::take(&mut state.pending_folder_offers);
         let (rx, ctl) = spawn_sync_worker(
             repo.base_data_dir(),
             identity.clone(),
             state.shares.clone(),
-            state.approved_devices(),
+            startup_peers,
             offered,
         );
         worker_rx = Some(rx);
@@ -271,15 +271,16 @@ fn main() {
             worker_ctl = None;
             state.session_connected = false;
             state.initial_sync.clear();
-            if state.has_configured_peers() {
-                state.sync_in_progress = true;
+            state.sync_in_progress = false;
+            let peers = state.sync_peers();
+            if !peers.is_empty() {
                 state.progress_pct = None;
                 let offered = std::mem::take(&mut state.pending_folder_offers);
                 let (rx, ctl) = spawn_sync_worker(
                     repo.base_data_dir(),
                     identity.clone(),
                     state.shares.clone(),
-                    state.approved_devices(),
+                    peers,
                     offered,
                 );
                 worker_rx = Some(rx);
@@ -297,25 +298,26 @@ fn main() {
             last_sync_finished = Instant::now();
         }
 
-        // Automatically reconnect to user-approved peers if the persistent session dropped
+        // Automatically reconnect to active sync peers if the persistent session dropped
         if worker_rx.is_none()
             && state.auto_reconnect_enabled
-            && state.has_configured_peers()
             && last_sync_finished.elapsed() >= AUTO_RECONNECT_DELAY
         {
-            signals.background_change = true;
-            state.sync_in_progress = true;
-            state.progress_pct = None;
-            let offered = std::mem::take(&mut state.pending_folder_offers);
-            let (rx, ctl) = spawn_sync_worker(
-                repo.base_data_dir(),
-                identity.clone(),
-                state.shares.clone(),
-                state.approved_devices(),
-                offered,
-            );
-            worker_rx = Some(rx);
-            worker_ctl = Some(ctl);
+            let peers = state.sync_peers();
+            if !peers.is_empty() {
+                signals.background_change = true;
+                state.progress_pct = None;
+                let offered = std::mem::take(&mut state.pending_folder_offers);
+                let (rx, ctl) = spawn_sync_worker(
+                    repo.base_data_dir(),
+                    identity.clone(),
+                    state.shares.clone(),
+                    peers,
+                    offered,
+                );
+                worker_rx = Some(rx);
+                worker_ctl = Some(ctl);
+            }
         }
 
         // Keep the console out of automatic standby only when useful: while charging, or during

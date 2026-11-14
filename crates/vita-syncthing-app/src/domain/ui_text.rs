@@ -32,6 +32,8 @@ pub enum UiText {
         name: String,
         addr: String,
     },
+    /// All connection attempts to a configured peer failed (e.g. off-LAN).
+    WaitingForLan,
     ExchangingIndex,
     FileUpToDate {
         file: String,
