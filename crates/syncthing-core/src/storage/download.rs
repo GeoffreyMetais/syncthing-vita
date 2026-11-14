@@ -63,13 +63,25 @@ impl FsSyncStorage {
     /// Starts a download: seeds the temp file with the current local content (delta sync only
     /// rewrites outdated blocks).
     pub fn prepare_download(&self, folder_id: &str, rel_path: &str) -> io::Result<()> {
+        self.prepare_download_seeded(folder_id, rel_path, true)
+    }
+
+    /// Starts a download. With `reuse_local_content`, the temp file starts as a copy of the
+    /// current local file; pass `false` when every block is downloaded anyway, to skip that
+    /// copy (and its disk space).
+    pub fn prepare_download_seeded(
+        &self,
+        folder_id: &str,
+        rel_path: &str,
+        reuse_local_content: bool,
+    ) -> io::Result<()> {
         let full = self.resolve_safe_path(folder_id, rel_path);
         if let Some(parent) = full.parent() {
             ensure_dir_exists(parent)?;
         }
         let tmp = self.download_temp_path(folder_id, rel_path);
         let _ = fs::remove_file(&tmp);
-        if full.is_file() {
+        if reuse_local_content && full.is_file() {
             fs::copy(&full, &tmp)
                 .map_err(|e| io::Error::new(e.kind(), format!("copy {}: {e}", full.display())))?;
         } else {
@@ -77,6 +89,18 @@ impl FsSyncStorage {
                 .map_err(|e| io::Error::new(e.kind(), format!("create {}: {e}", tmp.display())))?;
         }
         Ok(())
+    }
+
+    /// Opens the temp file of a prepared download for block writes ([`write_block_at`]), so
+    /// it is opened once per file rather than once per block. Close it before
+    /// [`Self::commit_download`].
+    pub fn open_download(&self, folder_id: &str, rel_path: &str) -> io::Result<File> {
+        let tmp = self.download_temp_path(folder_id, rel_path);
+        OpenOptions::new()
+            .read(true)
+            .write(true)
+            .open(&tmp)
+            .map_err(|e| io::Error::new(e.kind(), format!("open {}: {e}", tmp.display())))
     }
 
     /// Finishes a download: truncates the temp file to `final_size` and moves it into place.
@@ -138,4 +162,10 @@ impl FsSyncStorage {
 
         Ok(full_path)
     }
+}
+
+/// Writes a downloaded block at `offset` of a download temp file ([`FsSyncStorage::open_download`]).
+pub fn write_block_at(file: &mut File, offset: u64, data: &[u8]) -> io::Result<()> {
+    file.seek(SeekFrom::Start(offset))?;
+    file.write_all(data)
 }
