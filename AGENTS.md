@@ -454,7 +454,7 @@ The opt-in `ui-script` Cargo feature (never in release builds) replays inputs fr
 printf 'wait 60\npress R\nwait 10\nshot shares\n' > /tmp/shares.txt
 just ui-scenario /tmp/shares.txt
 ```
-PNGs land in `target/ui-shots/`; the Vita3K app data directory is backed up and restored around the run. It needs neither firmware nor a display (see above). `wait` frames count as activity (the automatic screensaver never starts during a script) but do not wake a screensaver started with `press SELECT`.
+PNGs land in `target/ui-shots/`; the Vita3K app data directory is backed up and restored around the run. It needs neither firmware nor a display (see above). `wait` frames count as activity (the automatic screensaver never starts during a script). `START` (or its hint on `Overview` and `Settings`) asks to quit.
 
 ---
 
@@ -479,4 +479,4 @@ The UI (`gfx.rs` + `ui/screens/*` + `ui/modals/*` + `ui/renderer.rs`) renders at
   - `FolderOffer`: Opens when a peer's `ClusterConfig` lists a folder that is not shared with it yet (including a deleted share). `Cross · Accept` creates a paused share and opens `Files` to choose its target, `Square · Decline` ignores it (`ignored_folders.cfg`, cleared from `Settings` · `Clear Declined`), `Circle · Later` postpones it until the app restarts.
   - `ConfirmQuit`: Triggered by `START` (or tapping `Quit`), warns if a sync is in progress before exiting to LiveArea.
 - **Sync activity** (`AppState::sync_activity`: `Downloading` / `Uploading` / `Ready` / `Idle`): the single source for the sidebar transfer card and the OLED screensaver status line, so they never disagree.
-- **OLED Screensaver**: Activates automatically after 12s of inactivity during active sync (or 45s when idle, or immediately via `SELECT`), rendering a pure `#000000` black background with a bouncing progress widget to protect PS Vita 1000 OLED screens.
+- **OLED Screensaver**: Activates automatically after 12s of inactivity during active sync (or 45s when idle; there is no manual activation), rendering a pure `#000000` black background with a bouncing progress widget to protect PS Vita 1000 OLED screens.

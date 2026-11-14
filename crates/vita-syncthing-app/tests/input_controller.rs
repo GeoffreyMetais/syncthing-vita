@@ -14,8 +14,7 @@ fn test_screensaver_wakes_on_press_or_touch_only() {
     let repo = ConfigRepository::new(&dir);
     let mut state = AppState::new(Vec::new(), Vec::new(), "ux0:");
 
-    press(&mut state, &repo, BTN_SELECT);
-    assert!(state.oled_saver_active);
+    state.oled_saver_active = true;
     // Activity without a press or touch contact (scripted `wait` frames) keeps it running.
     let idle = InputFrame {
         any_activity: true,
@@ -31,8 +30,13 @@ fn test_screensaver_wakes_on_press_or_touch_only() {
     };
     InputController::handle_input(&mut state, &repo, touch);
     assert!(!state.oled_saver_active);
-    // So does any button.
+    // So does any button, `SELECT` included (it no longer starts the screensaver).
+    state.oled_saver_active = true;
     press(&mut state, &repo, BTN_SELECT);
+    assert!(!state.oled_saver_active);
+    press(&mut state, &repo, BTN_SELECT);
+    assert!(!state.oled_saver_active);
+    state.oled_saver_active = true;
     press(&mut state, &repo, BTN_CIRCLE);
     assert!(!state.oled_saver_active);
 }

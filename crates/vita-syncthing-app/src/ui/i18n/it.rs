@@ -73,7 +73,6 @@ pub static STRINGS_IT: Strings = Strings {
     hint_tabs: "Schede",
     hint_quit: "Esci",
     hint_move: "Sposta",
-    hint_screensaver: "Salvaschermo",
     hint_folder: "Cartella",
     hint_folder_path: "Percorso cartella",
     hint_share_folder: "Condividi cartella",
@@ -121,7 +120,7 @@ pub static STRINGS_IT: Strings = Strings {
     settings_desc_theme_dark: "Scuro — Design blu ardesia VitaSend con accento turchese",
     settings_desc_theme_oled: "OLED — Fondo nero puro (risparmia batteria OLED)",
     settings_saver_auto_hint:
-        "Il salvaschermo OLED si attiva dopo 12s di sincronizzazione (o tasto SELECT).",
+        "Il salvaschermo OLED si attiva dopo 12s di sincronizzazione (45s a riposo).",
     settings_sec_devices: "DISPOSITIVI E ABBINAMENTO",
     settings_desc_devices: "Aggiungi un dispositivo o vedi l'ID di questa PS Vita",
     settings_sec_log: "REGISTRO PROTOCOLLO BEP/1.0 E TLS 1.3",
