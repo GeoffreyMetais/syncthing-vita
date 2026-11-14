@@ -9,7 +9,9 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use super::{mtime_secs, PullPlan};
 use crate::bep::{BepFileInfo, BepVersionCounter};
 use crate::device_id::DeviceId;
-use crate::local_db::{with_folder_db, FolderDb, LocalEntry};
+use crate::local_db::{
+    flush_folder_db, with_folder_db, with_folder_db_deferred, FolderDb, LocalEntry,
+};
 use crate::storage::names::is_syncable_name;
 use crate::storage::vita_fs::ensure_dir_exists;
 use crate::storage::FsSyncStorage;
@@ -208,10 +210,11 @@ impl FsSyncStorage {
         });
     }
 
-    /// Records a completed download of `rf` with the remote's version.
+    /// Records a completed download of `rf` with the remote's version. The database is not
+    /// rewritten for every file: call [`Self::flush_folder_db`] once the downloads are over.
     pub fn record_downloaded(&self, folder_id: &str, own_id: DeviceId, rf: &BepFileInfo) {
         let path = self.resolve_safe_path(folder_id, &rf.name);
-        with_folder_db(&self.db_path(folder_id), folder_id, own_id, |db| {
+        with_folder_db_deferred(&self.db_path(folder_id), folder_id, own_id, |db| {
             let prev = db
                 .entries
                 .get(&rf.name)
@@ -219,6 +222,11 @@ impl FsSyncStorage {
                 .unwrap_or_default();
             Self::put_file_from_remote(db, rf, &path, version_merge(&prev, &rf.versions));
         });
+    }
+
+    /// Saves the pending database changes of `folder_id` (see [`Self::record_downloaded`]).
+    pub fn flush_folder_db(&self, folder_id: &str) {
+        flush_folder_db(&self.db_path(folder_id));
     }
 }
 

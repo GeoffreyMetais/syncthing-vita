@@ -245,3 +245,27 @@ fn test_viewer_geometry_in_every_language() {
     }
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// The log is rotated above `LOG_MAX_BYTES`: it never grows without bound, and the history
+/// still spans the rotated file and the current one, oldest first.
+#[test]
+fn test_log_file_is_rotated_and_history_spans_both_files() {
+    use vita_syncthing_app::domain::defaults::LOG_MAX_BYTES;
+    let dir = common::temp_test_dir("log-rotation");
+    let repo = ConfigRepository::new(&dir);
+    let line = "x".repeat(1024);
+    let lines = (LOG_MAX_BYTES / 1024) as usize + 10;
+    for i in 0..lines {
+        repo.write_log(&format!("{i} {line}"));
+    }
+    let current = std::fs::metadata(format!("{dir}/syncthing.log")).unwrap().len();
+    let rotated = std::fs::metadata(format!("{dir}/syncthing.log.1")).unwrap().len();
+    assert!(current < LOG_MAX_BYTES, "current log: {current} bytes");
+    assert!(rotated <= LOG_MAX_BYTES + 2048, "rotated log: {rotated} bytes");
+
+    let history = repo.read_log_history(lines);
+    assert_eq!(history.len(), lines);
+    assert!(history[0].starts_with("0 "));
+    assert!(history[lines - 1].starts_with(&format!("{} ", lines - 1)));
+    let _ = std::fs::remove_dir_all(&dir);
+}

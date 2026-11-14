@@ -91,6 +91,9 @@ pub const TOUCH_DRAG_THRESHOLD: i32 = 12;
 
 /// Lines of this session's protocol log kept in memory (`AppState::logs`, log viewer).
 pub const LOG_BUFFER_LINES: usize = 200;
+/// Size above which `syncthing.log` is rotated to `syncthing.log.1` (replacing the previous
+/// one), so the log never uses more than about twice this size on the memory card.
+pub const LOG_MAX_BYTES: u64 = 512 * 1024;
 /// Newest `syncthing.log` lines loaded by the log viewer's `Show All` (bounds its memory use).
 pub const LOG_HISTORY_MAX_LINES: usize = 2000;
 

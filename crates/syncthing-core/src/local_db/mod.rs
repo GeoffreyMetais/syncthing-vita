@@ -18,7 +18,7 @@
 mod cache;
 mod codec;
 
-pub use cache::with_folder_db;
+pub use cache::{flush_folder_db, with_folder_db, with_folder_db_deferred};
 
 use std::collections::HashMap;
 use std::time::{SystemTime, UNIX_EPOCH};

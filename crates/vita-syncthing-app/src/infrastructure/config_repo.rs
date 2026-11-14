@@ -10,6 +10,7 @@ use syncthing_core::storage::atomic::{recover_replaced_file, replace_file, write
 use syncthing_core::DeviceId;
 
 use super::config_fields::{escape_field, unescape_field};
+use crate::domain::defaults::LOG_MAX_BYTES;
 use crate::domain::{
     IgnoredFolder, KnownDevice, LanguagePreference, ShareConfigEntry, ShareMode, ThemeMode,
     NEW_SHARE_TEMPLATES,
@@ -57,34 +58,59 @@ impl ConfigRepository {
         format!("{}/sync/{}", self.base_data_dir, dir)
     }
 
-    /// Appends a diagnostic log line to stdout and `<base_data_dir>/syncthing.log`.
+    fn log_path(&self) -> String {
+        format!("{}/syncthing.log", self.base_data_dir)
+    }
+
+    /// Previous log file, kept when `syncthing.log` is rotated.
+    fn rotated_log_path(&self) -> String {
+        format!("{}/syncthing.log.1", self.base_data_dir)
+    }
+
+    /// Appends a diagnostic log line to stdout and `<base_data_dir>/syncthing.log`. Above
+    /// `LOG_MAX_BYTES` the file becomes `syncthing.log.1` and a new one is started.
     pub fn write_log(&self, msg: &str) {
         println!("{LOG_LINE_PREFIX}{msg}");
-        let _ = fs::create_dir_all(&self.base_data_dir);
-        let log_path = format!("{}/syncthing.log", self.base_data_dir);
-        if let Ok(mut file) = OpenOptions::new().create(true).append(true).open(&log_path) {
-            let _ = writeln!(file, "{LOG_LINE_PREFIX}{msg}");
+        let log_path = self.log_path();
+        let open = || OpenOptions::new().create(true).append(true).open(&log_path);
+        let file = open().or_else(|_| {
+            // First line of a fresh installation: the data directory does not exist yet.
+            let _ = fs::create_dir_all(&self.base_data_dir);
+            open()
+        });
+        let Ok(mut file) = file else {
+            return;
+        };
+        let _ = writeln!(file, "{LOG_LINE_PREFIX}{msg}");
+        let too_large = file.metadata().is_ok_and(|m| m.len() > LOG_MAX_BYTES);
+        drop(file);
+        if too_large {
+            let rotated = self.rotated_log_path();
+            let _ = fs::remove_file(&rotated);
+            let _ = fs::rename(&log_path, &rotated);
         }
     }
 
-    /// Reads the last `max_lines` lines of `<base_data_dir>/syncthing.log` (oldest first,
+    /// Reads the last `max_lines` lines of the log (`syncthing.log.1` then `syncthing.log`, oldest first,
     /// without their prefix). The file is streamed: only `max_lines` lines are held at once.
     pub fn read_log_history(&self, max_lines: usize) -> Vec<String> {
-        let log_path = format!("{}/syncthing.log", self.base_data_dir);
-        let Ok(file) = fs::File::open(&log_path) else {
-            return Vec::new();
-        };
         let mut tail = VecDeque::with_capacity(max_lines.min(256));
-        for line in BufReader::new(file).split(b'\n').map_while(Result::ok) {
-            if max_lines == 0 {
-                break;
+        if max_lines == 0 {
+            return Vec::new();
+        }
+        // The rotated file holds the older lines.
+        for path in [self.rotated_log_path(), self.log_path()] {
+            let Ok(file) = fs::File::open(&path) else {
+                continue;
+            };
+            for line in BufReader::new(file).split(b'\n').map_while(Result::ok) {
+                if tail.len() == max_lines {
+                    tail.pop_front();
+                }
+                let text = String::from_utf8_lossy(&line);
+                let text = text.strip_prefix(LOG_LINE_PREFIX).unwrap_or(&text);
+                tail.push_back(text.to_owned());
             }
-            if tail.len() == max_lines {
-                tail.pop_front();
-            }
-            let text = String::from_utf8_lossy(&line);
-            let text = text.strip_prefix(LOG_LINE_PREFIX).unwrap_or(&text);
-            tail.push_back(text.to_owned());
         }
         tail.into()
     }

@@ -131,15 +131,11 @@ impl SyncCoordinator {
                     &format!("Received shares from peer: {}", joined),
                 );
             }
-            SyncEvent::FileUpToDate { name, size, .. } => {
+            SyncEvent::FileUpToDate { name, .. } => {
                 state.files_up_to_date += 1;
                 state.current_file = UiText::Raw(name.clone());
-                state.status_line = UiText::FileUpToDate { file: name.clone() };
-                ShareService::log_event(
-                    state,
-                    repo,
-                    &format!("Already up-to-date (SHA-256 OK): {} ({} B)", name, size),
-                );
+                // Not logged: one line per file on every connection would flood the log.
+                state.status_line = UiText::FileUpToDate { file: name };
             }
             SyncEvent::BlockDownloaded {
                 name,
@@ -186,23 +182,14 @@ impl SyncCoordinator {
                     &format!("Local index sent for {} ({} files)", folder, file_count),
                 );
             }
-            SyncEvent::BlockUploaded {
-                name, offset, size, ..
-            } => {
+            SyncEvent::BlockUploaded { name, size, .. } => {
                 state.blocks_uploaded += 1;
                 state.uploading = true;
                 state.transfer_activity += 1;
                 state.bytes_transferred += size;
                 state.current_file = UiText::Raw(name.clone());
-                state.status_line = UiText::Uploading { file: name.clone() };
-                ShareService::log_event(
-                    state,
-                    repo,
-                    &format!(
-                        "Block uploaded (Vita -> PC/Mac): {} (offset={}, {} B)",
-                        name, offset, size
-                    ),
-                );
+                // Not logged: one line (and one disk write) per 128 KiB block served.
+                state.status_line = UiText::Uploading { file: name };
             }
             SyncEvent::SyncCycleCompleted {
                 peer_device_id,
