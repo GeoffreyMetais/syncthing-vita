@@ -34,17 +34,17 @@ use vita_syncthing_app::ui::VitaUiRenderer;
 /// causing the very first Rust `malloc` to abort with `C2-12828-1`.
 #[cfg(target_os = "vita")]
 #[used]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub static _newlib_heap_size_user: u32 = 64 * 1024 * 1024;
 
 #[cfg(target_os = "vita")]
 #[used]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub static sceUserMainThreadStackSize: u32 = 2 * 1024 * 1024;
 
 #[cfg(target_os = "vita")]
 #[used]
-#[no_mangle]
+#[unsafe(no_mangle)]
 pub static sceUserMainThreadName: [u8; 16] = *b"vita_syncthing\0\0";
 
 #[cfg(target_os = "vita")]
@@ -254,7 +254,7 @@ fn main() {
 
         // Revert requests of read-only shares go to the running worker (its sessions take them),
         // unless that worker is about to be replaced by one with the new configuration.
-        if let (Some(ref ctl), false) = (&worker_ctl, state.config_dirty) {
+        if let (Some(ctl), false) = (&worker_ctl, state.config_dirty) {
             for folder_id in std::mem::take(&mut state.pending_reverts) {
                 ctl.request_revert(&folder_id);
             }

@@ -38,12 +38,12 @@ pub mod vita_ffi {
     }
 
     #[link(name = "SceSysmodule_stub")]
-    extern "C" {
+    unsafe extern "C" {
         pub fn sceSysmoduleLoadModule(id: c_ushort) -> c_int;
     }
 
     #[link(name = "SceAppUtil_stub")]
-    extern "C" {
+    unsafe extern "C" {
         pub fn sceAppUtilInit(
             init_param: *mut SceAppUtilInitParam,
             boot_param: *mut SceAppUtilBootParam,
@@ -53,13 +53,13 @@ pub mod vita_ffi {
     }
 
     #[link(name = "SceLibKernel_stub")]
-    extern "C" {
+    unsafe extern "C" {
         pub fn sceKernelGetRandomNumber(output: *mut c_void, size: u32) -> c_int;
         pub fn sceKernelPowerTick(tick_type: c_int) -> c_int;
     }
 
     #[link(name = "ScePower_stub")]
-    extern "C" {
+    unsafe extern "C" {
         /// Returns 1 when the console runs on external power (AC adapter / USB charging).
         pub fn scePowerIsPowerOnline() -> c_int;
         pub fn scePowerGetArmClockFrequency() -> c_int;
@@ -67,7 +67,7 @@ pub mod vita_ffi {
     }
 
     #[link(name = "SceSysmem_stub")]
-    extern "C" {
+    unsafe extern "C" {
         pub fn sceKernelAllocMemBlock(
             name: *const c_char,
             memblock_type: u32,
@@ -78,13 +78,13 @@ pub mod vita_ffi {
     }
 
     #[link(name = "SceNet_stub")]
-    extern "C" {
+    unsafe extern "C" {
         pub fn sceNetInit(param: *mut SceNetInitParam) -> c_int;
         pub fn sceNetTerm() -> c_int;
     }
 
     #[link(name = "SceNetCtl_stub")]
-    extern "C" {
+    unsafe extern "C" {
         pub fn sceNetCtlInit() -> c_int;
         pub fn sceNetCtlTerm();
     }

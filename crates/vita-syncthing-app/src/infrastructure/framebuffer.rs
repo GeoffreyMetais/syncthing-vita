@@ -29,7 +29,7 @@ mod display_ffi {
     }
 
     #[link(name = "SceSysmem_stub")]
-    extern "C" {
+    unsafe extern "C" {
         pub fn sceKernelAllocMemBlock(
             name: *const c_char,
             block_type: c_uint,
@@ -40,7 +40,7 @@ mod display_ffi {
     }
 
     #[link(name = "SceDisplay_stub")]
-    extern "C" {
+    unsafe extern "C" {
         pub fn sceDisplaySetFrameBuf(pParam: *const SceDisplayFrameBuf, sync: c_int) -> c_int;
         pub fn sceDisplayWaitVblankStart() -> c_int;
     }

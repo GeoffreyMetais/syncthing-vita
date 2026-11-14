@@ -153,7 +153,7 @@ mod input_ffi {
     const _: () = assert!(std::mem::size_of::<SceImeParam>() == 0x40);
 
     #[link(name = "SceCtrl_stub")]
-    extern "C" {
+    unsafe extern "C" {
         pub fn sceCtrlSetSamplingMode(mode: c_int) -> c_int;
         pub fn sceCtrlPeekBufferPositive(
             port: c_int,
@@ -163,18 +163,18 @@ mod input_ffi {
     }
 
     #[link(name = "SceTouch_stub")]
-    extern "C" {
+    unsafe extern "C" {
         pub fn sceTouchSetSamplingState(port: c_uint, state: c_uint) -> c_int;
         pub fn sceTouchPeek(port: c_uint, p_data: *mut SceTouchData, n_bufs: c_uint) -> c_int;
     }
 
     #[link(name = "SceSysmodule_stub")]
-    extern "C" {
+    unsafe extern "C" {
         pub fn sceSysmoduleLoadModule(id: c_ushort) -> c_int;
     }
 
     #[link(name = "SceIme_stub")]
-    extern "C" {
+    unsafe extern "C" {
         pub fn sceImeOpen(param: *const SceImeParam) -> c_int;
         pub fn sceImeUpdate() -> c_int;
         pub fn sceImeClose() -> c_int;
@@ -273,19 +273,21 @@ unsafe extern "C" fn vita_ime_event_handler(
     if arg.is_null() || e.is_null() {
         return;
     }
-    let st = &mut *(arg as *mut ImeRuntimeState);
-    match (*e).id {
-        input_ffi::SCE_IME_EVENT_UPDATE_TEXT => {
-            st.text_updated = true;
+    unsafe {
+        let st = &mut *(arg as *mut ImeRuntimeState);
+        match (*e).id {
+            input_ffi::SCE_IME_EVENT_UPDATE_TEXT => {
+                st.text_updated = true;
+            }
+            input_ffi::SCE_IME_EVENT_PRESS_ENTER => {
+                st.text_updated = true;
+                st.enter_pressed = true;
+            }
+            input_ffi::SCE_IME_EVENT_PRESS_CLOSE => {
+                st.close_pressed = true;
+            }
+            _ => {}
         }
-        input_ffi::SCE_IME_EVENT_PRESS_ENTER => {
-            st.text_updated = true;
-            st.enter_pressed = true;
-        }
-        input_ffi::SCE_IME_EVENT_PRESS_CLOSE => {
-            st.close_pressed = true;
-        }
-        _ => {}
     }
 }
 

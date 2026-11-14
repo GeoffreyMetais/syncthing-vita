@@ -256,7 +256,7 @@ mod vita_camera {
     const _: () = assert!(std::mem::size_of::<SceCameraRead>() == 0x38);
 
     #[link(name = "SceCamera_stub")]
-    extern "C" {
+    unsafe extern "C" {
         fn sceCameraOpen(devnum: c_int, info: *mut SceCameraInfo) -> c_int;
         fn sceCameraClose(devnum: c_int) -> c_int;
         fn sceCameraStart(devnum: c_int) -> c_int;
@@ -265,7 +265,7 @@ mod vita_camera {
     }
 
     #[link(name = "SceSysmem_stub")]
-    extern "C" {
+    unsafe extern "C" {
         fn sceKernelAllocMemBlock(
             name: *const c_char,
             ty: c_uint,
