@@ -24,6 +24,12 @@ pub struct VitaUiRenderer {
     gfx: Gfx,
 }
 
+impl Default for VitaUiRenderer {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl VitaUiRenderer {
     pub fn new() -> Self {
         Self {

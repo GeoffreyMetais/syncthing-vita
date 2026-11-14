@@ -299,6 +299,12 @@ pub struct VitaInput {
     script: crate::infrastructure::ui_script::UiScript,
 }
 
+impl Default for VitaInput {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl VitaInput {
     pub fn new() -> Self {
         #[cfg(target_os = "vita")]

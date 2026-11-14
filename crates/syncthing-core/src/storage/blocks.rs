@@ -143,7 +143,7 @@ pub(crate) fn hash_file_blocks(
 
         if read_total == 0 {
             if offset == 0 {
-                let empty_hash = Sha256::digest(&[]).to_vec();
+                let empty_hash = Sha256::digest([]).to_vec();
                 blocks.push(BepBlockInfo {
                     offset: 0,
                     size: 0,
