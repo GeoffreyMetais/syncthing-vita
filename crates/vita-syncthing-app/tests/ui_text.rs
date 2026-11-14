@@ -71,6 +71,7 @@ fn all_messages() -> Vec<UiText> {
         UiText::OwnDeviceId,
         UiText::InvalidDeviceId(DeviceIdParseError::TooLong(60)),
         UiText::QrNotDeviceId,
+        UiText::FolderProtected,
         UiText::ShareDeleted { label: s("Saves") },
         UiText::LinkDeviceToShare { label: s("Saves") },
         UiText::ShareCreated { label: s("Saves") },

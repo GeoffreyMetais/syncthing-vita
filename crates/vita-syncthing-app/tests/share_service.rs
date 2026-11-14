@@ -78,7 +78,6 @@ fn test_passive_lan_discovery_does_not_auto_link_or_connect() {
     let random_lan_peer = DeviceId([0x77; 32]);
     ShareService::register_discovered_peer(
         &mut state,
-        &repo,
         random_lan_peer,
         "LAN Peer",
         "192.168.1.99:22000",
@@ -167,5 +166,40 @@ fn test_sync_peers_excludes_devices_without_active_share() {
     assert_eq!(peers.len(), 1);
     assert_eq!(peers[0].device_id, active);
 
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// A LAN announcement is not authenticated: it must not turn a Short ID placeholder into a
+/// full ID (only a TLS session does), and it cannot fill the device list without bound.
+#[test]
+fn test_lan_announcement_never_upgrades_a_short_id_placeholder() {
+    use vita_syncthing_app::domain::defaults::MAX_DISCOVERED_PEERS;
+    let dir = temp_test_dir("announce-no-upgrade");
+    let repo = ConfigRepository::new(&dir);
+    let mut state = AppState::new(Vec::new(), Vec::new(), &dir);
+
+    let real = DeviceId([0x5A; 32]);
+    let prefix: String = real.to_syncthing_string().chars().take(7).collect();
+    let (placeholder, _, is_short) =
+        ShareService::add_device_by_input(&mut state, &repo, &prefix, None).unwrap();
+    assert!(is_short);
+
+    // Someone announces an ID sharing the prefix.
+    let mut forged = real;
+    forged.0[20] ^= 0xFF;
+    assert!(placeholder.matches_peer(&forged));
+    ShareService::register_discovered_peer(&mut state, forged, "LAN Peer", "192.168.1.66:22000");
+    assert_eq!(state.devices[0].device_id, placeholder);
+
+    // The real device proves its identity over TLS: the placeholder becomes its full ID.
+    ShareService::upsert_device(&mut state, &repo, real, "NAS", "192.168.1.10:22000");
+    assert_eq!(state.devices[0].device_id, real);
+
+    for i in 0..(MAX_DISCOVERED_PEERS as u8 + 10) {
+        let mut id = [i; 32];
+        id[0] = 0xEE;
+        ShareService::register_discovered_peer(&mut state, DeviceId(id), "LAN Peer", "10.0.0.1:1");
+    }
+    assert_eq!(state.unpaired_lan_peers.len(), MAX_DISCOVERED_PEERS);
     let _ = std::fs::remove_dir_all(&dir);
 }

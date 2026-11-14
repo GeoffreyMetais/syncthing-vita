@@ -94,6 +94,8 @@ pub enum UiText {
     OwnDeviceId,
     InvalidDeviceId(DeviceIdParseError),
     QrNotDeviceId,
+    /// The chosen folder holds (or is inside) the app's own data and cannot be shared.
+    FolderProtected,
     ShareDeleted {
         label: String,
     },

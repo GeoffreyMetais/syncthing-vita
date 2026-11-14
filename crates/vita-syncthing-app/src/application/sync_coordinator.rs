@@ -47,9 +47,7 @@ impl SyncCoordinator {
                         name,
                         address,
                     } => {
-                        ShareService::register_discovered_peer(
-                            state, repo, device_id, &name, &address,
-                        );
+                        ShareService::register_discovered_peer(state, device_id, &name, &address);
                     }
                     WorkerMsg::SyncEvent(event) => Self::handle_sync_event(state, repo, event),
                     WorkerMsg::Finished {
