@@ -81,6 +81,18 @@ pub enum UiAction {
     CycleLanguage,
     /// `Settings`: forget every declined folder offer.
     ClearDeclinedFolders,
+    /// `Settings`: open the full-screen protocol log viewer.
+    OpenLogs,
+
+    // --- Log viewer ---
+    /// Close the log viewer (back to `Settings`).
+    CloseLogs,
+    /// Switch between this session's lines and the whole `syncthing.log` history.
+    ToggleLogHistory,
+    /// Scroll one page towards older lines.
+    ScrollLogsOlder,
+    /// Scroll one page towards newer lines.
+    ScrollLogsNewer,
 }
 
 /// D-pad focus position an element holds on its page.

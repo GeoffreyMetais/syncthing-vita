@@ -51,3 +51,10 @@ Every interactive element **must** support both gamepad buttons and front touchs
      - Main Content Area (`tx >= 236 && ty < 500`)
 3. **Theme Compatibility**:
    - Always use `th.*` (`bg`, `sidebar`, `card`, `card_hi`, `border`, `text`, `dim`, `faint`, `accent`, `accent_hi`, `accent_bg`, `on_accent`) instead of hardcoded backgrounds so both **Dark** and **OLED (`#000000`)** themes render properly.
+
+## 4. Mandatory Emulator Check & Screenshots (every visual change)
+
+A change that alters what is drawn (layout, label, translation, colour, icon, screen, modal) is not done until:
+1. **Tested in Vita3K**: a `ui-script` scenario (`wait` / `press` / `tap` / `shot`) reaches every affected state and runs with `just ui-scenario <script> [secs]`. If only `vita3k.log` is produced with `qt.qpa.wayland: There are no outputs`, rerun with `DISPLAY=:0 SDL_VIDEODRIVER=x11 QT_QPA_PLATFORM=xcb ./scripts/vita3k_scenario.sh <script> 40`.
+2. **Screenshots taken and reviewed**: open each PNG of `target/ui-shots/`, check the change is visible and nothing is clipped or overlapping, and show them to the user.
+3. **Screenshots in the PR description**: commit them on the PR branch in `docs/screenshots/<branch>/` and embed them in a `## Screenshots` section, linking through the full hash of the commit that added them, never the branch name (`![caption](https://github.com/GeoffreyMetais/syncthing-vita/blob/<commit sha>/docs/screenshots/<branch>/<name>.png?raw=true)`). Exact commands: AGENTS.md §6 *Screenshots for Visual Changes*.

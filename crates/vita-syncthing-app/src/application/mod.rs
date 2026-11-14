@@ -16,8 +16,8 @@ pub mod sync_coordinator;
 pub mod upload_activity;
 
 pub use controllers::{
-    DashboardController, FilesController, InputController, SettingsController, SharesController,
-    UserCommand,
+    DashboardController, FilesController, InputController, LogsController, SettingsController,
+    SharesController, UserCommand,
 };
 pub use devices_scan::DevicesScan;
 pub use dpad_navigation::DpadNavigation;

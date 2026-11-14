@@ -11,8 +11,8 @@ use crate::ui::modals::{
     render_folder_offer_modal, render_manage_devices_modal, render_scan_qr_modal,
 };
 use crate::ui::screens::{
-    render_dashboard_tab, render_folder_picker_tab, render_oled_screensaver, render_settings_tab,
-    SAVER_H, SAVER_W,
+    render_dashboard_tab, render_folder_picker_tab, render_log_screen, render_oled_screensaver,
+    render_settings_tab, SAVER_H, SAVER_W,
 };
 use crate::ui::strings;
 use crate::ui::theme::UiTheme;
@@ -67,14 +67,18 @@ pub fn draw_frame(gfx: &mut Gfx, state: &mut AppState) {
         return;
     }
 
-    draw_chrome(gfx, &th, state, &mut hits);
-
-    match state.active_tab {
-        ActiveTab::Dashboard => render_dashboard_tab(gfx, &th, state, &mut hits),
-        ActiveTab::FolderPicker => {
-            render_folder_picker_tab(gfx, &th, state, &mut hits);
+    if let Some(view) = &state.log_view {
+        // The log viewer covers the whole screen, sidebar included.
+        render_log_screen(gfx, &th, state, view, &mut hits);
+    } else {
+        draw_chrome(gfx, &th, state, &mut hits);
+        match state.active_tab {
+            ActiveTab::Dashboard => render_dashboard_tab(gfx, &th, state, &mut hits),
+            ActiveTab::FolderPicker => {
+                render_folder_picker_tab(gfx, &th, state, &mut hits);
+            }
+            ActiveTab::Settings => render_settings_tab(gfx, &th, state, &mut hits),
         }
-        ActiveTab::Settings => render_settings_tab(gfx, &th, state, &mut hits),
     }
 
     // Draw active modal dialog on top of dimmed screen. Nothing of the page behind it is
