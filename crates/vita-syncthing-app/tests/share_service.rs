@@ -135,3 +135,37 @@ fn test_delete_share_removes_config_and_pending_offer() {
 
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn test_sync_peers_excludes_devices_without_active_share() {
+    let dir = temp_test_dir("sync-peers-active-share");
+    let repo = ConfigRepository::new(&dir);
+    let mut state = AppState::new(Vec::new(), Vec::new(), &dir);
+
+    let unlinked = DeviceId([0x11; 32]);
+    let paused_only = DeviceId([0x22; 32]);
+    let active = DeviceId([0x33; 32]);
+
+    ShareService::upsert_device(&mut state, &repo, unlinked, "Mac Deezer", "192.168.1.50:22000");
+    ShareService::upsert_device(&mut state, &repo, paused_only, "Old PC", "192.168.1.51:22000");
+    ShareService::upsert_device(&mut state, &repo, active, "NAS", "192.168.1.52:22000");
+
+    // With no shares yet, approved devices are eligible so folder offers can arrive.
+    assert_eq!(state.sync_peers().len(), 3);
+
+    // Once shares exist, only devices linked to at least one enabled share are dialed.
+    let s_active =
+        ShareService::create_share(&mut state, &repo, "saves", "Saves", &format!("{dir}/saves"));
+    ShareService::toggle_device_for_share(&mut state, &repo, s_active, active);
+
+    let s_paused =
+        ShareService::create_share(&mut state, &repo, "roms", "Roms", &format!("{dir}/roms"));
+    ShareService::toggle_device_for_share(&mut state, &repo, s_paused, paused_only);
+    state.shares[s_paused].enabled = false;
+
+    let peers = state.sync_peers();
+    assert_eq!(peers.len(), 1);
+    assert_eq!(peers[0].device_id, active);
+
+    let _ = std::fs::remove_dir_all(&dir);
+}

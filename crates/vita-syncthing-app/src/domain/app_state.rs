@@ -200,6 +200,29 @@ impl AppState {
             .collect()
     }
 
+    /// Devices eligible for BEP/1.0 synchronization right now:
+    /// - when shares exist, only approved devices linked to at least one enabled share;
+    /// - when no shares exist yet, all approved devices (so newly paired devices can still send
+    ///   folder offers).
+    pub fn sync_peers(&self) -> Vec<KnownDevice> {
+        let approved = self.approved_devices();
+        if self.shares.is_empty() {
+            return approved;
+        }
+        approved
+            .into_iter()
+            .filter(|d| {
+                self.shares.iter().any(|s| {
+                    s.enabled
+                        && s.shared_devices
+                            .iter()
+                            .filter_map(|h| DeviceId::from_hex(h))
+                            .any(|id| id.matches_peer(&d.device_id))
+                })
+            })
+            .collect()
+    }
+
     /// Returns `true` if at least one peer has been manually added or linked to a share.
     pub fn has_configured_peers(&self) -> bool {
         !self.approved_devices().is_empty()
@@ -487,7 +510,7 @@ impl AppState {
     /// scan will emit `WorkerMsg::Finished`). When starting a persistent worker without a connected
     /// peer, `sync_in_progress` stays `false` until a peer actually connects.
     pub fn prepare_manual_sync(&mut self) {
-        self.sync_in_progress = self.session_connected || !self.has_configured_peers();
+        self.sync_in_progress = self.session_connected || self.sync_peers().is_empty();
         self.files_up_to_date = 0;
         self.files_downloaded = 0;
         self.blocks_uploaded = 0;
