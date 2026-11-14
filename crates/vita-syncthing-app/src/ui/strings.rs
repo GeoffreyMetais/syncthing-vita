@@ -82,7 +82,6 @@ pub const HINT_BACK: &str = "Back";
 pub const HINT_TABS: &str = "Tabs";
 pub const HINT_QUIT: &str = "Quit";
 pub const HINT_MOVE: &str = "Move";
-pub const HINT_SCREENSAVER: &str = "Screensaver";
 pub const HINT_FOLDER: &str = "Folder";
 pub const HINT_FOLDER_PATH: &str = "Folder Path";
 pub const HINT_SHARE_FOLDER: &str = "Share Folder";
@@ -147,7 +146,7 @@ pub const SETTINGS_DESC_THEME_DARK: &str = "Dark — VitaSend slate blue-grey lo
 pub const SETTINGS_DESC_THEME_OLED: &str =
     "OLED — Pure black background (saves PS Vita OLED battery)";
 pub const SETTINGS_SAVER_AUTO_HINT: &str =
-    "OLED Screensaver activates automatically after 12s during sync (or press SELECT anytime).";
+    "OLED Screensaver activates automatically after 10s during sync (30s when idle).";
 pub const SETTINGS_SEC_LOG: &str = "LOG";
 pub const SETTINGS_SEC_DECLINED: &str = "DECLINED FOLDERS";
 pub const SETTINGS_NO_DECLINED: &str = "None · folders offered by peers are always asked first";

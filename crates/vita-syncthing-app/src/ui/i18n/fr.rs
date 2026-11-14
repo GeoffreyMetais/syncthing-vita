@@ -73,7 +73,6 @@ pub static STRINGS_FR: Strings = Strings {
     hint_tabs: "Onglets",
     hint_quit: "Quitter",
     hint_move: "Déplacer",
-    hint_screensaver: "Écran de veille",
     hint_folder: "Dossier",
     hint_folder_path: "Chemin du dossier",
     hint_share_folder: "Partager dossier",
@@ -122,7 +121,7 @@ pub static STRINGS_FR: Strings = Strings {
     settings_desc_theme_dark: "Sombre — Aspect bleu ardoise VitaSend avec accent turquoise",
     settings_desc_theme_oled: "OLED — Fond noir pur (économise la batterie PS Vita OLED)",
     settings_saver_auto_hint:
-        "L'économiseur d'écran OLED s'active après 12s en sync (ou touche SELECT).",
+        "L'économiseur d'écran OLED s'active après 10s en sync (30s au repos).",
     settings_sec_devices: "APPAREILS & APPAIRAGE",
     settings_desc_devices: "Associer un appareil ou afficher l'ID de la PS Vita",
     settings_sec_log: "JOURNAL",

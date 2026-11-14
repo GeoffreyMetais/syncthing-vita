@@ -10,7 +10,7 @@ use vita_syncthing_app::domain::{
     ActiveTab, AppState, Language, LanguagePreference, ModalDialog, PickerMode, Rect, UiAction,
     TAB_ORDER,
 };
-use vita_syncthing_app::infrastructure::{ConfigRepository, BTN_SQUARE, BTN_TRIANGLE};
+use vita_syncthing_app::infrastructure::{ConfigRepository, BTN_SQUARE, BTN_START, BTN_TRIANGLE};
 use vita_syncthing_app::ui::gfx::{Gfx, GFX_H, GFX_W};
 use vita_syncthing_app::ui::renderer::draw_frame;
 use vita_syncthing_app::ui::theme::{UiTheme, HINT_Y, SIDEBAR_W};
@@ -169,8 +169,12 @@ fn test_overview_card_buttons_and_hints() {
     assert_eq!(state.modal, ModalDialog::CreateShare { selected_idx: 0 });
     state.modal = ModalDialog::None;
 
-    tap_action(&mut state, &repo, UiAction::StartScreensaver);
-    assert!(state.oled_saver_active);
+    // `START` and its hint both ask for confirmation before quitting.
+    press(&mut state, &repo, BTN_START);
+    assert_eq!(state.modal, ModalDialog::ConfirmQuit);
+    state.modal = ModalDialog::None;
+    tap_action(&mut state, &repo, UiAction::ConfirmQuit);
+    assert_eq!(state.modal, ModalDialog::ConfirmQuit);
     let _ = std::fs::remove_dir_all(&dir);
 }
 

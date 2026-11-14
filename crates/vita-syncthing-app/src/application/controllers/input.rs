@@ -14,8 +14,7 @@ use crate::domain::{
     ActiveTab, AppState, ModalDialog, PickerMode, ShortcutKey, UiAction, TAB_ORDER,
 };
 use crate::infrastructure::{
-    ConfigRepository, InputFrame, BTN_CIRCLE, BTN_L, BTN_R, BTN_SELECT, BTN_SQUARE, BTN_START,
-    BTN_TRIANGLE,
+    ConfigRepository, InputFrame, BTN_CIRCLE, BTN_L, BTN_R, BTN_SQUARE, BTN_START, BTN_TRIANGLE,
 };
 
 /// Face buttons an element can declare as its shortcut.
@@ -89,10 +88,6 @@ impl InputController {
         if (input.pressed & BTN_START) != 0 {
             return Self::execute(state, repo, UiAction::ConfirmQuit);
         }
-        if (input.pressed & BTN_SELECT) != 0 {
-            state.oled_saver_active = !state.oled_saver_active;
-            return UserCommand::None;
-        }
         let mut pressed = input.pressed;
         if state.log_view.is_some() {
             // The log viewer covers the whole screen: D-pad and shoulder buttons scroll it.
@@ -148,7 +143,6 @@ impl InputController {
             }
             UiAction::ShowDeviceId => state.modal = ModalDialog::ShowDeviceId,
             UiAction::AddDevice => return open_add_device_modal(state, None),
-            UiAction::StartScreensaver => state.oled_saver_active = true,
             UiAction::ConfirmQuit => state.modal = ModalDialog::ConfirmQuit,
             UiAction::NewShare
             | UiAction::SelectShare(_)

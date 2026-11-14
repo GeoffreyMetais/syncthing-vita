@@ -349,8 +349,8 @@ fn main() {
         }
 
         // Automatic activation of OLED screensaver (pure black #000000 background):
-        // - After 12 seconds of inactivity while synchronization is in progress
-        // - After 45 seconds of inactivity when idle (or press SELECT anytime)
+        // - After 10 seconds of inactivity while synchronization is in progress
+        // - After 30 seconds of inactivity when idle
         let oled_timeout = if state.sync_in_progress {
             SCREENSAVER_TIMEOUT_SYNCING
         } else {

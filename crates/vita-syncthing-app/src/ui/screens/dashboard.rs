@@ -52,9 +52,9 @@ pub fn render_dashboard_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits:
     }
     hints.push(Hint::info(PadButton::L, Some(PadButton::R), s.hint_tabs));
     hints.push(Hint::action(
-        PadButton::Select,
-        s.hint_screensaver,
-        UiAction::StartScreensaver,
+        PadButton::Start,
+        s.action_quit,
+        UiAction::ConfirmQuit,
     ));
     draw_hint_bar(gfx, th, hits, &hints);
 }
