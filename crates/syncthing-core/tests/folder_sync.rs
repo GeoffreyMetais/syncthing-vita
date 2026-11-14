@@ -246,3 +246,100 @@ fn test_revert_local_changes_restores_the_peer_state() {
         .collect();
     assert!(offered.is_empty(), "{offered:?}");
 }
+
+fn block_of(data: &[u8]) -> syncthing_core::BepBlockInfo {
+    use sha2::{Digest, Sha256};
+    syncthing_core::BepBlockInfo {
+        offset: 0,
+        size: data.len() as i32,
+        hash: Sha256::digest(data).to_vec(),
+    }
+}
+
+/// A peer's dot-file whose name merely starts with `.st` (`.stylelintrc`, `.steam`, ...) is an
+/// ordinary file: once pulled, a rescan must still see it instead of announcing it as deleted
+/// (which would delete it on every peer).
+#[test]
+fn test_pulled_dot_st_file_is_not_announced_as_deleted() {
+    let tmp_dir = common::fresh_temp_dir("dot_st_file");
+    let storage = FsSyncStorage::new(&tmp_dir);
+    let dev_id = DeviceId([0x22; 32]);
+    let root = storage.folder_root("f");
+    std::fs::create_dir_all(&root).unwrap();
+    std::fs::write(root.join("keep.txt"), b"k").unwrap();
+
+    let peer = BepVersionCounter {
+        short_device_id: 0x9A7C,
+        value: 5,
+    };
+    let mut rf = remote_file(".stylelintrc", vec![peer]);
+    rf.size = 3;
+    rf.blocks = vec![block_of(b"abc")];
+    let plan = storage
+        .plan_pull("f", dev_id, std::slice::from_ref(&rf))
+        .unwrap();
+    assert_eq!(plan.downloads.len(), 1);
+    // Simulate the completed download.
+    storage.prepare_download("f", &rf.name).unwrap();
+    storage
+        .write_block_streaming("f", &rf.name, 0, b"abc", 3)
+        .unwrap();
+    storage.commit_download("f", &rf.name, 3).unwrap();
+    storage.record_downloaded("f", dev_id, &rf);
+
+    let (local, _) = storage
+        .build_local_index("f", dev_id, std::slice::from_ref(&rf))
+        .unwrap();
+    let entry = local.files.iter().find(|f| f.name == ".stylelintrc").unwrap();
+    assert!(!entry.deleted, "a pulled `.st*` file was announced as deleted");
+    let _ = std::fs::remove_dir_all(&tmp_dir);
+}
+
+/// Names that do not designate an entry strictly inside the folder (empty, `..`, absolute,
+/// internal Syncthing files) are ignored: they must never be planned, created or downloaded.
+#[test]
+fn test_invalid_remote_names_are_ignored() {
+    let tmp_dir = common::fresh_temp_dir("invalid_names");
+    let storage = FsSyncStorage::new(&tmp_dir);
+    let dev_id = DeviceId([0x22; 32]);
+    let root = storage.folder_root("f");
+    std::fs::create_dir_all(&root).unwrap();
+    std::fs::write(root.join("keep.txt"), b"k").unwrap();
+
+    let peer = BepVersionCounter {
+        short_device_id: 0x9A7C,
+        value: 5,
+    };
+    let names = [
+        "",
+        ".",
+        "..",
+        "../escape.txt",
+        "a/../../escape.txt",
+        "/abs.txt",
+        "a//b.txt",
+        "a\\b.txt",
+        "line\nbreak.txt",
+        ".syncthing.keep.txt.tmp",
+        ".stfolder",
+        "sub/.stversions/x",
+    ];
+    let remote: Vec<BepFileInfo> = names
+        .iter()
+        .map(|n| {
+            let mut rf = remote_file(n, vec![peer]);
+            rf.size = 3;
+            rf.blocks = vec![block_of(b"abc")];
+            rf
+        })
+        .collect();
+    let plan = storage.plan_pull("f", dev_id, &remote).unwrap();
+    assert!(
+        plan.downloads.is_empty(),
+        "planned: {:?}",
+        plan.downloads.iter().map(|f| &f.name).collect::<Vec<_>>()
+    );
+    assert!(plan.applied.is_empty());
+    assert!(root.join("keep.txt").is_file());
+    let _ = std::fs::remove_dir_all(&tmp_dir);
+}

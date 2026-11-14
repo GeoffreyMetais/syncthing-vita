@@ -82,7 +82,8 @@ pub(crate) fn collect_files_recursive(
         let entry = entry_res?;
         let name = entry.file_name().to_string_lossy().into_owned();
         // Internal files only: download temp files, local databases and Syncthing markers.
-        if name.starts_with(".syncthing") || name.starts_with(".st") {
+        // Pulls ignore the same names (`names::is_syncable_name`).
+        if super::names::is_internal_name(&name) {
             if super::download::is_download_backup_name(&name) {
                 out.download_backups.push(entry.path());
             }

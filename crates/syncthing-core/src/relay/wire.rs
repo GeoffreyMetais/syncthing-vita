@@ -171,13 +171,12 @@ fn read_u32(buf: &[u8], pos: &mut usize) -> io::Result<u32> {
 
 fn read_xdr_opaque(buf: &[u8], pos: &mut usize) -> io::Result<Vec<u8>> {
     let len = read_u32(buf, pos)? as usize;
-    if *pos + len > buf.len() {
-        return Err(io::Error::new(
-            io::ErrorKind::UnexpectedEof,
-            "Truncated relay XDR opaque",
-        ));
-    }
-    let out = buf[*pos..*pos + len].to_vec();
+    // `len` comes from the relay: the addition must not wrap on 32-bit targets.
+    let end = pos
+        .checked_add(len)
+        .filter(|end| *end <= buf.len())
+        .ok_or_else(|| io::Error::new(io::ErrorKind::UnexpectedEof, "Truncated relay XDR opaque"))?;
+    let out = buf[*pos..end].to_vec();
     let pad = (4 - (len % 4)) % 4;
     *pos = (*pos + len + pad).min(buf.len());
     Ok(out)

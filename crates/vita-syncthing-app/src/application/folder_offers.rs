@@ -227,6 +227,6 @@ impl FolderOfferService {
             .iter()
             .find(|&&(id, _, _)| id == folder_id && id != "__browse__")
             .map(|&(_, _, p)| p.to_owned())
-            .unwrap_or_else(|| format!("{}/sync/{}", repo.base_data_dir(), folder_id))
+            .unwrap_or_else(|| repo.default_share_dir(folder_id))
     }
 }

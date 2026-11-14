@@ -78,3 +78,17 @@ fn test_parse_user_id_errors_are_typed() {
         "Device ID is too long (57 chars, max 56)"
     );
 }
+
+/// 64 bytes of non-ASCII text are not a hex ID (and must not panic on a char boundary).
+#[test]
+fn test_non_ascii_64_byte_input_is_rejected_without_panic() {
+    let input = "é".repeat(32);
+    assert_eq!(input.len(), 64);
+    assert!(syncthing_core::DeviceId::from_hex(&input).is_none());
+    assert!(syncthing_core::DeviceId::parse_user_id(&input).is_err());
+    let odd = format!("a{}b", "é".repeat(31));
+    assert_eq!(odd.len(), 64);
+    assert!(syncthing_core::DeviceId::from_hex(&odd).is_none());
+    // A sign is not a hex digit either.
+    assert!(syncthing_core::DeviceId::from_hex(&"+f".repeat(32)).is_none());
+}

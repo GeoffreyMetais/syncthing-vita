@@ -119,11 +119,13 @@ fn extract_http_body(raw: &str) -> Option<(u16, String)> {
         if size == 0 {
             break;
         }
-        if after_size.len() < size {
+        // `size` comes from the server: a truncated chunk, or one that does not end on a
+        // character boundary, ends the body instead of panicking.
+        let Some(chunk) = after_size.get(..size) else {
             decoded.push_str(after_size);
             break;
-        }
-        decoded.push_str(&after_size[..size]);
+        };
+        decoded.push_str(chunk);
         rest = after_size[size..].strip_prefix("\r\n").unwrap_or("");
     }
     Some((status, decoded))

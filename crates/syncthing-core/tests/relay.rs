@@ -161,3 +161,16 @@ fn test_join_relay_session_over_loopback_tcp() {
     assert_eq!(&buf, b"TUNNELED");
     server.join().unwrap();
 }
+
+/// An opaque length larger than the payload (up to `u32::MAX`, which wraps a 32-bit `usize`
+/// addition) is a truncated message, never a panic.
+#[test]
+fn test_decode_payload_rejects_oversized_opaque_length() {
+    for len in [5u32, u32::MAX - 2, u32::MAX] {
+        let mut payload = Vec::new();
+        payload.extend_from_slice(&0u32.to_be_bytes()); // Response code
+        payload.extend_from_slice(&len.to_be_bytes()); // message length
+        payload.extend_from_slice(b"ok");
+        assert!(decode_payload(RelayMsgType::Response, &payload).is_err());
+    }
+}

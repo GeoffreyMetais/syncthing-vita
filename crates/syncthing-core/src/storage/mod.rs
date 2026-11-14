@@ -5,6 +5,7 @@
 //!   and path resolution
 //! - [`blocks`] — block hashing, delta comparison and block reads served to peers
 //! - [`download`] — crash-safe download assembly (temp file, streaming writes, commit / abort)
+//! - [`names`] — Syncthing-internal names and validation of names announced by peers
 //! - [`atomic`] — crash-safe file replacement (backup kept until the new file is in place)
 //! - [`vita_fs`] — PS Vita filesystem quirks (`device:` roots, `mkdir`, recursive listing)
 //!
@@ -13,6 +14,7 @@
 pub mod atomic;
 pub mod blocks;
 pub mod download;
+pub mod names;
 pub mod vita_fs;
 
 use std::collections::{HashMap, HashSet};

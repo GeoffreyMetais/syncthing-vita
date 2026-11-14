@@ -199,3 +199,22 @@ fn test_crafted_folder_label_cannot_inject_a_share() {
 
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// A folder ID is chosen by the peer: it must never steer the default target of an accepted
+/// share outside the `sync` directory.
+#[test]
+fn test_crafted_folder_id_cannot_escape_the_sync_directory() {
+    let (dir, repo, mut state) = setup("offer-traversal");
+
+    FolderOfferService::receive(&mut state, &repo, PEER, "../../outside", "Docs");
+    FolderOfferService::prompt_next(&mut state);
+    press(&mut state, &repo, BTN_CROSS);
+
+    assert_eq!(state.shares.len(), 1);
+    let target = &state.shares[0].target_path;
+    assert_eq!(target, &format!("{dir}/sync/outside"));
+    assert!(!target.contains(".."));
+    assert_eq!(repo.default_share_dir("../.."), format!("{dir}/sync/folder"));
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
