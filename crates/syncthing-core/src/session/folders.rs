@@ -1,7 +1,7 @@
 //! Per-session folder bookkeeping: which folders are shared with the peer, the peer's known
 //! files, and what we already published of our local indexes (pure state, no I/O).
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::bep::{BepFileInfo, BepFolder, BepIndex, BepMessageType};
 
@@ -50,6 +50,9 @@ pub struct FolderSyncState {
     /// Highest local sequence already sent to the peer per folder. A folder is present once
     /// its full `Index` was sent; later publications are `IndexUpdate`s of newer entries only.
     published_seq: HashMap<String, i64>,
+    /// Entries last sent flagged `invalid`, per folder (local changes of a receive-only
+    /// folder). Such a flag depends on the peer's index, not only on our sequence numbers.
+    published_invalid: HashMap<String, HashSet<String>>,
 }
 
 impl FolderSyncState {
@@ -108,15 +111,32 @@ impl FolderSyncState {
     /// Messages to send so the peer knows `index`, and marks them as published.
     ///
     /// The first publication of a folder is a full `Index`; later ones are `IndexUpdate`s
-    /// holding only the entries whose sequence is newer than what was already sent (none if
-    /// nothing changed). Entries are split into batches of [`INDEX_BATCH_FILES`].
+    /// holding only the entries whose sequence is newer than what was already sent, or whose
+    /// `invalid` flag changed since it was sent (none if nothing changed). Entries are split into batches of [`INDEX_BATCH_FILES`].
     pub fn take_unpublished(&mut self, index: &BepIndex) -> Vec<(BepMessageType, BepIndex)> {
         let already_sent = self.published_seq.get(&index.folder).copied();
+        let sent_invalid = self
+            .published_invalid
+            .entry(index.folder.clone())
+            .or_default();
+        // An entry is also sent again when its `invalid` flag changed although its sequence
+        // did not: a receive-only entry published as a local change before the peer's index
+        // arrived becomes valid once that index shows the peer has the same version.
         let pending: Vec<&BepFileInfo> = index
             .files
             .iter()
-            .filter(|f| already_sent.is_none_or(|seq| f.sequence > seq))
+            .filter(|f| {
+                already_sent.is_none_or(|seq| f.sequence > seq)
+                    || f.invalid != sent_invalid.contains(&f.name)
+            })
             .collect();
+        for f in &pending {
+            if f.invalid {
+                sent_invalid.insert(f.name.clone());
+            } else {
+                sent_invalid.remove(&f.name);
+            }
+        }
         let newest = index
             .files
             .iter()
