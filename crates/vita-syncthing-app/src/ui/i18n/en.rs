@@ -124,7 +124,7 @@ pub static STRINGS_EN: Strings = Strings {
         "OLED Screensaver activates automatically after 12s during sync (or press SELECT anytime).",
     settings_sec_devices: "DEVICES & PAIRING",
     settings_desc_devices: "Pair a remote device or view this PS Vita's ID",
-    settings_sec_log: "BEP/1.0 & TLS 1.3 PROTOCOL LOG",
+    settings_sec_log: "LOG",
     settings_sec_declined: "DECLINED FOLDERS",
     settings_no_declined: "None · folders offered by peers are always asked first",
     settings_sec_language: "LANGUAGE",

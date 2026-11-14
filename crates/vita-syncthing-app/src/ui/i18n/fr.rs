@@ -125,7 +125,7 @@ pub static STRINGS_FR: Strings = Strings {
         "L'économiseur d'écran OLED s'active après 12s en sync (ou touche SELECT).",
     settings_sec_devices: "APPAREILS & APPAIRAGE",
     settings_desc_devices: "Associer un appareil ou afficher l'ID de la PS Vita",
-    settings_sec_log: "JOURNAL PROTOCOLE BEP/1.0 & TLS 1.3",
+    settings_sec_log: "JOURNAL",
     settings_sec_declined: "DOSSIERS REFUSÉS",
     settings_no_declined: "Aucun · les dossiers proposés par les pairs sont toujours demandés",
     settings_sec_language: "LANGUE",

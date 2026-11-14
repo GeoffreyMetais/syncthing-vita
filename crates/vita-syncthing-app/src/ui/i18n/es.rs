@@ -124,7 +124,7 @@ pub static STRINGS_ES: Strings = Strings {
         "El salvapantallas OLED se activa tras 12s al sincronizar (o botón SELECT).",
     settings_sec_devices: "DISPOSITIVOS Y VINCULACIÓN",
     settings_desc_devices: "Añadir un dispositivo o ver el ID de esta PS Vita",
-    settings_sec_log: "REGISTRO DE PROTOCOLO BEP/1.0 Y TLS 1.3",
+    settings_sec_log: "REGISTRO",
     settings_sec_declined: "CARPETAS RECHAZADAS",
     settings_no_declined: "Ninguna · las carpetas ofrecidas por pares siempre se preguntan",
     settings_sec_language: "IDIOMA",

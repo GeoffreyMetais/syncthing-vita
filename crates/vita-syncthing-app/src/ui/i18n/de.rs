@@ -122,7 +122,7 @@ pub static STRINGS_DE: Strings = Strings {
     settings_saver_auto_hint: "OLED-Schoner aktiviert sich nach 12s Sync (oder Taste SELECT).",
     settings_sec_devices: "GERÄTE & KOPPLUNG",
     settings_desc_devices: "Gerät hinzufügen oder PS-Vita-ID anzeigen",
-    settings_sec_log: "BEP/1.0 & TLS 1.3 PROTOKOLL",
+    settings_sec_log: "PROTOKOLL",
     settings_sec_declined: "ABGELEHNTE ORDNER",
     settings_no_declined: "Keine · von Peers angebotene Ordner werden stets abgefragt",
     settings_sec_language: "SPRACHE",
