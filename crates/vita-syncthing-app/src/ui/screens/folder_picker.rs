@@ -1,7 +1,8 @@
 //! Tab 3 (`Files` / `FolderPicker`): Interactive `ux0:` directory browser and folder presets.
 
 use crate::domain::{
-    AppState, FocusSlot, HitMap, Hotspot, PickerMode, Rect, UiAction, BROWSER_ROWS,
+    AppState, FocusSlot, HitMap, Hotspot, PickerMode, Rect, ScrollArea, ScrollTarget, UiAction,
+    BROWSER_ROWS,
 };
 use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton};
 use crate::ui::strings;
@@ -85,6 +86,18 @@ pub fn render_folder_picker_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState, h
 
     let top = state.picker_top_idx;
     let total = state.picker_items.len();
+
+    // Dragging a finger over the rows scrolls the list.
+    hits.add_scroll_area(ScrollArea {
+        rect: Rect::new(
+            CONTENT_X,
+            BROWSER_TOP,
+            CONTENT_W,
+            (BROWSER_ROWS as i32) * BROWSER_STEP,
+        ),
+        target: ScrollTarget::FilesList,
+        step: BROWSER_STEP,
+    });
 
     for i in 0..BROWSER_ROWS {
         let idx = top + i;

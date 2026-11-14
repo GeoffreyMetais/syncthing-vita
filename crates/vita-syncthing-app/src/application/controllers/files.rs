@@ -38,6 +38,11 @@ impl FilesController {
         None
     }
 
+    /// Scrolls the folder list by `rows` (touch drag); the selection stays visible.
+    pub fn scroll(state: &mut AppState, rows: i32) {
+        state.scroll_picker_rows(rows);
+    }
+
     /// Executes a `Files` action. A row index that is no longer valid (the listing changed
     /// since the frame was drawn) is ignored.
     pub fn apply(state: &mut AppState, repo: &ConfigRepository, action: UiAction) {

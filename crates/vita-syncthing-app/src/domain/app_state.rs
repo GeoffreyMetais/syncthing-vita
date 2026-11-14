@@ -92,6 +92,8 @@ pub struct AppState {
     pub picker_items: Vec<PickerItem>,
     pub selected_picker_idx: usize,
     pub picker_top_idx: usize,
+    /// Rows already scrolled by the touch drag in progress (`ScrollTarget` lists).
+    pub drag_scrolled_rows: i32,
     /// Protocol log lines of this session, oldest first (last `LOG_BUFFER_LINES`).
     pub logs: Vec<String>,
     /// Full-screen log viewer, open over `Settings` (`None`: closed).
@@ -162,6 +164,7 @@ impl AppState {
             picker_items: Vec::new(),
             selected_picker_idx: 0,
             picker_top_idx: 0,
+            drag_scrolled_rows: 0,
             logs: Vec::with_capacity(32),
             log_view: None,
             toast_msg: None,
@@ -433,6 +436,18 @@ impl AppState {
             self.saver_y = max_y;
             self.saver_vy = -self.saver_vy;
         }
+    }
+
+    /// Scrolls the directory picker window by `rows` (positive: towards the end of the list),
+    /// within bounds; the selection moves along so that it stays visible.
+    pub fn scroll_picker_rows(&mut self, rows: i32) {
+        let len = self.picker_items.len();
+        let max_top = len.saturating_sub(BROWSER_ROWS);
+        let top = (self.picker_top_idx as i64 + rows as i64).clamp(0, max_top as i64) as usize;
+        self.picker_top_idx = top;
+        let last_visible = (top + BROWSER_ROWS).min(len).saturating_sub(1);
+        self.selected_picker_idx = self.selected_picker_idx.clamp(top, last_visible.max(top));
+        self.clamp_picker_scroll();
     }
 
     /// Ensures the directory picker scroll window (`picker_top_idx`) keeps `selected_picker_idx` visible.

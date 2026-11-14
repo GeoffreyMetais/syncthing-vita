@@ -74,6 +74,15 @@ pub const SCREENSAVER_TIMEOUT_SYNCING: Duration = Duration::from_secs(10);
 /// Inactivity before the OLED screensaver starts when idle.
 pub const SCREENSAVER_TIMEOUT_IDLE: Duration = Duration::from_secs(30);
 
+// --- Input -------------------------------------------------------------------------------
+
+/// VBlanks `Up` / `Down` must be held before it starts repeating (0.4 s).
+pub const KEY_REPEAT_DELAY: u32 = 24;
+/// VBlanks between two repeats of a held `Up` / `Down` (15 rows per second).
+pub const KEY_REPEAT_INTERVAL: u32 = 4;
+/// Distance in pixels a finger must move before a touch becomes a drag (and is no tap).
+pub const TOUCH_DRAG_THRESHOLD: i32 = 12;
+
 // --- Protocol log ----------------------------------------------------------------------------
 
 /// Lines of this session's protocol log kept in memory (`AppState::logs`, log viewer).
@@ -83,7 +92,11 @@ pub const LOG_HISTORY_MAX_LINES: usize = 2000;
 
 // --- Shares --------------------------------------------------------------------------------
 
-/// Share presets offered in the `Create New Share` dialog: `(folder ID, label, target path)`.
+/// Folder ID of the `NEW_SHARE_TEMPLATES` entry that opens the folder browser.
+pub const BROWSE_TEMPLATE_ID: &str = "__browse__";
+
+/// Share presets offered in the `Create New Share` dialog (and listed first at the root of the
+/// `Files` browser while not shared): `(folder ID, label, target path)`.
 /// The `__browse__` entry opens the folder browser instead of creating a share.
 pub const NEW_SHARE_TEMPLATES: &[(&str, &str, &str)] = &[
     (

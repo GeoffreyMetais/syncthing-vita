@@ -275,7 +275,7 @@ pub static MESSAGES_FR: Messages = Messages {
     id_decode_failed: "Impossible de décoder l'ID d'appareil",
     no_devices_linked: "Aucun appareil lié (Croix pour ajouter un appareil)",
     shared_with: "Partagé avec : {devices}",
-    picker_share_this_folder: "Partager ce dossier ({path})",
+    picker_template: "{label} ({path})",
     picker_keep_current: "Garder le dossier actuel ({path})",
     picker_save_data: "Sauvegardes ({path})",
     picker_pictures: "Images PS Vita ({path})",

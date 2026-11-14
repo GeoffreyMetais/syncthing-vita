@@ -12,12 +12,15 @@ pub mod ui_text;
 
 pub use app_state::AppState;
 pub use initial_sync::InitialSyncPeers;
-pub use interaction::{FocusSlot, HitMap, Hotspot, PadKey, Rect, ShortcutKey, UiAction};
+pub use interaction::{
+    FocusSlot, HitMap, Hotspot, PadKey, Rect, ScrollArea, ScrollTarget, ShortcutKey, UiAction,
+};
 pub use log_view::{sanitize_log_line, LogScope, LogView, LOG_VIEW_PAGE, LOG_VIEW_ROWS};
 pub use models::{
     fmt_size, ActiveTab, CameraPreview, FolderOffer, IgnoredFolder, KnownDevice, Language,
     LanguagePreference, ModalDialog, PickerItem, PickerMode, ShareConfigEntry, ShareMode,
-    SyncActivity, ThemeMode, ADD_DEVICE_KEYPAD, BROWSER_ROWS, NEW_SHARE_TEMPLATES, VISIBLE_DEVICES,
+    SyncActivity, ThemeMode, ADD_DEVICE_KEYPAD, BROWSER_ROWS, BROWSE_TEMPLATE_ID,
+    NEW_SHARE_TEMPLATES, VISIBLE_DEVICES,
 };
 pub use navigation::{
     action_count, default_col, settings_row_action_count, starts_on_header, NavFocus, NavState,

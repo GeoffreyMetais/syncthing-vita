@@ -181,15 +181,34 @@ mod input_ffi {
     }
 }
 
+/// Vertical finger movement of a touch drag on this frame.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct TouchDrag {
+    /// Where the finger first touched the screen (selects the scrolled list).
+    pub start: (usize, usize),
+    /// Vertical distance from `start` in pixels (negative: the finger moved up).
+    pub total_dy: i32,
+    /// True on the first frame of the drag.
+    pub started: bool,
+}
+
 /// Input state sampled on each frame (60 Hz).
 #[derive(Debug, Clone, Default)]
 pub struct InputFrame {
-    /// Buttons pressed on this frame (rising edge).
+    /// Buttons pressed on this frame (rising edge, plus the repeats of a held `Up` / `Down`
+    /// added by `application::InputGestures`).
     pub pressed: u32,
-    /// Screen coordinates (`0..960`, `0..544`) of a new touch tap on this frame.
+    /// Buttons held down on this frame.
+    pub held: u32,
+    /// Screen coordinates (`0..960`, `0..544`) of a touch tap: a finger lifted without
+    /// dragging (recognized by `application::InputGestures` from `touch_down` / `touch_pos`).
     pub touch_tap: Option<(usize, usize)>,
+    /// Screen coordinates of a new touch contact on this frame (hardware driver).
+    pub touch_down: Option<(usize, usize)>,
     /// Screen coordinates (`0..960`, `0..544`) of active touch contact.
     pub touch_pos: Option<(usize, usize)>,
+    /// Touch drag in progress (recognized by `application::InputGestures`).
+    pub touch_drag: Option<TouchDrag>,
     /// Updated text from the native PS Vita System Keyboard (`SceIme`), if active.
     pub ime_text: Option<String>,
     /// True if the user pressed Enter/Confirm on the PS Vita System Keyboard (`SceIme`).
@@ -206,6 +225,7 @@ impl InputFrame {
     pub fn changes_view(&self) -> bool {
         self.pressed != 0
             || self.touch_tap.is_some()
+            || self.touch_drag.is_some()
             || self.ime_text.is_some()
             || self.ime_submitted
             || self.ime_canceled
@@ -431,13 +451,11 @@ impl VitaInput {
                 self.prev_touch_down = true;
 
                 return InputFrame {
-                    pressed: 0,
-                    touch_tap: None,
-                    touch_pos: None,
                     ime_text,
                     ime_submitted,
                     ime_canceled,
                     any_activity: true,
+                    ..Default::default()
                 };
             }
 
@@ -446,7 +464,7 @@ impl VitaInput {
 
             let mut touch: SceTouchData = std::mem::zeroed();
             let mut touch_pos = None;
-            let mut touch_tap = None;
+            let mut touch_down = None;
 
             if sceTouchPeek(SCE_TOUCH_PORT_FRONT, &mut touch, 1) >= 0 && touch.report_num > 0 {
                 let rep = touch.report[0];
@@ -454,7 +472,7 @@ impl VitaInput {
                 let sy = ((rep.y.max(0) as usize) / 2).min(543);
                 touch_pos = Some((sx, sy));
                 if !self.prev_touch_down {
-                    touch_tap = Some((sx, sy));
+                    touch_down = Some((sx, sy));
                 }
                 self.prev_touch_down = true;
             } else {
@@ -465,12 +483,11 @@ impl VitaInput {
 
             InputFrame {
                 pressed,
-                touch_tap,
+                held: buttons,
+                touch_down,
                 touch_pos,
-                ime_text: None,
-                ime_submitted: false,
-                ime_canceled: false,
                 any_activity,
+                ..Default::default()
             }
         }
 

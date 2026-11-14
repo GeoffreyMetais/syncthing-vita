@@ -111,8 +111,8 @@ pub struct Messages {
     pub no_devices_linked: &'static str,
     /// `{devices}`.
     pub shared_with: &'static str,
-    /// `{path}`.
-    pub picker_share_this_folder: &'static str,
+    /// `{label}`, `{path}`.
+    pub picker_template: &'static str,
     /// `{path}`.
     pub picker_keep_current: &'static str,
     /// `{path}`.
@@ -263,8 +263,8 @@ impl Strings {
             }
             UiText::DeclinedCleared { count } => fill(m.declined_cleared, &[("count", count)]),
             UiText::SharedWith { devices } => fill(m.shared_with, &[("devices", devices)]),
-            UiText::PickerShareThisFolder { path } => {
-                fill(m.picker_share_this_folder, &[("path", path)])
+            UiText::PickerTemplate { label, path } => {
+                fill(m.picker_template, &[("label", label), ("path", path)])
             }
             UiText::PickerKeepCurrent { path } => fill(m.picker_keep_current, &[("path", path)]),
             UiText::PickerSaveData { path } => fill(m.picker_save_data, &[("path", path)]),

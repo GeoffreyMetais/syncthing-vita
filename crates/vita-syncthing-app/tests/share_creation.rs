@@ -74,7 +74,7 @@ fn test_reopening_existing_share_never_discards_it() {
 #[test]
 fn test_selecting_a_folder_in_files_tab_starts_share_creation() {
     use vita_syncthing_app::domain::{ActiveTab, PickerMode};
-    use vita_syncthing_app::infrastructure::{BTN_DOWN, BTN_R, BTN_RIGHT};
+    use vita_syncthing_app::infrastructure::{BTN_R, BTN_RIGHT};
 
     let dir = temp_test_dir("files-tab-create");
     std::fs::create_dir_all(format!("{}/saves", dir)).unwrap();
@@ -85,13 +85,12 @@ fn test_selecting_a_folder_in_files_tab_starts_share_creation() {
     press(&mut state, &repo, BTN_R);
     assert_eq!(state.active_tab, ActiveTab::FolderPicker);
     assert_eq!(state.picker_mode, PickerMode::CreateNewShare);
-    assert_eq!(state.picker_items[1].path, format!("{}/saves", dir));
+    assert_eq!(state.picker_items[0].path, format!("{}/saves", dir));
 
     // Right enters page content from sidebar
     press(&mut state, &repo, BTN_RIGHT);
 
     // Cross on the "saves/" folder opens device linking for a new pending share
-    press(&mut state, &repo, BTN_DOWN);
     press(&mut state, &repo, BTN_CROSS);
     assert_eq!(state.active_tab, ActiveTab::Dashboard);
     assert_eq!(state.shares.len(), 1);
@@ -109,8 +108,6 @@ fn test_selecting_a_folder_in_files_tab_starts_share_creation() {
 #[test]
 fn test_already_shared_folders_are_not_selectable_in_files_tab() {
     use vita_syncthing_app::domain::{ActiveTab, PickerMode};
-    use vita_syncthing_app::infrastructure::BTN_DOWN;
-
     let dir = temp_test_dir("files-tab-shared");
     let repo = ConfigRepository::new(&dir);
     let mut state = AppState::new(Vec::new(), Vec::new(), &dir);
@@ -122,18 +119,106 @@ fn test_already_shared_folders_are_not_selectable_in_files_tab() {
     state.reset_nav_for_tab();
     state.nav.focus = vita_syncthing_app::domain::NavFocus::Content;
     ShareService::refresh_picker_items(&mut state, &repo);
-    assert_eq!(state.picker_items[1].path, saves);
-    assert!(state.picker_items[1].is_shared);
-    assert!(!state.picker_items[0].is_shared);
+    assert_eq!(state.picker_items[0].path, saves);
+    assert!(state.picker_items[0].is_shared);
 
     // Neither selecting nor opening the shared folder does anything
-    press(&mut state, &repo, BTN_DOWN);
     press(&mut state, &repo, BTN_CROSS);
     press(&mut state, &repo, BTN_TRIANGLE);
     assert_eq!(state.modal, ModalDialog::None);
     assert_eq!(state.active_tab, ActiveTab::FolderPicker);
     assert_eq!(state.picker_current_dir, dir);
     assert_eq!(state.shares.len(), 1);
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// Prepares the `Files` tab (share creation) at the browser root `ux0:`.
+fn files_tab_at_root(state: &mut AppState, repo: &ConfigRepository) {
+    use vita_syncthing_app::domain::{ActiveTab, NavFocus, PickerMode};
+    state.active_tab = ActiveTab::FolderPicker;
+    state.picker_mode = PickerMode::CreateNewShare;
+    state.picker_current_dir = "ux0:".to_owned();
+    state.reset_nav_for_tab();
+    state.nav.focus = NavFocus::Content;
+    ShareService::refresh_picker_items(state, repo);
+}
+
+#[test]
+fn test_default_share_presets_are_listed_first_at_files_root() {
+    use vita_syncthing_app::domain::{BROWSE_TEMPLATE_ID, NEW_SHARE_TEMPLATES};
+
+    let dir = temp_test_dir("files-tab-presets");
+    let repo = ConfigRepository::new(&dir);
+    let mut state = AppState::new(Vec::new(), Vec::new(), &dir);
+    files_tab_at_root(&mut state, &repo);
+
+    let presets: Vec<_> = NEW_SHARE_TEMPLATES
+        .iter()
+        .filter(|(fid, _, _)| *fid != BROWSE_TEMPLATE_ID)
+        .collect();
+    for (item, (_, _, path)) in state.picker_items.iter().zip(&presets) {
+        assert_eq!(item.path, *path);
+        assert!(item.is_preset && item.template.is_some() && !item.is_shared);
+    }
+    // Then the root's subfolders, without a "Share this folder" row.
+    assert!(state.picker_items[presets.len()..]
+        .iter()
+        .all(|i| i.template.is_none() && !i.is_preset));
+
+    // Presets are not repeated in subfolders.
+    state.picker_current_dir = dir.clone();
+    ShareService::refresh_picker_items(&mut state, &repo);
+    assert!(state.picker_items.iter().all(|i| i.template.is_none()));
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_already_shared_presets_are_not_listed_in_files_tab() {
+    use vita_syncthing_app::domain::NEW_SHARE_TEMPLATES;
+
+    let dir = temp_test_dir("files-tab-presets-shared");
+    let repo = ConfigRepository::new(&dir);
+    let mut state = AppState::new(Vec::new(), Vec::new(), &dir);
+    // First preset shared under its folder ID, second one through its target folder.
+    let (fid0, label0, path0) = NEW_SHARE_TEMPLATES[0];
+    let (_, _, path1) = NEW_SHARE_TEMPLATES[1];
+    ShareService::create_share(&mut state, &repo, fid0, label0, &format!("{}/x", dir));
+    ShareService::create_share(&mut state, &repo, "other", "Other", &format!("{}/", path1));
+    files_tab_at_root(&mut state, &repo);
+
+    assert!(!state
+        .picker_items
+        .iter()
+        .any(|i| i.template == Some(0) || i.template == Some(1)));
+    assert!(!state.picker_items.iter().any(|i| i.path == path0));
+    assert_eq!(state.picker_items[0].template, Some(2));
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_selecting_a_preset_in_files_tab_creates_it_with_its_folder_id() {
+    use vita_syncthing_app::domain::{ActiveTab, NEW_SHARE_TEMPLATES};
+
+    let dir = temp_test_dir("files-tab-preset-select");
+    let repo = ConfigRepository::new(&dir);
+    let mut state = AppState::new(Vec::new(), Vec::new(), &dir);
+    files_tab_at_root(&mut state, &repo);
+
+    press(&mut state, &repo, BTN_CROSS);
+    let (fid, label, path) = NEW_SHARE_TEMPLATES[0];
+    assert_eq!(state.active_tab, ActiveTab::Dashboard);
+    assert_eq!(state.shares.len(), 1);
+    assert_eq!(state.shares[0].folder_id, fid);
+    assert_eq!(state.shares[0].label, label);
+    assert_eq!(state.shares[0].target_path, path);
+    assert!(state.is_share_creation_incomplete(0));
+    assert!(matches!(
+        state.modal,
+        ModalDialog::ManageDevices { share_idx: 0, .. }
+    ));
 
     let _ = std::fs::remove_dir_all(&dir);
 }

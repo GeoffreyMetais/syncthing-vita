@@ -273,7 +273,7 @@ pub static MESSAGES_EN: Messages = Messages {
     id_decode_failed: "Device ID could not be decoded",
     no_devices_linked: "No devices linked (press Cross to add a device)",
     shared_with: "Shared with: {devices}",
-    picker_share_this_folder: "Share this folder ({path})",
+    picker_template: "{label} ({path})",
     picker_keep_current: "Keep current folder ({path})",
     picker_save_data: "Save Data ({path})",
     picker_pictures: "PS Vita Pictures ({path})",

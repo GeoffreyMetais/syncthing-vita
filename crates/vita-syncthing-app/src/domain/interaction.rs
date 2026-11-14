@@ -144,16 +144,52 @@ pub struct Hotspot {
     pub shortcut: Option<ShortcutKey>,
 }
 
+/// List that a touch drag can scroll.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ScrollTarget {
+    /// The `Files` folder list.
+    FilesList,
+}
+
+/// Area of the frame that scrolls `target` when a finger drags across it: one row per
+/// `step` pixels of finger movement.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ScrollArea {
+    pub rect: Rect,
+    pub target: ScrollTarget,
+    pub step: i32,
+}
+
 /// Interactive elements of the last rendered frame, in drawing order.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct HitMap {
     hotspots: Vec<Hotspot>,
+    scroll_areas: Vec<ScrollArea>,
 }
 
 impl HitMap {
     /// Forgets every element (start of a new frame).
     pub fn clear(&mut self) {
         self.hotspots.clear();
+        self.scroll_areas.clear();
+    }
+
+    /// Declares a list area that touch drags scroll.
+    pub fn add_scroll_area(&mut self, area: ScrollArea) {
+        self.scroll_areas.push(area);
+    }
+
+    pub fn scroll_areas(&self) -> &[ScrollArea] {
+        &self.scroll_areas
+    }
+
+    /// Scroll area under a touch at (`x`, `y`) (where a drag started).
+    pub fn scroll_area_at(&self, x: i32, y: i32) -> Option<ScrollArea> {
+        self.scroll_areas
+            .iter()
+            .rev()
+            .find(|a| a.rect.contains(x, y))
+            .copied()
     }
 
     /// Declares an interactive element.

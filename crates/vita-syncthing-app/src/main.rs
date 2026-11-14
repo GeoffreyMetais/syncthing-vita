@@ -13,8 +13,8 @@ use std::time::Instant;
 use syncthing_core::SyncControl;
 use vita_syncthing_app::application::power_policy::{cpu_clock, should_block_standby, CpuClock};
 use vita_syncthing_app::application::{
-    DevicesScan, FolderOfferService, FramePacer, FrameSignals, InputController, QrScanFlow,
-    ShareService, SyncCoordinator, UploadActivity, UserCommand,
+    DevicesScan, FolderOfferService, FramePacer, FrameSignals, InputController, InputGestures,
+    QrScanFlow, ShareService, SyncCoordinator, UploadActivity, UserCommand,
 };
 use vita_syncthing_app::domain::defaults::{
     AUTO_RECONNECT_DELAY, POWER_TICK_INTERVAL, QUIT_WORKER_WAIT, SCREENSAVER_TIMEOUT_IDLE,
@@ -144,13 +144,15 @@ fn main() {
     let mut last_transfer_at: Option<Instant> = None;
     let mut uploads = UploadActivity::new();
     let mut pacer = FramePacer::new();
+    let mut gestures = InputGestures::new();
     let mut cpu = CpuClock::Full;
 
     // Main interactive loop (Gamepad SceCtrl + Touch SceTouch + OLED Saver), one iteration per
     // display VBlank. Frames are only rendered when the screen changes (dynamic frame rate).
     loop {
         let mut signals = FrameSignals::default();
-        let frame_input = input_ctl.poll();
+        let mut frame_input = input_ctl.poll();
+        gestures.apply(&mut frame_input);
         if frame_input.any_activity {
             last_activity = Instant::now();
         }

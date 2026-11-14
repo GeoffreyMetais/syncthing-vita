@@ -6,6 +6,7 @@ use syncthing_core::DeviceId;
 use crate::application::{FolderOfferService, ShareCreation};
 use crate::domain::{
     ActiveTab, AppState, KnownDevice, PickerItem, PickerMode, ShareConfigEntry, ShareMode, UiText,
+    BROWSE_TEMPLATE_ID, NEW_SHARE_TEMPLATES,
 };
 use crate::infrastructure::ConfigRepository;
 
@@ -471,14 +472,7 @@ impl ShareService {
             .unwrap_or_else(|| "ux0:user/00/savedata".to_owned());
 
         let mut items = if state.picker_mode == PickerMode::CreateNewShare {
-            vec![PickerItem {
-                label: UiText::PickerShareThisFolder {
-                    path: state.picker_current_dir.clone(),
-                },
-                path: state.picker_current_dir.clone(),
-                is_preset: true,
-                is_shared: false,
-            }]
+            Self::unshared_template_items(state)
         } else {
             vec![
                 PickerItem {
@@ -487,6 +481,7 @@ impl ShareService {
                     },
                     path: current_target,
                     is_preset: true,
+                    template: None,
                     is_shared: false,
                 },
                 PickerItem {
@@ -495,6 +490,7 @@ impl ShareService {
                     },
                     path: "ux0:user/00/savedata".to_owned(),
                     is_preset: true,
+                    template: None,
                     is_shared: false,
                 },
                 PickerItem {
@@ -503,6 +499,7 @@ impl ShareService {
                     },
                     path: "ux0:picture".to_owned(),
                     is_preset: true,
+                    template: None,
                     is_shared: false,
                 },
                 PickerItem {
@@ -511,6 +508,7 @@ impl ShareService {
                     },
                     path: "ux0:music".to_owned(),
                     is_preset: true,
+                    template: None,
                     is_shared: false,
                 },
                 PickerItem {
@@ -519,6 +517,7 @@ impl ShareService {
                     },
                     path: "ux0:data/retroarch/savefiles".to_owned(),
                     is_preset: true,
+                    template: None,
                     is_shared: false,
                 },
                 PickerItem {
@@ -527,6 +526,7 @@ impl ShareService {
                     },
                     path: format!("{}/sync/{}", base_data_dir, folder_id),
                     is_preset: true,
+                    template: None,
                     is_shared: false,
                 },
                 PickerItem {
@@ -535,6 +535,7 @@ impl ShareService {
                     },
                     path: state.picker_current_dir.trim_end_matches('/').to_owned(),
                     is_preset: true,
+                    template: None,
                     is_shared: false,
                 },
             ]
@@ -552,6 +553,7 @@ impl ShareService {
                 label: UiText::Raw(format!("{}/", sub)),
                 path: full,
                 is_preset: false,
+                template: None,
                 is_shared: false,
             });
         }
@@ -572,6 +574,35 @@ impl ShareService {
             state.selected_picker_idx = 0;
         }
         state.clamp_picker_scroll();
+    }
+
+    /// Default share presets (`NEW_SHARE_TEMPLATES`) listed first at the root of the `Files`
+    /// browser, except those already shared (same folder ID or same target folder).
+    fn unshared_template_items(state: &AppState) -> Vec<PickerItem> {
+        if parent_dir(&state.picker_current_dir).is_some() {
+            return Vec::new();
+        }
+        NEW_SHARE_TEMPLATES
+            .iter()
+            .enumerate()
+            .filter(|(_, (fid, _, _))| *fid != BROWSE_TEMPLATE_ID)
+            .filter(|(_, (fid, _, path))| {
+                !state.shares.iter().any(|s| {
+                    s.folder_id == *fid
+                        || s.target_path.trim_end_matches('/') == path.trim_end_matches('/')
+                })
+            })
+            .map(|(idx, &(_, label, path))| PickerItem {
+                label: UiText::PickerTemplate {
+                    label: label.to_owned(),
+                    path: path.to_owned(),
+                },
+                path: path.to_owned(),
+                is_preset: true,
+                template: Some(idx),
+                is_shared: false,
+            })
+            .collect()
     }
 
     /// Navigates one directory level up in the `ux0:` picker, or returns to the `Overview` tab if at root.
@@ -610,7 +641,10 @@ impl ShareService {
         }
 
         if state.picker_mode == PickerMode::CreateNewShare {
-            ShareCreation::begin_from_path(state, repo, &item.path);
+            match item.template {
+                Some(idx) => ShareCreation::begin_from_template(state, repo, idx),
+                None => ShareCreation::begin_from_path(state, repo, &item.path),
+            };
         } else {
             Self::update_selected_share_target(state, repo, &item.path);
         }

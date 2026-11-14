@@ -2,7 +2,7 @@
 //! device is linked to it in the `ManageDevices` modal that follows creation.
 
 use crate::application::ShareService;
-use crate::domain::{ActiveTab, AppState, ModalDialog, PickerMode, UiText};
+use crate::domain::{ActiveTab, AppState, ModalDialog, PickerMode, UiText, NEW_SHARE_TEMPLATES};
 use crate::infrastructure::ConfigRepository;
 
 pub struct ShareCreation;
@@ -55,6 +55,15 @@ impl ShareCreation {
         state.picker_mode = PickerMode::ChangeShareTarget;
         state.active_tab = ActiveTab::Dashboard;
         Self::begin(state, repo, &folder_id, &label, &chosen_path)
+    }
+
+    /// Starts creating the share of a default preset (`NEW_SHARE_TEMPLATES[idx]`) picked in the
+    /// `Files` browser, and switches to the `Overview` tab (share list).
+    pub fn begin_from_template(state: &mut AppState, repo: &ConfigRepository, idx: usize) -> usize {
+        let (folder_id, label, path) = NEW_SHARE_TEMPLATES[idx];
+        state.picker_mode = PickerMode::ChangeShareTarget;
+        state.active_tab = ActiveTab::Dashboard;
+        Self::begin(state, repo, folder_id, label, path)
     }
 
     /// Ends a pending creation when the `ManageDevices` modal closes: the share is kept if a
