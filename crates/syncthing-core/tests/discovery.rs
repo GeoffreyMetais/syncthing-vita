@@ -85,3 +85,53 @@ fn test_parse_endpoint_uri_supports_tcp_and_relay_and_filters_unspecified() {
     assert_eq!(parse_endpoint_uri("relay://198.51.100.5:22067/"), None);
 }
 
+
+/// The Global Discovery HTTPS client authenticates the server: a self-signed certificate (what
+/// anyone intercepting the connection can present) is refused.
+#[test]
+fn test_https_client_rejects_untrusted_server_certificate() {
+    use std::io::{Read, Write};
+    use std::sync::Arc;
+
+    use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
+    use rustls::{ServerConfig, ServerConnection, StreamOwned};
+    use syncthing_core::tls::client::open_https_tls_stream;
+    use syncthing_core::VitaIdentity;
+
+    // An HTTPS server presenting a self-signed certificate.
+    let identity = VitaIdentity::from_seed(&[0x51; 32]).unwrap();
+    let listener = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    let server = std::thread::spawn(move || {
+        let (tcp, _) = listener.accept().unwrap();
+        let mut config = ServerConfig::builder_with_provider(Arc::new(rustls_rustcrypto::provider()))
+            .with_safe_default_protocol_versions()
+            .unwrap()
+            .with_no_client_auth()
+            .with_single_cert(
+                vec![CertificateDer::from(identity.cert_der.clone())],
+                PrivateKeyDer::Pkcs8(PrivatePkcs8KeyDer::from(identity.key_pkcs8_der.clone())),
+            )
+            .unwrap();
+        config.alpn_protocols = vec![b"http/1.1".to_vec()];
+        let mut stream = StreamOwned::new(ServerConnection::new(Arc::new(config)).unwrap(), tcp);
+        let mut request = [0u8; 64];
+        // Answers if the client accepted the certificate; `false` if it gave up.
+        stream.read(&mut request).is_ok_and(|n| n > 0)
+            && stream.write_all(b"HTTP/1.1 200 OK\r\n\r\n{}").is_ok()
+    });
+
+    let mut stream =
+        open_https_tls_stream("127.0.0.1", port, std::time::Duration::from_secs(3)).unwrap();
+    let mut buf = [0u8; 16];
+    let outcome = stream
+        .write_all(b"GET / HTTP/1.1\r\n\r\n")
+        .and_then(|_| stream.flush())
+        .and_then(|_| stream.read(&mut buf));
+    let err = outcome.expect_err("an untrusted certificate must fail the handshake");
+    assert!(
+        format!("{err:?}").contains("Certificate"),
+        "unexpected error: {err:?}"
+    );
+    assert!(!server.join().unwrap(), "the request reached the server");
+}

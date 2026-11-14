@@ -8,7 +8,7 @@ use std::time::Duration;
 use rustls::client::WantsClientCert;
 use rustls::crypto::CryptoProvider;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer, ServerName};
-use rustls::{ClientConfig, ClientConnection, ConfigBuilder, StreamOwned};
+use rustls::{ClientConfig, ClientConnection, ConfigBuilder, RootCertStore, StreamOwned};
 
 use super::verifier::{ObservedDeviceId, SyncthingServerVerifier};
 use super::{BepTlsStream, BEP_ALPN};
@@ -124,6 +124,8 @@ pub fn open_tls_stream_with_alpn(
 }
 
 /// Opens an HTTPS (`http/1.1`) TLS stream to `host:port` (resolving DNS via `ToSocketAddrs`).
+/// Unlike Syncthing peers, a web server is authenticated the usual way: its certificate chain
+/// must lead to a public root (Mozilla's set, `webpki-roots`) and match `host`.
 pub fn open_https_tls_stream(host: &str, port: u16, timeout: Duration) -> io::Result<BepTlsStream> {
     use std::net::ToSocketAddrs;
 
@@ -145,8 +147,14 @@ pub fn open_https_tls_stream(host: &str, port: u16, timeout: Duration) -> io::Re
     tcp.set_read_timeout(Some(timeout))?;
     tcp.set_write_timeout(Some(timeout))?;
 
-    let (builder, _) = verified_config_builder(None)?;
-    let config = builder.with_no_client_auth();
+    let roots = RootCertStore {
+        roots: webpki_roots::TLS_SERVER_ROOTS.to_vec(),
+    };
+    let config = ClientConfig::builder_with_provider(Arc::new(rustls_rustcrypto::provider()))
+        .with_safe_default_protocol_versions()
+        .map_err(|e| io::Error::other(format!("TLS version error: {e}")))?
+        .with_root_certificates(roots)
+        .with_no_client_auth();
     let conn = new_alpn_connection(config, b"http/1.1", host)?;
     Ok(StreamOwned::new(conn, tcp))
 }

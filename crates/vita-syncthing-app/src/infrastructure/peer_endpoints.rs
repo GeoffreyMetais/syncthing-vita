@@ -24,6 +24,24 @@ const STOP_CHECK_STEP: Duration = Duration::from_millis(200);
 
 pub type SharedDiscoveredAddrs = Arc<Mutex<Vec<(DeviceId, Vec<SocketAddr>)>>>;
 pub type SharedGlobalEndpoints = Arc<Mutex<Vec<(DeviceId, Vec<PeerEndpoint>)>>>;
+/// Configured devices whose session is currently established.
+pub type SharedConnectedPeers = Arc<Mutex<Vec<DeviceId>>>;
+
+/// A device is looked up on Global Discovery only when that can help and is possible: it has a
+/// full `DeviceId` and no session is established with it. Looking up a connected peer would
+/// only tell the discovery server which devices this console talks to.
+pub fn needs_global_lookup(kd: &KnownDevice, connected: &[DeviceId]) -> bool {
+    !kd.device_id.is_short_placeholder() && !connected.contains(&kd.device_id)
+}
+
+fn set_connected(connected: &SharedConnectedPeers, device_id: DeviceId, is_connected: bool) {
+    if let Ok(mut guard) = connected.lock() {
+        guard.retain(|id| *id != device_id);
+        if is_connected {
+            guard.push(device_id);
+        }
+    }
+}
 
 /// Resolves a configured peer address (`ip:port` or `hostname:port`), returning empty for
 /// `"dynamic"` or unparseable/unresolvable strings.
@@ -94,11 +112,12 @@ pub fn collect_peer_targets(
     (resolved_id, direct)
 }
 
-/// Queries Global Discovery v2 for every configured peer with a full `DeviceId` and updates the
-/// shared endpoint cache.
+/// Queries Global Discovery v2 for every configured peer that needs it (see
+/// [`needs_global_lookup`]) and updates the shared endpoint cache.
 pub fn refresh_global_endpoints(
     approved_devices: &[KnownDevice],
     global: &SharedGlobalEndpoints,
+    connected: &SharedConnectedPeers,
     control: &SyncControl,
     tx: &Sender<WorkerMsg>,
     last_errors: &mut Vec<(DeviceId, String)>,
@@ -107,7 +126,8 @@ pub fn refresh_global_endpoints(
         if control.is_stop_requested() {
             return;
         }
-        if kd.device_id.is_short_placeholder() {
+        let connected_now = connected.lock().map(|g| g.clone()).unwrap_or_default();
+        if !needs_global_lookup(kd, &connected_now) {
             continue;
         }
         match lookup_global_peer(kd.device_id, GLOBAL_DISCOVERY_TIMEOUT) {
@@ -175,6 +195,7 @@ pub fn run_peer_session_loop(
     storage: FsSyncStorage,
     discovered: SharedDiscoveredAddrs,
     global: SharedGlobalEndpoints,
+    connected: SharedConnectedPeers,
     control: Arc<SyncControl>,
     tx: Sender<WorkerMsg>,
 ) {
@@ -219,7 +240,12 @@ pub fn run_peer_session_loop(
                 });
             }
             let tx_ev = tx.clone();
+            let connected_ev = Arc::clone(&connected);
+            let configured_id = kd.device_id;
             let emit = move |event: SyncEvent| {
+                if matches!(event, SyncEvent::PeerConnected { .. }) {
+                    set_connected(&connected_ev, configured_id, true);
+                }
                 let _ = tx_ev.send(WorkerMsg::SyncEvent(event));
             };
             let result = match ep {
@@ -257,6 +283,8 @@ pub fn run_peer_session_loop(
                     )
                 }),
             };
+
+            set_connected(&connected, kd.device_id, false);
 
             match result {
                 Ok(hs) => match hs.session_status {
