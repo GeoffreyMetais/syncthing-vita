@@ -67,6 +67,7 @@ syncthing-vita
             │   ├── devices_scan.rs   # DevicesScan (LAN scan of the ManageDevices dialog: immediate or delayed, cancelled on close)
             │   ├── dpad_navigation.rs # DpadNavigation (sidebar <-> page focus, Cross on focused element)
             │   ├── qr_scan.rs        # QrScanFlow (scanner events -> AddDeviceById confirmation), extract_device_id
+            │   ├── sync_supervisor.rs # SyncSupervisor (sync worker life cycle: start, restart on configuration change, rescan / discovery requests, reconnection)
             │   ├── sync_coordinator.rs # SyncCoordinator (maps WorkerMsg & SyncEvent into AppState & ShareService)
             │   ├── upload_activity.rs # UploadActivity ("Uploading" state ends UPLOAD_DISPLAY_GRACE after the last block served)
             │   ├── input_controller.rs # InputController (resolves touch / Cross / shortcuts against the frame's HitMap, executes UiActions)
@@ -168,6 +169,7 @@ Dependencies strictly point **inward**. Inner layers never import or depend on o
      - `share_mode.rs`: `ShareModeService::toggle` switches a share between `ShareMode::ReadWrite` and `ShareMode::ReadOnly`, saves it and restarts the worker (`config_dirty`). `ShareModeService::request_revert` queues a read-only share in `AppState::pending_reverts`; `main.rs` hands it to the running worker (`SyncControl::request_revert`) once no configuration change is pending, and a sync is started if none runs.
      - `folder_offers.rs`: Consent for folders offered by peers (`FolderOffer` modal); declined offers persisted.
      - `sync_coordinator.rs`: Maps background `WorkerMsg` protocol events into `AppState` updates. `AppState::session_connected` follows `connected_peers` (a peer enters on `SyncCycleCompleted`, leaves on `SessionEnded`). Per-file and per-block events (`FileUpToDate`, `BlockUploaded`) are never logged.
+     - `sync_supervisor.rs`: `SyncSupervisor` owns the running worker (message channel + `SyncControl`). `main.rs` forwards `UserCommand::StartSync` / `ScanLan` / quit to it and calls `tick` once per loop iteration; it never calls `spawn_sync_worker` itself.
      - `controllers/`: `input.rs` (`InputController`: translates main-screen button/touch inputs into actions, modal triggers, and commands) and one controller per page (`dashboard.rs` with the share list's `shares.rs`, `files.rs`, `settings.rs`; see §3.4).
      - `modal_input/`: Input handling for open modals, one file per modal (mirrors `ui/modals/`).
      - `dpad_navigation.rs`: D-pad focus between the sidebar and the page elements.
