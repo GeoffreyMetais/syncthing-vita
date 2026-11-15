@@ -2,7 +2,7 @@
 //! confirmation.
 
 use super::ModalTouch;
-use crate::application::{QrScanFlow, ShareService, UserCommand};
+use crate::application::{DeviceRegistry, QrScanFlow, ShareService, UserCommand};
 use crate::domain::{AppState, ModalDialog, UiText, ADD_DEVICE_KEYPAD};
 use crate::infrastructure::{
     ConfigRepository, InputFrame, BTN_CIRCLE, BTN_CROSS, BTN_DOWN, BTN_LEFT, BTN_R, BTN_RIGHT,
@@ -151,7 +151,7 @@ pub(crate) fn confirm_add_device(
     return_share_idx: Option<usize>,
 ) -> UserCommand {
     let input_str = state.device_id_input.clone();
-    match ShareService::add_device_by_input(state, repo, &input_str, return_share_idx) {
+    match DeviceRegistry::add_device_by_input(state, repo, &input_str, return_share_idx) {
         Ok((dev_id, dev_name, is_short)) => {
             let (msg, toast) = if is_short {
                 (

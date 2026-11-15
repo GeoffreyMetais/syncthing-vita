@@ -10,8 +10,8 @@ use std::time::Instant;
 
 use vita_syncthing_app::application::power_policy::{cpu_clock, should_block_standby, CpuClock};
 use vita_syncthing_app::application::{
-    DevicesScan, FramePacer, FrameSignals, InputController, InputGestures, QrScanFlow,
-    ShareService, SyncSupervisor, UploadActivity, UserCommand,
+    DevicesScan, FolderBrowser, FramePacer, FrameSignals, InputController, InputGestures,
+    QrScanFlow, ShareService, SyncSupervisor, UploadActivity, UserCommand,
 };
 use vita_syncthing_app::domain::defaults::{
     POWER_TICK_INTERVAL, SCREENSAVER_TIMEOUT_IDLE, SCREENSAVER_TIMEOUT_SYNCING,
@@ -69,7 +69,7 @@ fn main() {
     if let Ok(ref id) = identity_res {
         state.vita_device_id = id.device_id.to_syncthing_string();
     }
-    ShareService::refresh_picker_items(&mut state, &repo);
+    FolderBrowser::refresh(&mut state, &repo);
 
     let mut renderer = Box::new(VitaUiRenderer::new());
     renderer.render(&mut state, 1);

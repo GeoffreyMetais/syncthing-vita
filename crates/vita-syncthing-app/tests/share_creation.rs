@@ -4,7 +4,9 @@ mod common;
 
 use common::{press, temp_test_dir};
 use syncthing_core::DeviceId;
-use vita_syncthing_app::application::{ShareCreation, ShareService, UserCommand};
+use vita_syncthing_app::application::{
+    DeviceRegistry, FolderBrowser, ShareCreation, ShareService, UserCommand,
+};
 use vita_syncthing_app::domain::{AppState, ModalDialog};
 use vita_syncthing_app::infrastructure::{ConfigRepository, BTN_CIRCLE, BTN_CROSS, BTN_TRIANGLE};
 
@@ -14,7 +16,7 @@ fn test_share_without_linked_device_is_discarded() {
     let repo = ConfigRepository::new(&dir);
     let mut state = AppState::new(Vec::new(), Vec::new(), &dir);
     let dev_id = DeviceId([0x11; 32]);
-    ShareService::upsert_device(&mut state, &repo, dev_id, "Laptop", "192.168.1.5:22000");
+    DeviceRegistry::upsert_device(&mut state, &repo, dev_id, "Laptop", "192.168.1.5:22000");
 
     let idx = ShareCreation::begin(&mut state, &repo, "new", "New", &format!("{}/new", dir));
     assert!(state.is_share_creation_incomplete(idx));
@@ -40,7 +42,7 @@ fn test_share_with_linked_device_is_kept() {
     let repo = ConfigRepository::new(&dir);
     let mut state = AppState::new(Vec::new(), Vec::new(), &dir);
     let dev_id = DeviceId([0x22; 32]);
-    ShareService::upsert_device(&mut state, &repo, dev_id, "Laptop", "192.168.1.5:22000");
+    DeviceRegistry::upsert_device(&mut state, &repo, dev_id, "Laptop", "192.168.1.5:22000");
 
     let idx = ShareCreation::begin(&mut state, &repo, "new", "New", &format!("{}/new", dir));
     press(&mut state, &repo, BTN_CROSS); // link the first device
@@ -118,7 +120,7 @@ fn test_already_shared_folders_are_not_selectable_in_files_tab() {
     state.picker_mode = PickerMode::CreateNewShare;
     state.reset_nav_for_tab();
     state.nav.focus = vita_syncthing_app::domain::NavFocus::Content;
-    ShareService::refresh_picker_items(&mut state, &repo);
+    FolderBrowser::refresh(&mut state, &repo);
     assert_eq!(state.picker_items[0].path, saves);
     assert!(state.picker_items[0].is_shared);
 
@@ -141,7 +143,7 @@ fn files_tab_at_root(state: &mut AppState, repo: &ConfigRepository) {
     state.picker_current_dir = "ux0:".to_owned();
     state.reset_nav_for_tab();
     state.nav.focus = NavFocus::Content;
-    ShareService::refresh_picker_items(state, repo);
+    FolderBrowser::refresh(state, repo);
 }
 
 #[test]
@@ -168,7 +170,7 @@ fn test_default_share_presets_are_listed_first_at_files_root() {
 
     // Presets are not repeated in subfolders.
     state.picker_current_dir = dir.clone();
-    ShareService::refresh_picker_items(&mut state, &repo);
+    FolderBrowser::refresh(&mut state, &repo);
     assert!(state.picker_items.iter().all(|i| i.template.is_none()));
 
     let _ = std::fs::remove_dir_all(&dir);

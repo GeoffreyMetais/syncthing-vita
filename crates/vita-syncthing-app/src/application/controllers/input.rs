@@ -7,7 +7,7 @@
 use crate::application::dpad_navigation::DpadNavigation;
 use crate::application::modal_input::{open_add_device_modal, ModalInput};
 use crate::application::{
-    DevicesScan, FilesController, LogsController, SettingsController, ShareService,
+    DevicesScan, FilesController, FolderBrowser, LogsController, SettingsController, ShareService,
     SharesController,
 };
 use crate::domain::{
@@ -202,7 +202,7 @@ impl InputController {
         state.active_tab = tab;
         if tab == ActiveTab::FolderPicker {
             state.picker_mode = PickerMode::CreateNewShare;
-            ShareService::refresh_picker_items(state, repo);
+            FolderBrowser::refresh(state, repo);
         }
     }
 }

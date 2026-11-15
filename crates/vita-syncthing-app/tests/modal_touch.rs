@@ -6,7 +6,9 @@ mod common;
 
 use common::{draw, press, rect_of, rects_of, tap, tap_action, tap_rect, temp_test_dir};
 use syncthing_core::DeviceId;
-use vita_syncthing_app::application::{FolderOfferService, ShareService, UserCommand};
+use vita_syncthing_app::application::{
+    DeviceRegistry, FolderOfferService, ShareService, UserCommand,
+};
 use vita_syncthing_app::domain::{
     AppState, Language, LanguagePreference, ModalDialog, PadKey, Rect, UiAction, ADD_DEVICE_KEYPAD,
     NEW_SHARE_TEMPLATES,
@@ -23,8 +25,8 @@ fn setup(name: &str) -> (String, ConfigRepository, AppState) {
     let dir = temp_test_dir(name);
     let repo = ConfigRepository::new(&dir);
     let mut state = AppState::new(Vec::new(), Vec::new(), &dir);
-    ShareService::upsert_device(&mut state, &repo, PEER, "MacBook", "192.168.1.10:22000");
-    ShareService::upsert_device(&mut state, &repo, OTHER, "NAS", "192.168.1.11:22000");
+    DeviceRegistry::upsert_device(&mut state, &repo, PEER, "MacBook", "192.168.1.10:22000");
+    DeviceRegistry::upsert_device(&mut state, &repo, OTHER, "NAS", "192.168.1.11:22000");
     ShareService::create_share(&mut state, &repo, "saves", "Saves", &format!("{dir}/saves"));
     ShareService::toggle_device_for_share(&mut state, &repo, 0, PEER);
     state.modal = ModalDialog::None;

@@ -31,7 +31,7 @@ fn test_files_tab_up_navigation_walks_device_root_paths() {
 
 /// `Files` tab on a folder holding `count` subfolders, D-pad focus on the first row.
 fn files_tab_with_subfolders(name: &str, count: usize) -> (String, ConfigRepository, AppState) {
-    use vita_syncthing_app::application::ShareService;
+    use vita_syncthing_app::application::FolderBrowser;
     use vita_syncthing_app::domain::{NavFocus, PickerMode};
     let dir = temp_test_dir(name);
     for i in 0..count {
@@ -45,7 +45,7 @@ fn files_tab_with_subfolders(name: &str, count: usize) -> (String, ConfigReposit
     state.picker_mode = PickerMode::CreateNewShare;
     state.reset_nav_for_tab();
     state.nav.focus = NavFocus::Content;
-    ShareService::refresh_picker_items(&mut state, &repo);
+    FolderBrowser::refresh(&mut state, &repo);
     assert_eq!(state.picker_items.len(), count);
     (dir, repo, state)
 }
@@ -199,12 +199,12 @@ fn test_app_data_folders_cannot_be_shared() {
     }
 
     // Selecting such a folder in the browser explains why instead of creating a share.
-    use vita_syncthing_app::application::ShareService;
+    use vita_syncthing_app::application::FolderBrowser;
     use vita_syncthing_app::domain::UiText;
     let (dir, _, mut state) = files_tab_with_subfolders("picker-protected", 2);
     let repo = ConfigRepository::new(&format!("{dir}/sub01"));
     state.selected_picker_idx = 1;
-    ShareService::apply_picker_selection(&mut state, &repo, false);
+    FolderBrowser::apply_selection(&mut state, &repo, false);
     assert!(state.shares.is_empty());
     assert_eq!(
         state.toast_msg.map(|(msg, _)| msg),
@@ -212,7 +212,7 @@ fn test_app_data_folders_cannot_be_shared() {
     );
     state.selected_picker_idx = 0;
     state.toast_msg = None;
-    ShareService::apply_picker_selection(&mut state, &repo, false);
+    FolderBrowser::apply_selection(&mut state, &repo, false);
     assert_eq!(state.shares.len(), 1);
     let _ = std::fs::remove_dir_all(&dir);
 }

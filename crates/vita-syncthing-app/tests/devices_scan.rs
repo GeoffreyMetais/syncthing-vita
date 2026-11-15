@@ -6,7 +6,7 @@ mod common;
 
 use common::{press, tap_action, temp_test_dir};
 use syncthing_core::DeviceId;
-use vita_syncthing_app::application::{DevicesScan, ShareService, UserCommand};
+use vita_syncthing_app::application::{DeviceRegistry, DevicesScan, ShareService, UserCommand};
 use vita_syncthing_app::domain::defaults::DEVICES_DIALOG_SCAN_DELAY;
 use vita_syncthing_app::domain::{AppState, ModalDialog, UiAction};
 use vita_syncthing_app::infrastructure::{ConfigRepository, BTN_CIRCLE};
@@ -18,7 +18,7 @@ fn setup(name: &str, linked: bool) -> (String, ConfigRepository, AppState) {
     let dir = temp_test_dir(name);
     let repo = ConfigRepository::new(&dir);
     let mut state = AppState::new(Vec::new(), Vec::new(), &dir);
-    ShareService::upsert_device(&mut state, &repo, PEER, "MacBook", "192.168.1.10:22000");
+    DeviceRegistry::upsert_device(&mut state, &repo, PEER, "MacBook", "192.168.1.10:22000");
     ShareService::create_share(&mut state, &repo, "saves", "Saves", &format!("{dir}/saves"));
     if linked {
         ShareService::toggle_device_for_share(&mut state, &repo, 0, PEER);

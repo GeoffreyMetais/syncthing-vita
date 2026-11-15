@@ -4,7 +4,7 @@
 mod common;
 
 use common::{press, temp_test_dir};
-use vita_syncthing_app::application::{InputController, ShareService, UserCommand};
+use vita_syncthing_app::application::{DeviceRegistry, InputController, ShareService, UserCommand};
 use vita_syncthing_app::domain::{ActiveTab, AppState, ModalDialog};
 use vita_syncthing_app::infrastructure::{
     ConfigRepository, InputFrame, BTN_CIRCLE, BTN_CROSS, BTN_RIGHT, BTN_SQUARE, BTN_TRIANGLE,
@@ -67,7 +67,7 @@ fn test_add_device_by_short_id_and_system_keyboard_flow() {
     );
 
     // 3. When the peer is subsequently discovered on LAN, its Short ID placeholder automatically upgrades to the full 32-byte DeviceId
-    ShareService::upsert_device(
+    DeviceRegistry::upsert_device(
         &mut state,
         &repo,
         full_peer_id,

@@ -4,7 +4,7 @@ use std::sync::mpsc::Receiver;
 
 use syncthing_core::SyncEvent;
 
-use crate::application::{FolderOfferService, ShareService};
+use crate::application::{DeviceRegistry, FolderBrowser, FolderOfferService, ShareService};
 use crate::domain::{AppState, UiText};
 use crate::infrastructure::{ConfigRepository, WorkerMsg};
 
@@ -47,7 +47,7 @@ impl SyncCoordinator {
                         name,
                         address,
                     } => {
-                        ShareService::register_discovered_peer(state, device_id, &name, &address);
+                        DeviceRegistry::register_discovered_peer(state, device_id, &name, &address);
                     }
                     WorkerMsg::SyncEvent(event) => Self::handle_sync_event(state, repo, event),
                     WorkerMsg::Finished {
@@ -85,7 +85,7 @@ impl SyncCoordinator {
                 } else {
                     peer_name
                 };
-                ShareService::upsert_device(
+                DeviceRegistry::upsert_device(
                     state,
                     repo,
                     peer_device_id,
@@ -112,7 +112,7 @@ impl SyncCoordinator {
                     FolderOfferService::receive(state, repo, peer_device_id, &f.id, &f.label);
                     labels.push(format!("{} ({})", f.id, f.label));
                 }
-                ShareService::refresh_picker_items(state, repo);
+                FolderBrowser::refresh(state, repo);
                 let joined = if labels.is_empty() {
                     "No remote folders shared".to_owned()
                 } else {
