@@ -144,7 +144,7 @@ impl SyncCoordinator {
             } => {
                 state.sync_in_progress = true;
                 state.transfer_activity += 1;
-                state.bytes_transferred += size;
+                state.bytes_transferred += size as u64;
                 state.current_file = UiText::Raw(name.clone());
                 let pct = if total_size > 0 {
                     (((offset + size as u64) * 100) / total_size).min(100) as u32
@@ -184,7 +184,7 @@ impl SyncCoordinator {
                 state.blocks_uploaded += 1;
                 state.uploading = true;
                 state.transfer_activity += 1;
-                state.bytes_transferred += size;
+                state.bytes_transferred += size as u64;
                 state.current_file = UiText::Raw(name.clone());
                 // Not logged: one line (and one disk write) per 128 KiB block served.
                 state.status_line = UiText::Uploading { file: name };

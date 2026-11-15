@@ -34,7 +34,7 @@ pub enum SyncEvent {
         folder: String,
         name: String,
         blocks_downloaded: usize,
-        bytes_downloaded: usize,
+        bytes_downloaded: u64,
         total_size: u64,
     },
     LocalIndexPublished {
@@ -53,9 +53,9 @@ pub enum SyncEvent {
         active_connections: usize,
         files_up_to_date: usize,
         files_downloaded: usize,
-        bytes_downloaded: usize,
+        bytes_downloaded: u64,
         blocks_uploaded: usize,
-        bytes_uploaded: usize,
+        bytes_uploaded: u64,
     },
     /// A shared folder's local directory cannot be used; it is skipped for this session.
     FolderUnavailable {
