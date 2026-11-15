@@ -25,6 +25,22 @@ pub struct LanPeer {
     pub addrs: Vec<SocketAddr>,
 }
 
+/// Binds `0.0.0.0:port` with `SO_REUSEADDR` and `SO_REUSEPORT`: every socket bound this way
+/// on the computer receives the broadcasts sent to the port.
+fn bind_shared(port: u16) -> io::Result<UdpSocket> {
+    use socket2::{Domain, Protocol, SockAddr, Socket, Type};
+
+    let socket = Socket::new(Domain::IPV4, Type::DGRAM, Some(Protocol::UDP))?;
+    socket.set_reuse_address(true)?;
+    #[cfg(unix)]
+    socket.set_reuse_port(true)?;
+    socket.bind(&SockAddr::from(SocketAddr::new(
+        IpAddr::V4(Ipv4Addr::UNSPECIFIED),
+        port,
+    )))?;
+    Ok(socket.into())
+}
+
 /// Our announcement: `tcp://0.0.0.0:<port>` when we listen (peers substitute the address the
 /// packet came from), nothing otherwise.
 pub fn our_announce(id: DeviceId, listen_port: Option<u16>) -> Announce {
@@ -50,11 +66,12 @@ pub struct LanBeacon {
 }
 
 impl LanBeacon {
-    /// Binds UDP 21027. When another program holds it (e.g. Syncthing on the same computer),
+    /// Binds UDP 21027, shared with the other programs listening on it (Syncthing, another
+    /// instance: each one receives the broadcasts). When a program holds it exclusively,
     /// falls back to a random port: our broadcasts still go out and direct answers still come
     /// back, but other devices' broadcasts are missed.
     pub fn bind(announce: Announce) -> io::Result<Self> {
-        let socket = match UdpSocket::bind(("0.0.0.0", DISCOVERY_PORT)) {
+        let socket = match bind_shared(DISCOVERY_PORT) {
             Ok(s) => s,
             Err(e) => {
                 log(&format!(
@@ -71,6 +88,11 @@ impl LanBeacon {
             last_broadcast: None,
             replies: Vec::new(),
         })
+    }
+
+    /// The UDP port actually bound (21027 unless another program holds it exclusively).
+    pub fn local_port(&self) -> io::Result<u16> {
+        Ok(self.socket.local_addr()?.port())
     }
 
     /// Broadcasts our announcement on the global and `/24` subnet broadcast addresses.

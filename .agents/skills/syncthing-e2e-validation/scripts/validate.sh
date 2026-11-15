@@ -29,8 +29,15 @@ done
 rm -rf "$OUT" && mkdir -p "$OUT"
 WORK="$(mktemp -d)"
 PIDS=()
-cleanup() {
+# Stops the daemons a stage started: a daemon left running would hold UDP 21027 / TCP 22000
+# and answer the next stage's peers.
+stop_daemons() {
     for pid in "${PIDS[@]}"; do kill "$pid" 2>/dev/null || true; done
+    for pid in "${PIDS[@]}"; do wait "$pid" 2>/dev/null || true; done
+    PIDS=()
+}
+cleanup() {
+    stop_daemons
     rm -rf "$WORK"
 }
 trap cleanup EXIT
@@ -217,6 +224,7 @@ for stage in "${STAGES[@]}"; do
     if wanted "$stage"; then
         echo "==> $stage..."
         "stage_${stage//-/_}"
+        stop_daemons
     else
         result "$stage" SKIP
     fi
