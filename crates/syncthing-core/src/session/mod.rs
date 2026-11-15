@@ -8,27 +8,31 @@
 //! 4. [`initial_sync`]: initial download, local `Index` publication, request draining
 //! 5. [`persistent`]: persistent loop (when a [`SyncControl`] is given)
 //!
+//! Public API: the entry points of this file with [`params`], [`control`], [`events`],
+//! [`outcome`] and [`tuning`]. [`context`], [`folders`] and [`upload`] are public building
+//! blocks (usable to serve requests on a custom transport); the phases are private.
+//!
 //! Shared building blocks: [`context`] (identity, storage, stats, event sink), [`folders`]
 //! (per-session folder state), [`download`] / [`upload`] (block transfers), [`keepalive`],
 //! [`params`] (what the application provides), [`tuning`] (timings it chooses),
 //! [`index_exchange`] (local index publication, runtime `ClusterConfig` / `Index`) and
 //! [`dispatch`] (primary-connection message routing).
 
-pub mod cluster_exchange;
+mod cluster_exchange;
 pub mod context;
 pub mod control;
-pub mod dispatch;
-pub mod download;
+mod dispatch;
+mod download;
 pub mod events;
 pub mod folders;
-pub mod index_exchange;
-pub mod initial_sync;
-pub mod keepalive;
+mod index_exchange;
+mod initial_sync;
+mod keepalive;
 pub mod outcome;
 pub mod params;
-pub mod persistent;
-pub mod revert;
-pub mod secondary;
+mod persistent;
+mod revert;
+mod secondary;
 pub mod tuning;
 pub mod upload;
 
