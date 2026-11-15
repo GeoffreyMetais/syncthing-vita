@@ -162,17 +162,31 @@ pub fn refresh_global_endpoints(
     }
 }
 
-fn sleep_interruptible(control: &SyncControl, duration: Duration) -> bool {
+/// Sleeps up to `duration`, checking every `STOP_CHECK_STEP` whether to give up early: on a
+/// stop request (returns `false`) or when `wake` returns `true` (returns `true`).
+/// Returns `true` if the caller should carry on.
+pub(super) fn sleep_unless_stopped(
+    control: &SyncControl,
+    duration: Duration,
+    wake: impl Fn() -> bool,
+) -> bool {
     let mut elapsed = Duration::ZERO;
     while elapsed < duration {
         if control.is_stop_requested() {
             return false;
         }
-        let rem = (duration - elapsed).min(STOP_CHECK_STEP);
-        std::thread::sleep(rem);
-        elapsed += rem;
+        if wake() {
+            return true;
+        }
+        let step = (duration - elapsed).min(STOP_CHECK_STEP);
+        std::thread::sleep(step);
+        elapsed += step;
     }
     !control.is_stop_requested()
+}
+
+fn sleep_interruptible(control: &SyncControl, duration: Duration) -> bool {
+    sleep_unless_stopped(control, duration, || false)
 }
 
 fn format_endpoint_label(ep: &PeerEndpoint) -> String {

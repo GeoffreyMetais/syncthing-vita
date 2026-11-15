@@ -12,8 +12,8 @@ use syncthing_core::{
 };
 
 use super::peer_endpoints::{
-    refresh_global_endpoints, run_peer_session_loop, PeerSessionShared, SharedConnectedPeers,
-    SharedDiscoveredAddrs, SharedGlobalEndpoints,
+    refresh_global_endpoints, run_peer_session_loop, sleep_unless_stopped, PeerSessionShared,
+    SharedConnectedPeers, SharedDiscoveredAddrs, SharedGlobalEndpoints,
 };
 use super::worker_slot::spawn_after_previous;
 use super::ConfigRepository;
@@ -25,8 +25,6 @@ use crate::domain::{KnownDevice, ShareConfigEntry, ShareMode, UiText};
 
 /// Stack size of the worker and peer session threads.
 const WORKER_STACK_SIZE: usize = 1536 * 1024;
-/// Granularity at which a sleeping worker notices a stop request.
-const STOP_CHECK_STEP: Duration = Duration::from_millis(200);
 
 static PROCESS_INSTANCE_ID: OnceLock<i64> = OnceLock::new();
 
@@ -62,19 +60,7 @@ pub enum WorkerMsg {
 /// Waits up to `duration` before the next discovery cycle. Returns early when the UI asks for a
 /// LAN scan (`SyncControl::request_discovery`); `false` if a stop was requested.
 fn wait_for_next_discovery(control: &SyncControl, duration: Duration) -> bool {
-    let mut elapsed = Duration::ZERO;
-    while elapsed < duration {
-        if control.is_stop_requested() {
-            return false;
-        }
-        if control.take_discovery_request() {
-            return true;
-        }
-        let rem = (duration - elapsed).min(STOP_CHECK_STEP);
-        std::thread::sleep(rem);
-        elapsed += rem;
-    }
-    !control.is_stop_requested()
+    sleep_unless_stopped(control, duration, || control.take_discovery_request())
 }
 
 /// Spawns UDP 21027 discovery + concurrent persistent `1+2` TLS 1.3 / BEP sessions for all
