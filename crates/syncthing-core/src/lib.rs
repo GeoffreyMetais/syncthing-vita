@@ -35,7 +35,7 @@ pub use bep::{
 pub use cert::DeviceIdentity;
 pub use device_id::{DeviceId, DeviceIdParseError};
 pub use discovery::{
-    detect_local_ipv4, lookup_global_peer, parse_endpoint_uri, parse_global_discovery_json,
+    detect_local_ipv4, lookup_global_peer, parse_global_discovery_json, resolve_endpoint_uri,
     resolve_peer_tcp_addrs, run_discovery_cycle, scan_lan_bep_peers, Announce,
     DiscoveryCycleResult, PeerEndpoint, DISCOVERY_BROADCAST_ADDR, DISCOVERY_MAGIC, DISCOVERY_PORT,
 };

@@ -70,3 +70,60 @@ fn test_symlink_entries_are_decoded_as_invalid() {
         assert!(entry(symlink).invalid && !entry(symlink).is_dir);
     }
 }
+
+/// The announced `block_size` (field 13) is the size of the file's blocks, not always 128 KiB:
+/// a file pulled from a peer keeps the (larger) blocks that peer chose.
+#[test]
+fn test_announced_block_size_follows_the_blocks() {
+    use syncthing_core::proto::{decode_varint, WireIter};
+    use syncthing_core::{BepBlockInfo, BepFileInfo, BepIndex, BEP_BLOCK_SIZE};
+    let announced = |block_sizes: &[i32]| -> u64 {
+        let mut offset = 0;
+        let blocks: Vec<BepBlockInfo> = block_sizes
+            .iter()
+            .map(|&size| {
+                let block = BepBlockInfo {
+                    offset,
+                    size,
+                    hash: vec![0; 32],
+                };
+                offset += i64::from(size);
+                block
+            })
+            .collect();
+        let index = BepIndex {
+            folder: "f".to_owned(),
+            files: vec![BepFileInfo {
+                name: "a.bin".to_owned(),
+                is_dir: false,
+                size: offset,
+                modified_s: 1,
+                deleted: false,
+                invalid: false,
+                sequence: 1,
+                versions: Vec::new(),
+                blocks,
+            }],
+        };
+        let payload = index.encode();
+        let file = WireIter::new(&payload)
+            .filter_map(Result::ok)
+            .find(|(field, _, _)| *field == 2)
+            .unwrap()
+            .2;
+        let size = WireIter::new(file)
+            .filter_map(Result::ok)
+            .find(|(field, _, _)| *field == 13)
+            .unwrap()
+            .2;
+        decode_varint(size).unwrap().0
+    };
+    let mib = 1024 * 1024;
+    assert_eq!(announced(&[mib, mib, 5]), mib as u64);
+    assert_eq!(
+        announced(&[BEP_BLOCK_SIZE as i32, 7]),
+        BEP_BLOCK_SIZE as u64
+    );
+    assert_eq!(announced(&[42]), BEP_BLOCK_SIZE as u64);
+    assert_eq!(announced(&[]), BEP_BLOCK_SIZE as u64);
+}
