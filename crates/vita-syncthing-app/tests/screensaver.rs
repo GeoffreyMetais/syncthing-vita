@@ -9,7 +9,7 @@ use vita_syncthing_app::ui::theme::UiTheme;
 fn progress_bar_drawn(state: &AppState) -> bool {
     let mut gfx = Gfx::new();
     render_oled_screensaver(&mut gfx, &UiTheme::for_mode(state.theme_mode), state);
-    let (bx, by) = (state.saver_x as i32, state.saver_y as i32);
+    let (bx, by) = (state.saver.x as i32, state.saver.y as i32);
     let black = rgb(0, 0, 0);
     (by + 104..by + 112).any(|y| {
         (bx + 2..bx + SAVER_W as i32 - 6).any(|x| gfx.pixels[(y * GFX_W + x) as usize] != black)

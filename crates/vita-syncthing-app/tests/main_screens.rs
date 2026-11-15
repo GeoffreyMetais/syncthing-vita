@@ -90,7 +90,7 @@ fn test_sidebar_tabs_and_transfer_card() {
     );
     assert_eq!(state.active_tab, ActiveTab::FolderPicker);
     // The `Files` tab opens on the share-creation browser.
-    assert_eq!(state.picker_mode, PickerMode::CreateNewShare);
+    assert_eq!(state.picker.mode, PickerMode::CreateNewShare);
 
     tap_action(&mut state, &repo, UiAction::SwitchTab(ActiveTab::Dashboard));
     // The sidebar transfer card is the first `StartSync` element, the button the last.
@@ -187,17 +187,18 @@ fn test_files_row_selects_and_open_chip_enters_the_folder() {
         UiAction::SwitchTab(ActiveTab::FolderPicker),
     );
     let alpha = state
-        .picker_items
+        .picker
+        .items
         .iter()
         .position(|item| item.path.ends_with("/alpha"))
         .expect("alpha is listed");
 
     // The `Open` chip enters the folder...
     tap_action(&mut state, &repo, UiAction::PickerOpen(alpha));
-    assert!(state.picker_current_dir.ends_with("/alpha"));
+    assert!(state.picker.current_dir.ends_with("/alpha"));
     // ...the `Up` button and its hint go back...
     tap_action(&mut state, &repo, UiAction::PickerUp);
-    assert_eq!(state.picker_current_dir, dir);
+    assert_eq!(state.picker.current_dir, dir);
 
     // ...and the rest of the row chooses the folder (here: starts sharing it).
     let row = rect_of(&mut state, UiAction::PickerSelect(alpha));
@@ -220,12 +221,13 @@ fn test_files_row_selects_and_open_chip_enters_the_folder() {
         UiAction::SwitchTab(ActiveTab::FolderPicker),
     );
     let gamma = state
-        .picker_items
+        .picker
+        .items
         .iter()
         .position(|item| item.path.ends_with("/gamma"))
         .expect("gamma is listed");
     draw(&mut state);
-    assert!(state.picker_items[gamma].is_shared);
+    assert!(state.picker.items[gamma].is_shared);
     assert!(!state
         .hit_map
         .hotspots()

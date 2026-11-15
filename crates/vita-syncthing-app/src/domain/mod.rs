@@ -3,14 +3,17 @@
 
 pub mod app_state;
 pub mod defaults;
+pub mod folder_picker;
 pub mod initial_sync;
 pub mod interaction;
 pub mod log_view;
 pub mod models;
 pub mod navigation;
+pub mod screensaver;
 pub mod ui_text;
 
 pub use app_state::AppState;
+pub use folder_picker::FolderPicker;
 pub use initial_sync::{ConnectedPeers, InitialSyncPeers, PeerSet};
 pub use interaction::{
     FocusSlot, HitMap, Hotspot, PadKey, Rect, ScrollArea, ScrollTarget, ShortcutKey, UiAction,
@@ -27,4 +30,5 @@ pub use navigation::{
     DASHBOARD_HEADER_ACTIONS, SETTINGS_ROWS, SETTINGS_ROW_DECLINED, SETTINGS_ROW_DEVICES,
     SETTINGS_ROW_DISPLAY, SETTINGS_ROW_LANGUAGE, SETTINGS_ROW_LOG, TAB_ORDER,
 };
+pub use screensaver::ScreensaverMotion;
 pub use ui_text::UiText;

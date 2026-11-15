@@ -14,8 +14,8 @@ pub fn render_oled_screensaver(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
     let s = strings::strings(state.language);
     gfx.clear(rgb(0, 0, 0));
 
-    let bx = state.saver_x as i32;
-    let by = state.saver_y as i32;
+    let bx = state.saver.x as i32;
+    let by = state.saver.y as i32;
 
     gfx.rrect(bx, by, 64, 64, 18, th.accent);
     gfx.icon(

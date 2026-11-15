@@ -101,10 +101,10 @@ fn test_screensaver_speed_does_not_depend_on_frame_rate() {
     let mut every_vblank = new_state();
     let mut every_other = new_state();
     for _ in 0..30 {
-        every_vblank.step_screensaver(960.0, 544.0, 410.0, 132.0, 1);
-        every_vblank.step_screensaver(960.0, 544.0, 410.0, 132.0, 1);
-        every_other.step_screensaver(960.0, 544.0, 410.0, 132.0, 2);
+        every_vblank.saver.step(960.0, 544.0, 410.0, 132.0, 1);
+        every_vblank.saver.step(960.0, 544.0, 410.0, 132.0, 1);
+        every_other.saver.step(960.0, 544.0, 410.0, 132.0, 2);
     }
-    assert_eq!(every_vblank.saver_x, every_other.saver_x);
-    assert_eq!(every_vblank.saver_y, every_other.saver_y);
+    assert_eq!(every_vblank.saver.x, every_other.saver.x);
+    assert_eq!(every_vblank.saver.y, every_other.saver.y);
 }

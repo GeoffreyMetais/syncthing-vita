@@ -122,7 +122,7 @@ fn test_face_buttons_trigger_the_element_that_displays_them() {
     press(&mut state, &repo, BTN_TRIANGLE);
     assert_eq!(state.modal, ModalDialog::None);
     assert_eq!(state.active_tab, ActiveTab::FolderPicker);
-    assert_eq!(state.picker_mode, PickerMode::ChangeShareTarget);
+    assert_eq!(state.picker.mode, PickerMode::ChangeShareTarget);
     assert_eq!(state.selected_share_idx, 1);
 
     // ...and on the device card, the page's `New Share`.
@@ -136,7 +136,7 @@ fn test_face_buttons_trigger_the_element_that_displays_them() {
     let folder = rect_of(&mut state, UiAction::ChangeShareFolder(1));
     tap_rect(&mut state, &repo, folder);
     assert_eq!(state.active_tab, ActiveTab::FolderPicker);
-    assert_eq!(state.picker_mode, PickerMode::ChangeShareTarget);
+    assert_eq!(state.picker.mode, PickerMode::ChangeShareTarget);
     let _ = std::fs::remove_dir_all(&dir);
 }
 

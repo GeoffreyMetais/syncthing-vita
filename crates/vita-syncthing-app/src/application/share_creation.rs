@@ -52,7 +52,7 @@ impl ShareCreation {
             })
             .collect();
         let label = format!("Vita {}", raw_name);
-        state.picker_mode = PickerMode::ChangeShareTarget;
+        state.picker.mode = PickerMode::ChangeShareTarget;
         state.active_tab = ActiveTab::Dashboard;
         Self::begin(state, repo, &folder_id, &label, &chosen_path)
     }
@@ -61,7 +61,7 @@ impl ShareCreation {
     /// `Files` browser, and switches to the `Overview` tab (share list).
     pub fn begin_from_template(state: &mut AppState, repo: &ConfigRepository, idx: usize) -> usize {
         let (folder_id, label, path) = NEW_SHARE_TEMPLATES[idx];
-        state.picker_mode = PickerMode::ChangeShareTarget;
+        state.picker.mode = PickerMode::ChangeShareTarget;
         state.active_tab = ActiveTab::Dashboard;
         Self::begin(state, repo, folder_id, label, path)
     }

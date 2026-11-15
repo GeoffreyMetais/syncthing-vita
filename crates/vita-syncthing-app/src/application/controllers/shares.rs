@@ -38,7 +38,7 @@ impl SharesController {
                 state.modal = ModalDialog::ConfirmDeleteShare { share_idx };
             }
             UiAction::ChangeShareFolder(_) => {
-                state.picker_mode = PickerMode::ChangeShareTarget;
+                state.picker.mode = PickerMode::ChangeShareTarget;
                 FolderBrowser::refresh(state, repo);
                 state.active_tab = ActiveTab::FolderPicker;
             }
