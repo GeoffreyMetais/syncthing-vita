@@ -5,7 +5,7 @@ use std::io;
 use std::time::Duration;
 
 use crate::discovery::http::{https_request, json_string_values};
-use crate::tls::https::HttpsServer;
+use crate::tls::https::{HttpsClient, HttpsServer};
 
 /// Syncthing's public relay pool.
 pub const DEFAULT_RELAY_POOL: &str = "https://relays.syncthing.net/endpoint";
@@ -18,9 +18,13 @@ pub fn parse_relay_pool_json(json: &str) -> Vec<String> {
         .collect()
 }
 
-/// Downloads the relay list of `pool`.
-pub fn fetch_relay_pool(pool: &HttpsServer, timeout: Duration) -> io::Result<Vec<String>> {
-    let response = https_request(pool, "GET", &pool.path, None, None, timeout)?;
+/// Downloads the relay list of `pool` through `client`.
+pub fn fetch_relay_pool(
+    pool: &HttpsServer,
+    client: &HttpsClient,
+    timeout: Duration,
+) -> io::Result<Vec<String>> {
+    let response = https_request(pool, client, "GET", &pool.path, None, None, timeout)?;
     if response.status != 200 {
         return Err(io::Error::other(format!(
             "Relay pool HTTP {}",

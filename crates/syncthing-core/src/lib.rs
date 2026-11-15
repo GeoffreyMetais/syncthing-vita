@@ -51,5 +51,6 @@ pub use session::{
     SyncControl, SyncEvent, SyncSessionStatus, SyncTuning,
 };
 pub use storage::FsSyncStorage;
-pub use tls::https::HttpsServer;
+pub use tls::https::{HttpsClient, HttpsServer};
+pub use tls::proxy::HttpProxy;
 pub use tls::{accept_bep_tls_stream, probe_bep_peer_device_id, IncomingBepStream, BEP_ALPN};

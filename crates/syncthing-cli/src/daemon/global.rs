@@ -54,7 +54,13 @@ pub fn run_global_announcer(ctx: Arc<DaemonContext>) {
 
 /// One announcement; returns the delay before the next one.
 fn announce(ctx: &DaemonContext, server: &HttpsServer, addresses: &[String]) -> Duration {
-    match announce_on(server, &ctx.identity, addresses, HTTPS_TIMEOUT) {
+    match announce_on(
+        server,
+        &ctx.options.https,
+        &ctx.identity,
+        addresses,
+        HTTPS_TIMEOUT,
+    ) {
         Ok(AnnounceOutcome::Accepted { reannounce_after }) => {
             if ctx.first_report(format!("announced:{}:{addresses:?}", server.host)) {
                 log(&format!(

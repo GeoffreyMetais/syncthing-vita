@@ -7,5 +7,6 @@ pub mod cli;
 pub mod commands;
 pub mod config;
 pub mod daemon;
+pub mod https_env;
 pub mod identity;
 pub mod paths;

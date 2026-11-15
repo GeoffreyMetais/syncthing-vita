@@ -10,7 +10,7 @@ use std::time::Duration;
 
 use super::http::https_request;
 use crate::cert::DeviceIdentity;
-use crate::tls::https::HttpsServer;
+use crate::tls::https::{HttpsClient, HttpsServer};
 
 /// Public Syncthing Global Discovery v2 announce servers (IPv4, IPv6), certificate pinned.
 pub const DEFAULT_ANNOUNCE_SERVERS: [&str; 2] = [
@@ -51,10 +51,12 @@ fn seconds_header(value: Option<&str>) -> Option<Duration> {
     value?.trim().parse::<u64>().ok().map(Duration::from_secs)
 }
 
-/// Announces `addresses` for `identity` on `server`. Network and TLS failures are errors; an
+/// Announces `addresses` for `identity` on `server` (through `client`). A proxy that
+/// re-terminates TLS cannot forward our certificate: the server then refuses it. Network and TLS failures are errors; an
 /// HTTP refusal is an [`AnnounceOutcome::Refused`].
 pub fn announce_on(
     server: &HttpsServer,
+    client: &HttpsClient,
     identity: &DeviceIdentity,
     addresses: &[String],
     timeout: Duration,
@@ -62,6 +64,7 @@ pub fn announce_on(
     let body = encode_announcement(addresses);
     let response = https_request(
         server,
+        client,
         "POST",
         &server.path,
         Some(&body),

@@ -16,10 +16,33 @@ use rustls::crypto::CryptoProvider;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer, ServerName};
 use rustls::{ClientConfig, ClientConnection, RootCertStore, StreamOwned};
 
+use rustls::pki_types::pem::PemObject;
+
+use super::proxy::HttpProxy;
 use super::verifier::PinnedOrWebPkiVerifier;
 use super::BepTlsStream;
 use crate::cert::DeviceIdentity;
 use crate::device_id::DeviceId;
+
+/// How HTTPS requests reach the infrastructure servers. The default connects directly and
+/// trusts the public roots (`webpki-roots`) only.
+#[derive(Debug, Clone, Default)]
+pub struct HttpsClient {
+    /// HTTP proxy every request is tunnelled through (`CONNECT`).
+    pub proxy: Option<HttpProxy>,
+    /// Roots trusted in addition to the public ones (e.g. the CA of a TLS-inspecting proxy).
+    pub extra_roots: Vec<CertificateDer<'static>>,
+}
+
+impl HttpsClient {
+    /// Adds the certificates of a PEM bundle to the trusted roots; returns how many.
+    pub fn add_pem_roots(&mut self, pem: &[u8]) -> usize {
+        let before = self.extra_roots.len();
+        self.extra_roots
+            .extend(CertificateDer::pem_slice_iter(pem).filter_map(Result::ok));
+        self.extra_roots.len() - before
+    }
+}
 
 /// Query flags of Syncthing discovery URLs that configure the client (`?nolookup`, ...).
 const CLIENT_ONLY_FLAGS: [&str; 3] = ["nolookup", "noannounce", "insecure"];
@@ -117,7 +140,14 @@ fn split_host_port(authority: &str) -> Option<(String, u16)> {
     (!host.is_empty()).then(|| (host.to_owned(), port))
 }
 
-fn connect_any(server: &HttpsServer, timeout: Duration) -> io::Result<TcpStream> {
+fn connect_any(
+    server: &HttpsServer,
+    client: &HttpsClient,
+    timeout: Duration,
+) -> io::Result<TcpStream> {
+    if let Some(proxy) = &client.proxy {
+        return proxy.connect(&server.host, server.port, timeout);
+    }
     let addrs: Vec<SocketAddr> = (server.host.as_str(), server.port)
         .to_socket_addrs()?
         .collect();
@@ -131,21 +161,24 @@ fn connect_any(server: &HttpsServer, timeout: Duration) -> io::Result<TcpStream>
     Err(last_err.unwrap_or_else(|| io::Error::new(io::ErrorKind::NotFound, "No address resolved")))
 }
 
-/// Opens an HTTPS (`http/1.1`) stream to `server`, presenting `client_identity`'s certificate
-/// when given.
+/// Opens an HTTPS (`http/1.1`) stream to `server` through `client`, presenting
+/// `client_identity`'s certificate when given.
 pub fn open_https_stream(
     server: &HttpsServer,
+    client: &HttpsClient,
     client_identity: Option<&DeviceIdentity>,
     timeout: Duration,
 ) -> io::Result<BepTlsStream> {
-    let tcp = connect_any(server, timeout)?;
+    let tcp = connect_any(server, client, timeout)?;
     tcp.set_read_timeout(Some(timeout))?;
     tcp.set_write_timeout(Some(timeout))?;
 
     let provider: Arc<CryptoProvider> = Arc::new(rustls_rustcrypto::provider());
-    let roots = Arc::new(RootCertStore {
+    let mut roots = RootCertStore {
         roots: webpki_roots::TLS_SERVER_ROOTS.to_vec(),
-    });
+    };
+    roots.add_parsable_certificates(client.extra_roots.iter().cloned());
+    let roots = Arc::new(roots);
     let webpki = WebPkiServerVerifier::builder_with_provider(roots, Arc::clone(&provider))
         .build()
         .map_err(|e| io::Error::other(format!("TLS verifier error: {e}")))?;

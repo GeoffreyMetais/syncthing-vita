@@ -10,6 +10,7 @@ use crate::config::{load_config, Config};
 use crate::daemon::context::DaemonOptions;
 use crate::daemon::log::log;
 use crate::daemon::{run_daemon, ExitPolicy};
+use crate::https_env::https_client_from_env;
 use crate::identity::load_or_create_identity;
 
 /// The configuration, overridden by the command-line flags.
@@ -34,6 +35,7 @@ pub fn daemon_options(config: &Config, args: &RunArgs) -> io::Result<DaemonOptio
         lookup_servers: config.global_lookup_servers.clone(),
         relay_pool_url: config.relay_pool_url.clone(),
         static_relays: config.static_relays.clone(),
+        https: https_client_from_env().0,
     })
 }
 
@@ -47,6 +49,11 @@ pub fn run(home: &Path, args: RunArgs) -> io::Result<()> {
         identity.device_id,
         config.device_name
     ));
+    if options.global_discovery || options.relays {
+        for note in https_client_from_env().1 {
+            log(&note);
+        }
+    }
     if config.devices.is_empty() {
         log("No device configured: add one with `syncthing-cli device add <ID>`");
     }

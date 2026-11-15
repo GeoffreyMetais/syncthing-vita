@@ -9,8 +9,8 @@ use std::time::Duration;
 
 use syncthing_core::discovery::PeerEndpoint;
 use syncthing_core::{
-    BepFolder, BepHello, DeviceId, DeviceIdentity, FolderType, FsSyncStorage, SyncControl,
-    SyncTuning,
+    BepFolder, BepHello, DeviceId, DeviceIdentity, FolderType, FsSyncStorage, HttpsClient,
+    SyncControl, SyncTuning,
 };
 
 use super::activity::SyncActivity;
@@ -33,6 +33,8 @@ pub struct DaemonOptions {
     pub lookup_servers: Vec<String>,
     pub relay_pool_url: String,
     pub static_relays: Vec<String>,
+    /// How Global Discovery and the relay pool are reached (proxy, extra roots).
+    pub https: HttpsClient,
 }
 
 /// A configured remote device.

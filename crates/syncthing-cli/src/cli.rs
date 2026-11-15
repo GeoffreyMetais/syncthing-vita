@@ -34,6 +34,13 @@ pub enum Command {
     Discover(DiscoverArgs),
     /// Run the sync daemon until interrupted.
     Run(RunArgs),
+    /// Look a device up on the Global Discovery servers (diagnostic).
+    Lookup {
+        /// Full device ID.
+        id: String,
+    },
+    /// List the relays of the relay pool (diagnostic).
+    Relays,
 }
 
 #[derive(Debug, Subcommand)]

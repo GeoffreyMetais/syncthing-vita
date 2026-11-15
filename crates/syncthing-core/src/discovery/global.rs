@@ -10,7 +10,7 @@ use std::time::Duration;
 
 use super::http::{https_request, json_string_array};
 use crate::device_id::DeviceId;
-use crate::tls::https::HttpsServer;
+use crate::tls::https::{HttpsClient, HttpsServer};
 
 /// Public Syncthing Global Discovery v2 lookup server. Like Syncthing's default, the URL pins
 /// the certificate of the official discovery servers (`?id=`); a certificate chaining to a
@@ -74,19 +74,20 @@ pub fn parse_global_discovery_json(json: &str) -> Vec<String> {
 pub fn lookup_global_peer(device_id: DeviceId, timeout: Duration) -> io::Result<Vec<PeerEndpoint>> {
     let server = HttpsServer::parse(DEFAULT_LOOKUP_SERVER)
         .ok_or_else(|| io::Error::other("Invalid default lookup server"))?;
-    lookup_peer_on(&server, device_id, timeout)
+    lookup_peer_on(&server, &HttpsClient::default(), device_id, timeout)
 }
 
-/// Queries the Global Discovery v2 `server` for `device_id` and returns its announced direct
+/// Queries the Global Discovery v2 `server` (through `client`) for `device_id` and returns its announced direct
 /// and relay endpoints (empty if the device is unknown to the server).
 pub fn lookup_peer_on(
     server: &HttpsServer,
+    client: &HttpsClient,
     device_id: DeviceId,
     timeout: Duration,
 ) -> io::Result<Vec<PeerEndpoint>> {
     let base = server.path.split('?').next().unwrap_or("/");
     let path = format!("{base}?device={}", device_id.to_syncthing_string());
-    let response = https_request(server, "GET", &path, None, None, timeout)?;
+    let response = https_request(server, client, "GET", &path, None, None, timeout)?;
     if response.status == 404 {
         return Ok(Vec::new());
     }

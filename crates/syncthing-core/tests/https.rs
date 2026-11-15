@@ -23,6 +23,7 @@ use syncthing_core::tls::https::HttpsServer;
 use syncthing_core::tls::verifier::{
     PinnedOrWebPkiVerifier, SyncthingClientVerifier, SyncthingServerVerifier,
 };
+use syncthing_core::HttpsClient;
 use syncthing_core::{DeviceId, DeviceIdentity};
 
 const TIMEOUT: Duration = Duration::from_secs(5);
@@ -280,8 +281,16 @@ fn https_request_accepts_the_pinned_server() {
         server.device_id.to_syncthing_string()
     );
     let target = HttpsServer::parse(&url).expect("valid URL");
-    let response = https_request(&target, "GET", "/v2/?device=X", None, None, TIMEOUT)
-        .expect("pinned server accepted");
+    let response = https_request(
+        &target,
+        &HttpsClient::default(),
+        "GET",
+        "/v2/?device=X",
+        None,
+        None,
+        TIMEOUT,
+    )
+    .expect("pinned server accepted");
     let (request, _) = server.join();
 
     assert_eq!(response.status, 200);
@@ -303,7 +312,15 @@ fn https_request_rejects_a_server_with_another_pin() {
         wrong_pin.to_syncthing_string()
     );
     let target = HttpsServer::parse(&url).expect("valid URL");
-    let result = https_request(&target, "GET", "/", None, None, TIMEOUT);
+    let result = https_request(
+        &target,
+        &HttpsClient::default(),
+        "GET",
+        "/",
+        None,
+        None,
+        TIMEOUT,
+    );
     assert!(
         result.is_err(),
         "a certificate that does not match the pin must fail"
@@ -319,7 +336,16 @@ fn https_request_rejects_an_unpinned_self_signed_server() {
     });
     let url = format!("https://127.0.0.1:{}/", server.port);
     let target = HttpsServer::parse(&url).expect("valid URL");
-    assert!(https_request(&target, "GET", "/", None, None, TIMEOUT).is_err());
+    assert!(https_request(
+        &target,
+        &HttpsClient::default(),
+        "GET",
+        "/",
+        None,
+        None,
+        TIMEOUT
+    )
+    .is_err());
     let (reached, _) = server.join();
     assert!(!reached);
 }

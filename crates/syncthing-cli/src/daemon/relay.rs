@@ -28,7 +28,7 @@ fn candidate_relays(ctx: &DaemonContext) -> Vec<String> {
         ));
         return Vec::new();
     };
-    match fetch_relay_pool(&pool, HTTPS_TIMEOUT) {
+    match fetch_relay_pool(&pool, &ctx.options.https, HTTPS_TIMEOUT) {
         Ok(mut relays) => {
             let seed = SystemTime::now()
                 .duration_since(UNIX_EPOCH)

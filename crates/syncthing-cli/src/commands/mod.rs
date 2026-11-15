@@ -5,6 +5,8 @@ pub mod device;
 pub mod discover;
 pub mod folder;
 pub mod id;
+pub mod lookup;
+pub mod relays;
 pub mod run;
 
 use std::io;
@@ -22,5 +24,7 @@ pub fn run(cli: Cli) -> io::Result<()> {
         Command::Config(cmd) => config_cmd::run(&home, cmd),
         Command::Discover(args) => discover::run(&home, args),
         Command::Run(args) => run::run(&home, args),
+        Command::Lookup { id } => lookup::run(&home, &id),
+        Command::Relays => relays::run(&home),
     }
 }

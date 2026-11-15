@@ -3,6 +3,7 @@
 //!
 //! - [`verifier`] — Syncthing certificate verification (identity = SHA-256 of the peer certificate)
 //! - [`client`] — client connections (mutually authenticated streams and anonymous ID probes)
+//! - [`proxy`] — HTTP proxy tunnels (`CONNECT`) for [`https`]
 //! - [`https`] — HTTPS to discovery servers / relay pool (pinned or public certificates)
 //! - [`server`] — server connections (incoming peers, relay invitations with `ServerSocket`)
 //! - [`polling`] — non-blocking frame polling tolerant of PS Vita `SceNet` timeout codes
@@ -12,6 +13,7 @@
 pub mod client;
 pub mod https;
 pub mod polling;
+pub mod proxy;
 pub mod server;
 pub mod verifier;
 

@@ -5,7 +5,7 @@ use std::io::{self, Read, Write};
 use std::time::Duration;
 
 use crate::cert::DeviceIdentity;
-use crate::tls::https::{open_https_stream, HttpsServer};
+use crate::tls::https::{open_https_stream, HttpsClient, HttpsServer};
 
 /// Responses larger than this are truncated (discovery and relay pool answers are small).
 const MAX_RESPONSE_BYTES: usize = 1024 * 1024;
@@ -30,16 +30,17 @@ impl HttpResponse {
 }
 
 /// Sends `method path_and_query` with an optional JSON `body` to `server` and reads the whole
-/// response. `client_identity` presents our certificate (Global Discovery announcements).
+/// response through `client`. `client_identity` presents our certificate (Global Discovery announcements).
 pub fn https_request(
     server: &HttpsServer,
+    client: &HttpsClient,
     method: &str,
     path_and_query: &str,
     body: Option<&str>,
     client_identity: Option<&DeviceIdentity>,
     timeout: Duration,
 ) -> io::Result<HttpResponse> {
-    let mut stream = open_https_stream(server, client_identity, timeout)?;
+    let mut stream = open_https_stream(server, client, client_identity, timeout)?;
     let mut request = format!(
         "{method} {path_and_query} HTTP/1.1\r\nHost: {}\r\nUser-Agent: syncthing-core\r\nAccept: application/json\r\nConnection: close\r\n",
         server.host_header()

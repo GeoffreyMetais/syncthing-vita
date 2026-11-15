@@ -79,7 +79,7 @@ fn global_lookup(ctx: &DaemonContext, peer: &KnownPeer) {
         let Some(server) = HttpsServer::parse(url) else {
             continue;
         };
-        match lookup_peer_on(&server, peer.id, HTTPS_TIMEOUT) {
+        match lookup_peer_on(&server, &ctx.options.https, peer.id, HTTPS_TIMEOUT) {
             Ok(found) => endpoints.extend(found),
             Err(e) => {
                 if ctx.first_report(format!("lookup:{}:{e}", peer.id)) {

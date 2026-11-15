@@ -18,6 +18,7 @@ use syncthing_core::discovery::global_announce::{
 };
 use syncthing_core::tls::https::HttpsServer;
 use syncthing_core::DeviceId;
+use syncthing_core::HttpsClient;
 
 const TIMEOUT: Duration = Duration::from_secs(5);
 const SERVER_SEED: u8 = 0x21;
@@ -135,7 +136,8 @@ fn lookup_returns_the_usable_endpoints_of_the_peer() {
     ))
     .expect("valid URL");
 
-    let endpoints = lookup_peer_on(&target, peer.device_id, TIMEOUT).expect("lookup");
+    let endpoints =
+        lookup_peer_on(&target, &HttpsClient::default(), peer.device_id, TIMEOUT).expect("lookup");
     let (request, _) = server.join();
 
     assert_eq!(
@@ -170,8 +172,13 @@ fn lookup_of_an_unknown_device_is_empty() {
         "nolookup",
     ))
     .expect("valid URL");
-    let endpoints = lookup_peer_on(&target, test_identity(PEER_SEED).device_id, TIMEOUT)
-        .expect("404 is not an error");
+    let endpoints = lookup_peer_on(
+        &target,
+        &HttpsClient::default(),
+        test_identity(PEER_SEED).device_id,
+        TIMEOUT,
+    )
+    .expect("404 is not an error");
     server.join();
     assert!(endpoints.is_empty());
 }
@@ -188,8 +195,13 @@ fn lookup_server_error_is_an_error() {
         "nolookup",
     ))
     .expect("valid URL");
-    let err = lookup_peer_on(&target, test_identity(PEER_SEED).device_id, TIMEOUT)
-        .expect_err("HTTP 500 must fail");
+    let err = lookup_peer_on(
+        &target,
+        &HttpsClient::default(),
+        test_identity(PEER_SEED).device_id,
+        TIMEOUT,
+    )
+    .expect_err("HTTP 500 must fail");
     assert!(err.to_string().contains("500"), "unexpected error: {err}");
     server.join();
 }
@@ -223,7 +235,14 @@ fn announce_presents_our_certificate_and_honours_reannounce_after() {
         "relay://198.51.100.5:22067/?id=ABC".to_owned(),
     ];
 
-    let outcome = announce_on(&target, &client, &addresses, TIMEOUT).expect("announce");
+    let outcome = announce_on(
+        &target,
+        &HttpsClient::default(),
+        &client,
+        &addresses,
+        TIMEOUT,
+    )
+    .expect("announce");
     let (request, presented) = server.join();
 
     assert_eq!(
@@ -260,8 +279,14 @@ fn announce_refused_with_retry_after() {
         "noannounce",
     ))
     .expect("valid URL");
-    let outcome =
-        announce_on(&target, &test_identity(CLIENT_SEED), &[], TIMEOUT).expect("announce");
+    let outcome = announce_on(
+        &target,
+        &HttpsClient::default(),
+        &test_identity(CLIENT_SEED),
+        &[],
+        TIMEOUT,
+    )
+    .expect("announce");
     server.join();
     assert_eq!(
         outcome,
@@ -290,8 +315,14 @@ fn announce_refusal_falls_back_to_reannounce_after() {
         "nolookup",
     ))
     .expect("valid URL");
-    let outcome =
-        announce_on(&target, &test_identity(CLIENT_SEED), &[], TIMEOUT).expect("announce");
+    let outcome = announce_on(
+        &target,
+        &HttpsClient::default(),
+        &test_identity(CLIENT_SEED),
+        &[],
+        TIMEOUT,
+    )
+    .expect("announce");
     server.join();
     assert_eq!(
         outcome,
@@ -314,8 +345,14 @@ fn announce_without_headers_uses_the_defaults() {
         "nolookup",
     ))
     .expect("valid URL");
-    let outcome =
-        announce_on(&target, &test_identity(CLIENT_SEED), &[], TIMEOUT).expect("announce");
+    let outcome = announce_on(
+        &target,
+        &HttpsClient::default(),
+        &test_identity(CLIENT_SEED),
+        &[],
+        TIMEOUT,
+    )
+    .expect("announce");
     accepted.join();
     assert_eq!(
         outcome,
@@ -334,8 +371,14 @@ fn announce_without_headers_uses_the_defaults() {
         "nolookup",
     ))
     .expect("valid URL");
-    let outcome =
-        announce_on(&target, &test_identity(CLIENT_SEED), &[], TIMEOUT).expect("announce");
+    let outcome = announce_on(
+        &target,
+        &HttpsClient::default(),
+        &test_identity(CLIENT_SEED),
+        &[],
+        TIMEOUT,
+    )
+    .expect("announce");
     refused.join();
     assert_eq!(
         outcome,
@@ -358,7 +401,13 @@ fn announce_without_any_response_is_an_error() {
         "nolookup",
     ))
     .expect("valid URL");
-    let result = announce_on(&target, &test_identity(CLIENT_SEED), &[], TIMEOUT);
+    let result = announce_on(
+        &target,
+        &HttpsClient::default(),
+        &test_identity(CLIENT_SEED),
+        &[],
+        TIMEOUT,
+    );
     server.join();
     assert!(result.is_err());
 }
