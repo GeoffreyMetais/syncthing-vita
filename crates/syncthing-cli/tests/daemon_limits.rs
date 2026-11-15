@@ -1,9 +1,12 @@
-//! Bounded daemon state fed by unauthenticated input: the "reported once" memory and the
-//! listener's slots for connections not authenticated yet.
+//! Bounded daemon state fed by unauthenticated input: the "reported once" memory, the slots
+//! for connections not authenticated yet and the triage of relay invitations.
 
-use syncthing_cli::daemon::listener::ConnectionSlots;
+use syncthing_cli::daemon::connection_slots::ConnectionSlots;
+use syncthing_cli::daemon::relay::{triage_invitation, InvitationTriage};
 use syncthing_cli::daemon::reports::{ReportMemory, UnknownReport};
-use syncthing_cli::daemon::timing::{MAX_REPORTS_PER_SUBJECT, MAX_UNKNOWN_DEVICE_REPORTS};
+use syncthing_cli::daemon::timing::{
+    MAX_PENDING_RELAY_INVITATIONS, MAX_REPORTS_PER_SUBJECT, MAX_UNKNOWN_DEVICE_REPORTS,
+};
 use syncthing_core::{DeviceId, DeviceIdentity};
 
 /// A distinct device ID per `n` (no certificate needed: unknown IDs are arbitrary bytes).
@@ -106,5 +109,77 @@ fn connection_slots_are_bounded_and_given_back_when_dropped() {
     .join()
     .unwrap_err();
     drop(second);
+    assert_eq!(slots.in_use(), 0);
+}
+
+/// Triages an invitation from `from` for a daemon configured with `configured`, of which
+/// `connected` already have a session.
+fn triage(
+    from: &DeviceId,
+    configured: &[DeviceId],
+    connected: &[DeviceId],
+    slots: &ConnectionSlots,
+) -> InvitationTriage {
+    triage_invitation(
+        &from.0,
+        |id| configured.contains(id),
+        |id| connected.contains(id),
+        slots,
+    )
+}
+
+#[test]
+fn relay_invitations_needing_no_session_take_no_slot() {
+    let slots = ConnectionSlots::new(MAX_PENDING_RELAY_INVITATIONS);
+    let (known, connected) = (device(1), device(2));
+    let configured = [known, connected];
+    assert!(matches!(
+        triage_invitation(&[7u8; 31], |_| true, |_| false, &slots),
+        InvitationTriage::Malformed
+    ));
+    assert!(matches!(
+        triage(&device(3), &configured, &[connected], &slots),
+        InvitationTriage::UnknownDevice(id) if id == device(3)
+    ));
+    assert!(matches!(
+        triage(&connected, &configured, &[connected], &slots),
+        InvitationTriage::AlreadyConnected(id) if id == connected
+    ));
+    assert_eq!(slots.in_use(), 0);
+    match triage(&known, &configured, &[connected], &slots) {
+        InvitationTriage::Join(id, _slot) => {
+            assert_eq!(id, known);
+            assert_eq!(slots.in_use(), 1);
+        }
+        other => panic!("expected a join, got {other:?}"),
+    }
+    assert_eq!(slots.in_use(), 0, "the slot is given back with the join");
+}
+
+#[test]
+fn relay_invitations_beyond_the_limit_are_dropped_until_slots_come_back() {
+    let slots = ConnectionSlots::new(MAX_PENDING_RELAY_INVITATIONS);
+    let known = device(1);
+    let mut pending = Vec::new();
+    for _ in 0..MAX_PENDING_RELAY_INVITATIONS {
+        match triage(&known, &[known], &[], &slots) {
+            InvitationTriage::Join(_, slot) => pending.push(slot),
+            other => panic!("expected a join, got {other:?}"),
+        }
+    }
+    for _ in 0..100 {
+        assert!(matches!(
+            triage(&known, &[known], &[], &slots),
+            InvitationTriage::Busy(id) if id == known
+        ));
+    }
+    assert_eq!(slots.in_use(), MAX_PENDING_RELAY_INVITATIONS);
+    // A pending invitation becoming a session (or failing) gives its slot back.
+    pending.pop();
+    assert!(matches!(
+        triage(&known, &[known], &[], &slots),
+        InvitationTriage::Join(..)
+    ));
+    pending.clear();
     assert_eq!(slots.in_use(), 0);
 }

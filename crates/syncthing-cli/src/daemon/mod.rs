@@ -5,9 +5,11 @@
 //! - [`listener`] — incoming TCP; [`dialer`] — outgoing (direct, then relays)
 //! - [`lan`] — Local Discovery; [`global`] — Global Discovery announcements; [`relay`]
 //! - [`events`] — session events to log lines; [`activity`] — `--exit-when-synced`
-//! - [`reports`] — what was already logged once (bounded); [`timing`] — timings and limits
+//! - [`reports`] — what was already logged once (bounded); [`connection_slots`] — connections
+//!   not authenticated yet (bounded); [`timing`] — timings and limits
 
 pub mod activity;
+pub mod connection_slots;
 pub mod context;
 pub mod dialer;
 pub mod events;

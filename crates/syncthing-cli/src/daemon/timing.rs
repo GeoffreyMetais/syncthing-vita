@@ -48,6 +48,11 @@ pub const SYNCED_QUIET_PERIOD: Duration = Duration::from_secs(3);
 /// yet (TLS handshake in progress, or an unknown device being turned away). Above it, the
 /// listener closes new connections at once.
 pub const MAX_UNAUTHENTICATED_CONNECTIONS: usize = 32;
+/// Relay invitations from configured devices handled at the same time that are not a running
+/// session yet (relay session being joined, TLS handshake in progress). Above it, a new
+/// invitation is dropped at once, without a thread. Separate from the listener's connections,
+/// so that a relay (a third party) cannot keep directly connecting devices out, nor the reverse.
+pub const MAX_PENDING_RELAY_INVITATIONS: usize = 16;
 /// Unknown devices (LAN announcements, connections, relay invitations) reported individually;
 /// beyond it, one line says that no more are reported.
 pub const MAX_UNKNOWN_DEVICE_REPORTS: usize = 256;
