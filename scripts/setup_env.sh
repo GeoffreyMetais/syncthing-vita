@@ -164,8 +164,11 @@ install_just() {
 install_rust() {
     setup_user_env
     echo "=== Installing Rust Nightly and rust-src ==="
-    rustup toolchain install nightly
+    rustup toolchain install nightly --no-self-update
     rustup component add rust-src --toolchain nightly
+    if ! rustup show active-toolchain >/dev/null 2>&1; then
+        rustup default nightly
+    fi
     echo "✅ Rust nightly & rust-src installed successfully."
 }
 
@@ -229,10 +232,16 @@ install_vita3k() {
     chmod +x "${appimage_tmp}"
 
     echo "Extracting Vita3K AppImage..."
-    rm -rf "${VITA3K_APPDIR}"
-    (cd "$(dirname "${VITA3K_APPDIR}")" && "${appimage_tmp}" --appimage-extract >/dev/null 2>&1)
-    mv "$(dirname "${VITA3K_APPDIR}")/squashfs-root" "${VITA3K_APPDIR}" 2>/dev/null || \
-        mv "$(dirname "${VITA3K_APPDIR}")/AppDir" "${VITA3K_APPDIR}"
+    local share_dir
+    share_dir="$(dirname "${VITA3K_APPDIR}")"
+    rm -rf "${VITA3K_APPDIR}" "${share_dir}/squashfs-root" "${share_dir}/AppDir"
+    (cd "${share_dir}" && "${appimage_tmp}" --appimage-extract >/dev/null 2>&1)
+    if [[ -d "${share_dir}/AppDir" && ! -L "${share_dir}/AppDir" ]]; then
+        rm -f "${share_dir}/squashfs-root"
+        mv "${share_dir}/AppDir" "${VITA3K_APPDIR}"
+    else
+        mv "${share_dir}/squashfs-root" "${VITA3K_APPDIR}"
+    fi
     rm -f "${appimage_tmp}"
 
     echo "Creating robust Vita3K launcher script at ${VITA3K_BIN}..."
@@ -265,7 +274,13 @@ for arg in "$@"; do
     fi
 done
 
-if [[ -f "${VITA3K_APPDIR}/sharun" ]]; then
+if [[ -x "${VITA3K_APPDIR}/AppRun" ]]; then
+    if [[ "$HAS_BACKEND" == "true" ]]; then
+        exec "${VITA3K_APPDIR}/AppRun" "$@"
+    else
+        exec "${VITA3K_APPDIR}/AppRun" -B OpenGL "$@"
+    fi
+elif [[ -f "${VITA3K_APPDIR}/sharun" ]]; then
     if [[ "$HAS_BACKEND" == "true" ]]; then
         exec "${VITA3K_APPDIR}/sharun" "${VITA3K_APPDIR}/shared/bin/Vita3K" "$@"
     else
