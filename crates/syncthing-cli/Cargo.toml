@@ -1,0 +1,17 @@
+[package]
+name = "syncthing-cli"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Command-line Syncthing client (Linux & macOS) built on syncthing-core"
+
+[[bin]]
+name = "syncthing-cli"
+path = "src/main.rs"
+
+[dependencies]
+syncthing-core.workspace = true
+clap = { version = "4.5", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
+toml = "0.8"
+ctrlc = "3.4"

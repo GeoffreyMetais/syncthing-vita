@@ -96,7 +96,10 @@ pub fn wrap_tls_stream_with_alpn(
         })?;
 
     let conn = new_alpn_connection(config, alpn, SYNCTHING_SERVER_NAME)?;
-    Ok((StreamOwned::new(conn, tcp), observed_device_id))
+    Ok((
+        BepTlsStream::Client(StreamOwned::new(conn, tcp)),
+        observed_device_id,
+    ))
 }
 
 /// Opens a client-authenticated TLS 1.3 stream (`ALPN = "bep/1.0"`) to `peer_addr`.
@@ -156,7 +159,7 @@ pub fn open_https_tls_stream(host: &str, port: u16, timeout: Duration) -> io::Re
         .with_root_certificates(roots)
         .with_no_client_auth();
     let conn = new_alpn_connection(config, b"http/1.1", host)?;
-    Ok(StreamOwned::new(conn, tcp))
+    Ok(BepTlsStream::Client(StreamOwned::new(conn, tcp)))
 }
 
 /// Probes a TCP endpoint with a TLS 1.3 (`bep/1.0` ALPN) handshake and returns its Syncthing `DeviceId`

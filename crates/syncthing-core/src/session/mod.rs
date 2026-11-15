@@ -2,7 +2,8 @@
 //! (`1+2` multi-connection mode and optional persistent keepalive).
 //!
 //! The session runs in phases, one file each:
-//! 1. TLS connection + `Hello` exchange (this file, via [`crate::tls`])
+//! 1. TLS connection (dialed: [`connect_and_sync`], or accepted: [`accept_and_sync`]) +
+//!    `Hello` exchange (this file, via [`crate::tls`])
 //! 2. [`cluster_exchange`]: `ClusterConfig` exchange and initial remote `Index`
 //! 3. [`secondary`]: `+2` secondary data connections
 //! 4. [`initial_sync`]: initial download, local `Index` publication, request draining
@@ -38,6 +39,7 @@ pub mod upload;
 
 use std::io;
 use std::net::SocketAddr;
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 pub use control::SyncControl;
@@ -58,7 +60,7 @@ use std::net::TcpStream;
 
 use crate::tls::client::{open_bep_tls_stream, wrap_bep_tls_stream};
 use crate::tls::verifier::ObservedDeviceId;
-use crate::tls::BepTlsStream;
+use crate::tls::{BepTlsStream, IncomingBepStream};
 
 /// Timeout used when opening the initial secondary connections.
 const SECONDARY_OPEN_TIMEOUT: Duration = Duration::from_millis(2000);
@@ -119,6 +121,47 @@ where
         params,
         stream,
         observed_device_id,
+        peer_addr,
+        false,
+        on_event,
+    )
+}
+
+/// Same as [`connect_and_sync`] with a peer that connected to us: `incoming` comes from
+/// [`crate::tls::accept_bep_tls_stream`] (a TCP listener, or a relay invitation with
+/// `ServerSocket` set). [`SessionParams::expected_device_id`], when set, must match the peer.
+///
+/// The peer dialed, so it would also open the secondary connections: our `Hello` announces a
+/// single connection so that it opens none, and the whole session runs on `incoming`.
+pub fn accept_and_sync<F>(
+    params: &SessionParams<'_>,
+    incoming: IncomingBepStream,
+    peer_addr: SocketAddr,
+    on_event: F,
+) -> io::Result<PeerHandshakeResult>
+where
+    F: FnMut(SyncEvent),
+{
+    let peer_device_id = incoming.peer_device_id();
+    if let Some(expected) = params.expected_device_id {
+        if !expected.matches_peer(&peer_device_id) {
+            return Err(io::Error::new(
+                io::ErrorKind::PermissionDenied,
+                format!("Peer TLS DeviceId ({peer_device_id}) != expected DeviceId ({expected})"),
+            ));
+        }
+    }
+    let mut hello = params.hello.clone();
+    hello.num_connections = 1;
+    let single_connection = SessionParams {
+        hello: &hello,
+        ..params.clone()
+    };
+    let observed: ObservedDeviceId = Arc::new(Mutex::new(Some(peer_device_id)));
+    run_bep_session(
+        &single_connection,
+        incoming.stream,
+        observed,
         peer_addr,
         false,
         on_event,

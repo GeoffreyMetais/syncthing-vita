@@ -38,6 +38,14 @@ syncthing-vita
     │   │   ├── tls/                  # TLS 1.3 transport only: verifier.rs, client.rs (BEP streams, ID probe), polling.rs
     │   │   └── session/              # BEP sync engine, one file per phase (see §3.3)
     │   └── tests/                    # Integration tests, one file per module (+ common/ helpers)
+    ├── syncthing-cli/                # Command-line Syncthing client for Linux & macOS (see §3.6)
+    │   ├── src/
+    │   │   ├── lib.rs / main.rs / cli.rs  # Module declarations, entry point, `clap` command line
+    │   │   ├── paths.rs / identity.rs     # Home directory (`--home`, `$SYNCTHING_CLI_HOME`), device seed
+    │   │   ├── config/               # `config.toml`: model, devices, folders, options, atomic store
+    │   │   ├── commands/             # One file per command: id, device, folder, config, discover, run
+    │   │   └── daemon/               # `run`: listener, dialer, lan, global, relay, sessions, events, timing
+    │   └── tests/                    # Config, identity, commands, and CLI <-> CLI sync over localhost
     └── vita-syncthing-app/           # Native PlayStation Vita GUI application (Title ID: SYNCTHING, Clean Architecture)
         ├── assets/fonts/             # Embedded Poppins TrueType fonts (Regular, Medium, Bold — SIL OFL 1.1)
         ├── assets/sce_sys/           # Packed into the VPK: icon0.png (128x128), livearea/contents/{bg.png (840x500), startup.png (280x158), template.xml}; 8-bit indexed PNGs
@@ -258,6 +266,15 @@ Timings, limits and presets that govern the app's behaviour (rescan interval, re
 
 ---
 
+### 3.6 `syncthing-cli` (Linux & macOS)
+
+A host-only binary built on `syncthing-core` (never cross-compiled for the Vita; still no `ring` / `aws-lc-rs` / `openssl`). Same rules as the other crates: English, zero warnings, 200-400 line files, no `#[cfg(test)]` in `src/`, tests in `crates/syncthing-cli/tests/`.
+
+- **Commands** (`commands/`, one file each): `id`, `device add|list|remove`, `folder add|list|remove|share|unshare|pause|resume`, `config show|set`, `discover`, `run`. Configuration in `<home>/config.toml` (`config/`, saved atomically), identity in `<home>/device_seed.bin` (0600, `/dev/urandom`, no fallback), folder databases in `<home>/db/`.
+- **Consent**: only configured devices get a session (unknown devices and folders a peer offers are logged with the command that accepts them); a folder is only synchronized with the devices it is shared with (`FsSyncStorage::set_folder_devices`).
+- **Daemon** (`daemon/`, `run`): `listener.rs` accepts connections (the PS Vita app never listens: it always dials the CLI); `dialer.rs` keeps one thread per configured device dialing configured / LAN / Global Discovery addresses, then relays; `lan.rs` listens on UDP 21027 continuously and answers announcements directly (the Vita only listens briefly after its broadcast); `global.rs` announces `tcp://0.0.0.0:<port>` and our relay URI; `relay.rs` joins a relay (configured `static_relays` or the public pool) and runs invited sessions. `sessions.rs` allows one session per device whatever the link. Timings live in `daemon/timing.rs`.
+- **Logs**: one timestamped line per event on stdout; peer-supplied text goes through `log::printable` (no control characters).
+
 ### 3.3 `syncthing-core` Library Architecture
 
 `syncthing-core` is the platform-independent protocol library. It must stay as clean as the app: one responsibility per file, strict inward dependencies, no Vita syscalls.
@@ -293,7 +310,9 @@ Timings, limits and presets that govern the app's behaviour (rescan interval, re
 - **Sizes from the network are bounded before allocating**: block sizes above `BEP_MAX_BLOCK_SIZE`, negative sizes / offsets and LZ4 output beyond the announced length are rejected.
 - **`local_db/`**: in-memory model (`mod.rs`), on-disk text format (`codec.rs`), process-wide cache + atomic save (`cache.rs`). Version arithmetic lives in `version_vector.rs`.
 - **`folder_sync/`**: disk scan → local `Index` (`scan.rs`) vs. pull planning, conflicts and deletions (`pull.rs`).
-- **`tls/`**: TLS transport only — certificate verifier, client connection setup / ID probe, frame polling. Nothing about sync.
+- **`tls/`**: TLS transport only — certificate verifiers, client connection setup / ID probe, server side (`server.rs`: `accept_bep_tls_stream` completes the handshake and returns an `IncomingBepStream` whose `peer_device_id` the application checks before running a session), HTTPS to infrastructure servers (`https.rs`: `HttpsServer`, `?id=` certificate pin or public roots, optional client certificate), frame polling. `BepTlsStream` is a `Client` / `Server` enum: the session code never cares which side dialed. Nothing about sync.
+- **Incoming sessions**: `session::accept_and_sync` runs a session on an accepted stream (TCP listener, or a relay invitation with `ServerSocket`). Its `Hello` announces a single connection (the dialer would open the secondary ones), and it sends its `ClusterConfig` first: a dialing `syncthing-core` peer (the PS Vita app) only answers the one it receives.
+- **Global Discovery & relays**: `discovery/http.rs` (minimal HTTP/1.1 client), `discovery/global.rs` (`lookup_peer_on`), `discovery/global_announce.rs` (`announce_on`, mutual TLS), `relay/listen.rs` (`RelayListener`: permanent relay mode, `SessionInvitation`s), `relay/pool.rs` (public relay list). The PS Vita app only uses lookups and dials relays; announcing and relay listening are for devices that accept connections (`syncthing-cli`).
 - **`session/`**: the BEP sync engine, **one file per phase or concern**:
   - `mod.rs` — `connect_and_sync*` orchestrator (connect → `Hello` → phases), must stay a thin sequence of phase calls
   - `cluster_exchange.rs` — initial `ClusterConfig` exchange + initial remote `Index`
@@ -403,6 +422,9 @@ cargo test --workspace
 - `folder_sync.rs`: version convergence across peers, local deletions become tombstones, receive-only masking of local changes, revert of local changes
 - `version_vector.rs`: version vector ordering / merge / bump
 - `bep_codec.rs` / `storage.rs` / `folder_sync.rs` also cover the hardening rules: bounded LZ4 output, bounded block sizes, interrupted download commit recovery, unreadable entries never recorded as deleted, a pulled `.st*` dot-file is not announced as deleted, invalid peer-announced names are ignored
+- `session_inbound.rs`: a listening and a dialing `syncthing-core` device sync a folder both ways (`accept_and_sync`), a peer other than the expected one is refused
+- `https.rs` / `global_discovery.rs`: `HttpsServer` URLs and certificate pins, HTTP parsing, Global Discovery lookups and announcements against local HTTPS servers (`tests/common/tls_server.rs`)
+- `relay.rs`: relay wire codec, relay pool list, `RelayListener` (join, ping / pong, invitations, refusals)
 - `session.rs`: folder authorization (per-device sharing gate, block requests refused for unlinked peers, unconfigured or paused folders) and end-to-end sessions against the fake peer (only shared folders are announced / pulled, an `IndexUpdate` received during a download is applied, a local change is published as an incremental `IndexUpdate`, batched publication, scan progress for keepalives, a receive-only folder is announced as such, pulls the peer's changes and publishes its local changes as invalid, a revert request restores it once)
 
 `vita-syncthing-app` tests live in `crates/vita-syncthing-app/tests/` (`cargo test -p vita-syncthing-app`):
@@ -430,6 +452,14 @@ cargo test --workspace
 - `devices_scan.rs`: `ManageDevices` LAN scan — immediate without a linked device, after the delay with one, cancelled on close (and re-armed on reopening), also while another device is connected
 - `log_viewer.rs`: log viewer opened from the `Settings` log card (touch, D-pad `Open`), closed with `Circle`, scrolling by line / page (D-pad, `L` / `R`, touch) within bounds, new lines followed at the bottom and a scrolled-back window kept, `Show All` loading `syncthing.log` and back, session buffer size, geometry in all 5 languages
 - `language_settings.rs`: language preference codec / cycle, `language.cfg` persistence (defaults to the system language), `Settings` language card (D-pad and touch)
+
+`syncthing-cli` tests live in `crates/syncthing-cli/tests/` (`cargo test -p syncthing-cli`): `config.rs`, `identity.rs`, `cli_commands.rs` (the real binary), `daemon_sync.rs` (two daemons on `127.0.0.1` with discovery and relays off: sync both ways, live changes and deletions, unknown device refused, offered folder not synchronized, receive-only folder).
+
+### Sync Test Between the Vita App (Vita3K) and `syncthing-cli`
+```bash
+just vita3k-cli-sync
+```
+`scripts/vita3k_cli_sync.sh` pairs a fresh Vita identity with a fresh CLI home by writing both configurations (the Vita knows the CLI as `dynamic`: it is found by LAN discovery), shares `ux0:data/synctest` with a CLI folder, runs both and checks each side received the other's files. Logs (`vita.log`, `cli.log`) and screenshots land in `target/vita3k-cli-sync/`.
 
 ### Cross-Check for PS Vita (`armv7-sony-vita-newlibeabihf`)
 ```bash

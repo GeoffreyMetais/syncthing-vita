@@ -2,6 +2,7 @@
 #![allow(dead_code)]
 
 pub mod fake_peer;
+pub mod tls_server;
 
 use std::path::PathBuf;
 

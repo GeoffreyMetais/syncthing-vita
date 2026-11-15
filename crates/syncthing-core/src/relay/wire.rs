@@ -135,6 +135,42 @@ pub fn encode_join_session_request(key: &[u8]) -> Vec<u8> {
     frame_message(RelayMsgType::JoinSessionRequest, &payload)
 }
 
+/// Encodes a `JoinRelayRequest` (type 2) with an empty token: joins the relay permanently to
+/// receive `SessionInvitation`s for incoming connections.
+pub fn encode_join_relay_request() -> Vec<u8> {
+    let mut payload = Vec::with_capacity(4);
+    push_xdr_opaque(&mut payload, b"");
+    frame_message(RelayMsgType::JoinRelayRequest, &payload)
+}
+
+/// Encodes a `Ping` (type 0).
+pub fn encode_ping() -> Vec<u8> {
+    frame_message(RelayMsgType::Ping, &[])
+}
+
+/// Encodes a `Pong` (type 1), the answer to a relay `Ping`.
+pub fn encode_pong() -> Vec<u8> {
+    frame_message(RelayMsgType::Pong, &[])
+}
+
+/// Reads one complete relay message from `reader`.
+pub fn read_relay_message<R: io::Read>(reader: &mut R) -> io::Result<RelayMessage> {
+    let mut header = [0u8; 12];
+    reader.read_exact(&mut header)?;
+    read_relay_message_after_header(reader, header)
+}
+
+/// Reads the payload of a relay message whose 12-byte `header` was already read.
+pub fn read_relay_message_after_header<R: io::Read>(
+    reader: &mut R,
+    header: [u8; 12],
+) -> io::Result<RelayMessage> {
+    let (msg_type, len) = decode_header(header)?;
+    let mut payload = vec![0u8; len];
+    reader.read_exact(&mut payload)?;
+    decode_payload(msg_type, &payload)
+}
+
 /// Parses a 12-byte relay header into `(msg_type, payload_len)`.
 pub fn decode_header(header: [u8; 12]) -> io::Result<(RelayMsgType, usize)> {
     let magic = u32::from_be_bytes([header[0], header[1], header[2], header[3]]);
