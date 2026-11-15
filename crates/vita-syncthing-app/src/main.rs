@@ -4,27 +4,22 @@
 //! (`lib.rs`); this file only wires them together and runs the event loop, which wakes up on every
 //! display VBlank (60 Hz) but only renders a frame when needed (`FramePacer`).
 
-use std::sync::mpsc::Receiver;
-use std::sync::Arc;
 #[cfg(not(target_os = "vita"))]
 use std::time::Duration;
 use std::time::Instant;
 
-use syncthing_core::SyncControl;
 use vita_syncthing_app::application::power_policy::{cpu_clock, should_block_standby, CpuClock};
 use vita_syncthing_app::application::{
-    DevicesScan, FolderOfferService, FramePacer, FrameSignals, InputController, InputGestures,
-    QrScanFlow, ShareService, SyncCoordinator, UploadActivity, UserCommand,
+    DevicesScan, FramePacer, FrameSignals, InputController, InputGestures, QrScanFlow,
+    ShareService, SyncSupervisor, UploadActivity, UserCommand,
 };
 use vita_syncthing_app::domain::defaults::{
-    AUTO_RECONNECT_DELAY, POWER_TICK_INTERVAL, QUIT_WORKER_WAIT, SCREENSAVER_TIMEOUT_IDLE,
-    SCREENSAVER_TIMEOUT_SYNCING,
+    POWER_TICK_INTERVAL, SCREENSAVER_TIMEOUT_IDLE, SCREENSAVER_TIMEOUT_SYNCING,
 };
-use vita_syncthing_app::domain::{AppState, ModalDialog, UiText};
+use vita_syncthing_app::domain::AppState;
 use vita_syncthing_app::infrastructure::{
     detect_system_language, init_vita_network, is_on_external_power, keep_system_awake,
-    set_cpu_clock_mhz, spawn_sync_worker, wait_for_worker, ConfigRepository, IdentityStore,
-    QrScanner, VitaInput, WorkerMsg,
+    set_cpu_clock_mhz, ConfigRepository, IdentityStore, QrScanner, VitaInput,
 };
 use vita_syncthing_app::ui::VitaUiRenderer;
 
@@ -114,30 +109,11 @@ fn main() {
         &format!("PS Vita Device ID: {}", identity.device_id),
     );
 
-    let mut worker_rx: Option<Receiver<WorkerMsg>> = None;
-    let mut worker_ctl: Option<Arc<SyncControl>> = None;
-
-    // Only auto-connect on startup if at least one peer has an active share (or no share exists yet)
-    let startup_peers = state.sync_peers();
-    if !startup_peers.is_empty() {
-        state.progress_pct = None;
-        let offered = std::mem::take(&mut state.pending_folder_offers);
-        let (rx, ctl) = spawn_sync_worker(
-            repo.base_data_dir(),
-            identity.clone(),
-            state.shares.clone(),
-            startup_peers,
-            offered,
-        );
-        worker_rx = Some(rx);
-        worker_ctl = Some(ctl);
-    } else {
-        state.peer_label = UiText::NoPeerLinked;
-        state.status_line = UiText::SelectDeviceToConnect;
-    }
+    // Auto-connect on startup if at least one peer has an active share (or no share exists yet)
+    let mut sync = SyncSupervisor::new(identity);
+    sync.start_at_launch(&mut state, &repo);
 
     let mut last_activity = Instant::now();
-    let mut last_sync_finished = Instant::now();
     // Apply the power policy on the first iteration.
     let mut last_power_tick = Instant::now() - POWER_TICK_INTERVAL;
     let mut seen_transfer_activity = state.transfer_activity;
@@ -183,13 +159,11 @@ fn main() {
 
         // A LAN scan goes to the running worker; without one, a sync starts with a discovery.
         if command == UserCommand::ScanLan {
-            match worker_ctl {
-                Some(ref ctl) => {
-                    ctl.request_discovery();
-                    command = UserCommand::None;
-                }
-                None => command = UserCommand::StartSync,
-            }
+            command = if sync.request_discovery() {
+                UserCommand::None
+            } else {
+                UserCommand::StartSync
+            };
         }
         signals.user_change |= command != UserCommand::None;
         match command {
@@ -200,49 +174,12 @@ fn main() {
             UserCommand::StartSync => {
                 input_ctl.close_ime();
                 state.ime_active = false;
-                state.auto_reconnect_enabled = true;
-                if worker_rx.is_some() && state.session_connected && !state.config_dirty {
-                    state.prepare_manual_sync();
-                    ShareService::log_event(
-                        &mut state,
-                        &repo,
-                        "Triggering live local rescan over persistent 1+2 connection...",
-                    );
-                    if let Some(ref ctl) = worker_ctl {
-                        ctl.request_rescan();
-                    }
-                } else {
-                    if let Some(ref ctl) = worker_ctl {
-                        ctl.request_stop();
-                    }
-                    state.config_dirty = false;
-                    state.reset_sessions();
-                    state.prepare_manual_sync();
-                    ShareService::log_event(
-                        &mut state,
-                        &repo,
-                        "Starting BEP/1.0 synchronization...",
-                    );
-                    let offered = std::mem::take(&mut state.pending_folder_offers);
-                    let (rx, ctl) = spawn_sync_worker(
-                        repo.base_data_dir(),
-                        identity.clone(),
-                        state.shares.clone(),
-                        state.approved_devices(),
-                        offered,
-                    );
-                    worker_rx = Some(rx);
-                    worker_ctl = Some(ctl);
-                }
+                sync.start_sync(&mut state, &repo);
             }
             UserCommand::QuitApp => {
                 input_ctl.close_ime();
-                if let Some(ref ctl) = worker_ctl {
-                    ctl.request_stop();
-                }
                 ShareService::log_event(&mut state, &repo, "Exit requested by user [START].");
-                // Let the sessions close and save their state before the process exits.
-                wait_for_worker(QUIT_WORKER_WAIT);
+                sync.shutdown();
                 set_cpu_clock_mhz(CpuClock::Full.mhz());
                 break;
             }
@@ -251,72 +188,9 @@ fn main() {
         signals.user_change |= ime_open != state.ime_active;
         state.ime_active = ime_open;
 
-        // Revert requests of read-only shares go to the running worker (its sessions take them),
-        // unless that worker is about to be replaced by one with the new configuration.
-        if let (Some(ref ctl), false) = (&worker_ctl, state.config_dirty) {
-            for folder_id in std::mem::take(&mut state.pending_reverts) {
-                ctl.request_revert(&folder_id);
-            }
-        }
-
-        // Reload persistent worker if share/device configuration was changed and modals are closed
-        if state.config_dirty && state.modal == ModalDialog::None {
-            signals.background_change = true;
-            state.config_dirty = false;
-            if let Some(ref ctl) = worker_ctl {
-                ctl.request_stop();
-            }
-            worker_rx = None;
-            worker_ctl = None;
-            state.reset_sessions();
-            state.sync_in_progress = false;
-            let peers = state.sync_peers();
-            if !peers.is_empty() {
-                state.progress_pct = None;
-                let offered = std::mem::take(&mut state.pending_folder_offers);
-                let (rx, ctl) = spawn_sync_worker(
-                    repo.base_data_dir(),
-                    identity.clone(),
-                    state.shares.clone(),
-                    peers,
-                    offered,
-                );
-                worker_rx = Some(rx);
-                worker_ctl = Some(ctl);
-            }
-        }
-
-        let was_running = worker_rx.is_some();
-        signals.background_change |=
-            SyncCoordinator::process_worker_messages(&mut state, &repo, &mut worker_rx);
+        // Sync worker life cycle: configuration reloads, worker messages, reconnection.
+        signals.background_change |= sync.tick(&mut state, &repo);
         signals.background_change |= uploads.update(&mut state, Instant::now());
-        FolderOfferService::prompt_next(&mut state);
-        if was_running && worker_rx.is_none() {
-            worker_ctl = None;
-            last_sync_finished = Instant::now();
-        }
-
-        // Automatically reconnect to active sync peers if the persistent session dropped
-        if worker_rx.is_none()
-            && state.auto_reconnect_enabled
-            && last_sync_finished.elapsed() >= AUTO_RECONNECT_DELAY
-        {
-            let peers = state.sync_peers();
-            if !peers.is_empty() {
-                signals.background_change = true;
-                state.progress_pct = None;
-                let offered = std::mem::take(&mut state.pending_folder_offers);
-                let (rx, ctl) = spawn_sync_worker(
-                    repo.base_data_dir(),
-                    identity.clone(),
-                    state.shares.clone(),
-                    peers,
-                    offered,
-                );
-                worker_rx = Some(rx);
-                worker_ctl = Some(ctl);
-            }
-        }
 
         // Keep the console out of automatic standby only when useful: while charging, or during
         // transfers (plus a grace period). On battery and idle, standby is allowed.
@@ -340,7 +214,7 @@ fn main() {
             last_power_tick = Instant::now();
             // The system may reset the clock after standby: re-apply it periodically.
             set_cpu_clock_mhz(cpu.mhz());
-            let sync_active = worker_rx.is_some() || state.auto_reconnect_enabled;
+            let sync_active = sync.is_running() || state.auto_reconnect_enabled;
             if should_block_standby(
                 sync_active,
                 is_on_external_power(),

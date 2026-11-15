@@ -14,6 +14,7 @@ pub mod share_creation;
 pub mod share_mode;
 pub mod share_service;
 pub mod sync_coordinator;
+pub mod sync_supervisor;
 pub mod upload_activity;
 
 pub use controllers::{
@@ -31,4 +32,5 @@ pub use share_creation::ShareCreation;
 pub use share_mode::ShareModeService;
 pub use share_service::ShareService;
 pub use sync_coordinator::SyncCoordinator;
+pub use sync_supervisor::SyncSupervisor;
 pub use upload_activity::UploadActivity;
