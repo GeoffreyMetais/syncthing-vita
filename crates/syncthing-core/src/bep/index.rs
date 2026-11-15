@@ -116,8 +116,15 @@ impl BepIndex {
                 encode_varint_field(&mut fbuf, 12, last_ver.short_device_id);
             }
             if !f.is_dir {
-                // field 13: int32 block_size = 128 KiB
-                encode_varint_field(&mut fbuf, 13, BEP_BLOCK_SIZE as u64);
+                // field 13: int32 block_size. Every block but the last has that size, so the
+                // first one gives it (the blocks of a file pulled from a peer keep the size
+                // that peer chose, 128 KiB to 16 MiB); never below the 128 KiB minimum.
+                let block_size = f
+                    .blocks
+                    .first()
+                    .map_or(0, |b| b.size.max(0) as usize)
+                    .max(BEP_BLOCK_SIZE);
+                encode_varint_field(&mut fbuf, 13, block_size as u64);
 
                 for b in &f.blocks {
                     let mut bbuf = Vec::new();

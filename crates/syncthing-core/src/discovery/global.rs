@@ -38,8 +38,10 @@ fn resolve_socket_addr(host_port: &str) -> Option<SocketAddr> {
         .find(|s| !s.ip().is_unspecified())
 }
 
-/// Parses a single Syncthing URI (`tcp://...` or `relay://...`) into a [`PeerEndpoint`].
-pub fn parse_endpoint_uri(uri: &str) -> Option<PeerEndpoint> {
+/// Turns a single Syncthing URI (`tcp://...` or `relay://...`) into a [`PeerEndpoint`].
+/// A host name is resolved through DNS (this is not a pure parser: it may block on the
+/// network); `None` for unsupported schemes, unresolvable hosts and unspecified addresses.
+pub fn resolve_endpoint_uri(uri: &str) -> Option<PeerEndpoint> {
     if let Some(rest) = uri.strip_prefix("tcp://") {
         let host_port = rest.split(['/', '?']).next()?;
         let addr = resolve_socket_addr(host_port)?;
@@ -187,7 +189,7 @@ pub fn lookup_global_peer(device_id: DeviceId, timeout: Duration) -> io::Result<
     let uris = parse_global_discovery_json(&body);
     let mut endpoints = Vec::new();
     for uri in uris {
-        if let Some(ep) = parse_endpoint_uri(&uri) {
+        if let Some(ep) = resolve_endpoint_uri(&uri) {
             if !endpoints.contains(&ep) {
                 endpoints.push(ep);
             }

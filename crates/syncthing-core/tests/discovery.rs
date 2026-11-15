@@ -60,8 +60,8 @@ fn test_parse_global_discovery_json_extracts_addresses() {
 }
 
 #[test]
-fn test_parse_endpoint_uri_supports_tcp_and_relay_and_filters_unspecified() {
-    use syncthing_core::{parse_endpoint_uri, PeerEndpoint};
+fn test_resolve_endpoint_uri_supports_tcp_and_relay_and_filters_unspecified() {
+    use syncthing_core::{resolve_endpoint_uri, PeerEndpoint};
 
     let relay_id = DeviceId([0xAB; 32]);
     let relay_uri = format!(
@@ -70,19 +70,19 @@ fn test_parse_endpoint_uri_supports_tcp_and_relay_and_filters_unspecified() {
     );
 
     assert_eq!(
-        parse_endpoint_uri("tcp://203.0.113.10:22000"),
+        resolve_endpoint_uri("tcp://203.0.113.10:22000"),
         Some(PeerEndpoint::Direct("203.0.113.10:22000".parse().unwrap()))
     );
     assert_eq!(
-        parse_endpoint_uri(&relay_uri),
+        resolve_endpoint_uri(&relay_uri),
         Some(PeerEndpoint::Relay {
             addr: "198.51.100.5:22067".parse().unwrap(),
             device_id: relay_id,
         })
     );
-    assert_eq!(parse_endpoint_uri("tcp://0.0.0.0:22000"), None);
-    assert_eq!(parse_endpoint_uri("quic://203.0.113.10:22000"), None);
-    assert_eq!(parse_endpoint_uri("relay://198.51.100.5:22067/"), None);
+    assert_eq!(resolve_endpoint_uri("tcp://0.0.0.0:22000"), None);
+    assert_eq!(resolve_endpoint_uri("quic://203.0.113.10:22000"), None);
+    assert_eq!(resolve_endpoint_uri("relay://198.51.100.5:22067/"), None);
 }
 
 /// The Global Discovery HTTPS client authenticates the server: a self-signed certificate (what
