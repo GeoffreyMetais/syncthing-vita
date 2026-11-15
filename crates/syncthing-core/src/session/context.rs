@@ -17,9 +17,9 @@ use crate::storage::FsSyncStorage;
 pub struct SyncStats {
     pub files_up_to_date: usize,
     pub files_downloaded: usize,
-    pub bytes_downloaded: usize,
+    pub bytes_downloaded: u64,
     pub blocks_uploaded: usize,
-    pub bytes_uploaded: usize,
+    pub bytes_uploaded: u64,
 }
 
 impl SyncStats {

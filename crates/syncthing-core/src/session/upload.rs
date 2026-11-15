@@ -47,7 +47,7 @@ pub fn serve_block_request<W: Write>(
             };
             write_bep_message(stream, BepMessageType::Response, &resp.encode())?;
             ctx.stats.blocks_uploaded += 1;
-            ctx.stats.bytes_uploaded += len;
+            ctx.stats.bytes_uploaded += len as u64;
             ctx.emit(SyncEvent::BlockUploaded {
                 folder: req.folder,
                 name: req.name,

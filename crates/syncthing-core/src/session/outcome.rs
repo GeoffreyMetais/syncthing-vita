@@ -14,9 +14,9 @@ pub enum SyncSessionStatus {
         shared_folders: Vec<BepFolder>,
         files_up_to_date: usize,
         files_downloaded: usize,
-        bytes_downloaded: usize,
+        bytes_downloaded: u64,
         blocks_uploaded: usize,
-        bytes_uploaded: usize,
+        bytes_uploaded: u64,
     },
 }
 

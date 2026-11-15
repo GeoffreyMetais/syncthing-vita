@@ -59,9 +59,9 @@ pub enum UiText {
         connections: usize,
         up_to_date: usize,
         downloaded: usize,
-        downloaded_kb: usize,
+        downloaded_kb: u64,
         uploaded: usize,
-        uploaded_bytes: usize,
+        uploaded_bytes: u64,
     },
     FoundLanPeers {
         count: usize,

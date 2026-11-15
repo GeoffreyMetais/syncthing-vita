@@ -58,7 +58,7 @@ pub struct AppState {
     pub files_up_to_date: usize,
     pub files_downloaded: usize,
     pub blocks_uploaded: usize,
-    pub bytes_transferred: usize,
+    pub bytes_transferred: u64,
     pub shares: Vec<ShareConfigEntry>,
     pub devices: Vec<KnownDevice>,
     /// Peers discovered passively on the LAN (UDP 21027) that have NOT been manually linked/paired by the user.

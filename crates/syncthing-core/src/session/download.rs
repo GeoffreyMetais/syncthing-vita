@@ -185,7 +185,7 @@ fn download_file(
         folder: folder_id.to_owned(),
         name: file.name.clone(),
         blocks_downloaded: file_blocks,
-        bytes_downloaded: file_bytes,
+        bytes_downloaded: file_bytes as u64,
         total_size,
     });
     Ok(true)
@@ -263,7 +263,7 @@ fn fetch_block(
     }
 
     let len = resp.data.len();
-    ctx.stats.bytes_downloaded += len;
+    ctx.stats.bytes_downloaded += len as u64;
     ctx.emit(SyncEvent::BlockDownloaded {
         folder: folder_id.to_owned(),
         name: file.name.clone(),
