@@ -5,7 +5,7 @@ mod common;
 
 use common::temp_test_dir;
 use syncthing_core::DeviceId;
-use vita_syncthing_app::application::{FolderOfferService, ShareService};
+use vita_syncthing_app::application::{DeviceRegistry, FolderOfferService, ShareService};
 use vita_syncthing_app::domain::AppState;
 use vita_syncthing_app::infrastructure::ConfigRepository;
 
@@ -16,7 +16,7 @@ fn test_share_service_and_config_repository_roundtrip() {
     let mut state = AppState::new(Vec::new(), Vec::new(), &dir);
 
     let dev_id = DeviceId([0x42; 32]);
-    ShareService::upsert_device(&mut state, &repo, dev_id, "MacBook", "192.168.1.10:22000");
+    DeviceRegistry::upsert_device(&mut state, &repo, dev_id, "MacBook", "192.168.1.10:22000");
     assert_eq!(state.devices.len(), 1);
 
     let idx = ShareService::create_share(
@@ -76,7 +76,7 @@ fn test_passive_lan_discovery_does_not_auto_link_or_connect() {
     let mut state = AppState::new(Vec::new(), Vec::new(), &dir);
 
     let random_lan_peer = DeviceId([0x77; 32]);
-    ShareService::register_discovered_peer(
+    DeviceRegistry::register_discovered_peer(
         &mut state,
         random_lan_peer,
         "LAN Peer",
@@ -117,7 +117,7 @@ fn test_delete_share_removes_config_and_pending_offer() {
     let mut state = AppState::new(Vec::new(), Vec::new(), &dir);
 
     let dev_id = DeviceId([0x24; 32]);
-    ShareService::upsert_device(&mut state, &repo, dev_id, "Laptop", "192.168.1.20:22000");
+    DeviceRegistry::upsert_device(&mut state, &repo, dev_id, "Laptop", "192.168.1.20:22000");
     ShareService::create_share(&mut state, &repo, "a", "Share A", &format!("{}/a", dir));
     let b = ShareService::create_share(&mut state, &repo, "b", "Share B", &format!("{}/b", dir));
     ShareService::toggle_device_for_share(&mut state, &repo, b, dev_id).unwrap();
@@ -145,21 +145,21 @@ fn test_sync_peers_excludes_devices_without_active_share() {
     let paused_only = DeviceId([0x22; 32]);
     let active = DeviceId([0x33; 32]);
 
-    ShareService::upsert_device(
+    DeviceRegistry::upsert_device(
         &mut state,
         &repo,
         unlinked,
         "Mac Deezer",
         "192.168.1.50:22000",
     );
-    ShareService::upsert_device(
+    DeviceRegistry::upsert_device(
         &mut state,
         &repo,
         paused_only,
         "Old PC",
         "192.168.1.51:22000",
     );
-    ShareService::upsert_device(&mut state, &repo, active, "NAS", "192.168.1.52:22000");
+    DeviceRegistry::upsert_device(&mut state, &repo, active, "NAS", "192.168.1.52:22000");
 
     // With no shares yet, approved devices are eligible so folder offers can arrive.
     assert_eq!(state.sync_peers().len(), 3);
@@ -193,24 +193,29 @@ fn test_lan_announcement_never_upgrades_a_short_id_placeholder() {
     let real = DeviceId([0x5A; 32]);
     let prefix: String = real.to_syncthing_string().chars().take(7).collect();
     let (placeholder, _, is_short) =
-        ShareService::add_device_by_input(&mut state, &repo, &prefix, None).unwrap();
+        DeviceRegistry::add_device_by_input(&mut state, &repo, &prefix, None).unwrap();
     assert!(is_short);
 
     // Someone announces an ID sharing the prefix.
     let mut forged = real;
     forged.0[20] ^= 0xFF;
     assert!(placeholder.matches_peer(&forged));
-    ShareService::register_discovered_peer(&mut state, forged, "LAN Peer", "192.168.1.66:22000");
+    DeviceRegistry::register_discovered_peer(&mut state, forged, "LAN Peer", "192.168.1.66:22000");
     assert_eq!(state.devices[0].device_id, placeholder);
 
     // The real device proves its identity over TLS: the placeholder becomes its full ID.
-    ShareService::upsert_device(&mut state, &repo, real, "NAS", "192.168.1.10:22000");
+    DeviceRegistry::upsert_device(&mut state, &repo, real, "NAS", "192.168.1.10:22000");
     assert_eq!(state.devices[0].device_id, real);
 
     for i in 0..(MAX_DISCOVERED_PEERS as u8 + 10) {
         let mut id = [i; 32];
         id[0] = 0xEE;
-        ShareService::register_discovered_peer(&mut state, DeviceId(id), "LAN Peer", "10.0.0.1:1");
+        DeviceRegistry::register_discovered_peer(
+            &mut state,
+            DeviceId(id),
+            "LAN Peer",
+            "10.0.0.1:1",
+        );
     }
     assert_eq!(state.unpaired_lan_peers.len(), MAX_DISCOVERED_PEERS);
     let _ = std::fs::remove_dir_all(&dir);

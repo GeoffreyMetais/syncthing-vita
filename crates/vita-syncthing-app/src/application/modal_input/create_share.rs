@@ -1,6 +1,6 @@
 //! `CreateShare` modal input: pick a share template or browse `ux0:`.
 
-use crate::application::{ShareCreation, ShareService, UserCommand};
+use crate::application::{FolderBrowser, ShareCreation, UserCommand};
 use crate::domain::{ActiveTab, AppState, ModalDialog, PickerMode, NEW_SHARE_TEMPLATES};
 use crate::infrastructure::{
     ConfigRepository, InputFrame, BTN_CIRCLE, BTN_CROSS, BTN_DOWN, BTN_UP,
@@ -40,7 +40,7 @@ pub fn handle(
         if fid == "__browse__" {
             state.modal = ModalDialog::None;
             state.picker_mode = PickerMode::CreateNewShare;
-            ShareService::refresh_picker_items(state, repo);
+            FolderBrowser::refresh(state, repo);
             state.active_tab = ActiveTab::FolderPicker;
         } else {
             ShareCreation::begin(state, repo, fid, label, path);

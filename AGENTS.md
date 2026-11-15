@@ -57,7 +57,9 @@ syncthing-vita
             │   └── ui_text.rs        # UiText: translatable messages (status line, labels, toasts) chosen by inner layers
             ├── application/          # Layer 2: Use Cases, Input Controller & Sync Event Coordinator
             │   ├── mod.rs
-            │   ├── share_service.rs  # ShareService (create_share, upsert_device, toggle_device_for_share, refresh_picker_items)
+            │   ├── share_service.rs  # ShareService (create_share, delete_share, toggle_device_for_share, share target / pause, log_event)
+            │   ├── device_registry.rs # DeviceRegistry (LAN peers, devices added by ID, Short ID placeholder upgrade)
+            │   ├── folder_browser.rs # FolderBrowser (`Files` tab: presets and subfolders, navigation, selection)
             │   ├── dashboard_controller.rs / shares_controller.rs / files_controller.rs / settings_controller.rs / logs.rs # One controller per page: D-pad focus movement, execution of the page's UiActions (`LogsController`: log viewer scrolling)
             │   ├── share_creation.rs # ShareCreation (new share kept only once a device is linked)
             │   ├── share_mode.rs     # ShareModeService (share read & write <-> read only, revert of local changes)
@@ -164,7 +166,7 @@ Dependencies strictly point **inward**. Inner layers never import or depend on o
 2. **Layer 2: Application Layer (`crates/vita-syncthing-app/src/application/`)**
    - **Responsibility**: Use cases, business workflow orchestration, command routing, and event coordination.
    - **Key Modules**:
-     - `share_service.rs`: Share creation, device linkage, path validation.
+     - `share_service.rs`: Share creation, deletion, pause, target folder and device linkage. `device_registry.rs`: known devices (discovered, added by ID, placeholder upgrade). `folder_browser.rs`: the `Files` tab browser.
      - `share_creation.rs`: Share creation workflow — a new share is discarded if `ManageDevices` closes with no linked device.
      - `share_mode.rs`: `ShareModeService::toggle` switches a share between `ShareMode::ReadWrite` and `ShareMode::ReadOnly`, saves it and restarts the worker (`config_dirty`). `ShareModeService::request_revert` queues a read-only share in `AppState::pending_reverts`; `main.rs` hands it to the running worker (`SyncControl::request_revert`) once no configuration change is pending, and a sync is started if none runs.
      - `folder_offers.rs`: Consent for folders offered by peers (`FolderOffer` modal); declined offers persisted.
@@ -355,7 +357,7 @@ Emulators like Vita3K are permissive HLE environments that run with host PC RAM 
    - Never hardcode the contents of `ux0:data/syncthing/device_seed.bin`.
    - On a clean installation (when `device_seed.bin` does not exist), generate 32 random bytes via `sceKernelGetRandomNumber` (`SceLibKernel_stub`) so every PS Vita gets a unique Syncthing `DeviceId`.
    - Consent is enforced by `syncthing-core`, not only by the UI: `spawn_sync_worker` declares each share's linked devices with `FsSyncStorage::set_folder_devices`, and sessions ignore every other folder (see §3.3 **Folder authorization**).
-   - A LAN announcement is not authenticated: `ShareService::register_discovered_peer` only lists the peer (at most `MAX_DISCOVERED_PEERS`), and a Short ID placeholder is upgraded to a full ID only by `upsert_device`, once a TLS session proved the identity.
+   - A LAN announcement is not authenticated: `DeviceRegistry::register_discovered_peer` only lists the peer (at most `MAX_DISCOVERED_PEERS`), and a Short ID placeholder is upgraded to a full ID only by `upsert_device`, once a TLS session proved the identity.
    - There is no fallback random source: `IdentityStore::generate_random_seed` fails rather than derive a key from guessable values.
    - The app's data directory and its parents can never be a share's folder (`ConfigRepository::is_protected_share_path`: refused by the `Files` browser with a toast, skipped by `spawn_sync_worker`). A share's default directory comes from `ConfigRepository::default_share_dir`, which sanitizes the peer-chosen folder ID.
    - Remote folders received via `ClusterConfig` never become shares on their own: `FolderOfferService::receive` queues them as `FolderOffer`s and the `FolderOffer` modal asks for consent. An accepted folder defaults to `enabled: false` (**Paused**) until the user selects a target folder and enables it in the **Overview** share list; a declined one is saved in `ignored_folders.cfg`.

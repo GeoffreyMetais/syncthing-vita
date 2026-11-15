@@ -5,7 +5,7 @@ mod common;
 
 use common::{draw, press, rect_of, tap, tap_rect, temp_test_dir};
 use syncthing_core::DeviceId;
-use vita_syncthing_app::application::{InputController, ShareService};
+use vita_syncthing_app::application::{DeviceRegistry, InputController, ShareService};
 use vita_syncthing_app::domain::{
     ActiveTab, AppState, FocusSlot, Language, LanguagePreference, ModalDialog, PickerMode, UiAction,
 };
@@ -21,7 +21,7 @@ fn setup(name: &str, count: usize) -> (String, ConfigRepository, AppState) {
     let dir = temp_test_dir(name);
     let repo = ConfigRepository::new(&dir);
     let mut state = AppState::new(Vec::new(), Vec::new(), &dir);
-    ShareService::upsert_device(&mut state, &repo, PEER, "MacBook", "192.168.1.10:22000");
+    DeviceRegistry::upsert_device(&mut state, &repo, PEER, "MacBook", "192.168.1.10:22000");
     for i in 0..count {
         let id = format!("share-{i}");
         ShareService::create_share(&mut state, &repo, &id, &id, &format!("{dir}/{id}"));

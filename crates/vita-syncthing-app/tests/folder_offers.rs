@@ -5,7 +5,7 @@ mod common;
 
 use common::{press, tap_action, temp_test_dir};
 use syncthing_core::DeviceId;
-use vita_syncthing_app::application::{FolderOfferService, ShareService};
+use vita_syncthing_app::application::{DeviceRegistry, FolderOfferService, ShareService};
 use vita_syncthing_app::domain::{
     ActiveTab, AppState, ModalDialog, UiAction, SETTINGS_ROW_DECLINED,
 };
@@ -19,7 +19,7 @@ fn setup(name: &str) -> (String, ConfigRepository, AppState) {
     let dir = temp_test_dir(name);
     let repo = ConfigRepository::new(&dir);
     let mut state = AppState::new(Vec::new(), Vec::new(), &dir);
-    ShareService::upsert_device(&mut state, &repo, PEER, "MacBook", "192.168.1.10:22000");
+    DeviceRegistry::upsert_device(&mut state, &repo, PEER, "MacBook", "192.168.1.10:22000");
     (dir, repo, state)
 }
 

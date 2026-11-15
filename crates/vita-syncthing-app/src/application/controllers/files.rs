@@ -2,7 +2,7 @@
 //! rows, and execution of the browser's `UiAction`s. The elements are declared by
 //! `ui/screens/folder_picker.rs`.
 
-use crate::application::ShareService;
+use crate::application::FolderBrowser;
 use crate::domain::{AppState, NavFocus, UiAction};
 use crate::infrastructure::{ConfigRepository, BTN_DOWN, BTN_LEFT, BTN_RIGHT, BTN_UP};
 
@@ -47,14 +47,14 @@ impl FilesController {
     /// since the frame was drawn) is ignored.
     pub fn apply(state: &mut AppState, repo: &ConfigRepository, action: UiAction) {
         match action {
-            UiAction::PickerUp => ShareService::navigate_picker_up(state, repo),
+            UiAction::PickerUp => FolderBrowser::navigate_up(state, repo),
             UiAction::PickerSelect(idx) | UiAction::PickerOpen(idx) => {
                 if idx >= state.picker_items.len() {
                     return;
                 }
                 state.selected_picker_idx = idx;
                 let enter = matches!(action, UiAction::PickerOpen(_));
-                ShareService::apply_picker_selection(state, repo, enter);
+                FolderBrowser::apply_selection(state, repo, enter);
             }
             _ => {}
         }

@@ -4,7 +4,7 @@
 
 use syncthing_core::DeviceId;
 
-use crate::application::ShareService;
+use crate::application::{FolderBrowser, ShareService};
 use crate::domain::{
     ActiveTab, AppState, FolderOffer, IgnoredFolder, ModalDialog, PickerMode, ShareConfigEntry,
     ShareMode, UiText, NEW_SHARE_TEMPLATES,
@@ -127,7 +127,7 @@ impl FolderOfferService {
             state.active_tab = ActiveTab::Dashboard;
         } else {
             state.picker_mode = PickerMode::ChangeShareTarget;
-            ShareService::refresh_picker_items(state, repo);
+            FolderBrowser::refresh(state, repo);
             state.active_tab = ActiveTab::FolderPicker;
             state.reset_nav_for_tab();
             state.show_toast(UiText::ChooseWhereToStore {

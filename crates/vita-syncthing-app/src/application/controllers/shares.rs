@@ -2,7 +2,7 @@
 //! themselves (position, action, focus slot, shortcut) are declared by `ui/screens/shares.rs`
 //! in the frame's `HitMap`; D-pad focus over them is moved by `DashboardController`.
 
-use crate::application::ShareService;
+use crate::application::FolderBrowser;
 use crate::domain::{ActiveTab, AppState, ModalDialog, PickerMode, UiAction};
 use crate::infrastructure::ConfigRepository;
 
@@ -39,7 +39,7 @@ impl SharesController {
             }
             UiAction::ChangeShareFolder(_) => {
                 state.picker_mode = PickerMode::ChangeShareTarget;
-                ShareService::refresh_picker_items(state, repo);
+                FolderBrowser::refresh(state, repo);
                 state.active_tab = ActiveTab::FolderPicker;
             }
             _ => {}
