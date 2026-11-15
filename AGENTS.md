@@ -118,6 +118,7 @@ syncthing-vita
                 │   ├── scan_qr.rs
                 │   ├── fallback_keyboard.rs
                 │   ├── device_id.rs
+                │   ├── confirm_frame.rs  # Card, header, buttons and hints shared by the three confirmation modals
                 │   ├── confirm_quit.rs
                 │   ├── confirm_delete_share.rs
                 │   ├── confirm_revert_share.rs

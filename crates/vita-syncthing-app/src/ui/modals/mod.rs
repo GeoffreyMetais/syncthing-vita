@@ -5,6 +5,7 @@
 //! - `fallback_keyboard`: Dedicated fallback Base32 touch/gamepad keypad component
 //! - `scan_qr`: Rear-camera QR code viewfinder modal (`ScanDeviceQr`)
 //! - `device_id`: QR code & 8-group Device ID modal (`ShowDeviceId`)
+//! - `confirm_frame`: Card, header and buttons shared by the three confirmation modals
 //! - `confirm_quit`: Application exit confirmation modal (`ConfirmQuit`)
 //! - `confirm_delete_share`: Share deletion confirmation modal (`ConfirmDeleteShare`)
 //! - `confirm_revert_share`: Read-only share revert confirmation modal (`ConfirmRevertShare`)
@@ -12,6 +13,7 @@
 
 pub mod add_device;
 pub mod confirm_delete_share;
+pub mod confirm_frame;
 pub mod confirm_quit;
 pub mod confirm_revert_share;
 pub mod create_share;
