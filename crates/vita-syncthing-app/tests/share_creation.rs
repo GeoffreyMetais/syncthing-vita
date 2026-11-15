@@ -49,7 +49,7 @@ fn test_share_with_linked_device_is_kept() {
     press(&mut state, &repo, BTN_CIRCLE);
     assert_eq!(state.modal, ModalDialog::None);
     assert_eq!(state.shares.len(), 1);
-    assert_eq!(state.shares[0].shared_devices, vec![dev_id.to_hex()]);
+    assert_eq!(state.shares[0].shared_devices, vec![dev_id]);
     assert!(state.pending_share_creation.is_none());
     assert_eq!(repo.load_shares().len(), 1);
 

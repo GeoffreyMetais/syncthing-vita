@@ -36,7 +36,7 @@ fn test_share_service_and_config_repository_roundtrip() {
     let (_, _, added) =
         ShareService::toggle_device_for_share(&mut state, &repo, 0, dev_id).unwrap();
     assert!(added);
-    assert_eq!(state.shares[0].shared_devices, vec![dev_id.to_hex()]);
+    assert_eq!(state.shares[0].shared_devices, vec![dev_id]);
     assert_eq!(
         state.pending_folder_offers,
         vec!["vita-savedata".to_owned()]
@@ -51,7 +51,7 @@ fn test_share_service_and_config_repository_roundtrip() {
     let (_, _, added_again) =
         ShareService::toggle_device_for_share(&mut state, &repo, 0, dev_id).unwrap();
     assert!(added_again);
-    assert_eq!(state.shares[0].shared_devices, vec![dev_id.to_hex()]);
+    assert_eq!(state.shares[0].shared_devices, vec![dev_id]);
 
     // An accepted remote folder offer starts paused (enabled = false)
     FolderOfferService::receive(&mut state, &repo, dev_id, "remote-docs", "Remote Docs");

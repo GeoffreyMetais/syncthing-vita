@@ -26,11 +26,10 @@ impl FolderOfferService {
         folder_id: &str,
         label: &str,
     ) {
-        let peer_hex = peer_device_id.to_hex();
         if let Some(share) = state
             .shares
             .iter_mut()
-            .find(|s| s.folder_id == folder_id && s.shared_devices.contains(&peer_hex))
+            .find(|s| s.folder_id == folder_id && s.shared_devices.contains(&peer_device_id))
         {
             if !label.is_empty() && share.label != label {
                 share.label = label.to_owned();
@@ -85,7 +84,6 @@ impl FolderOfferService {
             return;
         }
         let offer = state.folder_offers.remove(offer_idx);
-        let peer_hex = offer.device_id.to_hex();
         let share_idx = match state
             .shares
             .iter()
@@ -93,8 +91,8 @@ impl FolderOfferService {
         {
             Some(idx) => {
                 let share = &mut state.shares[idx];
-                if !share.shared_devices.contains(&peer_hex) {
-                    share.shared_devices.push(peer_hex);
+                if !share.shared_devices.contains(&offer.device_id) {
+                    share.shared_devices.push(offer.device_id);
                 }
                 idx
             }
@@ -105,7 +103,7 @@ impl FolderOfferService {
                     target_path: Self::default_target(repo, &offer.folder_id),
                     enabled: false,
                     mode: ShareMode::ReadWrite,
-                    shared_devices: vec![peer_hex],
+                    shared_devices: vec![offer.device_id],
                 });
                 state.shares.len() - 1
             }

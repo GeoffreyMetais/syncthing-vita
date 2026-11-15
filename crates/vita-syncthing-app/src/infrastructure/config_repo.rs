@@ -179,8 +179,7 @@ impl ConfigRepository {
                     let shared_devices = if parts.len() >= 5 && !parts[4].trim().is_empty() {
                         parts[4]
                             .split(',')
-                            .map(|s| s.trim().to_owned())
-                            .filter(|s| DeviceId::from_hex(s).is_some())
+                            .filter_map(|hex| DeviceId::from_hex(hex.trim()))
                             .collect()
                     } else {
                         Vec::new()
@@ -222,7 +221,8 @@ impl ConfigRepository {
         let cfg_path = format!("{}/shares.cfg", self.base_data_dir);
         let mut out = String::new();
         for s in shares {
-            let devs = s.shared_devices.join(",");
+            let devs: Vec<String> = s.shared_devices.iter().map(DeviceId::to_hex).collect();
+            let devs = devs.join(",");
             out.push_str(&format!(
                 "{}|{}|{}|{}|{}|{}\n",
                 escape_field(&s.folder_id),

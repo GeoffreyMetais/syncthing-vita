@@ -76,7 +76,7 @@ fn test_legacy_shares_cfg_without_mode_is_read_write() {
     let shares = ConfigRepository::new(&dir).load_shares();
     assert_eq!(shares.len(), 1);
     assert_eq!(shares[0].mode, ShareMode::ReadWrite);
-    assert_eq!(shares[0].shared_devices, vec![PEER.to_hex()]);
+    assert_eq!(shares[0].shared_devices, vec![PEER]);
     let _ = std::fs::remove_dir_all(&dir);
 }
 
