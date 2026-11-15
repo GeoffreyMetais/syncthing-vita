@@ -46,14 +46,14 @@ fn test_hostile_fields_roundtrip_through_config_files() {
         target_path: "ux0:music/100% hits".to_owned(),
         enabled: true,
         mode: ShareMode::ReadWrite,
-        shared_devices: vec![PEER.to_hex()],
+        shared_devices: vec![PEER],
     }]);
     let shares = repo.load_shares();
     assert_eq!(shares.len(), 1);
     assert_eq!(shares[0].folder_id, HOSTILE);
     assert_eq!(shares[0].label, HOSTILE);
     assert_eq!(shares[0].target_path, "ux0:music/100% hits");
-    assert_eq!(shares[0].shared_devices, vec![PEER.to_hex()]);
+    assert_eq!(shares[0].shared_devices, vec![PEER]);
 
     repo.save_ignored_folders(&[IgnoredFolder {
         folder_id: HOSTILE.to_owned(),
@@ -75,7 +75,7 @@ fn test_invalid_linked_device_entries_are_dropped_on_load() {
         format!("docs|Docs|ux0:docs|1|{},not-a-device\n", PEER.to_hex()),
     )
     .unwrap();
-    assert_eq!(repo.load_shares()[0].shared_devices, vec![PEER.to_hex()]);
+    assert_eq!(repo.load_shares()[0].shared_devices, vec![PEER]);
     let _ = std::fs::remove_dir_all(&dir);
 }
 

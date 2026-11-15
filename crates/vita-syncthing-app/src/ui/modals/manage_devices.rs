@@ -1,7 +1,5 @@
 //! Modal Dialog: Add or remove Syncthing devices for a share (`shares[share_idx]`).
 
-use syncthing_core::DeviceId;
-
 use crate::domain::interaction::{HitMap, PadKey, UiAction};
 use crate::domain::{AppState, ShareMode, VISIBLE_DEVICES};
 use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton, GFX_W};
@@ -158,10 +156,7 @@ pub fn render_manage_devices_modal(
             // Touching a device links / unlinks it.
             declare_touch(hits, dx, ry, w, DEVICE_ROW_H, UiAction::ModalRow(i));
             let is_sel = i == selected_dev_idx;
-            let is_checked = shared_list
-                .iter()
-                .filter_map(|h| DeviceId::from_hex(h))
-                .any(|id| id.matches_peer(&dev.device_id));
+            let is_checked = shared_list.iter().any(|id| id.matches_peer(&dev.device_id));
 
             if is_sel {
                 gfx.rrect(lx, ry, w - 56, 46, 10, th.accent_bg);

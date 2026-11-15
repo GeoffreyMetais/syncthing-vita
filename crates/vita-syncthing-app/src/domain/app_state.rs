@@ -198,12 +198,7 @@ impl AppState {
         self.devices
             .iter()
             .filter(|d| {
-                let is_linked_to_share = self.shares.iter().any(|s| {
-                    s.shared_devices
-                        .iter()
-                        .filter_map(|h| DeviceId::from_hex(h))
-                        .any(|id| id.matches_peer(&d.device_id))
-                });
+                let is_linked_to_share = self.shares.iter().any(|s| s.is_linked_to(&d.device_id));
                 is_linked_to_share || !self.is_unpaired_lan_peer(&d.device_id)
             })
             .cloned()
@@ -222,13 +217,9 @@ impl AppState {
         approved
             .into_iter()
             .filter(|d| {
-                self.shares.iter().any(|s| {
-                    s.enabled
-                        && s.shared_devices
-                            .iter()
-                            .filter_map(|h| DeviceId::from_hex(h))
-                            .any(|id| id.matches_peer(&d.device_id))
-                })
+                self.shares
+                    .iter()
+                    .any(|s| s.enabled && s.is_linked_to(&d.device_id))
             })
             .collect()
     }
@@ -354,7 +345,7 @@ impl AppState {
     /// Cleans up legacy auto-discovered unpaired LAN peers (`"LAN Peer"`, `"Syncthing Peer"`, `"Syncthing ("`)
     /// that may have been persisted by older versions when an unpaired LAN instance rejected `Hello`.
     pub fn sanitize_legacy_unpaired_peers(&mut self) -> bool {
-        let mut unlinked_hexes = Vec::new();
+        let mut unlinked = Vec::new();
         for dev in &self.devices {
             let is_legacy_unpaired_name = dev.name == "LAN Peer"
                 || dev.name == "Syncthing Peer"
@@ -362,14 +353,14 @@ impl AppState {
                 || dev.name.starts_with("LAN Peer (");
             if is_legacy_unpaired_name && !self.is_unpaired_lan_peer(&dev.device_id) {
                 self.unpaired_lan_peers.push(dev.device_id);
-                unlinked_hexes.push(dev.device_id.to_hex());
+                unlinked.push(dev.device_id);
             }
         }
-        if unlinked_hexes.is_empty() {
+        if unlinked.is_empty() {
             return false;
         }
         for s in &mut self.shares {
-            s.shared_devices.retain(|h| !unlinked_hexes.contains(h));
+            s.shared_devices.retain(|h| !unlinked.contains(h));
         }
         true
     }
@@ -536,13 +527,10 @@ impl AppState {
             return UiText::NoDevicesLinked;
         }
         let mut names = Vec::new();
-        for hex in &share.shared_devices {
-            if let Some(dev) = self.devices.iter().find(|d| &d.device_id.to_hex() == hex) {
-                names.push(format!("{} ({})", dev.name, dev.device_id.short()));
-            } else if let Some(id) = syncthing_core::DeviceId::from_hex(hex) {
-                names.push(id.short());
-            } else if hex.len() >= 7 {
-                names.push(hex[..7].to_uppercase());
+        for id in &share.shared_devices {
+            match self.devices.iter().find(|d| d.device_id == *id) {
+                Some(dev) => names.push(format!("{} ({})", dev.name, dev.device_id.short())),
+                None => names.push(id.short()),
             }
         }
         UiText::SharedWith {

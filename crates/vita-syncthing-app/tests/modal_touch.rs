@@ -183,9 +183,9 @@ fn test_manage_devices_rows_and_buttons() {
     // Touching a device row links it, touching it again unlinks it.
     state.modal = manage;
     tap_action(&mut state, &repo, UiAction::ModalRow(other_row));
-    assert!(state.shares[0].shared_devices.contains(&OTHER.to_hex()));
+    assert!(state.shares[0].shared_devices.contains(&OTHER));
     tap_action(&mut state, &repo, UiAction::ModalRow(other_row));
-    assert!(!state.shares[0].shared_devices.contains(&OTHER.to_hex()));
+    assert!(!state.shares[0].shared_devices.contains(&OTHER));
 
     // The `Pause` button (shown with SELECT) pauses the share.
     assert!(state.shares[0].enabled);

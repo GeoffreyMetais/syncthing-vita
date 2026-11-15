@@ -52,7 +52,7 @@ fn test_accepting_offer_creates_paused_share_and_opens_folder_picker() {
     assert_eq!(state.shares.len(), 1);
     assert_eq!(state.shares[0].folder_id, "docs");
     assert!(!state.shares[0].enabled);
-    assert_eq!(state.shares[0].shared_devices, vec![PEER.to_hex()]);
+    assert_eq!(state.shares[0].shared_devices, vec![PEER]);
     assert_eq!(state.active_tab, ActiveTab::FolderPicker);
     assert_eq!(repo.load_shares(), state.shares);
 
@@ -195,7 +195,7 @@ fn test_crafted_folder_label_cannot_inject_a_share() {
     assert_eq!(shares[0].folder_id, "docs");
     assert_eq!(shares[0].label, crafted);
     assert!(!shares[0].enabled);
-    assert_eq!(shares[0].shared_devices, vec![PEER.to_hex()]);
+    assert_eq!(shares[0].shared_devices, vec![PEER]);
 
     let _ = std::fs::remove_dir_all(&dir);
 }

@@ -268,8 +268,16 @@ pub struct ShareConfigEntry {
     pub enabled: bool,
     /// Whether peers may modify this folder on the PS Vita.
     pub mode: ShareMode,
-    /// Hex strings (`DeviceId::to_hex()`) of remote devices this folder is shared with.
-    pub shared_devices: Vec<String>,
+    /// Remote devices this folder is shared with (a Short ID placeholder until the device
+    /// proved its full ID).
+    pub shared_devices: Vec<DeviceId>,
+}
+
+impl ShareConfigEntry {
+    /// True if this share is linked to `device` (a placeholder matches the ID it stands for).
+    pub fn is_linked_to(&self, device: &DeviceId) -> bool {
+        self.shared_devices.iter().any(|id| id.matches_peer(device))
+    }
 }
 
 /// Folder a remote device shares with this PS Vita (received in its `ClusterConfig`),

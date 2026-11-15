@@ -131,11 +131,7 @@ pub fn spawn_sync_worker(
                 },
             );
             // Authorization: a folder is only synchronized with the devices linked to its share.
-            let device_ids: Vec<DeviceId> = s
-                .shared_devices
-                .iter()
-                .filter_map(|hex| DeviceId::from_hex(hex))
-                .collect();
+            let device_ids = s.shared_devices.clone();
             storage.set_folder_devices(&s.folder_id, device_ids.clone());
             if s.enabled
                 && !device_ids.is_empty()

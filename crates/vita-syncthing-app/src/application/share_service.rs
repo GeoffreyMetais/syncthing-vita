@@ -58,12 +58,11 @@ impl ShareService {
     }
 
     /// Replaces a Short ID placeholder by the full ID it stood for in every share.
-    fn relink_upgraded_device(state: &mut AppState, old_hex: &str, new_id: DeviceId) {
-        let new_hex = new_id.to_hex();
+    fn relink_upgraded_device(state: &mut AppState, placeholder: DeviceId, new_id: DeviceId) {
         for s in &mut state.shares {
-            for h in &mut s.shared_devices {
-                if h == old_hex {
-                    *h = new_hex.clone();
+            for id in &mut s.shared_devices {
+                if *id == placeholder {
+                    *id = new_id;
                 }
             }
             s.shared_devices.dedup();
@@ -82,7 +81,7 @@ impl ShareService {
         state
             .unpaired_lan_peers
             .retain(|id| !id.matches_peer(&device_id));
-        let mut upgraded_from_hex: Option<String> = None;
+        let mut upgraded_from: Option<DeviceId> = None;
 
         if let Some(existing) = state
             .devices
@@ -90,7 +89,7 @@ impl ShareService {
             .find(|d| d.device_id.matches_peer(&device_id))
         {
             if existing.device_id != device_id && existing.device_id.is_short_placeholder() {
-                upgraded_from_hex = Some(existing.device_id.to_hex());
+                upgraded_from = Some(existing.device_id);
                 existing.device_id = device_id;
                 if existing.name.contains("(Short ID)") {
                     existing.name = format!("Device {}", device_id.short());
@@ -115,8 +114,8 @@ impl ShareService {
             });
         }
 
-        if let Some(old_hex) = upgraded_from_hex {
-            Self::relink_upgraded_device(state, &old_hex, device_id);
+        if let Some(placeholder) = upgraded_from {
+            Self::relink_upgraded_device(state, placeholder, device_id);
         }
 
         repo.save_devices(&state.approved_devices());
@@ -159,14 +158,14 @@ impl ShareService {
             .unpaired_lan_peers
             .retain(|id| !id.matches_peer(&parsed_id));
 
-        let mut upgraded_from_hex: Option<String> = None;
+        let mut upgraded_from: Option<DeviceId> = None;
         let (resolved_id, dev_name) = if let Some(existing) = state
             .devices
             .iter_mut()
             .find(|d| d.device_id.matches_peer(&parsed_id))
         {
             if existing.device_id.is_short_placeholder() && !parsed_id.is_short_placeholder() {
-                upgraded_from_hex = Some(existing.device_id.to_hex());
+                upgraded_from = Some(existing.device_id);
                 existing.device_id = parsed_id;
                 if existing.name.contains("(Short ID)") {
                     existing.name = format!("Device {}", parsed_id.short());
@@ -191,16 +190,15 @@ impl ShareService {
             (parsed_id, label)
         };
 
-        let dev_hex = resolved_id.to_hex();
-        if let Some(old_hex) = upgraded_from_hex {
-            Self::relink_upgraded_device(state, &old_hex, resolved_id);
+        if let Some(placeholder) = upgraded_from {
+            Self::relink_upgraded_device(state, placeholder, resolved_id);
         }
 
         let mut offered_fid: Option<String> = None;
         if let Some(idx) = share_idx {
             if let Some(share) = state.shares.get_mut(idx) {
-                if !share.shared_devices.contains(&dev_hex) {
-                    share.shared_devices.push(dev_hex.clone());
+                if !share.shared_devices.contains(&resolved_id) {
+                    share.shared_devices.push(resolved_id);
                 }
                 if share.enabled {
                     offered_fid = Some(share.folder_id.clone());
@@ -297,12 +295,7 @@ impl ShareService {
         share_idx: usize,
     ) -> Option<String> {
         let removed = Self::remove_share(state, repo, share_idx)?;
-        let linked: Vec<DeviceId> = removed
-            .shared_devices
-            .iter()
-            .filter_map(|h| DeviceId::from_hex(h))
-            .collect();
-        FolderOfferService::ignore(state, repo, &removed.folder_id, &linked);
+        FolderOfferService::ignore(state, repo, &removed.folder_id, &removed.shared_devices);
         Self::log_event(
             state,
             repo,
@@ -370,7 +363,6 @@ impl ShareService {
         share_idx: usize,
         device_id: DeviceId,
     ) -> Option<(String, String, bool)> {
-        let dev_hex = device_id.to_hex();
         let dev_name = state
             .devices
             .iter()
@@ -382,11 +374,12 @@ impl ShareService {
             let folder_id = share.folder_id.clone();
             let folder_label = share.label.clone();
             let is_enabled = share.enabled;
-            let added = if let Some(pos) = share.shared_devices.iter().position(|x| x == &dev_hex) {
+            let added = if let Some(pos) = share.shared_devices.iter().position(|x| *x == device_id)
+            {
                 share.shared_devices.remove(pos);
                 false
             } else {
-                share.shared_devices.push(dev_hex);
+                share.shared_devices.push(device_id);
                 true
             };
             if added {
@@ -397,12 +390,7 @@ impl ShareService {
                     state.queue_folder_offer(&folder_id);
                 }
             } else {
-                let still_linked_anywhere = state.shares.iter().any(|s| {
-                    s.shared_devices
-                        .iter()
-                        .filter_map(|h| DeviceId::from_hex(h))
-                        .any(|id| id.matches_peer(&device_id))
-                });
+                let still_linked_anywhere = state.shares.iter().any(|s| s.is_linked_to(&device_id));
                 if !still_linked_anywhere && !state.is_unpaired_lan_peer(&device_id) {
                     state.unpaired_lan_peers.push(device_id);
                 }

@@ -63,7 +63,7 @@ fn test_add_device_by_short_id_and_system_keyboard_flow() {
     assert!(state.devices[0].device_id.matches_peer(&full_peer_id));
     assert_eq!(
         state.shares[share_idx].shared_devices,
-        vec![state.devices[0].device_id.to_hex()]
+        vec![state.devices[0].device_id]
     );
 
     // 3. When the peer is subsequently discovered on LAN, its Short ID placeholder automatically upgrades to the full 32-byte DeviceId
@@ -77,10 +77,7 @@ fn test_add_device_by_short_id_and_system_keyboard_flow() {
     assert_eq!(state.devices.len(), 1);
     assert_eq!(state.devices[0].device_id, full_peer_id);
     assert!(!state.devices[0].device_id.is_short_placeholder());
-    assert_eq!(
-        state.shares[share_idx].shared_devices,
-        vec![full_peer_id.to_hex()]
-    );
+    assert_eq!(state.shares[share_idx].shared_devices, vec![full_peer_id]);
 
     let _ = std::fs::remove_dir_all(&dir);
 }
