@@ -76,7 +76,7 @@ pub fn handle_event(ctx: &DaemonContext, peer: &KnownPeer, event: SyncEvent) {
             bytes_uploaded,
             ..
         } => {
-            let first = ctx.first_report(format!("in-sync:{peer_device_id}"));
+            let first = ctx.first_report(&format!("in-sync:{peer_device_id}"), "");
             ctx.table().activity.record_cycle(peer_device_id);
             if first || files_downloaded > 0 || bytes_uploaded > 0 {
                 log(&format!(
@@ -101,7 +101,7 @@ fn report_unshared_folders(ctx: &DaemonContext, peer: &KnownPeer, folders: &[Bep
         if ctx.storage.is_folder_shared_with(&folder.id, &peer.id) {
             continue;
         }
-        if ctx.first_report(format!("offer:{}:{}", peer.id, folder.id)) {
+        if ctx.first_report(&format!("offer:{}", peer.id), &folder.id) {
             log(&format!(
                 "{} offers folder \"{}\" ({}). To accept: syncthing-cli folder add {} <path> --device {}",
                 peer.name,

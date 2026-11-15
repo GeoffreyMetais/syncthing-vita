@@ -1,7 +1,6 @@
 //! What the daemon's threads share: identity, folders, configured devices, the addresses
 //! learnt by discovery and which devices are connected.
 
-use std::collections::HashSet;
 use std::net::SocketAddr;
 use std::path::Path;
 use std::sync::{Arc, Mutex, MutexGuard};
@@ -14,6 +13,8 @@ use syncthing_core::{
 };
 
 use super::activity::SyncActivity;
+use super::log::log;
+use super::reports::{ReportMemory, UnknownReport};
 use super::timing::{KEEPALIVE_INTERVAL, STOP_CHECK_STEP};
 use crate::config::Config;
 use crate::paths::db_dir;
@@ -57,8 +58,8 @@ pub struct PeerTable {
     global: Vec<(DeviceId, Vec<PeerEndpoint>)>,
     /// `relay://` URIs we are reachable through.
     relay_uris: Vec<String>,
-    /// Things already reported once (unknown devices, folder offers).
-    reported: HashSet<String>,
+    /// Things already reported once (unknown devices, folder offers), bounded.
+    reported: ReportMemory,
     pub activity: SyncActivity,
 }
 
@@ -134,9 +135,28 @@ impl DaemonContext {
         self.peers.iter().find(|p| p.id == *id)
     }
 
-    /// `true` the first time `key` is reported (to log a recurring situation once).
-    pub fn first_report(&self, key: String) -> bool {
-        self.table().reported.insert(key)
+    /// `true` the first time `detail` is reported about `subject` (to log a recurring
+    /// situation once). `subject` names something configured (see [`ReportMemory::first`]).
+    pub fn first_report(&self, subject: &str, detail: &str) -> bool {
+        self.table().reported.first(subject, detail)
+    }
+
+    /// Logs `message` the first time the unknown device `id` shows up on `channel`; once
+    /// too many unknown devices were reported, logs that no more are, then stays quiet.
+    pub fn report_unknown_device(
+        &self,
+        channel: &'static str,
+        id: DeviceId,
+        message: impl FnOnce() -> String,
+    ) {
+        let report = self.table().reported.unknown_device(channel, id);
+        match report {
+            UnknownReport::First => log(&message()),
+            UnknownReport::LimitReached => {
+                log("Too many unknown devices: not reporting more of them")
+            }
+            UnknownReport::Quiet => {}
+        }
     }
 }
 

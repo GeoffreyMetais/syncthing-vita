@@ -8,7 +8,7 @@ use std::time::Duration;
 use rustls::client::WantsClientCert;
 use rustls::crypto::CryptoProvider;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer, ServerName};
-use rustls::{ClientConfig, ClientConnection, ConfigBuilder, RootCertStore, StreamOwned};
+use rustls::{ClientConfig, ClientConnection, ConfigBuilder, StreamOwned};
 
 use super::verifier::{ObservedDeviceId, SyncthingServerVerifier};
 use super::{BepTlsStream, BEP_ALPN};
@@ -124,42 +124,6 @@ pub fn open_tls_stream_with_alpn(
 ) -> io::Result<(BepTlsStream, ObservedDeviceId)> {
     let tcp = TcpStream::connect_timeout(&peer_addr, timeout)?;
     wrap_tls_stream_with_alpn(identity, tcp, alpn, expected_device_id, timeout)
-}
-
-/// Opens an HTTPS (`http/1.1`) TLS stream to `host:port` (resolving DNS via `ToSocketAddrs`).
-/// Unlike Syncthing peers, a web server is authenticated the usual way: its certificate chain
-/// must lead to a public root (Mozilla's set, `webpki-roots`) and match `host`.
-pub fn open_https_tls_stream(host: &str, port: u16, timeout: Duration) -> io::Result<BepTlsStream> {
-    use std::net::ToSocketAddrs;
-
-    let addrs: Vec<SocketAddr> = (host, port).to_socket_addrs()?.collect();
-    let mut last_err = None;
-    let mut tcp = None;
-    for addr in addrs {
-        match TcpStream::connect_timeout(&addr, timeout) {
-            Ok(s) => {
-                tcp = Some(s);
-                break;
-            }
-            Err(e) => last_err = Some(e),
-        }
-    }
-    let tcp = tcp.ok_or_else(|| {
-        last_err.unwrap_or_else(|| io::Error::new(io::ErrorKind::NotFound, "No address resolved"))
-    })?;
-    tcp.set_read_timeout(Some(timeout))?;
-    tcp.set_write_timeout(Some(timeout))?;
-
-    let roots = RootCertStore {
-        roots: webpki_roots::TLS_SERVER_ROOTS.to_vec(),
-    };
-    let config = ClientConfig::builder_with_provider(Arc::new(rustls_rustcrypto::provider()))
-        .with_safe_default_protocol_versions()
-        .map_err(|e| io::Error::other(format!("TLS version error: {e}")))?
-        .with_root_certificates(roots)
-        .with_no_client_auth();
-    let conn = new_alpn_connection(config, b"http/1.1", host)?;
-    Ok(BepTlsStream::Client(StreamOwned::new(conn, tcp)))
 }
 
 /// Probes a TCP endpoint with a TLS 1.3 (`bep/1.0` ALPN) handshake and returns its Syncthing `DeviceId`

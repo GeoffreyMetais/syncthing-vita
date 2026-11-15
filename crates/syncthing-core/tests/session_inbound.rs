@@ -127,18 +127,26 @@ fn test_listener_and_dialer_sync_a_folder_both_ways() {
         "the dialer did not receive the listener's file"
     );
 
+    // Only the listener stops: it leaves its persistent loop, so its session ran (`Active`).
+    // The dialer ends because its peer left: `Active` when the `Close` reached its persistent
+    // loop, `ClosedByPeer` when it was still draining its initial cycle (the listener's file
+    // can arrive there, within the drain window).
     listener_control.request_stop();
-    dialer_control.request_stop();
     let (result, events) = accept_thread.join().unwrap();
+    assert!(
+        matches!(result.session_status, SyncSessionStatus::Active { .. }),
+        "listener: {:?}",
+        result.session_status
+    );
     let dialer_result = dialer_thread.join().unwrap();
-    assert!(matches!(
-        result.session_status,
-        SyncSessionStatus::Active { .. }
-    ));
-    assert!(matches!(
-        dialer_result.session_status,
-        SyncSessionStatus::Active { .. }
-    ));
+    assert!(
+        matches!(
+            dialer_result.session_status,
+            SyncSessionStatus::Active { .. } | SyncSessionStatus::ClosedByPeer(_)
+        ),
+        "dialer: {:?}",
+        dialer_result.session_status
+    );
     assert!(events
         .iter()
         .any(|e| matches!(e, SyncEvent::PeerConnected { peer_name, .. } if peer_name == "dialer")));
@@ -192,4 +200,55 @@ fn test_incoming_session_is_refused_when_the_peer_is_not_the_expected_one() {
     assert_eq!(err.kind(), std::io::ErrorKind::PermissionDenied);
     drop(params);
     dialer.join().unwrap();
+}
+
+/// Runs `client` against a fresh listener and returns how long `accept_bep_tls_stream` took to
+/// give up on it (it must fail: the client never completes a handshake).
+fn handshake_failure_time(
+    timeout: Duration,
+    client: impl FnOnce(std::net::TcpStream) + Send + 'static,
+) -> Duration {
+    let identity = DeviceIdentity::from_seed(&[26u8; 32]).unwrap();
+    let tcp_listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let addr = tcp_listener.local_addr().unwrap();
+    let client = thread::spawn(move || client(std::net::TcpStream::connect(addr).unwrap()));
+    let (tcp, _) = tcp_listener.accept().unwrap();
+    let start = Instant::now();
+    let result = accept_bep_tls_stream(&identity, tcp, timeout);
+    let elapsed = start.elapsed();
+    assert!(result.is_err(), "the handshake cannot succeed");
+    client.join().unwrap();
+    elapsed
+}
+
+#[test]
+fn test_accept_gives_up_on_a_silent_client_after_the_timeout() {
+    let timeout = Duration::from_millis(800);
+    let elapsed = handshake_failure_time(timeout, |tcp| {
+        thread::sleep(Duration::from_secs(3));
+        drop(tcp);
+    });
+    assert!(elapsed >= timeout / 2, "gave up too early: {elapsed:?}");
+    assert!(elapsed < timeout * 2, "gave up too late: {elapsed:?}");
+}
+
+/// A client sending one byte at a time never lets a single read time out: the timeout must
+/// bound the whole handshake, not each read.
+#[test]
+fn test_accept_gives_up_on_a_trickling_client_after_the_timeout() {
+    use std::io::Write;
+
+    let timeout = Duration::from_millis(800);
+    let elapsed = handshake_failure_time(timeout, |mut tcp| {
+        // A TLS handshake record header announcing 16 KiB, then its body byte by byte.
+        let _ = tcp.write_all(&[0x16, 0x03, 0x01, 0x40, 0x00]);
+        let start = Instant::now();
+        while start.elapsed() < Duration::from_secs(6) {
+            if tcp.write_all(&[0]).is_err() {
+                break;
+            }
+            thread::sleep(Duration::from_millis(100));
+        }
+    });
+    assert!(elapsed < timeout * 2, "gave up too late: {elapsed:?}");
 }

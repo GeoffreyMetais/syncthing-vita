@@ -32,8 +32,11 @@ pub enum Link {
 pub enum SessionEnd {
     /// The session ran (and ended: stop, connection lost).
     Ran,
-    /// The peer does not accept us yet (or closed the session).
+    /// The peer does not accept us yet (it answered no `Hello` or no `ClusterConfig`).
     NotAccepted(String),
+    /// The peer closed the session with this reason (e.g. it is shutting down) before the
+    /// session was fully established.
+    ClosedByPeer(String),
     /// Another session with this device already runs.
     AlreadyConnected,
     Failed(io::Error),
@@ -53,7 +56,7 @@ pub fn run_session(ctx: &DaemonContext, peer: &KnownPeer, link: Link) -> Session
             SyncSessionStatus::AwaitingPairing => {
                 SessionEnd::NotAccepted("this device is not accepted by the peer yet".to_owned())
             }
-            SyncSessionStatus::ClosedByPeer(reason) => SessionEnd::NotAccepted(reason),
+            SyncSessionStatus::ClosedByPeer(reason) => SessionEnd::ClosedByPeer(reason),
         },
         Err(e) => SessionEnd::Failed(e),
     }

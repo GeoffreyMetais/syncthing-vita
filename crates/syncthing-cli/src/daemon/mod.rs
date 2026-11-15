@@ -5,6 +5,7 @@
 //! - [`listener`] — incoming TCP; [`dialer`] — outgoing (direct, then relays)
 //! - [`lan`] — Local Discovery; [`global`] — Global Discovery announcements; [`relay`]
 //! - [`events`] — session events to log lines; [`activity`] — `--exit-when-synced`
+//! - [`reports`] — what was already logged once (bounded); [`timing`] — timings and limits
 
 pub mod activity;
 pub mod context;
@@ -15,6 +16,7 @@ pub mod lan;
 pub mod listener;
 pub mod log;
 pub mod relay;
+pub mod reports;
 pub mod sessions;
 pub mod timing;
 

@@ -1,10 +1,10 @@
 //! TLS 1.3 server connections: a peer that dialed us (incoming TCP connection, or a relay
 //! session we were invited to with `ServerSocket` set).
 
-use std::io;
+use std::io::{self, Read, Write};
 use std::net::TcpStream;
 use std::sync::{Arc, Mutex};
-use std::time::Duration;
+use std::time::{Duration, Instant};
 
 use rustls::crypto::CryptoProvider;
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
@@ -57,22 +57,28 @@ fn bep_server_config(identity: &DeviceIdentity) -> io::Result<(ServerConfig, Obs
 }
 
 /// Runs the server side of the TLS handshake on `tcp` and returns the authenticated stream.
-/// Fails if the handshake fails or the peer presented no certificate.
+/// Fails if the handshake fails, takes longer than `timeout` in total (a peer trickling bytes
+/// cannot hold the connection longer), or the peer presented no certificate. The returned
+/// stream's socket has `timeout` as its read and write timeouts.
 pub fn accept_bep_tls_stream(
     identity: &DeviceIdentity,
     mut tcp: TcpStream,
     timeout: Duration,
 ) -> io::Result<IncomingBepStream> {
     let _ = tcp.set_nodelay(true);
-    tcp.set_read_timeout(Some(timeout))?;
-    tcp.set_write_timeout(Some(timeout))?;
 
     let (config, observed) = bep_server_config(identity)?;
     let mut conn = ServerConnection::new(Arc::new(config))
         .map_err(|e| io::Error::other(format!("TLS init failed: {e}")))?;
+    let mut handshake_io = DeadlineIo {
+        tcp: &mut tcp,
+        deadline: Instant::now() + timeout,
+    };
     while conn.is_handshaking() {
-        conn.complete_io(&mut tcp)?;
+        conn.complete_io(&mut handshake_io)?;
     }
+    tcp.set_read_timeout(Some(timeout))?;
+    tcp.set_write_timeout(Some(timeout))?;
 
     let peer_device_id =
         observed.lock().ok().and_then(|g| *g).ok_or_else(|| {
@@ -82,4 +88,41 @@ pub fn accept_bep_tls_stream(
         stream: BepTlsStream::Server(StreamOwned::new(conn, tcp)),
         peer_device_id,
     })
+}
+
+/// The socket during the handshake: every read and write is bounded by the time left before
+/// `deadline` (a per-operation timeout alone would restart with each byte received).
+struct DeadlineIo<'a> {
+    tcp: &'a mut TcpStream,
+    deadline: Instant,
+}
+
+impl DeadlineIo<'_> {
+    /// Time left before the deadline (an error once it passed).
+    fn time_left(&self) -> io::Result<Duration> {
+        self.deadline
+            .checked_duration_since(Instant::now())
+            .filter(|left| !left.is_zero())
+            .ok_or_else(|| io::Error::new(io::ErrorKind::TimedOut, "TLS handshake timed out"))
+    }
+}
+
+impl Read for DeadlineIo<'_> {
+    fn read(&mut self, buf: &mut [u8]) -> io::Result<usize> {
+        let left = self.time_left()?;
+        self.tcp.set_read_timeout(Some(left))?;
+        self.tcp.read(buf)
+    }
+}
+
+impl Write for DeadlineIo<'_> {
+    fn write(&mut self, buf: &[u8]) -> io::Result<usize> {
+        let left = self.time_left()?;
+        self.tcp.set_write_timeout(Some(left))?;
+        self.tcp.write(buf)
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        self.tcp.flush()
+    }
 }

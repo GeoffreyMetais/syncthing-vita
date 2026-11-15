@@ -106,11 +106,11 @@ fn handle_invitation(ctx: &DaemonContext, relay_addr: SocketAddr, invitation: Se
     };
     let from = DeviceId(raw_id);
     let Some(peer) = ctx.peer(&from) else {
-        if ctx.first_report(format!("relay-unknown:{from}")) {
-            log(&format!(
+        ctx.report_unknown_device("relay", from, || {
+            format!(
                 "Relay: unknown device {from} wants to connect. To accept it: syncthing-cli device add {from}"
-            ));
-        }
+            )
+        });
         return;
     };
     let tcp = match join_relay_session(relay_addr, &invitation, CONNECT_TIMEOUT) {
@@ -140,7 +140,20 @@ fn handle_invitation(ctx: &DaemonContext, relay_addr: SocketAddr, invitation: Se
             addr: relay_addr,
         }
     };
-    if let SessionEnd::Failed(e) = run_session(ctx, peer, link) {
-        log(&format!("Relayed session with {} failed: {e}", peer.name));
+    match run_session(ctx, peer, link) {
+        SessionEnd::Ran | SessionEnd::AlreadyConnected => {}
+        SessionEnd::NotAccepted(reason) => {
+            log(&format!(
+                "{} (relayed) did not accept us: {reason}",
+                peer.name
+            ));
+        }
+        SessionEnd::ClosedByPeer(reason) => {
+            log(&format!(
+                "{} (relayed) closed the session: {reason}",
+                peer.name
+            ));
+        }
+        SessionEnd::Failed(e) => log(&format!("Relayed session with {} failed: {e}", peer.name)),
     }
 }

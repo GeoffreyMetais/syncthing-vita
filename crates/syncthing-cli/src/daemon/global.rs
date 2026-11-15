@@ -62,7 +62,10 @@ fn announce(ctx: &DaemonContext, server: &HttpsServer, addresses: &[String]) -> 
         HTTPS_TIMEOUT,
     ) {
         Ok(AnnounceOutcome::Accepted { reannounce_after }) => {
-            if ctx.first_report(format!("announced:{}:{addresses:?}", server.host)) {
+            if ctx.first_report(
+                &format!("announced:{}", server.host),
+                &format!("{addresses:?}"),
+            ) {
                 log(&format!(
                     "Global Discovery: announced {} on {}",
                     addresses.join(", "),
@@ -82,7 +85,7 @@ fn announce(ctx: &DaemonContext, server: &HttpsServer, addresses: &[String]) -> 
             retry_after
         }
         Err(e) => {
-            if ctx.first_report(format!("announce-error:{}:{e}", server.host)) {
+            if ctx.first_report(&format!("announce-error:{}", server.host), &e.to_string()) {
                 log(&format!(
                     "Global Discovery: cannot announce on {}: {e}",
                     server.host

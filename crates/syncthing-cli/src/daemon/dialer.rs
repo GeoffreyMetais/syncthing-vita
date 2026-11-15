@@ -82,7 +82,7 @@ fn global_lookup(ctx: &DaemonContext, peer: &KnownPeer) {
         match lookup_peer_on(&server, &ctx.options.https, peer.id, HTTPS_TIMEOUT) {
             Ok(found) => endpoints.extend(found),
             Err(e) => {
-                if ctx.first_report(format!("lookup:{}:{e}", peer.id)) {
+                if ctx.first_report(&format!("lookup:{}", peer.id), &e.to_string()) {
                     log(&format!(
                         "Global Discovery lookup of {} on {}: {e}",
                         peer.name, server.host
@@ -167,6 +167,16 @@ pub fn run_dialer(ctx: Arc<DaemonContext>, peer: KnownPeer) {
                 SessionEnd::NotAccepted(reason) => {
                     report_error(&peer, &ep, &reason, &mut last_error);
                     delay = RETRY_AWAITING_PAIRING;
+                    break;
+                }
+                SessionEnd::ClosedByPeer(reason) => {
+                    log(&format!(
+                        "{} ({}) closed the session: {reason}",
+                        peer.name,
+                        label(&ep)
+                    ));
+                    last_error.clear();
+                    delay = RETRY_AFTER_SESSION;
                     break;
                 }
                 SessionEnd::Failed(e) => report_error(&peer, &ep, &e.to_string(), &mut last_error),

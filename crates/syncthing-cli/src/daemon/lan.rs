@@ -5,7 +5,7 @@
 use std::io;
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, UdpSocket};
 use std::sync::Arc;
-use std::time::{Instant, SystemTime, UNIX_EPOCH};
+use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use syncthing_core::{
     detect_local_ipv4, resolve_peer_tcp_addrs, Announce, DeviceId, DISCOVERY_PORT,
@@ -13,7 +13,9 @@ use syncthing_core::{
 
 use super::context::DaemonContext;
 use super::log::log;
-use super::timing::{LAN_ANNOUNCE_INTERVAL, LAN_RECV_TIMEOUT, LAN_REPLY_INTERVAL};
+use super::timing::{
+    LAN_ANNOUNCE_INTERVAL, LAN_RECV_TIMEOUT, LAN_REPLY_INTERVAL, MAX_LAN_REPLIES_TO_UNKNOWN,
+};
 
 /// A device heard on the LAN.
 #[derive(Debug, Clone)]
@@ -56,13 +58,69 @@ pub fn our_announce(id: DeviceId, listen_port: Option<u16>) -> Announce {
     }
 }
 
+/// Minimum delay between two direct answers to the same device.
+fn reply_interval() -> Duration {
+    LAN_ANNOUNCE_INTERVAL.max(LAN_REPLY_INTERVAL)
+}
+
+/// When to answer an announcement directly: at most once per reply interval per device. Only
+/// the answers of the last interval are remembered: every configured device, and at most
+/// [`MAX_LAN_REPLIES_TO_UNKNOWN`] other devices (announcements are not authenticated: anyone
+/// can announce any number of IDs), so configured devices are always answered.
+#[derive(Debug, Default)]
+pub struct ReplySchedule {
+    configured: Vec<DeviceId>,
+    /// Last direct answer per device, within the reply interval.
+    last: Vec<(DeviceId, Instant)>,
+}
+
+impl ReplySchedule {
+    pub fn new(configured: Vec<DeviceId>) -> Self {
+        Self {
+            configured,
+            last: Vec::new(),
+        }
+    }
+
+    /// `true` if `id`'s announcement heard at `now` must be answered (the answer is recorded).
+    pub fn is_due(&mut self, id: DeviceId, now: Instant) -> bool {
+        let interval = reply_interval();
+        self.last
+            .retain(|(_, at)| now.saturating_duration_since(*at) < interval);
+        if self.last.iter().any(|(d, _)| *d == id) {
+            return false;
+        }
+        if !self.configured.contains(&id) {
+            let unknown = self
+                .last
+                .iter()
+                .filter(|(d, _)| !self.configured.contains(d))
+                .count();
+            if unknown >= MAX_LAN_REPLIES_TO_UNKNOWN {
+                return false;
+            }
+        }
+        self.last.push((id, now));
+        true
+    }
+
+    /// Number of answers remembered.
+    pub fn len(&self) -> usize {
+        self.last.len()
+    }
+
+    /// `true` when no answer is remembered.
+    pub fn is_empty(&self) -> bool {
+        self.last.is_empty()
+    }
+}
+
 /// The Local Discovery socket and its schedule.
 pub struct LanBeacon {
     socket: UdpSocket,
     announce: Announce,
     last_broadcast: Option<Instant>,
-    /// Last direct answer per device.
-    replies: Vec<(DeviceId, Instant)>,
+    replies: ReplySchedule,
 }
 
 impl LanBeacon {
@@ -86,8 +144,13 @@ impl LanBeacon {
             socket,
             announce,
             last_broadcast: None,
-            replies: Vec::new(),
+            replies: ReplySchedule::default(),
         })
+    }
+
+    /// The configured devices: always answered (see [`ReplySchedule`]).
+    pub fn set_configured(&mut self, configured: Vec<DeviceId>) {
+        self.replies = ReplySchedule::new(configured);
     }
 
     /// The UDP port actually bound (21027 unless another program holds it exclusively).
@@ -113,17 +176,10 @@ impl LanBeacon {
 
     /// Answers `peer` directly, at most once per announcement interval.
     fn reply(&mut self, peer: &LanPeer) {
-        let due = self
-            .replies
-            .iter()
-            .find(|(id, _)| *id == peer.id)
-            .is_none_or(|(_, at)| at.elapsed() >= LAN_ANNOUNCE_INTERVAL.max(LAN_REPLY_INTERVAL));
-        if due {
+        if self.replies.is_due(peer.id, Instant::now()) {
             let _ = self
                 .socket
                 .send_to(&self.announce.encode_packet(), peer.source);
-            self.replies.retain(|(id, _)| *id != peer.id);
-            self.replies.push((peer.id, Instant::now()));
         }
     }
 
@@ -163,13 +219,14 @@ pub fn run_lan_discovery(ctx: Arc<DaemonContext>) {
             return;
         }
     };
+    beacon.set_configured(ctx.peers.iter().map(|p| p.id).collect());
     while !ctx.is_stopping() {
         let Some(peer) = beacon.step() else {
             continue;
         };
         match ctx.peer(&peer.id) {
             Some(known) => {
-                if ctx.first_report(format!("lan:{}:{:?}", peer.id, peer.addrs)) {
+                if ctx.first_report(&format!("lan:{}", peer.id), &format!("{:?}", peer.addrs)) {
                     log(&format!(
                         "LAN: {} announces {}",
                         known.name,
@@ -181,14 +238,14 @@ pub fn run_lan_discovery(ctx: Arc<DaemonContext>) {
                 }
             }
             None => {
-                if ctx.first_report(format!("lan-unknown:{}", peer.id)) {
-                    log(&format!(
+                ctx.report_unknown_device("lan", peer.id, || {
+                    format!(
                         "LAN: unknown device {} at {}. To add it: syncthing-cli device add {}",
                         peer.id,
                         peer.source.ip(),
                         peer.id
-                    ));
-                }
+                    )
+                });
             }
         }
     }

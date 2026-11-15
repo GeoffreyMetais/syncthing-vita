@@ -1,4 +1,4 @@
-//! Every timing of the daemon, in one place.
+//! Every timing and limit of the daemon, in one place.
 
 use std::time::Duration;
 
@@ -43,3 +43,17 @@ pub const RELAY_POOL_RETRY: Duration = Duration::from_secs(300);
 
 /// `--exit-when-synced`: no transfer for this long after the last completed sync cycle.
 pub const SYNCED_QUIET_PERIOD: Duration = Duration::from_secs(3);
+
+/// Incoming connections handled at the same time that are not a configured device's session
+/// yet (TLS handshake in progress, or an unknown device being turned away). Above it, the
+/// listener closes new connections at once.
+pub const MAX_UNAUTHENTICATED_CONNECTIONS: usize = 32;
+/// Unknown devices (LAN announcements, connections, relay invitations) reported individually;
+/// beyond it, one line says that no more are reported.
+pub const MAX_UNKNOWN_DEVICE_REPORTS: usize = 256;
+/// Distinct reports kept per subject (a configured device's LAN addresses, folder offers,
+/// lookup errors; a discovery server's announcements): beyond it, that subject is quiet.
+pub const MAX_REPORTS_PER_SUBJECT: usize = 32;
+/// Unknown devices whose last direct LAN answer is remembered (one entry each, dropped after
+/// the reply interval): beyond it, other unknown devices are not answered until entries expire.
+pub const MAX_LAN_REPLIES_TO_UNKNOWN: usize = 64;
