@@ -15,13 +15,13 @@ fn test_files_tab_up_navigation_walks_device_root_paths() {
     let repo = ConfigRepository::new(&dir);
     let mut state = AppState::new(Vec::new(), Vec::new(), "ux0:data/retroarch");
     state.active_tab = ActiveTab::FolderPicker;
-    state.selected_picker_idx = 3;
+    state.picker.selected_idx = 3;
 
     press(&mut state, &repo, BTN_CIRCLE);
-    assert_eq!(state.picker_current_dir, "ux0:data");
-    assert_eq!(state.selected_picker_idx, 0);
+    assert_eq!(state.picker.current_dir, "ux0:data");
+    assert_eq!(state.picker.selected_idx, 0);
     press(&mut state, &repo, BTN_CIRCLE);
-    assert_eq!(state.picker_current_dir, "ux0:");
+    assert_eq!(state.picker.current_dir, "ux0:");
     assert_eq!(state.active_tab, ActiveTab::FolderPicker);
     press(&mut state, &repo, BTN_CIRCLE);
     assert_eq!(state.active_tab, ActiveTab::Dashboard);
@@ -42,11 +42,11 @@ fn files_tab_with_subfolders(name: &str, count: usize) -> (String, ConfigReposit
     let repo = ConfigRepository::new(&format!("{dir}/.appdata"));
     let mut state = AppState::new(Vec::new(), Vec::new(), &dir);
     state.active_tab = ActiveTab::FolderPicker;
-    state.picker_mode = PickerMode::CreateNewShare;
+    state.picker.mode = PickerMode::CreateNewShare;
     state.reset_nav_for_tab();
     state.nav.focus = NavFocus::Content;
     FolderBrowser::refresh(&mut state, &repo);
-    assert_eq!(state.picker_items.len(), count);
+    assert_eq!(state.picker.items.len(), count);
     (dir, repo, state)
 }
 
@@ -110,9 +110,9 @@ fn test_holding_down_scrolls_the_files_list() {
         feed_gesture(&mut state, &repo, &mut gestures, frame);
     }
     // One press, then a repeat after the delay and every interval.
-    assert_eq!(state.selected_picker_idx, 1 + 9);
-    assert!(state.picker_top_idx > 0);
-    assert!(state.selected_picker_idx < state.picker_top_idx + BROWSER_ROWS);
+    assert_eq!(state.picker.selected_idx, 1 + 9);
+    assert!(state.picker.top_idx > 0);
+    assert!(state.picker.selected_idx < state.picker.top_idx + BROWSER_ROWS);
     assert!(state.shares.is_empty());
 
     let _ = std::fs::remove_dir_all(&dir);
@@ -128,22 +128,22 @@ fn test_dragging_the_files_list_scrolls_it_without_selecting() {
 
     // Finger moves up by 3 rows: the content follows it.
     drag_list(&mut state, &repo, bottom, bottom - 3 * area.step - 5);
-    assert_eq!(state.picker_top_idx, 3);
-    assert!(state.selected_picker_idx >= 3);
+    assert_eq!(state.picker.top_idx, 3);
+    assert!(state.picker.selected_idx >= 3);
     assert!(state.shares.is_empty(), "a drag is not a tap");
-    assert_eq!(state.picker_current_dir, dir);
+    assert_eq!(state.picker.current_dir, dir);
 
     // Dragging down further than the top stops at the first row.
     drag_list(&mut state, &repo, area.rect.y + 2, bottom);
-    assert_eq!(state.picker_top_idx, 0);
-    assert!(state.selected_picker_idx < BROWSER_ROWS);
+    assert_eq!(state.picker.top_idx, 0);
+    assert!(state.picker.selected_idx < BROWSER_ROWS);
 
     // Dragging up past the end stops on the last page.
     for _ in 0..4 {
         drag_list(&mut state, &repo, bottom, area.rect.y);
     }
-    assert_eq!(state.picker_top_idx, 30 - BROWSER_ROWS);
-    assert!(state.selected_picker_idx >= 30 - BROWSER_ROWS);
+    assert_eq!(state.picker.top_idx, 30 - BROWSER_ROWS);
+    assert!(state.picker.selected_idx >= 30 - BROWSER_ROWS);
 
     let _ = std::fs::remove_dir_all(&dir);
 }
@@ -203,14 +203,14 @@ fn test_app_data_folders_cannot_be_shared() {
     use vita_syncthing_app::domain::UiText;
     let (dir, _, mut state) = files_tab_with_subfolders("picker-protected", 2);
     let repo = ConfigRepository::new(&format!("{dir}/sub01"));
-    state.selected_picker_idx = 1;
+    state.picker.selected_idx = 1;
     FolderBrowser::apply_selection(&mut state, &repo, false);
     assert!(state.shares.is_empty());
     assert_eq!(
         state.toast_msg.map(|(msg, _)| msg),
         Some(UiText::FolderProtected)
     );
-    state.selected_picker_idx = 0;
+    state.picker.selected_idx = 0;
     state.toast_msg = None;
     FolderBrowser::apply_selection(&mut state, &repo, false);
     assert_eq!(state.shares.len(), 1);

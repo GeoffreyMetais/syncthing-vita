@@ -13,19 +13,19 @@ impl FilesController {
     /// opens its folder.
     pub fn move_focus(state: &mut AppState, buttons: u32) -> Option<UiAction> {
         if buttons & BTN_UP != 0 && !state.nav.header {
-            if state.selected_picker_idx == 0 {
+            if state.picker.selected_idx == 0 {
                 state.nav.header = true;
             } else {
-                state.selected_picker_idx -= 1;
-                state.clamp_picker_scroll();
+                state.picker.selected_idx -= 1;
+                state.picker.clamp_scroll();
             }
         }
         if buttons & BTN_DOWN != 0 {
             if state.nav.header {
                 state.nav.header = false;
-            } else if state.selected_picker_idx + 1 < state.picker_items.len() {
-                state.selected_picker_idx += 1;
-                state.clamp_picker_scroll();
+            } else if state.picker.selected_idx + 1 < state.picker.items.len() {
+                state.picker.selected_idx += 1;
+                state.picker.clamp_scroll();
             }
         }
         if buttons & BTN_LEFT != 0 {
@@ -33,14 +33,14 @@ impl FilesController {
             return None;
         }
         if buttons & BTN_RIGHT != 0 && !state.nav.header {
-            return Some(UiAction::PickerOpen(state.selected_picker_idx));
+            return Some(UiAction::PickerOpen(state.picker.selected_idx));
         }
         None
     }
 
     /// Scrolls the folder list by `rows` (touch drag); the selection stays visible.
     pub fn scroll(state: &mut AppState, rows: i32) {
-        state.scroll_picker_rows(rows);
+        state.picker.scroll_rows(rows);
     }
 
     /// Executes a `Files` action. A row index that is no longer valid (the listing changed
@@ -49,10 +49,10 @@ impl FilesController {
         match action {
             UiAction::PickerUp => FolderBrowser::navigate_up(state, repo),
             UiAction::PickerSelect(idx) | UiAction::PickerOpen(idx) => {
-                if idx >= state.picker_items.len() {
+                if idx >= state.picker.items.len() {
                     return;
                 }
-                state.selected_picker_idx = idx;
+                state.picker.selected_idx = idx;
                 let enter = matches!(action, UiAction::PickerOpen(_));
                 FolderBrowser::apply_selection(state, repo, enter);
             }

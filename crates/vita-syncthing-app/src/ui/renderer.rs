@@ -44,7 +44,9 @@ impl VitaUiRenderer {
     pub fn render(&mut self, state: &mut AppState, elapsed_vblanks: u32) {
         if state.oled_saver_active {
             let steps = elapsed_vblanks.min(ANIMATION_INTERVAL);
-            state.step_screensaver(GFX_W as f32, GFX_H as f32, SAVER_W, SAVER_H, steps);
+            state
+                .saver
+                .step(GFX_W as f32, GFX_H as f32, SAVER_W, SAVER_H, steps);
         }
         draw_frame(&mut self.gfx, state);
         self.fb.present(&self.gfx.pixels);
@@ -64,7 +66,7 @@ pub fn draw_frame(gfx: &mut Gfx, state: &mut AppState) {
     let mut hits = std::mem::take(&mut state.hit_map);
     hits.clear();
     if state.active_tab == ActiveTab::FolderPicker {
-        state.clamp_picker_scroll();
+        state.picker.clamp_scroll();
     }
 
     if state.oled_saver_active {

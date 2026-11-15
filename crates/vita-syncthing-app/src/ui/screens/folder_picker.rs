@@ -22,7 +22,7 @@ const CHIP_TOUCH_MARGIN: i32 = 16;
 /// Renders Tab 3: **Files** (`FolderPicker`).
 pub fn render_folder_picker_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut HitMap) {
     let s = strings::strings(state.language);
-    let (page_title, share_name) = if state.picker_mode == PickerMode::CreateNewShare {
+    let (page_title, share_name) = if state.picker.mode == PickerMode::CreateNewShare {
         (s.picker_title_create, s.picker_subtitle_create.to_owned())
     } else {
         let title_sub = state
@@ -60,8 +60,8 @@ pub fn render_folder_picker_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState, h
     );
     let mut right = CONTENT_R - 18 - uw;
 
-    if !state.picker_items.is_empty() {
-        let cnt = s.fmt_item_counter(state.selected_picker_idx + 1, state.picker_items.len());
+    if !state.picker.items.is_empty() {
+        let cnt = s.fmt_item_counter(state.picker.selected_idx + 1, state.picker.items.len());
         right -= gfx.text(
             right,
             101,
@@ -81,11 +81,11 @@ pub fn render_folder_picker_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState, h
         FontWeight::Medium,
         th.text,
         Align::Left,
-        &state.picker_current_dir,
+        &state.picker.current_dir,
     );
 
-    let top = state.picker_top_idx;
-    let total = state.picker_items.len();
+    let top = state.picker.top_idx;
+    let total = state.picker.items.len();
 
     // Dragging a finger over the rows scrolls the list.
     hits.add_scroll_area(ScrollArea {
@@ -106,8 +106,8 @@ pub fn render_folder_picker_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState, h
         }
         let y = BROWSER_TOP + (i as i32) * BROWSER_STEP;
         let cy = y + 19;
-        let item = &state.picker_items[idx];
-        let cur = idx == state.selected_picker_idx;
+        let item = &state.picker.items[idx];
+        let cur = idx == state.picker.selected_idx;
 
         if cur {
             gfx.rrect(
@@ -189,7 +189,7 @@ pub fn render_folder_picker_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState, h
         total,
     );
 
-    let selected = state.selected_picker_idx;
+    let selected = state.picker.selected_idx;
     let open_action = (selected < total).then_some(UiAction::PickerOpen(selected));
     draw_hint_bar(
         gfx,
@@ -200,7 +200,7 @@ pub fn render_folder_picker_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState, h
             Hint::info(
                 PadButton::Cross,
                 None,
-                if state.picker_mode == PickerMode::CreateNewShare {
+                if state.picker.mode == PickerMode::CreateNewShare {
                     s.hint_share_folder
                 } else {
                     s.hint_select_target

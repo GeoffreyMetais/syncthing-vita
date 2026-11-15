@@ -50,6 +50,8 @@ syncthing-vita
             │   ├── navigation.rs     # NavFocus / NavState (D-pad focus), tab order, buttons per row
             │   ├── models.rs         # KnownDevice, ShareConfigEntry, PickerItem, ActiveTab, PickerMode, ModalDialog, ThemeMode
             │   ├── app_state.rs      # AppState (pure state & view-model queries, zero I/O or rendering dependencies)
+            │   ├── folder_picker.rs  # FolderPicker (`Files` browser state: mode, browsed directory, rows, selection, scroll window)
+            │   ├── screensaver.rs    # ScreensaverMotion (bouncing position of the OLED screensaver widget)
             │   ├── interaction.rs    # HitMap / Hotspot / UiAction / FocusSlot: interactive elements declared by the frame on screen
             │   ├── defaults.rs       # Every tunable value of the app: sync / discovery / power / display timings, limits, share presets
             │   ├── log_view.rs       # LogView (full-screen protocol log viewer: session lines / `Show All` history, scroll window)

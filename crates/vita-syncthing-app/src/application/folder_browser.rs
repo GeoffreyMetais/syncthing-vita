@@ -13,9 +13,10 @@ pub struct FolderBrowser;
 impl FolderBrowser {
     /// Refreshes presets and `ux0:` subdirectories for the currently selected share or new share creation.
     pub fn refresh(state: &mut AppState, repo: &ConfigRepository) {
-        let folder_id = if state.picker_mode == PickerMode::CreateNewShare {
+        let folder_id = if state.picker.mode == PickerMode::CreateNewShare {
             let tail = state
-                .picker_current_dir
+                .picker
+                .current_dir
                 .trim_end_matches('/')
                 .rsplit(['/', ':'])
                 .next()
@@ -39,7 +40,7 @@ impl FolderBrowser {
             .map(|s| s.target_path.clone())
             .unwrap_or_else(|| "ux0:user/00/savedata".to_owned());
 
-        let mut items = if state.picker_mode == PickerMode::CreateNewShare {
+        let mut items = if state.picker.mode == PickerMode::CreateNewShare {
             Self::unshared_template_items(state)
         } else {
             vec![
@@ -81,20 +82,20 @@ impl FolderBrowser {
                 ),
                 preset(
                     UiText::PickerBrowsedFolder {
-                        path: state.picker_current_dir.trim_end_matches('/').to_owned(),
+                        path: state.picker.current_dir.trim_end_matches('/').to_owned(),
                     },
-                    state.picker_current_dir.trim_end_matches('/').to_owned(),
+                    state.picker.current_dir.trim_end_matches('/').to_owned(),
                 ),
             ]
         };
 
-        for sub in repo.list_subdirectories(&state.picker_current_dir) {
-            let full = if state.picker_current_dir.ends_with(':')
-                || state.picker_current_dir.ends_with('/')
+        for sub in repo.list_subdirectories(&state.picker.current_dir) {
+            let full = if state.picker.current_dir.ends_with(':')
+                || state.picker.current_dir.ends_with('/')
             {
-                format!("{}{}", state.picker_current_dir, sub)
+                format!("{}{}", state.picker.current_dir, sub)
             } else {
-                format!("{}/{}", state.picker_current_dir, sub)
+                format!("{}/{}", state.picker.current_dir, sub)
             };
             items.push(PickerItem {
                 label: UiText::Raw(format!("{}/", sub)),
@@ -106,7 +107,7 @@ impl FolderBrowser {
         }
 
         // In `ChangeShareTarget` mode the selected share may keep its own folder.
-        let own_share = (state.picker_mode == PickerMode::ChangeShareTarget)
+        let own_share = (state.picker.mode == PickerMode::ChangeShareTarget)
             .then_some(state.selected_share_idx);
         for item in &mut items {
             let path = item.path.trim_end_matches('/');
@@ -116,17 +117,17 @@ impl FolderBrowser {
                 });
         }
 
-        state.picker_items = items;
-        if state.selected_picker_idx >= state.picker_items.len() {
-            state.selected_picker_idx = 0;
+        state.picker.items = items;
+        if state.picker.selected_idx >= state.picker.items.len() {
+            state.picker.selected_idx = 0;
         }
-        state.clamp_picker_scroll();
+        state.picker.clamp_scroll();
     }
 
     /// Default share presets (`NEW_SHARE_TEMPLATES`) listed first at the root of the `Files`
     /// browser, except those already shared (same folder ID or same target folder).
     fn unshared_template_items(state: &AppState) -> Vec<PickerItem> {
-        if parent_dir(&state.picker_current_dir).is_some() {
+        if parent_dir(&state.picker.current_dir).is_some() {
             return Vec::new();
         }
         NEW_SHARE_TEMPLATES
@@ -154,10 +155,10 @@ impl FolderBrowser {
 
     /// Navigates one directory level up in the `ux0:` picker, or returns to the `Overview` tab if at root.
     pub fn navigate_up(state: &mut AppState, repo: &ConfigRepository) {
-        match parent_dir(&state.picker_current_dir) {
+        match parent_dir(&state.picker.current_dir) {
             Some(parent) => {
-                state.picker_current_dir = parent;
-                state.selected_picker_idx = 0;
+                state.picker.current_dir = parent;
+                state.picker.selected_idx = 0;
                 Self::refresh(state, repo);
             }
             None => state.active_tab = ActiveTab::Dashboard,
@@ -166,10 +167,10 @@ impl FolderBrowser {
 
     /// Applies selection in the `ux0:` directory browser (folders already shared are ignored):
     /// - If `enter_subdir == true` and item is a directory, descends into it.
-    /// - If `state.picker_mode == PickerMode::CreateNewShare`, creates a new share and opens device assignment.
+    /// - If `state.picker.mode == PickerMode::CreateNewShare`, creates a new share and opens device assignment.
     /// - Otherwise, assigns the chosen target path to the selected share.
     pub fn apply_selection(state: &mut AppState, repo: &ConfigRepository, enter_subdir: bool) {
-        let Some(item) = state.picker_items.get(state.selected_picker_idx).cloned() else {
+        let Some(item) = state.picker.items.get(state.picker.selected_idx).cloned() else {
             return;
         };
         if item.is_shared {
@@ -177,8 +178,8 @@ impl FolderBrowser {
         }
 
         if enter_subdir && !item.is_preset {
-            state.picker_current_dir = item.path;
-            state.selected_picker_idx = 0;
+            state.picker.current_dir = item.path;
+            state.picker.selected_idx = 0;
             Self::refresh(state, repo);
             return;
         }
@@ -188,7 +189,7 @@ impl FolderBrowser {
             return;
         }
 
-        if state.picker_mode == PickerMode::CreateNewShare {
+        if state.picker.mode == PickerMode::CreateNewShare {
             match item.template {
                 Some(idx) => ShareCreation::begin_from_template(state, repo, idx),
                 None => ShareCreation::begin_from_path(state, repo, &item.path),

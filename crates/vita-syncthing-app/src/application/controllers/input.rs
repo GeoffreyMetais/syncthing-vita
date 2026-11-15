@@ -125,7 +125,7 @@ impl InputController {
             ActiveTab::Dashboard => state
                 .is_share_row_focused()
                 .then_some(state.selected_share_idx),
-            ActiveTab::FolderPicker => Some(state.selected_picker_idx),
+            ActiveTab::FolderPicker => Some(state.picker.selected_idx),
             ActiveTab::Settings => Some(0),
         };
         let shortcut = SHORTCUT_BUTTONS
@@ -201,7 +201,7 @@ impl InputController {
     fn switch_tab(state: &mut AppState, repo: &ConfigRepository, tab: ActiveTab) {
         state.active_tab = tab;
         if tab == ActiveTab::FolderPicker {
-            state.picker_mode = PickerMode::CreateNewShare;
+            state.picker.mode = PickerMode::CreateNewShare;
             FolderBrowser::refresh(state, repo);
         }
     }

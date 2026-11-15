@@ -39,7 +39,7 @@ pub fn handle(
         let (fid, label, path) = NEW_SHARE_TEMPLATES[selected_idx];
         if fid == "__browse__" {
             state.modal = ModalDialog::None;
-            state.picker_mode = PickerMode::CreateNewShare;
+            state.picker.mode = PickerMode::CreateNewShare;
             FolderBrowser::refresh(state, repo);
             state.active_tab = ActiveTab::FolderPicker;
         } else {

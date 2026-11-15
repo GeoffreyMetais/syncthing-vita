@@ -4,17 +4,18 @@
 use syncthing_core::DeviceId;
 
 use crate::domain::defaults::LOG_BUFFER_LINES;
+use crate::domain::folder_picker::FolderPicker;
 use crate::domain::initial_sync::{ConnectedPeers, InitialSyncPeers};
 use crate::domain::interaction::{FocusSlot, HitMap};
 use crate::domain::log_view::{sanitize_log_line, LogView};
 use crate::domain::models::{
     ActiveTab, CameraPreview, FolderOffer, IgnoredFolder, KnownDevice, Language,
-    LanguagePreference, ModalDialog, PickerItem, PickerMode, ShareConfigEntry, SyncActivity,
-    ThemeMode, BROWSER_ROWS,
+    LanguagePreference, ModalDialog, ShareConfigEntry, SyncActivity, ThemeMode,
 };
 use crate::domain::navigation::{
     default_col, starts_on_header, NavFocus, NavState, DASHBOARD_HEADER_ACTIONS,
 };
+use crate::domain::screensaver::ScreensaverMotion;
 use crate::domain::ui_text::UiText;
 
 /// Pure application state for PS Vita Syncthing.
@@ -32,13 +33,12 @@ pub struct AppState {
     pub nav: NavState,
     /// Interactive elements of the frame on screen, declared by the UI while drawing it.
     pub hit_map: HitMap,
-    pub picker_mode: PickerMode,
+    /// `Files` tab folder browser (mode, browsed directory, rows, selection, scroll).
+    pub picker: FolderPicker,
     pub modal: ModalDialog,
     pub oled_saver_active: bool,
-    pub saver_x: f32,
-    pub saver_y: f32,
-    pub saver_vx: f32,
-    pub saver_vy: f32,
+    /// Position and speed of the bouncing OLED screensaver widget.
+    pub saver: ScreensaverMotion,
     pub sync_in_progress: bool,
     /// True while blocks are being served to a peer (set on every `BlockUploaded`, cleared by
     /// `application::UploadActivity` once no block was served for `UPLOAD_DISPLAY_GRACE`).
@@ -90,10 +90,6 @@ pub struct AppState {
     /// Folder offers the user declined (persisted in `ignored_folders.cfg`).
     pub ignored_folders: Vec<IgnoredFolder>,
     pub selected_share_idx: usize,
-    pub picker_current_dir: String,
-    pub picker_items: Vec<PickerItem>,
-    pub selected_picker_idx: usize,
-    pub picker_top_idx: usize,
     /// Rows already scrolled by the touch drag in progress (`ScrollTarget` lists).
     pub drag_scrolled_rows: i32,
     /// Protocol log lines of this session, oldest first (last `LOG_BUFFER_LINES`).
@@ -127,13 +123,10 @@ impl AppState {
             active_tab: ActiveTab::Dashboard,
             nav: NavState::new(ActiveTab::Dashboard),
             hit_map: HitMap::default(),
-            picker_mode: PickerMode::ChangeShareTarget,
+            picker: FolderPicker::new(default_browse_root),
             modal: ModalDialog::None,
             oled_saver_active: false,
-            saver_x: 180.0,
-            saver_y: 160.0,
-            saver_vx: 0.65,
-            saver_vy: 0.45,
+            saver: ScreensaverMotion::default(),
             sync_in_progress: false,
             uploading: false,
             vita_device_id: "Initializing...".to_owned(),
@@ -163,10 +156,6 @@ impl AppState {
             folder_offers: Vec::new(),
             ignored_folders: Vec::new(),
             selected_share_idx: 0,
-            picker_current_dir: default_browse_root.to_owned(),
-            picker_items: Vec::new(),
-            selected_picker_idx: 0,
-            picker_top_idx: 0,
             drag_scrolled_rows: 0,
             logs: Vec::with_capacity(32),
             log_view: None,
@@ -298,7 +287,7 @@ impl AppState {
             },
             ActiveTab::FolderPicker if self.nav.header => FocusSlot::Header { col: 0 },
             ActiveTab::FolderPicker => FocusSlot::RowAction {
-                row: self.selected_picker_idx,
+                row: self.picker.selected_idx,
                 col: 0,
             },
             ActiveTab::Settings => FocusSlot::RowAction {
@@ -423,71 +412,6 @@ impl AppState {
     pub fn tick_progress_anim(&mut self) {
         if self.progress_pct.is_none() {
             self.progress_anim_tick = self.progress_anim_tick.wrapping_add(1);
-        }
-    }
-
-    /// Advances the bouncing DVD-style OLED screensaver position within the given screen bounds
-    /// by `frames` display VBlanks (the speed is the same whatever the rendering frame rate).
-    pub fn step_screensaver(
-        &mut self,
-        screen_w: f32,
-        screen_h: f32,
-        box_w: f32,
-        box_h: f32,
-        frames: u32,
-    ) {
-        for _ in 0..frames {
-            self.step_screensaver_once(screen_w, screen_h, box_w, box_h);
-        }
-    }
-
-    fn step_screensaver_once(&mut self, screen_w: f32, screen_h: f32, box_w: f32, box_h: f32) {
-        self.saver_x += self.saver_vx;
-        self.saver_y += self.saver_vy;
-        let max_x = screen_w - box_w - 12.0;
-        let max_y = screen_h - box_h - 12.0;
-        if self.saver_x < 12.0 {
-            self.saver_x = 12.0;
-            self.saver_vx = -self.saver_vx;
-        } else if self.saver_x > max_x {
-            self.saver_x = max_x;
-            self.saver_vx = -self.saver_vx;
-        }
-        if self.saver_y < 12.0 {
-            self.saver_y = 12.0;
-            self.saver_vy = -self.saver_vy;
-        } else if self.saver_y > max_y {
-            self.saver_y = max_y;
-            self.saver_vy = -self.saver_vy;
-        }
-    }
-
-    /// Scrolls the directory picker window by `rows` (positive: towards the end of the list),
-    /// within bounds; the selection moves along so that it stays visible.
-    pub fn scroll_picker_rows(&mut self, rows: i32) {
-        let len = self.picker_items.len();
-        let max_top = len.saturating_sub(BROWSER_ROWS);
-        let top = (self.picker_top_idx as i64 + rows as i64).clamp(0, max_top as i64) as usize;
-        self.picker_top_idx = top;
-        let last_visible = (top + BROWSER_ROWS).min(len).saturating_sub(1);
-        self.selected_picker_idx = self.selected_picker_idx.clamp(top, last_visible.max(top));
-        self.clamp_picker_scroll();
-    }
-
-    /// Ensures the directory picker scroll window (`picker_top_idx`) keeps `selected_picker_idx` visible.
-    pub fn clamp_picker_scroll(&mut self) {
-        if self.picker_items.is_empty() {
-            self.selected_picker_idx = 0;
-            self.picker_top_idx = 0;
-            return;
-        }
-        if self.selected_picker_idx >= self.picker_items.len() {
-            self.selected_picker_idx = self.picker_items.len() - 1;
-        }
-        if self.selected_picker_idx < self.picker_top_idx {
-            self.picker_top_idx = self.selected_picker_idx;
-        } else if self.selected_picker_idx >= self.picker_top_idx + BROWSER_ROWS {
-            self.picker_top_idx = self.selected_picker_idx + 1 - BROWSER_ROWS;
         }
     }
 

@@ -122,13 +122,13 @@ fn test_files_rows_open_and_up_button() {
     // Down to "saves/", Right opens it
     press(&mut state, &repo, BTN_DOWN);
     press(&mut state, &repo, BTN_RIGHT);
-    assert_eq!(state.picker_current_dir, format!("{}/saves", dir));
+    assert_eq!(state.picker.current_dir, format!("{}/saves", dir));
 
     // Up from the first row focuses the "Up" button; Cross goes back up
     press(&mut state, &repo, BTN_UP);
     assert!(state.is_header_focused(ActiveTab::FolderPicker));
     press(&mut state, &repo, BTN_CROSS);
-    assert_eq!(state.picker_current_dir, dir);
+    assert_eq!(state.picker.current_dir, dir);
 
     let _ = std::fs::remove_dir_all(&dir);
 }
