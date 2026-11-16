@@ -63,3 +63,18 @@ fn a_response_with_a_padded_message_decodes_exactly() {
         })
     );
 }
+
+#[test]
+fn every_byte_of_a_big_endian_u32_counts() {
+    // Code 0x01020304: four distinct bytes, so reading any byte from the wrong offset
+    // changes the value (zero-led values such as ports or 0 / 1 codes would hide it).
+    let payload = [1, 2, 3, 4, 0, 0, 0, 0];
+    let decoded = decode_payload(RelayMsgType::Response, &payload).expect("response");
+    assert_eq!(
+        decoded,
+        syncthing_core::RelayMessage::Response(syncthing_core::RelayResponse {
+            code: 0x0102_0304,
+            message: String::new(),
+        })
+    );
+}

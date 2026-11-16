@@ -63,6 +63,28 @@ fn a_proxy_answer_head_over_16_kib_is_refused() {
 }
 
 #[test]
+fn an_oversized_answer_head_is_refused_while_the_proxy_keeps_the_connection_open() {
+    // The proxy never closes: the head must be refused once it exceeds the limit,
+    // not when the connection ends (which would surface as a read timeout).
+    let listener = TcpListener::bind("127.0.0.1:0").expect("bind proxy");
+    let port = listener.local_addr().expect("address").port();
+    let (done_tx, done_rx) = std::sync::mpsc::channel::<()>();
+    let proxy = thread::spawn(move || {
+        let (mut client, _) = listener.accept().expect("accept");
+        let _ = read_connect_head(&mut client);
+        let _ = client.write_all(&vec![b'a'; 20 * 1024]);
+        let _ = client.flush();
+        let _ = done_rx.recv_timeout(Duration::from_secs(10));
+    });
+    let err = proxy_at(port)
+        .connect("127.0.0.1", 9, Duration::from_secs(2))
+        .expect_err("oversized answer head");
+    let _ = done_tx.send(());
+    proxy.join().expect("proxy");
+    assert_eq!(err.kind(), io::ErrorKind::InvalidData, "{err}");
+}
+
+#[test]
 fn a_proxy_closing_without_an_answer_is_an_invalid_response() {
     // Nothing is written: the proxy closes right after reading the request.
     let (proxy_port, proxy) = spawn_proxy_replying(Vec::new());
