@@ -182,6 +182,35 @@ fn test_camera_preview_needs_a_complete_frame() {
 }
 
 #[test]
+fn test_camera_preview_needs_a_non_empty_width_and_height() {
+    // Zero width with a height and an empty buffer is not a frame, even though 0 == 0 * height.
+    let no_width = CameraPreview {
+        width: 0,
+        height: 2,
+        gray: Vec::new(),
+    };
+    assert!(!no_width.has_frame());
+}
+
+#[test]
+fn test_camera_preview_frame_length_is_width_times_height() {
+    // A 3 x 2 frame has 6 pixels: 3 + 2 = 5 is not the expected length.
+    let wide = CameraPreview {
+        width: 3,
+        height: 2,
+        gray: vec![0; 6],
+    };
+    assert!(wide.has_frame());
+
+    let five = CameraPreview {
+        width: 3,
+        height: 2,
+        gray: vec![0; 5],
+    };
+    assert!(!five.has_frame());
+}
+
+#[test]
 fn test_camera_preview_clear_forgets_the_frame() {
     let mut frame = CameraPreview {
         width: 2,
