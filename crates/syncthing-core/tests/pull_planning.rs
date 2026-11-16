@@ -295,3 +295,47 @@ fn test_local_file_is_only_up_to_date_when_blocks_and_length_match() {
     assert!(plan.up_to_date.is_empty());
     let _ = fs::remove_dir_all(&dir);
 }
+
+/// A concurrent remote deletion that is newer than the local live file still loses: a deletion
+/// only wins against a deletion.
+#[test]
+fn test_newer_concurrent_remote_deletion_still_loses_against_a_local_file() {
+    let (dir, storage, root) = setup("pull_live_vs_newer_tomb");
+    fs::write(root.join("k.txt"), b"keep").unwrap();
+    set_mtime(&root.join("k.txt"), T);
+    local_versions(&storage, "k.txt");
+    let remote = BepFileInfo {
+        modified_s: (T + 100) as i64,
+        ..remote_deleted("k.txt", vec![peer(4)])
+    };
+    let plan = storage.plan_pull("f", OWN, &[remote]).unwrap();
+    assert!(plan.applied.is_empty() && plan.downloads.is_empty());
+    assert_eq!(fs::read(root.join("k.txt")).unwrap(), b"keep");
+    let _ = fs::remove_dir_all(&dir);
+}
+
+/// The same bytes split into other blocks by the peer: the block descriptions differ, but the
+/// local data matches them, so the file is up to date without a download.
+#[test]
+fn test_same_bytes_with_another_block_layout_are_up_to_date() {
+    let (dir, storage, root) = setup("pull_other_layout");
+    fs::write(root.join("l.txt"), b"abc").unwrap();
+    let local = local_versions(&storage, "l.txt");
+    let mut remote = remote_file("l.txt", version_merge(&local, &[peer(3)]), 1, b"abc");
+    remote.blocks = vec![
+        BepBlockInfo {
+            offset: 0,
+            size: 2,
+            hash: sha(b"ab"),
+        },
+        BepBlockInfo {
+            offset: 2,
+            size: 1,
+            hash: sha(b"c"),
+        },
+    ];
+    let plan = storage.plan_pull("f", OWN, &[remote]).unwrap();
+    assert!(plan.downloads.is_empty());
+    assert_eq!(plan.up_to_date.len(), 1);
+    let _ = fs::remove_dir_all(&dir);
+}

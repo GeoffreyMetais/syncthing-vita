@@ -275,3 +275,23 @@ fn test_named_pipes_are_not_indexed() {
     assert!(!index.files.iter().any(|f| f.name == "pipe"));
     let _ = fs::remove_dir_all(&dir);
 }
+
+/// A removed file keeps a tombstone in the database with no size and no blocks.
+#[test]
+fn test_removed_file_is_stored_as_a_bare_tombstone() {
+    let dir = common::fresh_temp_dir("scan_tombstone_db");
+    let storage = FsSyncStorage::new(&dir);
+    let root = storage.folder_root("f");
+    fs::create_dir_all(&root).unwrap();
+    fs::write(root.join("gone.txt"), b"twelve bytes").unwrap();
+    fs::write(root.join("keep.txt"), b"k").unwrap();
+    scan(&storage);
+    assert_eq!(stored_db(&storage).entries["gone.txt"].size, 12);
+
+    fs::remove_file(root.join("gone.txt")).unwrap();
+    scan(&storage);
+    let entry = &stored_db(&storage).entries["gone.txt"];
+    assert!(entry.deleted);
+    assert_eq!((entry.size, entry.blocks.len()), (0, 0));
+    let _ = fs::remove_dir_all(&dir);
+}

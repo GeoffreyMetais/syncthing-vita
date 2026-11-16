@@ -246,6 +246,40 @@ fn test_folder_root_keeps_only_safe_id_characters() {
         PathBuf::from("base").join("xkx75-ukkm3")
     );
     assert_eq!(storage.folder_root("..."), PathBuf::from("base").join(""));
+    let db = storage.db_path("a-b_c.d/../e");
+    assert_eq!(db.parent(), Some(Path::new("base")));
+    assert!(db
+        .file_name()
+        .unwrap()
+        .to_string_lossy()
+        .starts_with(".syncthing_db_a-b_cde_"));
+}
+
+/// An empty file has one zero-length block; it is a valid block, not an out-of-bounds one.
+#[test]
+fn test_zero_length_block_of_an_empty_file_is_accepted() {
+    let dir = common::fresh_temp_dir("delta_empty_block");
+    let storage = FsSyncStorage::new(&dir);
+    let remote = BepFileInfo {
+        name: "empty.bin".to_owned(),
+        is_dir: false,
+        size: 0,
+        modified_s: 1,
+        deleted: false,
+        invalid: false,
+        sequence: 1,
+        versions: Vec::new(),
+        blocks: vec![BepBlockInfo {
+            offset: 0,
+            size: 0,
+            hash: sha(&[]),
+        }],
+    };
+    assert_eq!(
+        storage.find_outdated_blocks("f", &remote).unwrap(),
+        remote.blocks
+    );
+    let _ = fs::remove_dir_all(&dir);
 }
 
 #[test]

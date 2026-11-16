@@ -126,6 +126,8 @@ fn test_scan_sees_a_file_restored_from_an_interrupted_commit() {
     let root = storage.folder_root("f");
     fs::create_dir_all(&root).unwrap();
     fs::write(root.join("save.bin"), b"keep me").unwrap();
+    // A second file keeps the folder non-empty once the first one is set aside.
+    fs::write(root.join("other.bin"), b"other").unwrap();
     storage.build_local_index("f", OWN, &[]).unwrap();
 
     fs::rename(
@@ -166,5 +168,36 @@ fn test_scan_ignores_leftover_download_files_and_internal_names() {
     assert_eq!(fs::read(root.join(".syncthing..bak")).unwrap(), b"odd");
     assert_eq!(fs::read(root.join(".syncthing.bak")).unwrap(), b"odd");
     assert!(root.join(".syncthing.x.tmp").is_file());
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_abort_removes_the_temp_file_and_write_block_at_writes_in_place() {
+    use std::io::Read;
+    use syncthing_core::storage::download::write_block_at;
+
+    let dir = common::fresh_temp_dir("staging_abort_write");
+    let storage = FsSyncStorage::new(&dir);
+    storage
+        .prepare_download_seeded("f", "p.bin", false)
+        .unwrap();
+    let tmp = storage.download_temp_path("f", "p.bin");
+    assert!(tmp.is_file());
+    storage.abort_download("f", "p.bin");
+    assert!(!tmp.exists());
+
+    storage
+        .prepare_download_seeded("f", "w.bin", false)
+        .unwrap();
+    let mut file = storage.open_download("f", "w.bin").unwrap();
+    write_block_at(&mut file, 2, b"xy").unwrap();
+    write_block_at(&mut file, 0, b"ab").unwrap();
+    drop(file);
+    let mut content = Vec::new();
+    fs::File::open(storage.download_temp_path("f", "w.bin"))
+        .unwrap()
+        .read_to_end(&mut content)
+        .unwrap();
+    assert_eq!(content, b"abxy");
     let _ = fs::remove_dir_all(&dir);
 }
