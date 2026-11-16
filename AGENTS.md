@@ -470,6 +470,18 @@ just vita3k-cli-sync
 ```
 Runs every stage — host tests, Vita build + ELF audit, CLI <-> CLI LAN sync, Vita3K <-> CLI sync, Internet (relay pool, Global Discovery announce + lookup, relay, CLI <-> CLI sync through Global Discovery + relay) — and prints `PASS` / `FAIL` / `BLOCKED` / `SKIP` per stage (see `.agents/skills/syncthing-e2e-validation/SKILL.md`). Run it before proposing any change to sync behaviour; report `BLOCKED` stages as not validated.
 
+### Mutation Testing (`cargo-mutants`)
+```bash
+just mutants                   # whole workspace (hours on 4 cores)
+just mutants syncthing-core    # one crate
+cargo mutants -p vita-syncthing-app -f crates/vita-syncthing-app/src/domain/log_view.rs   # one file
+```
+`.cargo/mutants.toml` sets the scope: `syncthing-core`, `syncthing-cli` and the app's domain / application / persistence / i18n logic. Pixel rendering (`ui/gfx.rs`, screens, modals, widgets, theme), the PS Vita hardware drivers, the `ui-script` feature and the `main.rs` entry points are excluded (host tests cannot observe them; visual changes are checked in Vita3K). Builds use the `mutants` profile (no debug info). Outcomes land in `mutants.out/` (`missed.txt`, `caught.txt`, `timeout.txt`).
+- **New code comes with tests that kill its mutants.** Before proposing a change to a covered file, run `cargo mutants -f <file>` on it and kill every `MISSED` mutant, or explain in the PR why it is equivalent (no observable difference: `|` vs `^` on disjoint bits, a `<` vs `<=` on values that are never equal, a clamp that undoes an overshoot) or not testable on the host (Vita-only branch, real Internet, OS-level `EINTR`).
+- Prefer exact expected values over round trips (a symmetric encode / decode mutation survives a round trip), and test boundaries on both sides (limit, limit + 1).
+- While iterating, restrict the run to the test targets you touch (`cargo mutants -f <file> -- --test <target>`); the final run uses the whole crate suite.
+- Test files written for mutation coverage follow the usual rules (one file per component, named after it): e.g. `syncthing-core/tests/{proto_wire,bep_frames,bep_messages,bep_index_codec,lz4_codec,device_id_codec,block_storage,download_staging,folder_db_codec,folder_registry,pull_planning,pull_deletions,scan_changes,revert_local_changes,session_state,session_transfers,session_index,session_control,session_secondary,session_reconnect,tls_client,https_request,http_proxy_tunnel,relay_wire_xdr,relay_join,relay_pool,discovery_udp,lan_scan,local_ip}.rs` (sessions are driven through `tests/common/session_driver.rs`), `syncthing-cli/tests/{daemon_*,lan_beacon,diagnostic_commands,events_format,paths,https_env,...}.rs` (local Global Discovery / relay stand-ins in `tests/common/servers.rs`, never the Internet), `vita-syncthing-app/tests/{app_state,hit_map,domain_models,dashboard_controller,files_controller,settings_controller,logs_controller,manage_devices_modal,create_share_modal,add_device_keypad,confirm_dialogs,device_registry,sync_coordinator_events,power_policy_levels,config_repo_formats,log_rotation,i18n_formatters,...}.rs`.
+
 ### Cross-Check for PS Vita (`armv7-sony-vita-newlibeabihf`)
 ```bash
 just check-vita

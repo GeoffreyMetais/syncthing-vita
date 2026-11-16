@@ -66,3 +66,8 @@ cli:
 vita3k-cli-sync secs="75":
     CARGO_FEATURES=ui-script just vpk
     ./scripts/vita3k_cli_sync.sh {{secs}}
+
+# Mutation testing with cargo-mutants (scope in .cargo/mutants.toml); outcomes in mutants.out/
+mutants crate="" jobs="3":
+    @command -v cargo-mutants >/dev/null || cargo install cargo-mutants --locked
+    if [ -n "{{crate}}" ]; then cargo mutants -p {{crate}} -j {{jobs}}; else cargo mutants --workspace -j {{jobs}}; fi
