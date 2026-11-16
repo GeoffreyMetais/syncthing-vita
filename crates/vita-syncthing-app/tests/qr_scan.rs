@@ -7,7 +7,7 @@ use common::{press, rects_of, tap_rect, temp_test_dir};
 use qrcodegen::{QrCode, QrCodeEcc};
 use syncthing_core::DeviceId;
 use vita_syncthing_app::application::{extract_device_id, QrScanFlow, UserCommand};
-use vita_syncthing_app::domain::{AppState, ModalDialog, PadKey, UiAction};
+use vita_syncthing_app::domain::{AppState, ModalDialog, PadKey, UiAction, UiText};
 use vita_syncthing_app::infrastructure::{
     ConfigRepository, QrDecoder, QrScanEvent, BTN_CIRCLE, BTN_R, CAMERA_H, CAMERA_W,
 };
@@ -222,4 +222,81 @@ fn test_scan_qr_action_in_show_device_id_modal() {
             ..
         }
     ));
+}
+
+#[test]
+fn test_extract_device_id_finds_the_first_id_inside_longer_text() {
+    let id = sample_device_id();
+    let other = DeviceId([9u8; 32]).to_syncthing_string();
+    assert_eq!(
+        extract_device_id(&format!("My device is {} thanks", id)).as_deref(),
+        Some(id.as_str())
+    );
+    assert_eq!(
+        extract_device_id(&format!("{} then {}", id, other)).as_deref(),
+        Some(id.as_str()),
+        "the first valid ID wins"
+    );
+    // A token with one wrong character fails the Luhn check and is rejected.
+    let mut bad = id.clone();
+    let first = bad[..1].to_owned();
+    bad.replace_range(0..1, if first == "A" { "B" } else { "A" });
+    assert_eq!(extract_device_id(&bad), None);
+}
+
+#[test]
+fn test_scanner_open_and_close_keep_the_return_target() {
+    let dir = temp_test_dir("qr-open-close");
+    let mut state = AppState::new(Vec::new(), Vec::new(), &dir);
+    state.ime_active = true;
+    state.qr_preview.clear();
+    state.qr_camera_error = Some("old error".to_owned());
+
+    QrScanFlow::open(&mut state, Some(2));
+    assert!(!state.ime_active);
+    assert_eq!(state.qr_camera_error, None);
+    assert_eq!(state.modal, ModalDialog::ScanDeviceQr { return_share_idx: Some(2) });
+    assert!(state.is_scanning_qr());
+
+    QrScanFlow::close(&mut state, Some(2));
+    assert_eq!(
+        state.modal,
+        ModalDialog::AddDeviceById {
+            return_share_idx: Some(2),
+            keypad_idx: 0
+        }
+    );
+    assert!(!state.is_scanning_qr());
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_scanner_events_outside_the_scanner_are_ignored_and_errors_are_kept() {
+    use vita_syncthing_app::infrastructure::QrScanEvent as Event;
+    let dir = temp_test_dir("qr-events");
+    let repo = ConfigRepository::new(&dir);
+    let mut state = AppState::new(Vec::new(), Vec::new(), &dir);
+
+    // Not in the scanner: no command, nothing changes.
+    let cmd = QrScanFlow::handle_event(&mut state, &repo, Event::Payload(sample_device_id()));
+    assert_eq!(cmd, UserCommand::None);
+    assert!(state.device_id_input.is_empty());
+
+    QrScanFlow::open(&mut state, None);
+    assert_eq!(
+        QrScanFlow::handle_event(&mut state, &repo, Event::CameraError("no camera".to_owned())),
+        UserCommand::None
+    );
+    assert_eq!(state.qr_camera_error.as_deref(), Some("no camera"));
+    assert!(state.is_scanning_qr());
+
+    // A QR code that is not a device ID stays in the scanner with a toast.
+    QrScanFlow::handle_event(&mut state, &repo, Event::Payload("hello".to_owned()));
+    assert!(state.is_scanning_qr());
+    assert_eq!(
+        state.toast_msg.as_ref().map(|(m, _)| m.clone()),
+        Some(UiText::QrNotDeviceId)
+    );
+    assert!(state.device_id_input.is_empty());
+    let _ = std::fs::remove_dir_all(&dir);
 }

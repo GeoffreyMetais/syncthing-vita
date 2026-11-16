@@ -101,3 +101,42 @@ fn test_scan_also_runs_while_another_device_is_connected() {
         let _ = std::fs::remove_dir_all(&dir);
     }
 }
+
+#[test]
+fn test_on_input_arms_or_fires_the_scan_only_when_the_dialog_opens() {
+    let (dir, _repo, mut state) = setup("devices-scan-on-input", true);
+    let dialog = ModalDialog::ManageDevices {
+        share_idx: 0,
+        selected_dev_idx: 0,
+    };
+
+    // Opening with a linked device arms the delayed scan without scanning now.
+    state.modal = dialog;
+    assert_eq!(DevicesScan::on_input(ModalDialog::None, &mut state), UserCommand::None);
+    assert_eq!(state.devices_scan_countdown, Some(DEVICES_DIALOG_SCAN_DELAY));
+
+    // The dialog was already open before this frame: nothing is re-armed.
+    state.devices_scan_countdown = Some(7);
+    assert_eq!(DevicesScan::on_input(dialog, &mut state), UserCommand::None);
+    assert_eq!(state.devices_scan_countdown, Some(7));
+
+    // A share index that does not exist has no linked device: scan at once.
+    state.modal = ModalDialog::ManageDevices {
+        share_idx: 9,
+        selected_dev_idx: 0,
+    };
+    assert_eq!(DevicesScan::on_input(ModalDialog::None, &mut state), UserCommand::ScanLan);
+    assert_eq!(state.devices_scan_countdown, None);
+
+    // No dialog open: the countdown is dropped.
+    state.modal = ModalDialog::None;
+    state.devices_scan_countdown = Some(5);
+    assert_eq!(DevicesScan::on_input(dialog, &mut state), UserCommand::None);
+    assert_eq!(state.devices_scan_countdown, None);
+
+    // The same on a tick with no dialog open.
+    state.devices_scan_countdown = Some(5);
+    assert_eq!(DevicesScan::tick(&mut state), UserCommand::None);
+    assert_eq!(state.devices_scan_countdown, None);
+    let _ = std::fs::remove_dir_all(&dir);
+}

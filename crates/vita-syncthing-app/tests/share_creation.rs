@@ -225,3 +225,46 @@ fn test_selecting_a_preset_in_files_tab_creates_it_with_its_folder_id() {
 
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn begin_from_path_derives_the_folder_id_and_label_from_the_folder_name() {
+    let dir = temp_test_dir("creation-from-path");
+    let repo = ConfigRepository::new(&dir);
+    let mut state = AppState::new(Vec::new(), Vec::new(), &dir);
+    state.picker.mode = vita_syncthing_app::domain::PickerMode::CreateNewShare;
+
+    // Spaces and capitals become a clean folder ID; `-` and `_` are kept; the label keeps the name.
+    let chosen = format!("{}/My Save_Data-1/", dir);
+    let idx = ShareCreation::begin_from_path(&mut state, &repo, &chosen);
+    assert_eq!(state.shares[idx].folder_id, "my-save_data-1");
+    assert_eq!(state.shares[idx].label, "Vita My Save_Data-1");
+    assert_eq!(state.shares[idx].target_path, format!("{}/My Save_Data-1", dir));
+    assert_eq!(
+        state.pending_share_creation.as_deref(),
+        Some("my-save_data-1")
+    );
+    assert_eq!(
+        state.picker.mode,
+        vita_syncthing_app::domain::PickerMode::ChangeShareTarget
+    );
+    assert_eq!(
+        state.active_tab,
+        vita_syncthing_app::domain::ActiveTab::Dashboard
+    );
+    assert_eq!(
+        state.modal,
+        ModalDialog::ManageDevices {
+            share_idx: idx,
+            selected_dev_idx: 0
+        }
+    );
+
+    // A folder named `ux0` has no usable name: the fallback folder ID is used.
+    let fallback = format!("{}/ux0/", dir);
+    let idx = ShareCreation::begin_from_path(&mut state, &repo, &fallback);
+    assert_eq!(state.shares[idx].folder_id, "vita-shared");
+    assert_eq!(state.shares[idx].label, "Vita vita-shared");
+    assert_eq!(state.shares[idx].target_path, format!("{}/ux0", dir));
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
