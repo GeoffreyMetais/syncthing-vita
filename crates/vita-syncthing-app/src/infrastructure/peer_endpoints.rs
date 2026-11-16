@@ -34,7 +34,7 @@ pub fn needs_global_lookup(kd: &KnownDevice, connected: &[DeviceId]) -> bool {
     !kd.device_id.is_short_placeholder() && !connected.contains(&kd.device_id)
 }
 
-fn set_connected(connected: &SharedConnectedPeers, device_id: DeviceId, is_connected: bool) {
+pub fn set_connected(connected: &SharedConnectedPeers, device_id: DeviceId, is_connected: bool) {
     if let Ok(mut guard) = connected.lock() {
         guard.retain(|id| *id != device_id);
         if is_connected {
@@ -165,7 +165,7 @@ pub fn refresh_global_endpoints(
 /// Sleeps up to `duration`, checking every `STOP_CHECK_STEP` whether to give up early: on a
 /// stop request (returns `false`) or when `wake` returns `true` (returns `true`).
 /// Returns `true` if the caller should carry on.
-pub(super) fn sleep_unless_stopped(
+pub fn sleep_unless_stopped(
     control: &SyncControl,
     duration: Duration,
     wake: impl Fn() -> bool,
@@ -185,7 +185,7 @@ pub(super) fn sleep_unless_stopped(
     !control.is_stop_requested()
 }
 
-fn sleep_interruptible(control: &SyncControl, duration: Duration) -> bool {
+pub fn sleep_interruptible(control: &SyncControl, duration: Duration) -> bool {
     sleep_unless_stopped(control, duration, || false)
 }
 
