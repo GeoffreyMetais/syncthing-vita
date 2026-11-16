@@ -30,7 +30,8 @@ pub use bep::{
     decompress_bep_lz4, read_bep_message, write_bep_message, BepBlockInfo, BepClose,
     BepClusterConfig, BepCompression, BepFileInfo, BepFolder, BepHeader, BepHello, BepIndex,
     BepMessageType, BepRequest, BepResponse, BepVersionCounter, FolderIndexState, FolderType,
-    BEP_BLOCK_SIZE, BEP_DEFAULT_NUM_CONNECTIONS, BEP_DEFAULT_PORT, BEP_MAGIC, BEP_MAX_BLOCK_SIZE,
+    BEP_BLOCK_HASH_LEN, BEP_BLOCK_SIZE, BEP_DEFAULT_NUM_CONNECTIONS, BEP_DEFAULT_PORT, BEP_MAGIC,
+    BEP_MAX_BLOCK_SIZE,
 };
 pub use cert::DeviceIdentity;
 pub use device_id::{DeviceId, DeviceIdParseError};

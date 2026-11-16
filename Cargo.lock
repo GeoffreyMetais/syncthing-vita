@@ -1151,6 +1151,8 @@ version = "0.1.0"
 dependencies = [
  "clap",
  "ctrlc",
+ "rustls",
+ "rustls-rustcrypto",
  "serde",
  "socket2",
  "syncthing-core",

@@ -48,3 +48,31 @@ fn corrupt_seed_file_is_an_error() {
         .expect("corrupt seed rejected");
     assert_eq!(err.kind(), ErrorKind::InvalidData);
 }
+
+#[test]
+fn a_seed_of_the_wrong_length_is_refused_and_left_alone() {
+    let home = temp_home("identity-bad-length");
+    let path = home.join(SEED_FILE);
+    std::fs::write(&path, [1u8; 31]).unwrap();
+    let err = load_or_create_identity(&home).err().expect("31-byte seed");
+    assert_eq!(err.kind(), ErrorKind::InvalidData);
+    assert!(
+        err.to_string().contains("must be exactly 32 bytes"),
+        "{err}"
+    );
+    assert_eq!(std::fs::read(&path).unwrap(), vec![1u8; 31]);
+}
+
+#[test]
+fn an_unreadable_seed_is_an_error_and_never_replaced() {
+    // A directory where the seed should be: reading it fails, which is not "no seed yet".
+    let home = temp_home("identity-unreadable");
+    let path = home.join(SEED_FILE);
+    std::fs::create_dir_all(&path).unwrap();
+    assert!(load_or_create_identity(&home).is_err());
+    assert!(path.is_dir(), "the directory is not replaced by a seed");
+    assert!(
+        !home.join(format!("{SEED_FILE}.tmp")).exists(),
+        "no seed is generated on a read error"
+    );
+}

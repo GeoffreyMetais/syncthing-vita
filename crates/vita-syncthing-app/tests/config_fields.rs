@@ -101,3 +101,35 @@ fn test_interrupted_config_replacement_restores_the_backup() {
     assert_eq!(repo.load_shares().len(), 1);
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn test_escape_uses_the_exact_percent_codes() {
+    assert_eq!(escape_field("a|b"), "a%7Cb");
+    assert_eq!(escape_field("%"), "%25");
+    assert_eq!(escape_field("x\ny"), "x%0Ay");
+    assert_eq!(escape_field("x\ry"), "x%0Dy");
+    assert_eq!(escape_field("plain text"), "plain text");
+    assert_eq!(escape_field(""), "");
+    // The escape character itself is escaped first, so an escaped text is never ambiguous.
+    assert_eq!(escape_field("%7C"), "%257C");
+    assert_eq!(unescape_field("%257C"), "%7C");
+}
+
+#[test]
+fn test_unescape_accepts_lowercase_codes_and_ignores_incomplete_ones() {
+    assert_eq!(unescape_field("a%7cb%0a%0d%25"), "a|b\n\r%");
+    assert_eq!(unescape_field("%"), "%");
+    assert_eq!(unescape_field("%2"), "%2");
+    assert_eq!(unescape_field("abc%"), "abc%");
+    assert_eq!(unescape_field("%%7C"), "%|");
+    assert_eq!(unescape_field(""), "");
+}
+
+#[test]
+fn test_non_ascii_text_survives_escaping() {
+    let name = "Café|ü\n日本";
+    let escaped = escape_field(name);
+    assert_eq!(escaped, "Café%7Cü%0A日本");
+    assert_eq!(unescape_field(&escaped), name);
+    assert_eq!(unescape_field("é%7Cé"), "é|é");
+}

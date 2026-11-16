@@ -28,7 +28,7 @@ const WORKER_STACK_SIZE: usize = 1536 * 1024;
 
 static PROCESS_INSTANCE_ID: OnceLock<i64> = OnceLock::new();
 
-fn process_instance_id() -> i64 {
+pub fn process_instance_id() -> i64 {
     *PROCESS_INSTANCE_ID.get_or_init(|| {
         std::time::SystemTime::now()
             .duration_since(std::time::UNIX_EPOCH)

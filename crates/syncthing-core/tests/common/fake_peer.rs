@@ -4,8 +4,9 @@
 use std::collections::HashMap;
 use std::io;
 use std::net::{SocketAddr, TcpListener, TcpStream};
-use std::sync::Arc;
-use std::thread::JoinHandle;
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
+use std::sync::{Arc, Mutex};
+use std::thread::{self, JoinHandle};
 use std::time::{Duration, Instant};
 
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
@@ -17,6 +18,9 @@ use syncthing_core::{
     DeviceIdentity, FolderIndexState, BEP_ALPN,
 };
 
+/// Behaviour of one secondary connection: the connection and its index in accept order.
+pub type SecondaryScript = Arc<dyn Fn(&mut PeerConn, usize) + Send + Sync>;
+
 /// Read timeout of a single poll on the peer side.
 const POLL: Duration = Duration::from_millis(50);
 
@@ -27,36 +31,140 @@ pub type Received = (BepMessageType, Vec<u8>);
 pub struct FakePeer {
     pub addr: SocketAddr,
     pub device_id: DeviceId,
+    /// Connections accepted after the primary one (secondary connections), at any time.
+    pub accepted: Arc<AtomicUsize>,
     handle: JoinHandle<Vec<Received>>,
+    secondary_log: Arc<Mutex<Vec<Vec<Received>>>>,
 }
 
 impl FakePeer {
     /// Starts a peer with the identity derived from `seed`, accepting one connection and
-    /// running `script` on it after the TLS handshake and the `Hello` exchange.
+    /// running `script` on it after the TLS handshake and the `Hello` exchange. The peer
+    /// announces a single connection in its `Hello`.
     pub fn spawn<F>(seed: u8, script: F) -> Self
     where
         F: FnOnce(&mut PeerConn) + Send + 'static,
     {
-        let identity = DeviceIdentity::from_seed(&[seed; 32]).expect("peer identity");
+        Self::start(seed, 1, script, None)
+    }
+
+    /// Like [`Self::spawn`], but the peer announces `connections` connections in its `Hello`
+    /// and accepts every further TCP connection (secondary connections) until `script` ends.
+    /// `secondary` runs on each of them, given its index in accept order.
+    pub fn spawn_with_secondaries<F, S>(seed: u8, connections: i32, script: F, secondary: S) -> Self
+    where
+        F: FnOnce(&mut PeerConn) + Send + 'static,
+        S: Fn(&mut PeerConn, usize) + Send + Sync + 'static,
+    {
+        Self::start(seed, connections, script, Some(Arc::new(secondary)))
+    }
+
+    fn start<F>(seed: u8, connections: i32, script: F, secondary: Option<SecondaryScript>) -> Self
+    where
+        F: FnOnce(&mut PeerConn) + Send + 'static,
+    {
+        let identity = Arc::new(DeviceIdentity::from_seed(&[seed; 32]).expect("peer identity"));
         let device_id = identity.device_id;
         let listener = TcpListener::bind("127.0.0.1:0").expect("bind fake peer");
         let addr = listener.local_addr().expect("fake peer address");
-        let handle = std::thread::spawn(move || {
+        let accepted = Arc::new(AtomicUsize::new(0));
+        let secondary_log = Arc::new(Mutex::new(Vec::new()));
+        let (accepted_for_thread, log_for_thread) =
+            (Arc::clone(&accepted), Arc::clone(&secondary_log));
+        let handle = thread::spawn(move || {
             let (tcp, _) = listener.accept().expect("accept");
-            let mut conn = PeerConn::accept(&identity, tcp);
+            let stop = Arc::new(AtomicBool::new(false));
+            let acceptor = secondary.map(|secondary| {
+                listener
+                    .set_nonblocking(true)
+                    .expect("non-blocking listener");
+                let worker = AcceptWorker {
+                    listener,
+                    identity: Arc::clone(&identity),
+                    connections,
+                    secondary,
+                    stop: Arc::clone(&stop),
+                    accepted: accepted_for_thread,
+                    log: log_for_thread,
+                };
+                thread::spawn(move || worker.run())
+            });
+            let mut conn = PeerConn::accept(&identity, tcp, connections);
             script(&mut conn);
-            conn.received
+            // Closing the primary connection first lets the device end its session, whatever
+            // the secondary scripts still do.
+            let received = std::mem::take(&mut conn.received);
+            drop(conn);
+            stop.store(true, Ordering::SeqCst);
+            if let Some(acceptor) = acceptor {
+                acceptor.join().expect("secondary script panicked");
+            }
+            received
         });
         Self {
             addr,
             device_id,
+            accepted,
             handle,
+            secondary_log,
         }
     }
 
     /// Waits for the script to end and returns the messages received from the device.
     pub fn join(self) -> Vec<Received> {
         self.handle.join().expect("fake peer script panicked")
+    }
+
+    /// Like [`Self::join`], also returning the messages received on each secondary connection
+    /// (in the order they ended).
+    pub fn join_with_secondaries(self) -> (Vec<Received>, Vec<Vec<Received>>) {
+        let primary = self.handle.join().expect("fake peer script panicked");
+        let secondaries = std::mem::take(&mut *self.secondary_log.lock().unwrap());
+        (primary, secondaries)
+    }
+}
+
+/// Accepts the secondary connections of a [`FakePeer`] until the primary script ends.
+struct AcceptWorker {
+    listener: TcpListener,
+    identity: Arc<DeviceIdentity>,
+    connections: i32,
+    secondary: SecondaryScript,
+    stop: Arc<AtomicBool>,
+    accepted: Arc<AtomicUsize>,
+    log: Arc<Mutex<Vec<Vec<Received>>>>,
+}
+
+impl AcceptWorker {
+    fn run(self) {
+        let mut workers = Vec::new();
+        while !self.stop.load(Ordering::SeqCst) {
+            match self.listener.accept() {
+                Ok((tcp, _)) => {
+                    let index = self.accepted.fetch_add(1, Ordering::SeqCst);
+                    let (identity, connections, secondary, log) = (
+                        Arc::clone(&self.identity),
+                        self.connections,
+                        Arc::clone(&self.secondary),
+                        Arc::clone(&self.log),
+                    );
+                    workers.push(thread::spawn(move || {
+                        tcp.set_nonblocking(false)
+                            .expect("blocking secondary stream");
+                        let mut conn = PeerConn::accept(&identity, tcp, connections);
+                        secondary(&mut conn, index);
+                        log.lock().unwrap().push(conn.received);
+                    }));
+                }
+                Err(e) if e.kind() == io::ErrorKind::WouldBlock => {
+                    thread::sleep(Duration::from_millis(5));
+                }
+                Err(_) => break,
+            }
+        }
+        for worker in workers {
+            worker.join().expect("secondary script panicked");
+        }
     }
 }
 
@@ -71,7 +179,7 @@ pub struct PeerConn {
 }
 
 impl PeerConn {
-    fn accept(identity: &DeviceIdentity, tcp: TcpStream) -> Self {
+    fn accept(identity: &DeviceIdentity, tcp: TcpStream, connections: i32) -> Self {
         let provider = Arc::new(rustls_rustcrypto::provider());
         let mut config = ServerConfig::builder_with_provider(provider)
             .with_safe_default_protocol_versions()
@@ -90,7 +198,7 @@ impl PeerConn {
             device_name: "fake-peer".to_owned(),
             client_name: "syncthing".to_owned(),
             client_version: "v2.0.0-test".to_owned(),
-            num_connections: 1,
+            num_connections: connections,
             timestamp: 0,
         };
         hello.exchange(&mut stream).expect("Hello exchange");
@@ -128,8 +236,60 @@ impl PeerConn {
         }
     }
 
+    /// Like [`Self::file`], with the content split in blocks of `block_size` bytes.
+    pub fn file_in_blocks(
+        &mut self,
+        folder: &str,
+        name: &str,
+        content: &[u8],
+        version: u64,
+        block_size: usize,
+    ) -> BepFileInfo {
+        let mut info = self.file(folder, name, content, version);
+        info.blocks = content
+            .chunks(block_size)
+            .enumerate()
+            .map(|(i, chunk)| BepBlockInfo {
+                offset: (i * block_size) as i64,
+                size: chunk.len() as i32,
+                hash: Sha256::digest(chunk).to_vec(),
+            })
+            .collect();
+        info
+    }
+
     pub fn send(&mut self, msg_type: BepMessageType, payload: &[u8]) {
         write_bep_message(&mut self.stream, msg_type, payload).expect("peer send");
+    }
+
+    /// Sends the secondary `ClusterConfig` that promotes a secondary connection.
+    pub fn promote(&mut self) {
+        self.send(
+            BepMessageType::ClusterConfig,
+            &BepClusterConfig::encode_secondary(),
+        );
+    }
+
+    /// Sends a block `Request` for `folder/name` and waits up to `timeout` for its `Response`
+    /// (answering the device's own requests meanwhile). `None` if no `Response` came in time.
+    pub fn request(
+        &mut self,
+        id: i32,
+        folder: &str,
+        name: &str,
+        timeout: Duration,
+    ) -> Option<BepResponse> {
+        let req = BepRequest {
+            id,
+            folder: folder.to_owned(),
+            name: name.to_owned(),
+            offset: 0,
+            size: 0,
+            hash: Vec::new(),
+        };
+        self.send(BepMessageType::Request, &req.encode());
+        let payload = self.wait_for(BepMessageType::Response, timeout)?;
+        BepResponse::decode(&payload).ok()
     }
 
     /// Sends a `ClusterConfig` announcing `folders` as shared with `device`.
@@ -190,11 +350,16 @@ impl PeerConn {
     pub fn answer(&mut self, request_payload: &[u8]) {
         let req = BepRequest::decode(request_payload).expect("request");
         let resp = match self.served.get(&format!("{}/{}", req.folder, req.name)) {
-            Some(content) => BepResponse {
-                id: req.id,
-                data: content.clone(),
-                code: 0,
-            },
+            Some(content) => {
+                // The requested range of the content (the whole file for a single block).
+                let start = (req.offset.max(0) as usize).min(content.len());
+                let end = (start + req.size.max(0) as usize).min(content.len());
+                BepResponse {
+                    id: req.id,
+                    data: content[start..end].to_vec(),
+                    code: 0,
+                }
+            }
             None => BepResponse {
                 id: req.id,
                 data: Vec::new(),
@@ -241,13 +406,4 @@ impl PeerConn {
             }
         }
     }
-}
-
-/// Payloads of the received messages of type `wanted`.
-pub fn payloads(received: &[Received], wanted: BepMessageType) -> Vec<&[u8]> {
-    received
-        .iter()
-        .filter(|(t, _)| *t == wanted)
-        .map(|(_, p)| p.as_slice())
-        .collect()
 }

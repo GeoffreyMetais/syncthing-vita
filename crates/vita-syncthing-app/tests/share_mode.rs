@@ -208,3 +208,89 @@ fn test_reverted_event_shows_a_toast() {
     ));
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn test_toggle_switches_mode_saves_and_reports_each_direction() {
+    let (dir, repo, mut state) = setup("share-mode-toggle-direct");
+    state.config_dirty = false;
+    state.auto_reconnect_enabled = false;
+
+    ShareModeService::toggle(&mut state, &repo, 0);
+    assert_eq!(state.shares[0].mode, ShareMode::ReadOnly);
+    assert!(state.config_dirty);
+    assert!(state.auto_reconnect_enabled);
+    assert_eq!(repo.load_shares()[0].mode, ShareMode::ReadOnly);
+    assert_eq!(
+        state.toast_msg.as_ref().map(|(m, _)| m.clone()),
+        Some(UiText::ShareReadOnly {
+            id: "saves".to_owned()
+        })
+    );
+    assert!(state.logs.iter().any(|l| l == "Share saves is now read only"));
+
+    ShareModeService::toggle(&mut state, &repo, 0);
+    assert_eq!(state.shares[0].mode, ShareMode::ReadWrite);
+    assert_eq!(repo.load_shares()[0].mode, ShareMode::ReadWrite);
+    assert_eq!(
+        state.toast_msg.as_ref().map(|(m, _)| m.clone()),
+        Some(UiText::ShareReadWrite {
+            id: "saves".to_owned()
+        })
+    );
+    assert!(state.logs.iter().any(|l| l == "Share saves is now read & write"));
+
+    // An unknown share is ignored.
+    state.config_dirty = false;
+    ShareModeService::toggle(&mut state, &repo, 5);
+    assert!(!state.config_dirty);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_revert_request_is_queued_once_and_only_for_read_only_shares() {
+    let (dir, repo, mut state) = setup("share-mode-revert-queue");
+
+    // Read & write: refused, nothing queued.
+    assert_eq!(
+        ShareModeService::request_revert(&mut state, &repo, 0),
+        UserCommand::None
+    );
+    assert!(state.pending_reverts.is_empty());
+    assert_eq!(
+        ShareModeService::request_revert(&mut state, &repo, 9),
+        UserCommand::None
+    );
+
+    ShareModeService::toggle(&mut state, &repo, 0);
+    state.sync_in_progress = false;
+    state.session_connected = false;
+    assert_eq!(
+        ShareModeService::request_revert(&mut state, &repo, 0),
+        UserCommand::StartSync
+    );
+    // A second request for the same folder is not queued twice.
+    assert_eq!(
+        ShareModeService::request_revert(&mut state, &repo, 0),
+        UserCommand::StartSync
+    );
+    assert_eq!(state.pending_reverts, vec!["saves".to_owned()]);
+    assert!(state.auto_reconnect_enabled);
+    assert!(state
+        .logs
+        .iter()
+        .any(|l| l == "Revert of local changes requested for saves"));
+
+    // With a worker already syncing, the revert waits for it: no new sync is started.
+    state.sync_in_progress = true;
+    assert_eq!(
+        ShareModeService::request_revert(&mut state, &repo, 0),
+        UserCommand::None
+    );
+    state.sync_in_progress = false;
+    state.session_connected = true;
+    assert_eq!(
+        ShareModeService::request_revert(&mut state, &repo, 0),
+        UserCommand::None
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}

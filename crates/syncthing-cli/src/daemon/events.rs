@@ -115,7 +115,7 @@ fn report_unshared_folders(ctx: &DaemonContext, peer: &KnownPeer, folders: &[Bep
 }
 
 /// Quotes `s` for a POSIX shell when needed (folder IDs come from peers).
-fn shell_word(s: &str) -> String {
+pub fn shell_word(s: &str) -> String {
     if !s.is_empty()
         && s.chars()
             .all(|c| c.is_ascii_alphanumeric() || "-_.".contains(c))

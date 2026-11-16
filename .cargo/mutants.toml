@@ -1,0 +1,39 @@
+# cargo-mutants configuration (https://mutants.rs) — see AGENTS.md §6 "Mutation Testing".
+#
+# Scope: the Syncthing protocol (`syncthing-core`), the CLI client and the
+# PS Vita app's domain / application / persistence / i18n logic.
+# Left out, because host tests cannot observe them:
+# - pixel rendering (`ui/gfx.rs`, screens, modals, widgets, theme): checked in
+#   Vita3K with screenshots (AGENTS.md §6); their hit-map declarations are
+#   covered through the application tests instead;
+# - PS Vita hardware drivers (`sce*` syscalls), the `ui-script` replay feature
+#   and the binaries' entry points (`main.rs`).
+
+exclude_globs = [
+    "crates/*/src/main.rs",
+    "crates/vita-syncthing-app/src/ui/gfx.rs",
+    "crates/vita-syncthing-app/src/ui/image.rs",
+    "crates/vita-syncthing-app/src/ui/renderer.rs",
+    "crates/vita-syncthing-app/src/ui/theme.rs",
+    "crates/vita-syncthing-app/src/ui/widgets.rs",
+    "crates/vita-syncthing-app/src/ui/screens/**",
+    "crates/vita-syncthing-app/src/ui/modals/**",
+    "crates/vita-syncthing-app/src/infrastructure/framebuffer.rs",
+    "crates/vita-syncthing-app/src/infrastructure/input.rs",
+    "crates/vita-syncthing-app/src/infrastructure/qr_camera.rs",
+    "crates/vita-syncthing-app/src/infrastructure/ui_script.rs",
+    "crates/vita-syncthing-app/src/infrastructure/vita_system.rs",
+]
+
+# Debug output is not part of any contract.
+exclude_re = [
+    "impl (std::fmt::)?Debug for",
+]
+
+# Faster builds: no debug info (see `[profile.mutants]` in Cargo.toml).
+profile = "mutants"
+
+# Networking tests rely on real timeouts: give slow mutants room before
+# declaring them hung.
+timeout_multiplier = 3.0
+minimum_test_timeout = 60

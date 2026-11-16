@@ -21,3 +21,8 @@ lto = true
 codegen-units = 1
 panic = "abort"
 strip = false # Important: preserve relocations (-Wl,-q) for vita-elf-create
+
+# Used by cargo-mutants (`.cargo/mutants.toml`): test builds without debug info.
+[profile.mutants]
+inherits = "test"
+debug = false

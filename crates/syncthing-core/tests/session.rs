@@ -6,7 +6,8 @@ use std::io::Cursor;
 use std::sync::mpsc;
 use std::time::Duration;
 
-use common::fake_peer::{payloads, FakePeer};
+use common::fake_peer::FakePeer;
+use common::session_driver::payloads;
 use syncthing_core::session::context::SessionContext;
 use syncthing_core::session::folders::{FolderSyncState, INDEX_BATCH_FILES};
 use syncthing_core::session::upload::serve_block_request;

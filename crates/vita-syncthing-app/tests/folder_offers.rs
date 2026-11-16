@@ -221,3 +221,162 @@ fn test_crafted_folder_id_cannot_escape_the_sync_directory() {
 
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+const OTHER: DeviceId = DeviceId([0x43; 32]);
+const THIRD: DeviceId = DeviceId([0x44; 32]);
+
+fn offer_pairs(state: &AppState) -> Vec<(String, DeviceId)> {
+    state
+        .folder_offers
+        .iter()
+        .map(|o| (o.folder_id.clone(), o.device_id))
+        .collect()
+}
+
+#[test]
+fn repeated_offers_refresh_only_the_label_of_the_same_peer_and_device() {
+    let (dir, repo, mut state) = setup("offers-label-refresh");
+    DeviceRegistry::upsert_device(&mut state, &repo, OTHER, "Tablet", "");
+
+    FolderOfferService::receive(&mut state, &repo, PEER, "remote-docs", "Remote Docs");
+    FolderOfferService::receive(&mut state, &repo, OTHER, "remote-docs", "Tablet Docs");
+    // The same folder offered by another device is a separate offer.
+    assert_eq!(state.folder_offers.len(), 2);
+    assert_eq!(state.folder_offers[1].label, "Tablet Docs");
+
+    // An empty label never erases the known one.
+    FolderOfferService::receive(&mut state, &repo, PEER, "remote-docs", "");
+    assert_eq!(state.folder_offers.len(), 2);
+    assert_eq!(state.folder_offers[0].label, "Remote Docs");
+
+    // A new label updates the offer of that peer only.
+    FolderOfferService::receive(&mut state, &repo, PEER, "remote-docs", "Renamed");
+    assert_eq!(state.folder_offers[0].label, "Renamed");
+    assert_eq!(state.folder_offers[1].label, "Tablet Docs");
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn offer_log_names_the_peer_and_the_folder() {
+    let (dir, repo, mut state) = setup("offers-log-name");
+    FolderOfferService::receive(&mut state, &repo, PEER, "remote-docs", "Remote Docs");
+    assert!(state
+        .logs
+        .iter()
+        .any(|l| l == "MacBook wants to share 'Remote Docs' (remote-docs): waiting for approval"));
+
+    // A peer unknown to the registry is named by its short ID.
+    FolderOfferService::receive(&mut state, &repo, THIRD, "other", "");
+    let unknown = format!("Device {} wants to share 'other' (other): waiting for approval", THIRD.short());
+    assert!(state.logs.iter().any(|l| l == &unknown));
+
+    // device_name: known name, the placeholder of a known ID, or the short ID.
+    assert_eq!(FolderOfferService::device_name(&state, &PEER), "MacBook");
+    let placeholder = DeviceId::parse_user_id(&PEER.short()).unwrap();
+    assert_eq!(FolderOfferService::device_name(&state, &placeholder), "MacBook");
+    assert_eq!(
+        FolderOfferService::device_name(&state, &THIRD),
+        format!("Device {}", THIRD.short())
+    );
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn accepting_an_offer_links_its_device_to_an_existing_share_once() {
+    let (dir, repo, mut state) = setup("offers-accept-link");
+    ShareService::create_share(&mut state, &repo, "docs", "Docs", &format!("{}/docs", dir));
+    ShareService::toggle_device_for_share(&mut state, &repo, 0, PEER).unwrap();
+
+    FolderOfferService::receive(&mut state, &repo, OTHER, "docs", "Docs");
+    assert_eq!(state.folder_offers.len(), 1);
+    FolderOfferService::accept(&mut state, &repo, 0);
+
+    assert_eq!(state.shares.len(), 1, "no second share for the same folder");
+    assert_eq!(state.shares[0].shared_devices, vec![PEER, OTHER]);
+    assert!(state.folder_offers.is_empty());
+    assert_eq!(repo.load_shares()[0].shared_devices, vec![PEER, OTHER]);
+
+    // Accepting an offer whose device is already linked does not duplicate it.
+    FolderOfferService::receive(&mut state, &repo, PEER, "docs", "Docs");
+    FolderOfferService::receive(&mut state, &repo, PEER, "docs", "Docs");
+    assert!(state.folder_offers.is_empty(), "linked peers only refresh the label");
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn accepting_an_offer_stops_listing_only_its_own_device_as_unpaired() {
+    let (dir, repo, mut state) = setup("offers-accept-unpaired");
+    DeviceRegistry::register_discovered_peer(&mut state, OTHER, "", "");
+    DeviceRegistry::register_discovered_peer(&mut state, THIRD, "", "");
+    FolderOfferService::receive(&mut state, &repo, OTHER, "music", "Music");
+
+    FolderOfferService::accept(&mut state, &repo, 0);
+    assert!(!state.is_unpaired_lan_peer(&OTHER));
+    assert!(state.is_unpaired_lan_peer(&THIRD));
+    assert!(state.shares[0].is_linked_to(&OTHER));
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn accepting_a_template_offer_uses_the_preset_folder() {
+    let (dir, repo, mut state) = setup("offers-template-target");
+    FolderOfferService::receive(&mut state, &repo, PEER, "screenshots", "Screens");
+    FolderOfferService::accept(&mut state, &repo, 0);
+    assert_eq!(state.shares[0].target_path, "ux0:picture/SCREENSHOT");
+
+    // Other folder IDs get a folder inside the app's sync directory.
+    FolderOfferService::receive(&mut state, &repo, PEER, "custom-id", "Custom");
+    FolderOfferService::accept(&mut state, &repo, 0);
+    assert_eq!(state.shares[1].target_path, repo.default_share_dir("custom-id"));
+    assert!(!state.shares[1].enabled);
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn ignoring_a_folder_drops_only_its_offers_from_the_given_devices() {
+    let (dir, repo, mut state) = setup("offers-ignore-scope");
+    FolderOfferService::receive(&mut state, &repo, PEER, "a", "");
+    FolderOfferService::receive(&mut state, &repo, OTHER, "a", "");
+    FolderOfferService::receive(&mut state, &repo, PEER, "b", "");
+
+    FolderOfferService::ignore(&mut state, &repo, "a", &[PEER]);
+    assert_eq!(
+        offer_pairs(&state),
+        vec![("a".to_owned(), OTHER), ("b".to_owned(), PEER)]
+    );
+    assert_eq!(state.ignored_folders.len(), 1);
+    assert!(state.is_folder_ignored("a", &PEER));
+    assert!(!state.is_folder_ignored("a", &OTHER));
+    assert_eq!(repo.load_ignored_folders(), state.ignored_folders);
+
+    // Ignoring the same pair again does not record it twice.
+    FolderOfferService::ignore(&mut state, &repo, "a", &[PEER]);
+    assert_eq!(state.ignored_folders.len(), 1);
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn ignoring_closes_the_offer_modal_only_when_its_offer_is_gone() {
+    let (dir, repo, mut state) = setup("offers-ignore-modal");
+    FolderOfferService::receive(&mut state, &repo, OTHER, "a", "");
+    FolderOfferService::receive(&mut state, &repo, PEER, "b", "");
+
+    // The open offer (index 0) still exists after ignoring `b`: the modal stays.
+    state.modal = ModalDialog::FolderOffer { offer_idx: 0 };
+    FolderOfferService::ignore(&mut state, &repo, "b", &[PEER]);
+    assert_eq!(state.modal, ModalDialog::FolderOffer { offer_idx: 0 });
+
+    // The open offer (index 1) is the one removed: the modal closes.
+    FolderOfferService::receive(&mut state, &repo, PEER, "c", "");
+    state.modal = ModalDialog::FolderOffer { offer_idx: 1 };
+    FolderOfferService::ignore(&mut state, &repo, "c", &[PEER]);
+    assert_eq!(state.modal, ModalDialog::None);
+
+    let _ = std::fs::remove_dir_all(&dir);
+}

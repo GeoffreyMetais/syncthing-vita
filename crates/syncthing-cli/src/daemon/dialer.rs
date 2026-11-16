@@ -30,7 +30,7 @@ pub fn resolve_configured(address: &str) -> Vec<SocketAddr> {
         .unwrap_or_default()
 }
 
-fn jitter() -> Duration {
+pub fn jitter() -> Duration {
     let nanos = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.subsec_nanos())
@@ -39,7 +39,7 @@ fn jitter() -> Duration {
 }
 
 /// Candidate endpoints: direct ones first (configured, LAN, global), relays last.
-fn targets(ctx: &DaemonContext, peer: &KnownPeer) -> Vec<PeerEndpoint> {
+pub fn targets(ctx: &DaemonContext, peer: &KnownPeer) -> Vec<PeerEndpoint> {
     let mut direct: Vec<PeerEndpoint> = Vec::new();
     let mut relays: Vec<PeerEndpoint> = Vec::new();
     let mut push = |ep: PeerEndpoint| {
@@ -94,7 +94,7 @@ fn global_lookup(ctx: &DaemonContext, peer: &KnownPeer) {
     ctx.table().set_global_endpoints(peer.id, endpoints);
 }
 
-fn label(ep: &PeerEndpoint) -> String {
+pub fn label(ep: &PeerEndpoint) -> String {
     match ep {
         PeerEndpoint::Direct(addr) => format!("tcp://{addr}"),
         PeerEndpoint::Relay { addr, .. } => format!("relay://{addr}"),

@@ -183,3 +183,24 @@ fn relay_invitations_beyond_the_limit_are_dropped_until_slots_come_back() {
     pending.clear();
     assert_eq!(slots.in_use(), 0);
 }
+
+#[test]
+fn report_memory_is_empty_until_something_is_reported() {
+    let mut memory = ReportMemory::default();
+    assert!(memory.is_empty());
+    assert_eq!(memory.len(), 0);
+    assert!(memory.first("lookup:x", "timeout"));
+    assert!(!memory.is_empty());
+    assert_eq!(memory.len(), 2, "one subject and one detail");
+}
+
+#[test]
+fn report_memory_counts_unknown_devices_too() {
+    let mut memory = ReportMemory::default();
+    assert_eq!(
+        memory.unknown_device("lan", device(7)),
+        UnknownReport::First
+    );
+    assert!(!memory.is_empty());
+    assert_eq!(memory.len(), 1);
+}
