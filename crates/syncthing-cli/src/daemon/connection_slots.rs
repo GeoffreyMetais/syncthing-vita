@@ -29,14 +29,28 @@ impl ConnectionSlots {
 
     /// Takes a slot; `None` when all of them are in use.
     pub fn try_take(&self) -> Option<ConnectionSlot> {
-        self.in_use
-            .try_update(Ordering::AcqRel, Ordering::Acquire, |n| {
-                (n < self.capacity).then_some(n + 1)
-            })
-            .ok()
-            .map(|_| ConnectionSlot {
-                in_use: Arc::clone(&self.in_use),
-            })
+        // An explicit compare-exchange loop: `fetch_update` is deprecated on
+        // recent toolchains and its `try_update` replacement is still unstable
+        // on others, so neither can be used on every supported compiler.
+        let mut current = self.in_use.load(Ordering::Acquire);
+        loop {
+            if current >= self.capacity {
+                return None;
+            }
+            match self.in_use.compare_exchange_weak(
+                current,
+                current + 1,
+                Ordering::AcqRel,
+                Ordering::Acquire,
+            ) {
+                Ok(_) => {
+                    return Some(ConnectionSlot {
+                        in_use: Arc::clone(&self.in_use),
+                    })
+                }
+                Err(actual) => current = actual,
+            }
+        }
     }
 
     /// Slots currently taken.
