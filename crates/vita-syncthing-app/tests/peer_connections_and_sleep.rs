@@ -97,3 +97,23 @@ fn test_interruptible_sleep_gives_up_on_stop_and_carries_on_otherwise() {
     let running = SyncControl::new();
     assert!(sleep_interruptible(&running, Duration::from_millis(20)));
 }
+
+#[test]
+fn test_endpoint_labels_show_direct_and_relay_addresses() {
+    use std::net::SocketAddr;
+    use syncthing_core::PeerEndpoint;
+    use vita_syncthing_app::infrastructure::peer_endpoints::format_endpoint_label;
+    let direct: SocketAddr = "10.0.0.8:22000".parse().unwrap();
+    let relay: SocketAddr = "198.51.100.9:22067".parse().unwrap();
+    assert_eq!(
+        format_endpoint_label(&PeerEndpoint::Direct(direct)),
+        "10.0.0.8:22000"
+    );
+    assert_eq!(
+        format_endpoint_label(&PeerEndpoint::Relay {
+            addr: relay,
+            device_id: DeviceId([0x09; 32]),
+        }),
+        "relay://198.51.100.9:22067"
+    );
+}

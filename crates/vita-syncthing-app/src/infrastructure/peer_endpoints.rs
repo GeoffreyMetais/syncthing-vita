@@ -189,7 +189,7 @@ pub fn sleep_interruptible(control: &SyncControl, duration: Duration) -> bool {
     sleep_unless_stopped(control, duration, || false)
 }
 
-fn format_endpoint_label(ep: &PeerEndpoint) -> String {
+pub fn format_endpoint_label(ep: &PeerEndpoint) -> String {
     match ep {
         PeerEndpoint::Direct(addr) => addr.to_string(),
         PeerEndpoint::Relay { addr, .. } => format!("relay://{addr}"),
