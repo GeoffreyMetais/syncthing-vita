@@ -132,3 +132,45 @@ fn test_files_rows_open_and_up_button() {
 
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn test_sidebar_up_and_down_stop_at_the_first_and_last_tab() {
+    let (dir, repo, mut state) = setup("dpad-sidebar-edges");
+    assert_eq!(state.nav.focus, NavFocus::Sidebar);
+    // Up on the first tab: nothing to switch to.
+    press(&mut state, &repo, BTN_UP);
+    assert_eq!(state.active_tab, ActiveTab::Dashboard);
+    // Down to the last tab, then Down again stays there.
+    press(&mut state, &repo, BTN_DOWN);
+    press(&mut state, &repo, BTN_DOWN);
+    assert_eq!(state.active_tab, ActiveTab::Settings);
+    press(&mut state, &repo, BTN_DOWN);
+    assert_eq!(state.active_tab, ActiveTab::Settings);
+    assert_eq!(state.nav.focus, NavFocus::Sidebar);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_cross_on_the_sidebar_enters_the_page_without_activating_anything() {
+    let (dir, repo, mut state) = setup("dpad-sidebar-cross");
+    assert_eq!(press(&mut state, &repo, BTN_CROSS), UserCommand::None);
+    assert_eq!(state.nav.focus, NavFocus::Content);
+    assert_eq!(state.active_tab, ActiveTab::Dashboard);
+    assert_eq!(state.modal, ModalDialog::None);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_cross_on_a_page_without_focused_element_does_nothing() {
+    let (dir, repo, mut state) = setup("dpad-cross-none");
+    // Files rows have no buttons: the focused row declares no Cross target of its own.
+    state.active_tab = ActiveTab::FolderPicker;
+    state.reset_nav_for_tab();
+    state.nav.focus = NavFocus::Content;
+    state.nav.header = false;
+    // `Cross` on a row that is not a button leaves the tab and the focus alone.
+    press(&mut state, &repo, BTN_CROSS);
+    assert_eq!(state.active_tab, ActiveTab::FolderPicker);
+    assert_eq!(state.nav.focus, NavFocus::Content);
+    let _ = std::fs::remove_dir_all(&dir);
+}

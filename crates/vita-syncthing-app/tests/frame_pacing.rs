@@ -108,3 +108,46 @@ fn test_screensaver_speed_does_not_depend_on_frame_rate() {
     assert_eq!(every_vblank.saver.x, every_other.saver.x);
     assert_eq!(every_vblank.saver.y, every_other.saver.y);
 }
+
+#[test]
+fn test_first_tick_renders_with_the_elapsed_count_of_a_new_pacer() {
+    let mut pacer = FramePacer::new();
+    assert_eq!(pacer.tick(IDLE), Some(IDLE_REFRESH_INTERVAL + 1));
+}
+
+#[test]
+fn test_user_frame_clears_a_pending_background_update() {
+    let mut pacer = settled_pacer();
+    // A background change waits for its rate-limited redraw...
+    assert_eq!(pacer.tick(BACKGROUND), None);
+    // ...but a user frame renders the screen anyway, with the background change in it.
+    assert_eq!(pacer.tick(USER), Some(2));
+    // Nothing is left to redraw before the idle refresh.
+    assert_eq!(count_frames(&mut pacer, IDLE, IDLE_REFRESH_INTERVAL - 1), 0);
+}
+
+#[test]
+fn test_background_interval_is_measured_from_the_last_rendered_frame() {
+    let mut pacer = settled_pacer();
+    // Two VBlanks after the last frame, a background change arrives: it waits until the
+    // interval counted from that frame has elapsed.
+    assert_eq!(pacer.tick(IDLE), None);
+    assert_eq!(pacer.tick(IDLE), None);
+    let mut rendered = None;
+    for _ in 0..BACKGROUND_INTERVAL {
+        if let Some(elapsed) = pacer.tick(BACKGROUND) {
+            rendered = Some(elapsed);
+            break;
+        }
+    }
+    assert_eq!(rendered, Some(BACKGROUND_INTERVAL));
+}
+
+#[test]
+fn test_animation_renders_with_the_elapsed_vblanks_of_its_interval() {
+    let mut pacer = settled_pacer();
+    assert_eq!(pacer.tick(ANIMATION), None);
+    assert_eq!(pacer.tick(ANIMATION), Some(ANIMATION_INTERVAL));
+    assert_eq!(pacer.tick(ANIMATION), None);
+    assert_eq!(pacer.tick(ANIMATION), Some(ANIMATION_INTERVAL));
+}

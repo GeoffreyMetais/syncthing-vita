@@ -97,12 +97,12 @@ fn test_scroll_area_at_returns_topmost_area_and_respects_bounds() {
         step: 12,
     });
     map.add_scroll_area(ScrollArea {
-        rect: Rect::new(0, 0, 20, 20),
+        rect: Rect::new(0, 0, 40, 40),
         target: ScrollTarget::FilesList,
         step: 3,
     });
     // Inside both: the last declared one wins.
-    assert_eq!(map.scroll_area_at(15, 21).map(|a| a.step), Some(3));
+    assert_eq!(map.scroll_area_at(15, 25).map(|a| a.step), Some(3));
     // Only inside the first.
     assert_eq!(map.scroll_area_at(50, 40).map(|a| a.step), Some(12));
     assert_eq!(map.scroll_area_at(110, 40), None);

@@ -124,3 +124,87 @@ fn test_injected_tap_passes_through() {
     );
     assert_eq!(frame.touch_tap, Some((10, 20)));
 }
+
+#[test]
+fn test_touch_drag_threshold_is_exclusive_in_both_directions() {
+    // A finger exactly at the threshold is still a tap; one more pixel is a drag.
+    let threshold = TOUCH_DRAG_THRESHOLD as usize;
+    for (dx, dy) in [(threshold, 0), (0, threshold), (0, 0)] {
+        let mut g = InputGestures::new();
+        step(&mut g, touch((300, 300), true));
+        let moved = (300 + dx, 300 + dy);
+        assert_eq!(step(&mut g, touch(moved, false)).touch_drag, None);
+        assert_eq!(
+            step(&mut g, InputFrame::default()).touch_tap,
+            Some((300, 300))
+        );
+    }
+    for (x, y) in [(300 + threshold + 1, 300), (300 - threshold - 1, 300), (300, 300 - threshold - 1)] {
+        let mut g = InputGestures::new();
+        step(&mut g, touch((300, 300), true));
+        assert!(step(&mut g, touch((x, y), false)).touch_drag.is_some());
+        assert_eq!(step(&mut g, InputFrame::default()).touch_tap, None);
+    }
+}
+
+#[test]
+fn test_drag_continues_when_the_finger_returns_inside_the_threshold() {
+    let mut g = InputGestures::new();
+    step(&mut g, touch((300, 300), true));
+    assert!(step(&mut g, touch((300, 200), false)).touch_drag.is_some());
+    // Back at the start: the touch is still a drag, so it never becomes a tap.
+    let back = step(&mut g, touch((300, 300), false)).touch_drag.expect("still dragging");
+    assert_eq!((back.total_dy, back.started), (0, false));
+    assert_eq!(step(&mut g, InputFrame::default()).touch_tap, None);
+}
+
+#[test]
+fn test_a_new_touch_down_resets_the_previous_drag() {
+    let mut g = InputGestures::new();
+    step(&mut g, touch((300, 300), true));
+    step(&mut g, touch((300, 100), false));
+    step(&mut g, InputFrame::default());
+    // Second touch: starts a fresh gesture, small movement is a tap again.
+    step(&mut g, touch((50, 50), true));
+    let small = step(&mut g, touch((52, 50), false));
+    assert_eq!(small.touch_drag, None);
+    assert_eq!(step(&mut g, InputFrame::default()).touch_tap, Some((50, 50)));
+}
+
+#[test]
+fn test_drag_reports_its_start_and_the_started_flag_only_once() {
+    let mut g = InputGestures::new();
+    step(&mut g, touch((200, 200), true));
+    let first = step(&mut g, touch((200, 180), false)).touch_drag.unwrap();
+    assert!(first.started);
+    assert_eq!(first.start, (200, 200));
+    let second = step(&mut g, touch((200, 170), false)).touch_drag.unwrap();
+    assert!(!second.started);
+    assert_eq!((second.start, second.total_dy), ((200, 200), -30));
+}
+
+#[test]
+fn test_release_keeps_an_injected_tap_and_nothing_else_is_emitted() {
+    let mut g = InputGestures::new();
+    step(&mut g, touch((10, 10), true));
+    let released = step(
+        &mut g,
+        InputFrame {
+            touch_tap: Some((99, 99)),
+            ..Default::default()
+        },
+    );
+    assert_eq!(released.touch_tap, Some((99, 99)));
+    assert_eq!(released.touch_drag, None);
+}
+
+#[test]
+fn test_repeat_follows_the_held_direction_only() {
+    let mut g = InputGestures::new();
+    step(&mut g, pressed(BTN_UP));
+    // Holding Down instead of Up (without a new press) ends the repeat.
+    for _ in 0..KEY_REPEAT_DELAY + KEY_REPEAT_INTERVAL {
+        assert_eq!(step(&mut g, held(BTN_DOWN)).pressed & BTN_UP, 0);
+    }
+    assert_eq!(step(&mut g, held(BTN_DOWN)).pressed, 0);
+}
