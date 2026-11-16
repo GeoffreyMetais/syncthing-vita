@@ -13,7 +13,7 @@ use super::keepalive::send_keepalive_if_due;
 use super::upload::serve_block_request;
 use crate::bep::{
     read_bep_message, write_bep_message, BepBlockInfo, BepFileInfo, BepMessageType, BepRequest,
-    BepResponse,
+    BepResponse, BEP_BLOCK_HASH_LEN,
 };
 use crate::storage::download::write_block_at;
 use crate::tls::BepTlsStream;
@@ -247,7 +247,10 @@ fn fetch_block(
             ),
         ));
     }
-    if block.hash.len() == 32 && Sha256::digest(&resp.data).as_slice() != block.hash.as_slice() {
+    // A hash that is not a SHA-256 cannot be verified: the block is refused, never trusted.
+    if block.hash.len() != BEP_BLOCK_HASH_LEN
+        || Sha256::digest(&resp.data).as_slice() != block.hash.as_slice()
+    {
         return Err(io::Error::new(
             io::ErrorKind::InvalidData,
             format!("Invalid SHA-256 block hash for {}", file.name),

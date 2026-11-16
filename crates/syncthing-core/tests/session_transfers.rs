@@ -175,6 +175,39 @@ fn test_block_with_a_wrong_sha256_is_refused() {
 }
 
 #[test]
+fn test_block_with_a_hash_that_is_not_a_sha256_is_never_requested_nor_written() {
+    let vita = vita_id();
+    let peer = FakePeer::spawn(0x64, move |conn| {
+        let mut bad = conn.file("saves", "short.bin", b"unverifiable", 1);
+        // A 2-byte hash: nothing could ever be checked against it.
+        bad.blocks[0].hash = vec![0xAB, 0xCD];
+        conn.send_cluster_config(&["saves"], vita);
+        conn.wait_for(BepMessageType::ClusterConfig, Duration::from_secs(5))
+            .expect("ClusterConfig reply");
+        conn.send_index("saves", vec![bad], false);
+        conn.serve_until_idle(Duration::from_millis(800));
+    });
+
+    let mut storage = FsSyncStorage::new(common::fresh_temp_dir("transfers_short_hash"));
+    storage.set_folder_devices("saves", vec![peer.device_id]);
+    let path = storage.resolve_safe_path("saves", "short.bin");
+
+    let _ = run_session(
+        &peer,
+        &storage,
+        &hello_under_test(1),
+        Some(quiet_control()),
+        |_| {},
+    );
+    let received = peer.join();
+    assert!(
+        payloads(&received, BepMessageType::Request).is_empty(),
+        "no block of an unverifiable file is requested"
+    );
+    assert!(!path.exists(), "the unverifiable file must not be written");
+}
+
+#[test]
 fn test_keepalives_are_sent_during_a_long_local_scan() {
     let vita = vita_id();
     let pings_before_index = Arc::new(AtomicUsize::new(usize::MAX));

@@ -8,7 +8,9 @@ use std::path::Path;
 use sha2::{Digest, Sha256};
 
 use super::FsSyncStorage;
-use crate::bep::{BepBlockInfo, BepFileInfo, BEP_BLOCK_SIZE, BEP_MAX_BLOCK_SIZE};
+use crate::bep::{
+    BepBlockInfo, BepFileInfo, BEP_BLOCK_HASH_LEN, BEP_BLOCK_SIZE, BEP_MAX_BLOCK_SIZE,
+};
 
 impl FsSyncStorage {
     /// **Step 1 (Delta Sync)**:
@@ -16,7 +18,8 @@ impl FsSyncStorage {
     /// only the list of blocks that are missing or have a differing SHA-256 compared to the remote `Index`.
     /// Read-only: the local file is never modified here. Block sizes and offsets come from the
     /// peer: they are rejected when negative, above [`BEP_MAX_BLOCK_SIZE`], beyond the announced
-    /// file size, or when the blocks do not add up to that size.
+    /// file size, or when the blocks do not add up to that size. A block whose hash is not a
+    /// SHA-256 ([`BEP_BLOCK_HASH_LEN`] bytes) is rejected too: it could never be verified.
     pub fn find_outdated_blocks(
         &self,
         folder_id: &str,
@@ -24,20 +27,24 @@ impl FsSyncStorage {
     ) -> io::Result<Vec<BepBlockInfo>> {
         let full_path = self.resolve_safe_path(folder_id, &remote_file.name);
         let file_size = remote_file.size;
-        let out_of_bounds = |b: &&BepBlockInfo| {
-            b.size < 0
+        let invalid = |b: &&BepBlockInfo| {
+            b.hash.len() != BEP_BLOCK_HASH_LEN
+                || b.size < 0
                 || b.size as usize > BEP_MAX_BLOCK_SIZE
                 || b.offset < 0
                 || b.offset
                     .checked_add(i64::from(b.size))
                     .is_none_or(|end| end > file_size)
         };
-        if let Some(bad) = remote_file.blocks.iter().find(out_of_bounds) {
+        if let Some(bad) = remote_file.blocks.iter().find(invalid) {
             return Err(io::Error::new(
                 io::ErrorKind::InvalidData,
                 format!(
-                    "invalid block (offset {}, size {}) announced for {}",
-                    bad.offset, bad.size, remote_file.name
+                    "invalid block (offset {}, size {}, {}-byte hash) announced for {}",
+                    bad.offset,
+                    bad.size,
+                    bad.hash.len(),
+                    remote_file.name
                 ),
             ));
         }
@@ -81,11 +88,9 @@ impl FsSyncStorage {
 
             match file.read_exact(&mut buf[..bsize]) {
                 Ok(()) => {
-                    if block.hash.len() == 32 {
-                        let actual_hash = Sha256::digest(&buf[..bsize]);
-                        if actual_hash.as_slice() != block.hash.as_slice() {
-                            outdated.push(block.clone());
-                        }
+                    let actual_hash = Sha256::digest(&buf[..bsize]);
+                    if actual_hash.as_slice() != block.hash.as_slice() {
+                        outdated.push(block.clone());
                     }
                 }
                 Err(_) => outdated.push(block.clone()),

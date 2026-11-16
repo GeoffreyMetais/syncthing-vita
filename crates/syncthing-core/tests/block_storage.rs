@@ -309,3 +309,36 @@ fn test_custom_folder_path_wins_and_moves_the_database() {
     );
     let _ = fs::remove_dir_all(&dir);
 }
+
+#[test]
+fn test_a_block_hash_that_is_not_a_sha256_is_rejected_even_for_identical_content() {
+    let dir = common::fresh_temp_dir("delta_bad_hash_len");
+    let storage = FsSyncStorage::new(&dir);
+    let root = storage.folder_root("f");
+    let data = pattern(BEP_BLOCK_SIZE + 10, 4);
+    write(&root, "save.bin", &data);
+
+    for bad_hash in [
+        Vec::new(),
+        sha(&data[..BEP_BLOCK_SIZE])[..31].to_vec(),
+        vec![0; 33],
+    ] {
+        let mut remote = remote_of("save.bin", &data);
+        // Truncated, empty or oversized: the local block can never be verified against it.
+        remote.blocks[0].hash = bad_hash.clone();
+        let err = storage
+            .find_outdated_blocks("f", &remote)
+            .expect_err("an unverifiable block must not be taken as up to date");
+        assert_eq!(err.kind(), std::io::ErrorKind::InvalidData);
+        assert!(
+            err.to_string()
+                .contains(&format!("{}-byte hash", bad_hash.len())),
+            "{err}"
+        );
+    }
+    assert_eq!(
+        fs::read(root.join("save.bin")).unwrap(),
+        data,
+        "the local file is left untouched"
+    );
+}
