@@ -242,6 +242,17 @@ fn test_short_id_label_in_every_language() {
 }
 
 #[test]
+fn test_share_title_method_in_every_language() {
+    for lang in ALL {
+        assert_eq!(
+            cat(lang).fmt_share_title("Photos", "pics"),
+            "Photos  ·  pics",
+            "{lang:?}"
+        );
+    }
+}
+
+#[test]
 fn test_english_free_helpers_in_ui_strings() {
     assert_eq!(
         en_strings::fmt_active_shares_devices(0, 1),

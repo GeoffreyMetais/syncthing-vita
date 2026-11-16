@@ -71,12 +71,13 @@ fn test_sleep_runs_its_full_duration_then_reports_to_carry_on() {
     let start = Instant::now();
     assert!(sleep_unless_stopped(
         &control,
-        Duration::from_millis(450),
+        Duration::from_millis(300),
         || false
     ));
     let slept = start.elapsed();
-    assert!(slept >= Duration::from_millis(440), "slept {slept:?}");
-    assert!(slept < Duration::from_secs(3), "slept {slept:?}");
+    // Steps of at most 200 ms: 200 + 100 ms, never a longer or shorter total.
+    assert!(slept >= Duration::from_millis(290), "slept {slept:?}");
+    assert!(slept < Duration::from_millis(360), "slept {slept:?}");
 }
 
 #[test]
