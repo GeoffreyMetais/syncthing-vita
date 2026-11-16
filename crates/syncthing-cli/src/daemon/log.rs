@@ -4,7 +4,7 @@ use std::io::Write;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 /// `HH:MM:SS` (UTC) of now.
-fn timestamp() -> String {
+pub fn timestamp() -> String {
     let secs = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map(|d| d.as_secs())

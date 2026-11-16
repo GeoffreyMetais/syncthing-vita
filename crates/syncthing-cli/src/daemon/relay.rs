@@ -61,7 +61,7 @@ pub fn triage_invitation(
 }
 
 /// The relays to try, in order: the configured ones, or the public pool in a random order.
-fn candidate_relays(ctx: &DaemonContext) -> Vec<String> {
+pub fn candidate_relays(ctx: &DaemonContext) -> Vec<String> {
     if !ctx.options.static_relays.is_empty() {
         return ctx.options.static_relays.clone();
     }

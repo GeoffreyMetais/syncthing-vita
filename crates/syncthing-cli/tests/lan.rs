@@ -53,3 +53,37 @@ fn replies_are_bounded_and_configured_devices_are_always_answered() {
     assert!(schedule.is_due(device(0), later));
     assert_eq!(schedule.len(), 2);
 }
+
+#[test]
+fn reply_schedule_is_empty_until_an_answer_is_recorded() {
+    use std::time::Instant;
+
+    use syncthing_cli::daemon::lan::ReplySchedule;
+    let id = DeviceIdentity::from_seed(&[61; 32])
+        .expect("identity")
+        .device_id;
+    let mut schedule = ReplySchedule::new(vec![id]);
+    assert!(schedule.is_empty());
+    assert_eq!(schedule.len(), 0);
+    assert!(schedule.is_due(id, Instant::now()));
+    assert!(!schedule.is_empty());
+    assert_eq!(schedule.len(), 1);
+}
+
+#[test]
+fn reply_is_due_again_exactly_one_interval_after_the_last_answer() {
+    use std::time::{Duration, Instant};
+
+    use syncthing_cli::daemon::lan::ReplySchedule;
+    use syncthing_cli::daemon::timing::{LAN_ANNOUNCE_INTERVAL, LAN_REPLY_INTERVAL};
+
+    let id = DeviceIdentity::from_seed(&[62; 32])
+        .expect("identity")
+        .device_id;
+    let interval = LAN_ANNOUNCE_INTERVAL.max(LAN_REPLY_INTERVAL);
+    let mut schedule = ReplySchedule::new(vec![id]);
+    let t0 = Instant::now();
+    assert!(schedule.is_due(id, t0));
+    assert!(!schedule.is_due(id, t0 + interval - Duration::from_millis(1)));
+    assert!(schedule.is_due(id, t0 + interval));
+}
