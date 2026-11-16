@@ -76,7 +76,13 @@ fn test_downloaded_files_are_saved_in_batches() {
     let _ = std::fs::remove_dir_all(&tmp_dir);
 }
 
-fn entry(name: &str, is_dir: bool, deleted: bool, size: i64, blocks: Vec<BepBlockInfo>) -> LocalEntry {
+fn entry(
+    name: &str,
+    is_dir: bool,
+    deleted: bool,
+    size: i64,
+    blocks: Vec<BepBlockInfo>,
+) -> LocalEntry {
     LocalEntry {
         name: name.to_owned(),
         is_dir,

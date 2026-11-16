@@ -123,11 +123,17 @@ fn test_delta_reuses_unchanged_blocks() {
     // A local file cut short: the blocks it no longer covers are outdated.
     write(&root, "save.bin", &data[..BEP_BLOCK_SIZE + 10]);
     let outdated = storage.find_outdated_blocks("f", &remote).unwrap();
-    assert_eq!(outdated, vec![remote.blocks[1].clone(), remote.blocks[2].clone()]);
+    assert_eq!(
+        outdated,
+        vec![remote.blocks[1].clone(), remote.blocks[2].clone()]
+    );
 
     // No local file: every block is needed.
     let _ = fs::remove_file(root.join("save.bin"));
-    assert_eq!(storage.find_outdated_blocks("f", &remote).unwrap(), remote.blocks);
+    assert_eq!(
+        storage.find_outdated_blocks("f", &remote).unwrap(),
+        remote.blocks
+    );
     let _ = fs::remove_dir_all(&dir);
 }
 
@@ -213,7 +219,9 @@ fn test_read_block_for_peer_returns_the_requested_range() {
     drop(file);
 
     assert_eq!(
-        storage.read_block_for_peer("f", "big.bin", 1000, 4).unwrap(),
+        storage
+            .read_block_for_peer("f", "big.bin", 1000, 4)
+            .unwrap(),
         b"MARK"
     );
     let whole = storage
@@ -256,7 +264,11 @@ fn test_custom_folder_path_wins_and_moves_the_database() {
     fs::create_dir_all(&custom).unwrap();
     storage.set_folder_path("f", &custom);
     assert_eq!(storage.folder_root("f"), custom);
-    assert_ne!(storage.db_path("f"), default_db, "a new root starts a new database");
+    assert_ne!(
+        storage.db_path("f"),
+        default_db,
+        "a new root starts a new database"
+    );
     assert_eq!(
         storage.resolve_safe_path("f", "../a/./b\\c"),
         custom.join("a").join("b").join("c")

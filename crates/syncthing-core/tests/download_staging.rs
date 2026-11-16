@@ -32,7 +32,9 @@ fn test_prepare_download_seeds_the_temp_file_with_local_content() {
     assert_eq!(fs::read(&tmp).unwrap(), b"hello");
 
     // Without reuse the temp file starts empty, even though the local file exists.
-    storage.prepare_download_seeded("f", "a.bin", false).unwrap();
+    storage
+        .prepare_download_seeded("f", "a.bin", false)
+        .unwrap();
     assert!(tmp.is_file());
     assert_eq!(fs::read(&tmp).unwrap().len(), 0);
 
@@ -75,11 +77,17 @@ fn test_streamed_write_cuts_the_temp_file_to_the_final_size() {
         .unwrap();
     assert_eq!(tmp, storage.download_temp_path("f", "big.bin"));
     let content = fs::read(&tmp).unwrap();
-    assert_eq!(content.len(), 10, "longer temp file is cut to the final size");
+    assert_eq!(
+        content.len(),
+        10,
+        "longer temp file is cut to the final size"
+    );
     assert_eq!(&content[..3], b"xyz");
 
     // A shorter temp file is never extended by a block write.
-    storage.prepare_download_seeded("f", "small.bin", false).unwrap();
+    storage
+        .prepare_download_seeded("f", "small.bin", false)
+        .unwrap();
     storage
         .write_block_streaming("f", "small.bin", 0, b"ab", 10)
         .unwrap();
@@ -96,7 +104,9 @@ fn test_commit_moves_the_temp_file_into_place_with_its_final_size() {
     fs::create_dir_all(&root).unwrap();
     fs::write(root.join("c.bin"), b"previous version").unwrap();
 
-    storage.prepare_download_seeded("f", "c.bin", false).unwrap();
+    storage
+        .prepare_download_seeded("f", "c.bin", false)
+        .unwrap();
     storage
         .write_block_streaming("f", "c.bin", 0, b"fresh!", 6)
         .unwrap();
@@ -125,7 +135,10 @@ fn test_scan_sees_a_file_restored_from_an_interrupted_commit() {
     .unwrap();
     let (index, _) = storage.build_local_index("f", OWN, &[]).unwrap();
     let file = index.files.iter().find(|f| f.name == "save.bin").unwrap();
-    assert!(!file.deleted, "restored file must not be announced as deleted");
+    assert!(
+        !file.deleted,
+        "restored file must not be announced as deleted"
+    );
     assert_eq!(fs::read(root.join("save.bin")).unwrap(), b"keep me");
     let _ = fs::remove_dir_all(&dir);
 }
@@ -145,7 +158,10 @@ fn test_scan_ignores_leftover_download_files_and_internal_names() {
     fs::write(root.join(".syncthing.bak"), b"odd").unwrap();
     fs::create_dir_all(root.join(".stfolder")).unwrap();
 
-    assert!(names(&storage, "f").is_empty(), "no internal name is indexed");
+    assert!(
+        names(&storage, "f").is_empty(),
+        "no internal name is indexed"
+    );
     assert!(!root.join("x").exists(), "a temp file is never promoted");
     assert_eq!(fs::read(root.join(".syncthing..bak")).unwrap(), b"odd");
     assert_eq!(fs::read(root.join(".syncthing.bak")).unwrap(), b"odd");

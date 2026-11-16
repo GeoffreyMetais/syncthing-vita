@@ -100,7 +100,10 @@ fn test_unchanged_directory_keeps_its_version_when_its_time_changes() {
     let after = find(&second, "d");
     assert_eq!(after.versions, before.versions);
     assert_eq!(after.sequence, before.sequence);
-    assert_eq!(state.max_sequence, first.files.iter().map(|f| f.sequence).max().unwrap());
+    assert_eq!(
+        state.max_sequence,
+        first.files.iter().map(|f| f.sequence).max().unwrap()
+    );
     let _ = fs::remove_dir_all(&dir);
 }
 
@@ -150,7 +153,10 @@ fn test_file_recreated_over_a_tombstone_is_live_again() {
     let f = find(&index, "f.txt");
     assert!(!f.deleted, "the file is on disk again");
     assert_eq!(f.size, 4);
-    assert!(f.versions.iter().any(|v| v.short_device_id == 1 && v.value == 1));
+    assert!(f
+        .versions
+        .iter()
+        .any(|v| v.short_device_id == 1 && v.value == 1));
     assert!(f
         .versions
         .iter()
@@ -171,7 +177,10 @@ fn test_emptied_folder_keeps_its_live_entries() {
 
     fs::remove_file(root.join("only.txt")).unwrap();
     let index = scan(&storage);
-    assert!(!find(&index, "only.txt").deleted, "an empty root is not a deletion");
+    assert!(
+        !find(&index, "only.txt").deleted,
+        "an empty root is not a deletion"
+    );
 
     fs::write(root.join("other.txt"), b"y").unwrap();
     fs::write(root.join("gone.txt"), b"z").unwrap();
@@ -191,25 +200,30 @@ fn test_identical_remote_versions_are_adopted() {
     let storage = FsSyncStorage::new(&dir);
     let root = storage.folder_root("f");
     fs::create_dir_all(&root).unwrap();
-    for (name, data) in [("m.txt", &b"same"[..]), ("n.txt", b"same"), ("q.txt", b"mine")] {
+    for (name, data) in [
+        ("m.txt", &b"same"[..]),
+        ("n.txt", b"same"),
+        ("q.txt", b"mine"),
+    ] {
         fs::write(root.join(name), data).unwrap();
     }
     scan(&storage);
-    let remote = |name: &str, data: &[u8], versions: Vec<BepVersionCounter>, invalid: bool| BepFileInfo {
-        name: name.to_owned(),
-        is_dir: false,
-        size: data.len() as i64,
-        modified_s: 1,
-        deleted: false,
-        invalid,
-        sequence: 1,
-        versions,
-        blocks: vec![BepBlockInfo {
-            offset: 0,
-            size: data.len() as i32,
-            hash: Sha256::digest(data).to_vec(),
-        }],
-    };
+    let remote =
+        |name: &str, data: &[u8], versions: Vec<BepVersionCounter>, invalid: bool| BepFileInfo {
+            name: name.to_owned(),
+            is_dir: false,
+            size: data.len() as i64,
+            modified_s: 1,
+            deleted: false,
+            invalid,
+            sequence: 1,
+            versions,
+            blocks: vec![BepBlockInfo {
+                offset: 0,
+                size: data.len() as i32,
+                hash: Sha256::digest(data).to_vec(),
+            }],
+        };
     let peer = |v| BepVersionCounter {
         short_device_id: 0x9A7C,
         value: v,
@@ -219,12 +233,19 @@ fn test_identical_remote_versions_are_adopted() {
         remote("n.txt", b"same", vec![peer(7)], true),
         remote("q.txt", b"other", vec![peer(9)], false),
     ];
-    let (index, _) = storage
-        .build_local_index("f", OWN, &remotes)
-        .unwrap();
-    assert!(find(&index, "m.txt").versions.iter().any(|v| v.short_device_id == 0x9A7C && v.value >= 5));
-    assert!(!find(&index, "n.txt").versions.iter().any(|v| v.short_device_id == 0x9A7C));
-    assert!(!find(&index, "q.txt").versions.iter().any(|v| v.short_device_id == 0x9A7C));
+    let (index, _) = storage.build_local_index("f", OWN, &remotes).unwrap();
+    assert!(find(&index, "m.txt")
+        .versions
+        .iter()
+        .any(|v| v.short_device_id == 0x9A7C && v.value >= 5));
+    assert!(!find(&index, "n.txt")
+        .versions
+        .iter()
+        .any(|v| v.short_device_id == 0x9A7C));
+    assert!(!find(&index, "q.txt")
+        .versions
+        .iter()
+        .any(|v| v.short_device_id == 0x9A7C));
     let _ = fs::remove_dir_all(&dir);
 }
 

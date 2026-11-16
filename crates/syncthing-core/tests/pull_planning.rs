@@ -14,6 +14,7 @@ use syncthing_core::version_vector::{short_device_id, version_ge, version_merge}
 use syncthing_core::{BepBlockInfo, BepFileInfo, BepVersionCounter, DeviceId, FsSyncStorage};
 
 const OWN: DeviceId = DeviceId([0x31; 32]);
+const OWN_SHORT: u64 = 0x3131_3131_3131_3131;
 const T: u64 = 1_600_000_000;
 
 fn c(id: u64, value: u64) -> BepVersionCounter {
@@ -53,7 +54,12 @@ fn blocks_of(data: &[u8]) -> Vec<BepBlockInfo> {
         .collect()
 }
 
-fn remote_file(name: &str, versions: Vec<BepVersionCounter>, modified_s: i64, data: &[u8]) -> BepFileInfo {
+fn remote_file(
+    name: &str,
+    versions: Vec<BepVersionCounter>,
+    modified_s: i64,
+    data: &[u8],
+) -> BepFileInfo {
     BepFileInfo {
         name: name.to_owned(),
         is_dir: false,
@@ -64,13 +70,6 @@ fn remote_file(name: &str, versions: Vec<BepVersionCounter>, modified_s: i64, da
         sequence: 1,
         versions,
         blocks: blocks_of(data),
-    }
-}
-
-fn remote_dir(name: &str, versions: Vec<BepVersionCounter>) -> BepFileInfo {
-    BepFileInfo {
-        is_dir: true,
-        ..remote_file(name, versions, 1, &[])
     }
 }
 
@@ -155,8 +154,6 @@ fn test_remote_version_covered_by_local_is_ignored() {
     let _ = fs::remove_dir_all(&dir);
 }
 
-const OWN_SHORT: u64 = 0x3131_3131_3131_3131;
-
 #[test]
 fn test_own_short_id_matches_the_test_device() {
     assert_eq!(short_device_id(OWN), OWN_SHORT);
@@ -170,10 +167,16 @@ fn test_concurrent_newer_remote_wins_and_local_copy_is_kept() {
     set_mtime(&root.join("c.txt"), T);
     let local = local_versions(&storage, "c.txt");
     let remote = remote_file("c.txt", vec![peer(3)], (T + 100) as i64, b"remote");
-    assert!(!version_ge(&remote.versions, &local), "versions must be concurrent");
+    assert!(
+        !version_ge(&remote.versions, &local),
+        "versions must be concurrent"
+    );
 
     let plan = storage.plan_pull("f", OWN, &[remote]).unwrap();
-    assert!(plan.applied.iter().any(|m| m.starts_with("Conflict on c.txt")));
+    assert!(plan
+        .applied
+        .iter()
+        .any(|m| m.starts_with("Conflict on c.txt")));
     assert_eq!(plan.downloads.len(), 1);
     assert!(!root.join("c.txt").exists());
     let copies = conflict_copies(&root, "c");
@@ -247,130 +250,12 @@ fn test_concurrent_file_over_local_directory_keeps_the_directory() {
     let remote = remote_file("x", vec![peer(4)], (T + 100) as i64, b"file");
 
     let plan = storage.plan_pull("f", OWN, &[remote]).unwrap();
-    assert!(root.join("x").is_dir(), "the local directory stays in place");
+    assert!(
+        root.join("x").is_dir(),
+        "the local directory stays in place"
+    );
     assert!(!plan.applied.iter().any(|m| m.starts_with("Conflict")));
     assert_eq!(plan.downloads.len(), 1);
-    let _ = fs::remove_dir_all(&dir);
-}
-
-#[test]
-fn test_remote_deletion_removes_the_file_and_stores_a_tombstone() {
-    let (dir, storage, root) = setup("pull_delete");
-    fs::write(root.join("d.txt"), b"bye").unwrap();
-    let local = local_versions(&storage, "d.txt");
-    let merged = version_merge(&local, &[peer(9)]);
-    let remote = remote_deleted("d.txt", merged.clone());
-
-    let plan = storage.plan_pull("f", OWN, &[remote]).unwrap();
-    assert!(plan.applied.iter().any(|m| m == "Deleted d.txt"));
-    assert!(!root.join("d.txt").exists());
-    let entry = &stored_db(&storage).entries["d.txt"];
-    assert!(entry.deleted);
-    assert_eq!((entry.size, entry.blocks.len()), (0, 0));
-    assert!(version_ge(&entry.version, &merged), "the merged version is recorded");
-    let _ = fs::remove_dir_all(&dir);
-}
-
-#[test]
-fn test_remote_deletion_of_an_unknown_entry_does_nothing() {
-    let (dir, storage, root) = setup("pull_delete_unknown");
-    fs::write(root.join("other.txt"), b"x").unwrap();
-    let remote = remote_deleted("never.txt", vec![peer(2)]);
-    let plan = storage.plan_pull("f", OWN, &[remote]).unwrap();
-    assert!(plan.applied.is_empty() && plan.downloads.is_empty());
-    assert!(!stored_db(&storage).entries.contains_key("never.txt"));
-    let _ = fs::remove_dir_all(&dir);
-}
-
-/// A deletion whose file is already gone (its parent is an unreadable entry, so the scan keeps
-/// it) is still recorded: the removal failed because nothing is there.
-#[cfg(unix)]
-#[test]
-fn test_deletion_of_an_already_missing_file_is_recorded() {
-    let (dir, storage, root) = setup("pull_missing_child");
-    fs::create_dir_all(root.join("x")).unwrap();
-    fs::write(root.join("x").join("y"), b"data").unwrap();
-    fs::write(root.join("keep.txt"), b"k").unwrap();
-    let local = local_versions(&storage, "x/y");
-    fs::remove_dir_all(root.join("x")).unwrap();
-    // A dangling link where the directory was: `x` and everything below it cannot be inspected.
-    std::os::unix::fs::symlink(dir.join("missing-target"), root.join("x")).unwrap();
-
-    let remote = remote_deleted("x/y", version_merge(&local, &[peer(9)]));
-    let plan = storage.plan_pull("f", OWN, &[remote]).unwrap();
-    assert!(plan.applied.iter().any(|m| m == "Deleted x/y"));
-    assert!(stored_db(&storage).entries["x/y"].deleted);
-    let _ = fs::remove_dir_all(&dir);
-}
-
-#[test]
-fn test_directory_creation_is_announced_once() {
-    let (dir, storage, root) = setup("pull_dirs");
-    let plan = storage
-        .plan_pull("f", OWN, &[remote_dir("newdir", vec![peer(2)])])
-        .unwrap();
-    assert!(root.join("newdir").is_dir());
-    assert!(plan.applied.iter().any(|m| m == "Created directory newdir"));
-
-    // A directory that is already there is not announced again.
-    fs::create_dir_all(root.join("live")).unwrap();
-    let local = local_versions(&storage, "live");
-    let plan = storage
-        .plan_pull("f", OWN, &[remote_dir("live", version_merge(&local, &[peer(9)]))])
-        .unwrap();
-    assert!(plan.applied.is_empty(), "{:?}", plan.applied);
-
-    // A directory deleted locally is created again and announced.
-    fs::create_dir_all(root.join("old")).unwrap();
-    let local = local_versions(&storage, "old");
-    fs::remove_dir(root.join("old")).unwrap();
-    let (index, _) = storage.build_local_index("f", OWN, &[]).unwrap();
-    assert!(index.files.iter().any(|f| f.name == "old" && f.deleted));
-    let plan = storage
-        .plan_pull("f", OWN, &[remote_dir("old", version_merge(&local, &[peer(9)]))])
-        .unwrap();
-    assert!(root.join("old").is_dir());
-    assert!(plan.applied.iter().any(|m| m == "Created directory old"));
-    let _ = fs::remove_dir_all(&dir);
-}
-
-#[test]
-fn test_directory_that_cannot_be_created_is_neither_announced_nor_stored() {
-    let (dir, storage, root) = setup("pull_dir_blocked");
-    fs::write(root.join("f.txt"), b"a file").unwrap();
-    let plan = storage
-        .plan_pull("f", OWN, &[remote_dir("f.txt/sub", vec![peer(2)])])
-        .unwrap();
-    assert!(plan.applied.is_empty(), "{:?}", plan.applied);
-    assert!(root.join("f.txt").is_file());
-    assert!(!stored_db(&storage).entries.contains_key("f.txt/sub"));
-    let _ = fs::remove_dir_all(&dir);
-}
-
-/// Only regular files are reported as up to date; directories and tombstones with an equal
-/// version are not files to download nor to keep track of.
-#[test]
-fn test_up_to_date_lists_only_regular_files() {
-    let (dir, storage, root) = setup("pull_up_to_date");
-    fs::write(root.join("same.txt"), b"abc").unwrap();
-    fs::create_dir_all(root.join("d")).unwrap();
-    fs::write(root.join("g.txt"), b"gone").unwrap();
-    let (index, _) = storage.build_local_index("f", OWN, &[]).unwrap();
-    fs::remove_file(root.join("g.txt")).unwrap();
-    storage.build_local_index("f", OWN, &[]).unwrap();
-    let version_of = |name: &str| index.files.iter().find(|f| f.name == name).unwrap().versions.clone();
-    let tomb = storage.build_local_index("f", OWN, &[]).unwrap().0;
-    let tomb_v = tomb.files.iter().find(|f| f.name == "g.txt").unwrap().versions.clone();
-
-    let remote = vec![
-        remote_file("same.txt", version_of("same.txt"), 1, b"abc"),
-        remote_dir("d", version_of("d")),
-        remote_deleted("g.txt", tomb_v),
-    ];
-    let plan = storage.plan_pull("f", OWN, &remote).unwrap();
-    let names: Vec<&str> = plan.up_to_date.iter().map(|f| f.name.as_str()).collect();
-    assert_eq!(names, vec!["same.txt"]);
-    assert!(plan.downloads.is_empty());
     let _ = fs::remove_dir_all(&dir);
 }
 

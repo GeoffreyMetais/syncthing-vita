@@ -75,8 +75,14 @@ fn test_header_must_be_the_exact_magic_with_three_fields() {
     assert!(FolderDb::parse("#vita-db-x\t1\t0\n").is_none());
     assert!(FolderDb::parse("#vita-db-v1\t1\n").is_none());
     assert!(FolderDb::parse("#vita-db-v1\t1\t0\textra\n").is_none());
-    assert!(FolderDb::parse("#vita-db-v1\tzz\t0\n").is_none(), "index id is hex");
-    assert!(FolderDb::parse("#vita-db-v1\t1\tx\n").is_none(), "sequence is decimal");
+    assert!(
+        FolderDb::parse("#vita-db-v1\tzz\t0\n").is_none(),
+        "index id is hex"
+    );
+    assert!(
+        FolderDb::parse("#vita-db-v1\t1\tx\n").is_none(),
+        "sequence is decimal"
+    );
     let db = FolderDb::parse("#vita-db-v1\t1\t0\n").expect("empty database");
     assert_eq!((db.index_id, db.max_sequence), (1, 0));
     assert!(db.entries.is_empty());
@@ -144,10 +150,16 @@ fn test_flags_and_numbers_fall_back_to_safe_values() {
     let db = FolderDb::parse(text).expect("parse");
     let dir = &db.entries["dir-tomb"];
     assert!(dir.is_dir && dir.deleted);
-    assert_eq!((dir.size, dir.modified_s, dir.disk_mtime, dir.sequence), (0, 0, 0, 0));
+    assert_eq!(
+        (dir.size, dir.modified_s, dir.disk_mtime, dir.sequence),
+        (0, 0, 0, 0)
+    );
     let file = &db.entries["file-odd-flag"];
     assert!(!file.is_dir && !file.deleted);
-    assert_eq!((file.size, file.modified_s, file.disk_mtime, file.sequence), (2, 3, 4, 5));
+    assert_eq!(
+        (file.size, file.modified_s, file.disk_mtime, file.sequence),
+        (2, 3, 4, 5)
+    );
     assert_eq!(db.max_sequence, 5, "the highest stored sequence is kept");
 }
 
