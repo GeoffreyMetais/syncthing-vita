@@ -56,8 +56,26 @@ where
     F: FnOnce(&mut ServerStream) -> T + Send + 'static,
     T: Send + 'static,
 {
-    let device_id = identity.device_id;
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind loopback listener");
+    spawn_tls_server_on(listener, 0, identity, alpn, require_client_cert, exchange)
+}
+
+/// Like [`spawn_tls_server`], on a listener the caller bound (e.g. the fixed BEP port). The
+/// first `dropped` connections are accepted and closed at once, without a TLS exchange: they
+/// model the plain TCP "is the port open?" check that some clients make before the TLS probe.
+pub fn spawn_tls_server_on<T, F>(
+    listener: TcpListener,
+    dropped: usize,
+    identity: DeviceIdentity,
+    alpn: &[u8],
+    require_client_cert: bool,
+    exchange: F,
+) -> TlsTestServer<T>
+where
+    F: FnOnce(&mut ServerStream) -> T + Send + 'static,
+    T: Send + 'static,
+{
+    let device_id = identity.device_id;
     let port = listener.local_addr().expect("listener address").port();
     let observed: ObservedDeviceId = Arc::new(Mutex::new(None));
 
@@ -83,6 +101,9 @@ where
     let config = Arc::new(config);
 
     let handle = std::thread::spawn(move || {
+        for _ in 0..dropped {
+            let _ = listener.accept();
+        }
         let (tcp, _) = listener.accept().expect("accept client");
         tcp.set_read_timeout(Some(SERVER_IO_TIMEOUT))
             .expect("read timeout");
