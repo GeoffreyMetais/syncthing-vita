@@ -5,10 +5,12 @@ mod common;
 
 use common::{press, tap_action, temp_test_dir};
 use vita_syncthing_app::application::{InputController, ShareService, UserCommand};
-use vita_syncthing_app::domain::{ActiveTab, AppState, ModalDialog, NavFocus, PickerMode, UiAction};
+use vita_syncthing_app::domain::{
+    ActiveTab, AppState, ModalDialog, NavFocus, PickerMode, UiAction,
+};
 use vita_syncthing_app::infrastructure::{
     ConfigRepository, InputFrame, BTN_CIRCLE, BTN_CROSS, BTN_DOWN, BTN_L, BTN_R, BTN_RIGHT,
-    BTN_SELECT, BTN_SQUARE, BTN_START, BTN_TRIANGLE, BTN_UP,
+    BTN_SELECT, BTN_SQUARE, BTN_START, BTN_TRIANGLE,
 };
 
 #[test]
@@ -72,9 +74,17 @@ fn test_start_opens_the_quit_confirmation_from_anywhere() {
 fn test_l_and_r_cycle_the_tabs_in_both_directions() {
     let (dir, repo, mut state) = overview("input-lr", 0);
     press(&mut state, &repo, BTN_L);
-    assert_eq!(state.active_tab, ActiveTab::Settings, "L from the first tab wraps");
+    assert_eq!(
+        state.active_tab,
+        ActiveTab::Settings,
+        "L from the first tab wraps"
+    );
     press(&mut state, &repo, BTN_R);
-    assert_eq!(state.active_tab, ActiveTab::Dashboard, "R from the last tab wraps");
+    assert_eq!(
+        state.active_tab,
+        ActiveTab::Dashboard,
+        "R from the last tab wraps"
+    );
     press(&mut state, &repo, BTN_R);
     assert_eq!(state.active_tab, ActiveTab::FolderPicker);
     let _ = std::fs::remove_dir_all(&dir);
@@ -116,19 +126,24 @@ fn test_circle_on_overview_without_a_share_row_opens_the_device_id() {
 }
 
 #[test]
-fn test_face_buttons_of_a_share_row_answer_only_while_the_row_is_focused() {
+fn test_square_deletes_the_selected_share_from_any_focus_on_the_overview() {
+    // `Delete` is a page-level hint of the Overview: Square acts on the selected share.
     let (dir, repo, mut state) = overview("input-square-row", 2);
-    // The header is focused: Square does not reach the share rows.
-    eprintln!("DBG nav={:?} tab={:?} shares={}", state.nav, state.active_tab, state.shares.len());
     press(&mut state, &repo, BTN_SQUARE);
-    eprintln!("DBG after modal={:?} nav={:?}", state.modal, state.nav);
-    assert_eq!(state.modal, ModalDialog::None);
-    // Focus the second share row: Square deletes that share (confirmation).
+    assert_eq!(
+        state.modal,
+        ModalDialog::ConfirmDeleteShare { share_idx: 0 }
+    );
+    state.modal = ModalDialog::None;
+    // Focus the second share row: Square deletes that one.
     press(&mut state, &repo, BTN_DOWN);
     press(&mut state, &repo, BTN_DOWN);
     assert_eq!(state.selected_share_idx, 1);
     press(&mut state, &repo, BTN_SQUARE);
-    assert_eq!(state.modal, ModalDialog::ConfirmDeleteShare { share_idx: 1 });
+    assert_eq!(
+        state.modal,
+        ModalDialog::ConfirmDeleteShare { share_idx: 1 }
+    );
     let _ = std::fs::remove_dir_all(&dir);
 }
 
@@ -153,18 +168,26 @@ fn test_cross_on_a_focused_share_row_button_runs_that_button() {
     press(&mut state, &repo, BTN_DOWN);
     press(&mut state, &repo, BTN_RIGHT);
     press(&mut state, &repo, BTN_CROSS);
-    assert_eq!(state.modal, ModalDialog::ConfirmDeleteShare { share_idx: 0 });
+    assert_eq!(
+        state.modal,
+        ModalDialog::ConfirmDeleteShare { share_idx: 0 }
+    );
     let _ = std::fs::remove_dir_all(&dir);
 }
 
 #[test]
 fn test_sync_card_starts_a_sync_only_when_none_is_running() {
     let (dir, repo, mut state) = overview("input-sync-card", 0);
-    let start = common::rect_of(&mut state, UiAction::StartSync);
-    let _ = start;
-    assert_eq!(tap_action(&mut state, &repo, UiAction::StartSync), UserCommand::StartSync);
+    common::rect_of(&mut state, UiAction::StartSync);
+    assert_eq!(
+        tap_action(&mut state, &repo, UiAction::StartSync),
+        UserCommand::StartSync
+    );
     state.sync_in_progress = true;
-    assert_eq!(tap_action(&mut state, &repo, UiAction::StartSync), UserCommand::None);
+    assert_eq!(
+        tap_action(&mut state, &repo, UiAction::StartSync),
+        UserCommand::None
+    );
     let _ = std::fs::remove_dir_all(&dir);
 }
 

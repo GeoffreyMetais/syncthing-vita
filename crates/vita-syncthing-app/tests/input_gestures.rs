@@ -139,7 +139,11 @@ fn test_touch_drag_threshold_is_exclusive_in_both_directions() {
             Some((300, 300))
         );
     }
-    for (x, y) in [(300 + threshold + 1, 300), (300 - threshold - 1, 300), (300, 300 - threshold - 1)] {
+    for (x, y) in [
+        (300 + threshold + 1, 300),
+        (300 - threshold - 1, 300),
+        (300, 300 - threshold - 1),
+    ] {
         let mut g = InputGestures::new();
         step(&mut g, touch((300, 300), true));
         assert!(step(&mut g, touch((x, y), false)).touch_drag.is_some());
@@ -153,7 +157,9 @@ fn test_drag_continues_when_the_finger_returns_inside_the_threshold() {
     step(&mut g, touch((300, 300), true));
     assert!(step(&mut g, touch((300, 200), false)).touch_drag.is_some());
     // Back at the start: the touch is still a drag, so it never becomes a tap.
-    let back = step(&mut g, touch((300, 300), false)).touch_drag.expect("still dragging");
+    let back = step(&mut g, touch((300, 300), false))
+        .touch_drag
+        .expect("still dragging");
     assert_eq!((back.total_dy, back.started), (0, false));
     assert_eq!(step(&mut g, InputFrame::default()).touch_tap, None);
 }
@@ -168,7 +174,10 @@ fn test_a_new_touch_down_resets_the_previous_drag() {
     step(&mut g, touch((50, 50), true));
     let small = step(&mut g, touch((52, 50), false));
     assert_eq!(small.touch_drag, None);
-    assert_eq!(step(&mut g, InputFrame::default()).touch_tap, Some((50, 50)));
+    assert_eq!(
+        step(&mut g, InputFrame::default()).touch_tap,
+        Some((50, 50))
+    );
 }
 
 #[test]

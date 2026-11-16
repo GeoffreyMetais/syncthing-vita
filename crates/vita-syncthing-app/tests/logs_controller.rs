@@ -108,7 +108,10 @@ fn test_other_buttons_are_left_in_the_frame() {
     let (dir, _repo, mut state) = setup("logs-ctl-passthrough", 40);
     let start = top(&state);
     // Circle (close) and Triangle (history) are for the viewer's hints, not for scrolling.
-    assert_eq!(scroll(&mut state, BTN_CIRCLE | BTN_TRIANGLE), BTN_CIRCLE | BTN_TRIANGLE);
+    assert_eq!(
+        scroll(&mut state, BTN_CIRCLE | BTN_TRIANGLE),
+        BTN_CIRCLE | BTN_TRIANGLE
+    );
     assert_eq!(top(&state), start);
     // Scrolling buttons pressed with another one: only the scrolling ones are consumed.
     assert_eq!(scroll(&mut state, BTN_UP | BTN_CIRCLE), BTN_CIRCLE);

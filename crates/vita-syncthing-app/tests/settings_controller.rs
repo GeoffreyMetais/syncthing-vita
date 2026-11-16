@@ -150,7 +150,10 @@ fn test_cross_on_declined_card_forgets_declined_folders_and_saves_it() {
     press(&mut state, &repo, BTN_CROSS);
     assert!(state.ignored_folders.is_empty());
     assert!(repo.load_ignored_folders().is_empty());
-    assert!(state.config_dirty, "the offers are reconsidered by the worker");
+    assert!(
+        state.config_dirty,
+        "the offers are reconsidered by the worker"
+    );
     let _ = std::fs::remove_dir_all(&dir);
 }
 
