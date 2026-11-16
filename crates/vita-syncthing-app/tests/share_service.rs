@@ -6,7 +6,7 @@ mod common;
 use common::temp_test_dir;
 use syncthing_core::DeviceId;
 use vita_syncthing_app::application::{DeviceRegistry, FolderOfferService, ShareService};
-use vita_syncthing_app::domain::AppState;
+use vita_syncthing_app::domain::{AppState, UiText};
 use vita_syncthing_app::infrastructure::ConfigRepository;
 
 #[test]
@@ -218,5 +218,230 @@ fn test_lan_announcement_never_upgrades_a_short_id_placeholder() {
         );
     }
     assert_eq!(state.unpaired_lan_peers.len(), MAX_DISCOVERED_PEERS);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn create_share_on_an_existing_folder_updates_it_and_offers_it_when_linked() {
+    let dir = temp_test_dir("share-service-recreate");
+    let repo = ConfigRepository::new(&dir);
+    let mut state = AppState::new(Vec::new(), Vec::new(), &dir);
+    let dev = DeviceId([0x31; 32]);
+    DeviceRegistry::upsert_device(&mut state, &repo, dev, "Mac", "");
+
+    let first = format!("{}/first", dir);
+    ShareService::create_share(&mut state, &repo, "docs", "Docs", &first);
+    ShareService::toggle_selected_share(&mut state, &repo); // paused, nothing linked yet
+    assert!(!state.shares[0].enabled);
+    state.pending_folder_offers.clear();
+
+    // Re-creating an existing folder updates it in place and re-enables it. No device is linked,
+    // so no folder offer is queued.
+    let second = format!("{}/second", dir);
+    let idx = ShareService::create_share(&mut state, &repo, "docs", "Docs v2", &second);
+    assert_eq!(idx, 0);
+    assert_eq!(state.shares.len(), 1);
+    assert_eq!(state.shares[0].label, "Docs v2");
+    assert_eq!(state.shares[0].target_path, second);
+    assert!(state.shares[0].enabled);
+    assert!(state.pending_folder_offers.is_empty());
+    assert!(std::path::Path::new(&second).is_dir(), "target directory is created");
+    assert_eq!(repo.load_shares()[0].target_path, second);
+
+    // Once a device is linked, re-creating the share queues its folder offer.
+    ShareService::toggle_device_for_share(&mut state, &repo, 0, dev).unwrap();
+    state.pending_folder_offers.clear();
+    ShareService::create_share(&mut state, &repo, "docs", "Docs v3", &second);
+    assert_eq!(state.pending_folder_offers, vec!["docs".to_owned()]);
+    assert_eq!(state.shares[0].shared_devices, vec![dev]);
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn update_selected_share_target_trims_saves_and_returns_to_overview() {
+    let dir = temp_test_dir("share-service-target");
+    let repo = ConfigRepository::new(&dir);
+    let mut state = AppState::new(Vec::new(), Vec::new(), &dir);
+    ShareService::create_share(&mut state, &repo, "a", "A", &format!("{}/a", dir));
+    ShareService::create_share(&mut state, &repo, "b", "B", &format!("{}/b", dir));
+    state.config_dirty = false;
+    state.active_tab = vita_syncthing_app::domain::ActiveTab::FolderPicker;
+
+    // Selected share is `b` (the last created one).
+    let chosen = format!("{}/moved/", dir);
+    ShareService::update_selected_share_target(&mut state, &repo, &chosen);
+
+    let expected = format!("{}/moved", dir);
+    assert_eq!(state.shares[1].target_path, expected, "trailing slash is trimmed");
+    assert_eq!(state.shares[0].target_path, format!("{}/a", dir));
+    assert!(state.config_dirty);
+    assert_eq!(repo.load_shares()[1].target_path, expected);
+    assert!(std::path::Path::new(&expected).is_dir());
+    assert_eq!(
+        state.toast_msg.as_ref().map(|(msg, _)| msg.clone()),
+        Some(UiText::SavedIn {
+            path: expected.clone()
+        })
+    );
+    assert_eq!(
+        state.active_tab,
+        vita_syncthing_app::domain::ActiveTab::Dashboard
+    );
+    assert!(state
+        .logs
+        .iter()
+        .any(|l| l == &format!("Target directory updated for b -> {}", expected)));
+
+    // Without a selected share nothing changes and the tab stays.
+    state.selected_share_idx = 7;
+    state.config_dirty = false;
+    state.active_tab = vita_syncthing_app::domain::ActiveTab::FolderPicker;
+    ShareService::update_selected_share_target(&mut state, &repo, "ux0:elsewhere");
+    assert!(!state.config_dirty);
+    assert_eq!(
+        state.active_tab,
+        vita_syncthing_app::domain::ActiveTab::FolderPicker
+    );
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn toggle_selected_share_pauses_and_resumes_with_the_matching_offers_and_messages() {
+    let dir = temp_test_dir("share-service-toggle");
+    let repo = ConfigRepository::new(&dir);
+    let mut state = AppState::new(Vec::new(), Vec::new(), &dir);
+    let dev = DeviceId([0x32; 32]);
+    DeviceRegistry::upsert_device(&mut state, &repo, dev, "PC", "");
+    ShareService::create_share(&mut state, &repo, "pics", "Pics", &format!("{}/p", dir));
+    ShareService::toggle_device_for_share(&mut state, &repo, 0, dev).unwrap();
+    state.pending_folder_offers.clear();
+    state.config_dirty = false;
+
+    // Pausing a share with linked devices queues nothing and reports "Paused".
+    ShareService::toggle_selected_share(&mut state, &repo);
+    assert!(!state.shares[0].enabled);
+    assert!(state.pending_folder_offers.is_empty());
+    assert!(state.config_dirty);
+    assert!(state.auto_reconnect_enabled);
+    assert!(!repo.load_shares()[0].enabled);
+    assert_eq!(
+        state.toast_msg.as_ref().map(|(msg, _)| msg.clone()),
+        Some(UiText::SharePaused {
+            id: "pics".to_owned()
+        })
+    );
+    assert!(state.logs.iter().any(|l| l == "Share pics is now Paused"));
+
+    // Resuming a share with linked devices queues its offer and reports "Active".
+    state.config_dirty = false;
+    ShareService::toggle_selected_share(&mut state, &repo);
+    assert!(state.shares[0].enabled);
+    assert_eq!(state.pending_folder_offers, vec!["pics".to_owned()]);
+    assert!(state.config_dirty);
+    assert_eq!(
+        state.toast_msg.as_ref().map(|(msg, _)| msg.clone()),
+        Some(UiText::ShareActive {
+            id: "pics".to_owned()
+        })
+    );
+    assert!(state.logs.iter().any(|l| l == "Share pics is now Active"));
+
+    // Resuming a share without any linked device queues nothing.
+    ShareService::create_share(&mut state, &repo, "empty", "Empty", &format!("{}/e", dir));
+    state.pending_folder_offers.clear();
+    ShareService::toggle_selected_share(&mut state, &repo); // pause `empty`
+    ShareService::toggle_selected_share(&mut state, &repo); // resume it
+    assert!(state.shares[1].enabled);
+    assert!(state.pending_folder_offers.is_empty());
+
+    // No selected share: nothing happens.
+    state.selected_share_idx = 9;
+    state.config_dirty = false;
+    ShareService::toggle_selected_share(&mut state, &repo);
+    assert!(!state.config_dirty);
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn toggle_device_reports_the_known_device_name_and_the_link_state() {
+    let dir = temp_test_dir("share-service-toggle-name");
+    let repo = ConfigRepository::new(&dir);
+    let mut state = AppState::new(Vec::new(), Vec::new(), &dir);
+    let laptop = DeviceId([0x33; 32]);
+    let phone = DeviceId([0x34; 32]);
+    let unknown = DeviceId([0x35; 32]);
+    DeviceRegistry::upsert_device(&mut state, &repo, laptop, "Laptop", "");
+    DeviceRegistry::upsert_device(&mut state, &repo, phone, "Phone", "");
+    ShareService::create_share(&mut state, &repo, "s", "S", &format!("{}/s", dir));
+
+    let (label, name, added) =
+        ShareService::toggle_device_for_share(&mut state, &repo, 0, phone).unwrap();
+    assert_eq!((label.as_str(), name.as_str(), added), ("S", "Phone", true));
+
+    let (_, name, added) =
+        ShareService::toggle_device_for_share(&mut state, &repo, 0, laptop).unwrap();
+    assert_eq!((name.as_str(), added), ("Laptop", true));
+
+    // A device unknown to the registry is named by its short ID.
+    let (_, name, _) =
+        ShareService::toggle_device_for_share(&mut state, &repo, 0, unknown).unwrap();
+    assert_eq!(name, unknown.short());
+
+    // Unlinking reports `added == false`; an unknown share index yields nothing.
+    let (_, _, added) =
+        ShareService::toggle_device_for_share(&mut state, &repo, 0, phone).unwrap();
+    assert!(!added);
+    assert!(ShareService::toggle_device_for_share(&mut state, &repo, 4, phone).is_none());
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn linking_a_discovered_peer_only_clears_that_peer_from_the_unpaired_list() {
+    let dir = temp_test_dir("share-service-unpair");
+    let repo = ConfigRepository::new(&dir);
+    let mut state = AppState::new(Vec::new(), Vec::new(), &dir);
+    let a = DeviceId([0x36; 32]);
+    let b = DeviceId([0x37; 32]);
+    DeviceRegistry::register_discovered_peer(&mut state, a, "", "");
+    DeviceRegistry::register_discovered_peer(&mut state, b, "", "");
+    ShareService::create_share(&mut state, &repo, "s", "S", &format!("{}/s", dir));
+
+    ShareService::toggle_device_for_share(&mut state, &repo, 0, a).unwrap();
+    assert!(!state.is_unpaired_lan_peer(&a));
+    assert!(state.is_unpaired_lan_peer(&b), "other discovered peers stay unpaired");
+
+    // Unlinking the only share of `a`: it is no longer approved, so it is listed as discovered again.
+    ShareService::toggle_device_for_share(&mut state, &repo, 0, a).unwrap();
+    assert!(state.is_unpaired_lan_peer(&a));
+    assert!(state.is_unpaired_lan_peer(&b));
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn unlinking_a_device_still_linked_to_another_share_keeps_it_approved() {
+    let dir = temp_test_dir("share-service-unlink-elsewhere");
+    let repo = ConfigRepository::new(&dir);
+    let mut state = AppState::new(Vec::new(), Vec::new(), &dir);
+    let dev = DeviceId([0x38; 32]);
+    DeviceRegistry::upsert_device(&mut state, &repo, dev, "Shared", "");
+    ShareService::create_share(&mut state, &repo, "one", "One", &format!("{}/1", dir));
+    ShareService::create_share(&mut state, &repo, "two", "Two", &format!("{}/2", dir));
+    ShareService::toggle_device_for_share(&mut state, &repo, 0, dev).unwrap();
+    ShareService::toggle_device_for_share(&mut state, &repo, 1, dev).unwrap();
+
+    ShareService::toggle_device_for_share(&mut state, &repo, 0, dev).unwrap();
+    assert!(state.shares[1].is_linked_to(&dev));
+    assert!(!state.is_unpaired_lan_peer(&dev), "still linked to share two");
+    assert!(state.has_configured_peers());
+
+    ShareService::toggle_device_for_share(&mut state, &repo, 1, dev).unwrap();
+    assert!(state.is_unpaired_lan_peer(&dev), "linked to no share any more");
+    assert!(!state.has_configured_peers());
+
     let _ = std::fs::remove_dir_all(&dir);
 }
