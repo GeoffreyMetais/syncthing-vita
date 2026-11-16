@@ -7,10 +7,13 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
-use common::fake_peer::{
-    control_with, device_under_test, hello_under_test, payloads, run_session, FakePeer,
+use common::fake_peer::FakePeer;
+use common::session_driver::{
+    control_with, device_under_test, hello_under_test, payloads, run_session,
 };
-use syncthing_core::{BepMessageType, BepResponse, FsSyncStorage, SyncEvent, SyncSessionStatus};
+use syncthing_core::{
+    BepMessageType, BepResponse, FsSyncStorage, SyncEvent, SyncSessionStatus, BEP_BLOCK_SIZE,
+};
 
 /// Vita-side device ID of the test identity.
 fn vita_id() -> syncthing_core::DeviceId {
@@ -204,4 +207,59 @@ fn test_keepalives_are_sent_during_a_long_local_scan() {
         pings_before_index.load(Ordering::SeqCst) > 0,
         "no keepalive was sent while the folder was being scanned"
     );
+}
+
+#[test]
+fn test_blocks_already_held_locally_are_kept_and_only_the_others_are_fetched() {
+    let vita = vita_id();
+    let first = vec![0xAA_u8; BEP_BLOCK_SIZE];
+    let second = vec![0xBB_u8; BEP_BLOCK_SIZE];
+    let served: Vec<u8> = [first.clone(), second.clone()].concat();
+    let peer = FakePeer::spawn(0x65, move |conn| {
+        let mut file = conn.file_in_blocks("saves", "world.bin", &served, 2, BEP_BLOCK_SIZE);
+        file.modified_s = 4_000_000_000;
+        // The peer's version has seen our own counter: the local copy is an older version of
+        // the file, not a conflicting one, so its blocks are kept.
+        let own = u64::from_be_bytes(vita.0[..8].try_into().unwrap());
+        file.versions.push(syncthing_core::BepVersionCounter {
+            short_device_id: own,
+            // Larger than the timestamp our scan records for the local copy.
+            value: 1 << 40,
+        });
+        conn.send_cluster_config(&["saves"], vita);
+        conn.wait_for(BepMessageType::ClusterConfig, Duration::from_secs(5))
+            .expect("ClusterConfig reply");
+        conn.send_index("saves", vec![file], false);
+        conn.serve_until_idle(Duration::from_millis(800));
+    });
+
+    let mut storage = FsSyncStorage::new(common::fresh_temp_dir("transfers_partial_blocks"));
+    storage.set_folder_devices("saves", vec![peer.device_id]);
+    let dir = storage.folder_root("saves");
+    std::fs::create_dir_all(&dir).unwrap();
+    // Locally: the first block is the peer's, the second one differs.
+    let local: Vec<u8> = [first.clone(), vec![0xCC_u8; BEP_BLOCK_SIZE]].concat();
+    std::fs::write(dir.join("world.bin"), &local).unwrap();
+
+    run_session(
+        &peer,
+        &storage,
+        &hello_under_test(1),
+        Some(quiet_control()),
+        |_| {},
+    )
+    .expect("session failed");
+    let received = peer.join();
+
+    let content = std::fs::read(storage.resolve_safe_path("saves", "world.bin")).unwrap();
+    assert!(
+        content == [first, second].concat(),
+        "the file was not rebuilt from its blocks"
+    );
+    // Only the block that differs was requested.
+    let offsets: Vec<i64> = payloads(&received, BepMessageType::Request)
+        .iter()
+        .map(|p| syncthing_core::BepRequest::decode(p).unwrap().offset)
+        .collect();
+    assert_eq!(offsets, vec![BEP_BLOCK_SIZE as i64]);
 }

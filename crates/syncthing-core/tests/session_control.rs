@@ -4,12 +4,14 @@
 
 mod common;
 
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
-use common::fake_peer::{
-    control_with, device_under_test, hello_under_test, index_messages, run_session, FakePeer,
+use common::fake_peer::FakePeer;
+use common::session_driver::{
+    control_with, device_under_test, hello_under_test, index_messages, run_session,
 };
 use syncthing_core::{
     BepClose, BepFolder, BepMessageType, FolderType, FsSyncStorage, SyncControl, SyncEvent,
@@ -204,8 +206,8 @@ fn test_only_linked_running_receive_only_folders_take_a_revert() {
             .expect("ClusterConfig reply");
         conn.send_index("rw", Vec::new(), false);
         conn.send_index("ro_paused", Vec::new(), false);
-        // Stay connected through the persistent loop, which handles the requests.
-        thread::sleep(Duration::from_millis(1800));
+        // Stay connected past the drain window: the persistent loop handles the requests.
+        thread::sleep(Duration::from_millis(3500));
     });
 
     // `rw`: read & write, linked. `ro_paused`: receive-only, linked, paused. `ro_unlinked`:
@@ -248,4 +250,44 @@ fn test_only_linked_running_receive_only_folders_take_a_revert() {
     for folder in ["rw", "ro_paused", "ro_unlinked"] {
         assert!(storage.folder_root(folder).join("local.txt").exists());
     }
+}
+
+#[test]
+fn test_no_periodic_rescan_before_the_interval_elapses() {
+    let vita = device_under_test().device_id;
+    let published = Arc::new(AtomicBool::new(false));
+    let flag = Arc::clone(&published);
+    let peer = FakePeer::spawn(0x86, move |conn| {
+        conn.send_cluster_config(&["shared"], vita);
+        conn.wait_for(BepMessageType::ClusterConfig, Duration::from_secs(5))
+            .expect("ClusterConfig reply");
+        conn.send_index("shared", Vec::new(), false);
+        conn.wait_for(BepMessageType::Index, Duration::from_secs(5))
+            .expect("Index of the shared folder");
+        // A local change made during the session is not published before the rescan interval.
+        let update = conn.wait_for(BepMessageType::IndexUpdate, Duration::from_millis(2500));
+        flag.store(update.is_some(), Ordering::SeqCst);
+    });
+
+    let storage = storage_with("control_no_early_rescan", &peer, &["shared"], &["shared"]);
+    let late = storage.resolve_safe_path("shared", "late.txt");
+    let writer = thread::spawn(move || {
+        thread::sleep(Duration::from_millis(1200));
+        std::fs::write(late, b"created during the session").unwrap();
+    });
+    run_session(
+        &peer,
+        &storage,
+        &hello_under_test(1),
+        Some(long_control()),
+        |_| {},
+    )
+    .expect("session failed");
+    peer.join();
+    writer.join().unwrap();
+
+    assert!(
+        !published.load(Ordering::SeqCst),
+        "a rescan ran before its interval"
+    );
 }

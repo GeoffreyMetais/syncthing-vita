@@ -12,12 +12,10 @@ use std::time::{Duration, Instant};
 use rustls::pki_types::{CertificateDer, PrivateKeyDer, PrivatePkcs8KeyDer};
 use rustls::{ServerConfig, ServerConnection, StreamOwned};
 use sha2::{Digest, Sha256};
-use syncthing_core::session::PeerHandshakeResult;
 use syncthing_core::{
-    connect_and_sync, read_bep_message, write_bep_message, BepBlockInfo, BepClusterConfig,
-    BepFileInfo, BepFolder, BepHello, BepIndex, BepMessageType, BepRequest, BepResponse,
-    BepVersionCounter, DeviceId, DeviceIdentity, FolderIndexState, FsSyncStorage, SessionParams,
-    SyncControl, SyncEvent, SyncTuning, BEP_ALPN,
+    read_bep_message, write_bep_message, BepBlockInfo, BepClusterConfig, BepFileInfo, BepFolder,
+    BepHello, BepIndex, BepMessageType, BepRequest, BepResponse, BepVersionCounter, DeviceId,
+    DeviceIdentity, FolderIndexState, BEP_ALPN,
 };
 
 /// Behaviour of one secondary connection: the connection and its index in accept order.
@@ -238,6 +236,28 @@ impl PeerConn {
         }
     }
 
+    /// Like [`Self::file`], with the content split in blocks of `block_size` bytes.
+    pub fn file_in_blocks(
+        &mut self,
+        folder: &str,
+        name: &str,
+        content: &[u8],
+        version: u64,
+        block_size: usize,
+    ) -> BepFileInfo {
+        let mut info = self.file(folder, name, content, version);
+        info.blocks = content
+            .chunks(block_size)
+            .enumerate()
+            .map(|(i, chunk)| BepBlockInfo {
+                offset: (i * block_size) as i64,
+                size: chunk.len() as i32,
+                hash: Sha256::digest(chunk).to_vec(),
+            })
+            .collect();
+        info
+    }
+
     pub fn send(&mut self, msg_type: BepMessageType, payload: &[u8]) {
         write_bep_message(&mut self.stream, msg_type, payload).expect("peer send");
     }
@@ -330,11 +350,16 @@ impl PeerConn {
     pub fn answer(&mut self, request_payload: &[u8]) {
         let req = BepRequest::decode(request_payload).expect("request");
         let resp = match self.served.get(&format!("{}/{}", req.folder, req.name)) {
-            Some(content) => BepResponse {
-                id: req.id,
-                data: content.clone(),
-                code: 0,
-            },
+            Some(content) => {
+                // The requested range of the content (the whole file for a single block).
+                let start = (req.offset.max(0) as usize).min(content.len());
+                let end = (start + req.size.max(0) as usize).min(content.len());
+                BepResponse {
+                    id: req.id,
+                    data: content[start..end].to_vec(),
+                    code: 0,
+                }
+            }
             None => BepResponse {
                 id: req.id,
                 data: Vec::new(),
@@ -381,80 +406,4 @@ impl PeerConn {
             }
         }
     }
-}
-
-/// Payloads of the received messages of type `wanted`.
-pub fn payloads(received: &[Received], wanted: BepMessageType) -> Vec<&[u8]> {
-    received
-        .iter()
-        .filter(|(t, _)| *t == wanted)
-        .map(|(_, p)| p.as_slice())
-        .collect()
-}
-
-/// Identity of the device under test (the PS Vita side) in end-to-end sessions.
-pub fn device_under_test() -> DeviceIdentity {
-    DeviceIdentity::from_seed(&[7u8; 32]).expect("device identity")
-}
-
-/// `Hello` of the device under test announcing `connections` connections.
-pub fn hello_under_test(connections: i32) -> BepHello {
-    let mut hello = BepHello::new("Test device", "syncthing-core-tests", "0.0.0");
-    hello.num_connections = connections;
-    hello
-}
-
-/// Timings of a persistent session with a rescan interval of `rescan` and a keepalive every
-/// `keepalive`.
-pub fn tuning(rescan: Duration, keepalive: Duration) -> SyncTuning {
-    SyncTuning {
-        rescan_interval: rescan,
-        keepalive_interval: keepalive,
-    }
-}
-
-/// A persistent session control with the given timings.
-pub fn control_with(rescan: Duration, keepalive: Duration) -> Arc<SyncControl> {
-    SyncControl::with_tuning(tuning(rescan, keepalive))
-}
-
-/// Runs a session of the device under test against `peer` and reports its events to
-/// `on_event`. With a `control` the session is persistent: it ends when the peer disconnects
-/// (its script ends) or when a stop is requested.
-pub fn run_session(
-    peer: &FakePeer,
-    storage: &FsSyncStorage,
-    hello: &BepHello,
-    control: Option<Arc<SyncControl>>,
-    on_event: impl FnMut(SyncEvent),
-) -> io::Result<PeerHandshakeResult> {
-    let identity = device_under_test();
-    let params = SessionParams {
-        identity: &identity,
-        hello,
-        storage,
-        expected_device_id: Some(peer.device_id),
-        timeout: Duration::from_secs(4),
-        control,
-    };
-    connect_and_sync(&params, peer.addr, on_event)
-}
-
-/// Payloads of the `Index` and `IndexUpdate` messages of `received`, in order.
-pub fn index_messages(received: &[Received]) -> Vec<BepIndex> {
-    received
-        .iter()
-        .filter(|(t, _)| matches!(t, BepMessageType::Index | BepMessageType::IndexUpdate))
-        .map(|(_, p)| BepIndex::decode(p).expect("index"))
-        .collect()
-}
-
-/// Folder IDs announced by a `ClusterConfig` payload.
-pub fn announced_folders(payload: &[u8]) -> Vec<String> {
-    BepClusterConfig::decode(payload)
-        .expect("ClusterConfig")
-        .folders
-        .into_iter()
-        .map(|f| f.id)
-        .collect()
 }

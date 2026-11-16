@@ -5,9 +5,10 @@ mod common;
 
 use std::time::Duration;
 
-use common::fake_peer::{
+use common::fake_peer::FakePeer;
+use common::session_driver::{
     announced_folders, control_with, device_under_test, hello_under_test, index_messages, payloads,
-    run_session, FakePeer,
+    run_session,
 };
 use syncthing_core::{BepFolder, BepMessageType, FsSyncStorage, SyncEvent};
 

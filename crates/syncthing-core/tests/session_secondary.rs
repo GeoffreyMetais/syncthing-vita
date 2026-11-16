@@ -9,8 +9,9 @@ use std::sync::Arc;
 use std::thread;
 use std::time::Duration;
 
-use common::fake_peer::{
-    control_with, device_under_test, hello_under_test, payloads, run_session, FakePeer,
+use common::fake_peer::FakePeer;
+use common::session_driver::{
+    control_with, device_under_test, hello_under_test, payloads, run_session,
 };
 use syncthing_core::{BepFolder, BepMessageType, BepResponse, FsSyncStorage, SyncEvent};
 
@@ -201,4 +202,22 @@ fn test_dropped_secondary_connection_is_not_reopened_at_once() {
         accepted, 1,
         "the secondary connection was re-opened too early"
     );
+}
+
+#[test]
+fn test_no_secondary_connection_for_a_single_connection_peer() {
+    // The peer announces one connection: the session must not open any other.
+    let peer = FakePeer::spawn_with_secondaries(
+        0x96,
+        1,
+        primary_script(Duration::from_millis(1500)),
+        |_, _| {},
+    );
+    let storage = storage_for("secondary_single", &peer);
+    let control = control_with(Duration::from_secs(3600), Duration::from_secs(20));
+    run_session(&peer, &storage, &hello_under_test(2), Some(control), |_| {})
+        .expect("session failed");
+    let accepted = peer.accepted.load(Ordering::SeqCst);
+    peer.join_with_secondaries();
+    assert_eq!(accepted, 0);
 }
