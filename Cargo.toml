@@ -3,6 +3,7 @@ resolver = "2"
 members = [
     "crates/syncthing-core",
     "crates/vita-syncthing-app",
+    "crates/syncthing-cli",
 ]
 
 [workspace.package]

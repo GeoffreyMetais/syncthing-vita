@@ -57,3 +57,12 @@ run-vita3k: vpk
 ui-scenario script secs="15":
     CARGO_FEATURES=ui-script just vpk
     ./scripts/vita3k_scenario.sh {{script}} {{secs}}
+
+# Build the command-line client (Linux / macOS host)
+cli:
+    cargo build --release -p syncthing-cli
+
+# Sync test between the PS Vita app in Vita3K and syncthing-cli (logs + screenshots in target/vita3k-cli-sync)
+vita3k-cli-sync secs="75":
+    CARGO_FEATURES=ui-script just vpk
+    ./scripts/vita3k_cli_sync.sh {{secs}}

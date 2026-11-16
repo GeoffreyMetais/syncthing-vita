@@ -2,28 +2,17 @@
 //! 1. Protocol mode (`TLS`, `ALPN = "bep-relay"`): send `ConnectRequest` -> receive `SessionInvitation`.
 //! 2. Session mode (plain TCP): send `JoinSessionRequest` -> receive `Response(0, "success")`.
 
-use std::io::{self, Read, Write};
+use std::io::{self, Write};
 use std::net::{SocketAddr, TcpStream};
 use std::time::Duration;
 
 use super::wire::{
-    decode_header, decode_payload, encode_connect_request, encode_join_session_request,
-    RelayMessage, SessionInvitation, RELAY_ALPN,
+    encode_connect_request, encode_join_session_request, read_relay_message, RelayMessage,
+    SessionInvitation, RELAY_ALPN,
 };
 use crate::cert::DeviceIdentity;
 use crate::device_id::DeviceId;
 use crate::tls::client::open_tls_stream_with_alpn;
-
-fn read_relay_message<R: Read>(reader: &mut R) -> io::Result<RelayMessage> {
-    let mut header = [0u8; 12];
-    reader.read_exact(&mut header)?;
-    let (msg_type, len) = decode_header(header)?;
-    let mut payload = vec![0u8; len];
-    if len > 0 {
-        reader.read_exact(&mut payload)?;
-    }
-    decode_payload(msg_type, &payload)
-}
 
 /// Connects to `relay_addr` (authenticating `relay_device_id` via TLS) and requests a relay
 /// session to `target_device_id`.

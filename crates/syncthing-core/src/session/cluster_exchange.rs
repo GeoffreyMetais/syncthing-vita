@@ -43,6 +43,13 @@ pub fn exchange_cluster_config(
     peer_hello: &BepHello,
 ) -> io::Result<ClusterExchange> {
     let mut got_cluster_config = false;
+    // The dialer waits for our `ClusterConfig` when it is a peer like us (it answers the one it
+    // receives): when the peer connected to us, we announce our folders first.
+    let mut announced: Option<Vec<String>> = None;
+    if stream.is_server() {
+        add_local_folders_shared_with_peer(ctx, folders);
+        announced = Some(send_cluster_config(stream, ctx, folders)?);
+    }
     let start = Instant::now();
 
     while start.elapsed() < EXCHANGE_WINDOW {
@@ -69,14 +76,9 @@ pub fn exchange_cluster_config(
                     });
                 }
                 accept_peer_cluster_config(ctx, folders, cfg);
-                let states = initial_folder_states(stream, ctx, folders);
-                let reply = BepClusterConfig::encode_for_peers(
-                    &states,
-                    ctx.own_id(),
-                    &ctx.hello.device_name,
-                    ctx.peer_device_id,
-                );
-                write_bep_message(stream, BepMessageType::ClusterConfig, &reply)?;
+                if announced.as_deref() != Some(&shared_folder_ids(folders)) {
+                    announced = Some(send_cluster_config(stream, ctx, folders)?);
+                }
             }
             Ok(Some((BepMessageType::Index | BepMessageType::IndexUpdate, payload))) => {
                 let idx = BepIndex::decode(&payload)?;
@@ -128,6 +130,12 @@ fn accept_peer_cluster_config(
         folders: cfg.folders,
     });
 
+    add_local_folders_shared_with_peer(ctx, folders);
+}
+
+/// Adds the local shares explicitly shared with the peer to the session's shared folders.
+fn add_local_folders_shared_with_peer(ctx: &SessionContext<'_>, folders: &mut FolderSyncState) {
+    let peer_device_id = ctx.peer_device_id;
     for lf in ctx.storage.local_folders() {
         let shared_with_peer = lf
             .device_ids
@@ -137,6 +145,34 @@ fn accept_peer_cluster_config(
             folders.shared_folders.push(lf.clone());
         }
     }
+}
+
+/// The session's shared folder IDs, sorted (the announced set, whatever its order).
+fn shared_folder_ids(folders: &FolderSyncState) -> Vec<String> {
+    let mut ids: Vec<String> = folders
+        .shared_folders
+        .iter()
+        .map(|f| f.id.clone())
+        .collect();
+    ids.sort();
+    ids
+}
+
+/// Sends our `ClusterConfig` for the session's shared folders; returns the folder IDs announced.
+fn send_cluster_config(
+    stream: &mut BepTlsStream,
+    ctx: &mut SessionContext<'_>,
+    folders: &FolderSyncState,
+) -> io::Result<Vec<String>> {
+    let states = initial_folder_states(stream, ctx, folders);
+    let config = BepClusterConfig::encode_for_peers(
+        &states,
+        ctx.own_id(),
+        &ctx.hello.device_name,
+        ctx.peer_device_id,
+    );
+    write_bep_message(stream, BepMessageType::ClusterConfig, &config)?;
+    Ok(shared_folder_ids(folders))
 }
 
 /// Local index state of each shared folder, so our single `ClusterConfig` advertises accurate

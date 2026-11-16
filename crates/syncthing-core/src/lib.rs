@@ -35,15 +35,22 @@ pub use bep::{
 pub use cert::DeviceIdentity;
 pub use device_id::{DeviceId, DeviceIdParseError};
 pub use discovery::{
-    detect_local_ipv4, lookup_global_peer, parse_global_discovery_json, resolve_endpoint_uri,
-    resolve_peer_tcp_addrs, run_discovery_cycle, scan_lan_bep_peers, Announce,
-    DiscoveryCycleResult, PeerEndpoint, DISCOVERY_BROADCAST_ADDR, DISCOVERY_MAGIC, DISCOVERY_PORT,
+    announce_on, detect_local_ipv4, lookup_global_peer, lookup_peer_on,
+    parse_global_discovery_json, resolve_endpoint_uri, resolve_peer_tcp_addrs, run_discovery_cycle,
+    scan_lan_bep_peers, Announce, AnnounceOutcome, DiscoveryCycleResult, PeerEndpoint,
+    DEFAULT_ANNOUNCE_SERVERS, DEFAULT_LOOKUP_SERVER, DISCOVERY_BROADCAST_ADDR, DISCOVERY_MAGIC,
+    DISCOVERY_PORT,
 };
 pub use folder_sync::PullPlan;
-pub use relay::{connect_via_relay, RelayMessage, RelayResponse, SessionInvitation};
+pub use relay::{
+    connect_via_relay, fetch_relay_pool, join_relay_session, RelayListener, RelayMessage,
+    RelayResponse, SessionInvitation, DEFAULT_RELAY_POOL,
+};
 pub use session::{
-    connect_and_sync, connect_and_sync_stream, PeerHandshakeResult, SessionParams, SyncControl,
-    SyncEvent, SyncSessionStatus, SyncTuning,
+    accept_and_sync, connect_and_sync, connect_and_sync_stream, PeerHandshakeResult, SessionParams,
+    SyncControl, SyncEvent, SyncSessionStatus, SyncTuning,
 };
 pub use storage::FsSyncStorage;
-pub use tls::{probe_bep_peer_device_id, BEP_ALPN};
+pub use tls::https::{HttpsClient, HttpsServer};
+pub use tls::proxy::HttpProxy;
+pub use tls::{accept_bep_tls_stream, probe_bep_peer_device_id, IncomingBepStream, BEP_ALPN};
