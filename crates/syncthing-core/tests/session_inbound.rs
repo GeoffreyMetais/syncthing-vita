@@ -9,6 +9,7 @@ use std::sync::Arc;
 use std::thread;
 use std::time::{Duration, Instant};
 
+use syncthing_core::tls::client::open_bep_tls_stream;
 use syncthing_core::{
     accept_and_sync, accept_bep_tls_stream, connect_and_sync, BepFolder, BepHello, DeviceId,
     DeviceIdentity, FsSyncStorage, SessionParams, SyncControl, SyncEvent, SyncSessionStatus,
@@ -251,4 +252,44 @@ fn test_accept_gives_up_on_a_trickling_client_after_the_timeout() {
         }
     });
     assert!(elapsed < timeout * 2, "gave up too late: {elapsed:?}");
+}
+
+/// An incoming session announces a single connection in its `Hello`, whatever the application's
+/// `Hello` says: the dialing device then opens no secondary connection to it.
+#[test]
+fn test_incoming_session_announces_a_single_connection() {
+    let dir = common::fresh_temp_dir("inbound_single_connection");
+    let listener_id = DeviceIdentity::from_seed(&[26u8; 32]).unwrap();
+    let dialer_id = DeviceIdentity::from_seed(&[27u8; 32]).unwrap();
+    let listener_device = listener_id.device_id;
+    let storage = storage_sharing_with(&dir, dialer_id.device_id);
+
+    let tcp_listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let addr = tcp_listener.local_addr().unwrap();
+    let expected_dialer = dialer_id.device_id;
+    let listener = thread::spawn(move || {
+        let (tcp, peer_addr) = tcp_listener.accept().unwrap();
+        let incoming = accept_bep_tls_stream(&listener_id, tcp, TIMEOUT).unwrap();
+        // The application would announce three connections; the session must not.
+        let mut hello = BepHello::new("listener", "test", "1");
+        hello.num_connections = 2;
+        let params = SessionParams {
+            identity: &listener_id,
+            hello: &hello,
+            storage: &storage,
+            expected_device_id: Some(expected_dialer),
+            timeout: TIMEOUT,
+            control: None,
+        };
+        let _ = accept_and_sync(&params, incoming, peer_addr, |_| {});
+    });
+
+    let (mut stream, _) = open_bep_tls_stream(&dialer_id, addr, Some(listener_device), TIMEOUT)
+        .expect("dial the listener");
+    let peer_hello = BepHello::new("dialer", "test", "1")
+        .exchange(&mut stream)
+        .expect("Hello exchange");
+    assert_eq!(peer_hello.num_connections, 1);
+    drop(stream);
+    listener.join().unwrap();
 }
