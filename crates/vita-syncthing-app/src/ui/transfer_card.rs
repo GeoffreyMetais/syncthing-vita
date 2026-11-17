@@ -18,8 +18,8 @@ const INNER_W: i32 = SIDEBAR_W - 2 * INNER_X;
 /// Height of the idle `Sync now` button.
 const CTA_H: i32 = 26;
 
-/// Draws the transfer card above the sidebar's network status and declares it: touching it
-/// starts a sync (`UiAction::StartSync`).
+/// Draws the transfer card above the sidebar's network status and declares it as a touch target
+/// (`UiAction::StartSync`) when `Idle` or `Ready` (non-clickable while `Downloading` or `Uploading`).
 pub fn draw_transfer_card(
     gfx: &mut Gfx,
     th: &UiTheme,
@@ -28,15 +28,18 @@ pub fn draw_transfer_card(
     hits: &mut HitMap,
 ) {
     let card_y = HINT_Y - 150;
+    let activity = state.sync_activity();
     gfx.rrect(CARD_X, card_y, CARD_W, CARD_H, 12, th.card);
-    hits.add(Hotspot {
-        rect: Rect::new(CARD_X, card_y, CARD_W, CARD_H),
-        action: UiAction::StartSync,
-        focus: None,
-        shortcut: None,
-    });
+    if matches!(activity, SyncActivity::Idle | SyncActivity::Ready) {
+        hits.add(Hotspot {
+            rect: Rect::new(CARD_X, card_y, CARD_W, CARD_H),
+            action: UiAction::StartSync,
+            focus: None,
+            shortcut: None,
+        });
+    }
     gfx.rrect_outline(CARD_X, card_y, CARD_W, CARD_H, 12, 1, th.border);
-    match state.sync_activity() {
+    match activity {
         SyncActivity::Ready => draw_ready(gfx, s, card_y),
         SyncActivity::Idle => draw_idle(gfx, th, s, state, card_y),
         SyncActivity::Downloading => {

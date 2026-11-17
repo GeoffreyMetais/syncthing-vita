@@ -179,16 +179,16 @@ fn test_cross_on_a_focused_share_row_button_runs_that_button() {
 #[test]
 fn test_sync_card_starts_a_sync_only_when_none_is_running() {
     let (dir, repo, mut state) = overview("input-sync-card", 0);
-    common::rect_of(&mut state, UiAction::StartSync);
+    let card = common::rect_of(&mut state, UiAction::StartSync);
     assert_eq!(
         tap_action(&mut state, &repo, UiAction::StartSync),
         UserCommand::StartSync
     );
     state.sync_in_progress = true;
-    assert_eq!(
-        tap_action(&mut state, &repo, UiAction::StartSync),
-        UserCommand::None
-    );
+    assert_eq!(common::tap_rect(&mut state, &repo, card), UserCommand::None);
+    state.sync_in_progress = false;
+    state.uploading = true;
+    assert_eq!(common::tap_rect(&mut state, &repo, card), UserCommand::None);
     let _ = std::fs::remove_dir_all(&dir);
 }
 
