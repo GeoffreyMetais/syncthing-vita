@@ -78,6 +78,8 @@ pub const HINT_TOUCH_MARGIN: i32 = 8;
 pub const C_GOOD: Color = rgb(102, 187, 106);
 pub const C_WARN: Color = rgb(255, 193, 77);
 pub const C_BAD: Color = rgb(239, 83, 80);
+/// Track (unfilled part) of the progress bars.
+pub const C_PROGRESS_TRACK: Color = rgb(38, 47, 56);
 
 /// Colour palette for the VitaSend-inspired interface.
 #[allow(dead_code)]

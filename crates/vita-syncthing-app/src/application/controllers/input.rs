@@ -143,7 +143,7 @@ impl InputController {
         match action {
             UiAction::SwitchTab(tab) => Self::switch_tab(state, repo, tab),
             UiAction::StartSync => {
-                if !state.sync_in_progress {
+                if !state.sync_in_progress && !state.uploading {
                     return UserCommand::StartSync;
                 }
             }

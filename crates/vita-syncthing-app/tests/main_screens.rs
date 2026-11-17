@@ -13,7 +13,7 @@ use vita_syncthing_app::domain::{
 use vita_syncthing_app::infrastructure::{ConfigRepository, BTN_SQUARE, BTN_START, BTN_TRIANGLE};
 use vita_syncthing_app::ui::gfx::{Gfx, GFX_H, GFX_W};
 use vita_syncthing_app::ui::renderer::draw_frame;
-use vita_syncthing_app::ui::theme::{UiTheme, HINT_Y, SIDEBAR_W};
+use vita_syncthing_app::ui::theme::{UiTheme, C_PROGRESS_TRACK, HINT_Y, SIDEBAR_W};
 
 const PEER: DeviceId = DeviceId([0x42; 32]);
 const LANGUAGES: [Language; 5] = [
@@ -100,40 +100,109 @@ fn test_sidebar_tabs_and_transfer_card() {
         tap_action(&mut state, &repo, UiAction::StartSync),
         UserCommand::StartSync
     );
-    // No second sync is started while one is running.
+    // No second sync is started while one is running (downloading or uploading).
     state.sync_in_progress = true;
+    draw(&mut state);
+    assert!(
+        !state
+            .hit_map
+            .hotspots()
+            .iter()
+            .any(|h| h.action == UiAction::StartSync),
+        "transfer card must not be clickable while downloading"
+    );
+    assert_eq!(tap_rect(&mut state, &repo, card), UserCommand::None);
     assert_eq!(
-        tap_action(&mut state, &repo, UiAction::StartSync),
+        vita_syncthing_app::application::InputController::execute(
+            &mut state,
+            &repo,
+            UiAction::StartSync
+        ),
+        UserCommand::None
+    );
+
+    state.sync_in_progress = false;
+    state.uploading = true;
+    draw(&mut state);
+    assert!(
+        !state
+            .hit_map
+            .hotspots()
+            .iter()
+            .any(|h| h.action == UiAction::StartSync),
+        "transfer card must not be clickable while uploading"
+    );
+    assert_eq!(tap_rect(&mut state, &repo, card), UserCommand::None);
+    assert_eq!(
+        vita_syncthing_app::application::InputController::execute(
+            &mut state,
+            &repo,
+            UiAction::StartSync
+        ),
         UserCommand::None
     );
     let _ = std::fs::remove_dir_all(&dir);
 }
 
-/// Draws the frame and tells whether anything is drawn where the transfer card's bar goes.
-fn transfer_bar_drawn(state: &mut AppState) -> bool {
-    let card = rect_of(state, UiAction::StartSync);
+/// Draws the frame and tells whether the transfer card's progress bar (its track) is drawn.
+fn transfer_bar_drawn(state: &mut AppState, card: Rect) -> bool {
     let mut gfx = Gfx::new();
     draw_frame(&mut gfx, state);
-    let card_bg = UiTheme::for_mode(state.theme_mode).card;
-    (card.y + 60..card.y + 66)
-        .any(|y| (24..SIDEBAR_W - 64).any(|x| gfx.pixels[(y * GFX_W + x) as usize] != card_bg))
+    (card.y + 64..card.y + 72).any(|y| {
+        (24..SIDEBAR_W - 64).any(|x| gfx.pixels[(y * GFX_W + x) as usize] == C_PROGRESS_TRACK)
+    })
+}
+
+/// Draws the frame and tells whether the transfer card's `Sync now` button is drawn.
+fn sync_button_is_drawn(state: &mut AppState, card: Rect) -> bool {
+    let mut gfx = Gfx::new();
+    draw_frame(&mut gfx, state);
+    let th = UiTheme::for_mode(state.theme_mode);
+    (card.y + 12..card.y + 38)
+        .any(|y| (28..SIDEBAR_W - 28).any(|x| gfx.pixels[(y * GFX_W + x) as usize] == th.accent_hi))
 }
 
 #[test]
 fn test_transfer_card_progress_bar_only_while_transferring() {
     let (dir, _repo, mut state) = setup("screens-transfer-bar");
+    let card = rect_of(&mut state, UiAction::StartSync);
     // Idle (no connected session) and Ready (connected, up to date): no bar.
-    assert!(!transfer_bar_drawn(&mut state));
+    assert!(!transfer_bar_drawn(&mut state, card));
     state.session_connected = true;
-    assert!(!transfer_bar_drawn(&mut state));
+    assert!(!transfer_bar_drawn(&mut state, card));
     // Uploading: indeterminate bar.
     state.uploading = true;
-    assert!(transfer_bar_drawn(&mut state));
+    assert!(transfer_bar_drawn(&mut state, card));
     // Downloading: determinate bar, even at 0 %.
     state.uploading = false;
     state.sync_in_progress = true;
     state.progress_pct = Some(0);
-    assert!(transfer_bar_drawn(&mut state));
+    assert!(transfer_bar_drawn(&mut state, card));
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_transfer_card_sync_button_states() {
+    let (dir, repo, mut state) = setup("screens-sync-button");
+    let card = rect_of(&mut state, UiAction::StartSync);
+    for language in LANGUAGES {
+        state.language = language;
+        // Idle (no session): `Sync now` button is drawn and touching it syncs.
+        assert!(sync_button_is_drawn(&mut state, card), "{language:?}");
+    }
+    assert_eq!(tap_rect(&mut state, &repo, card), UserCommand::StartSync);
+    // Ready (connected, up to date): `Sync now` button stays visible and clickable.
+    state.session_connected = true;
+    assert!(sync_button_is_drawn(&mut state, card));
+    assert_eq!(tap_rect(&mut state, &repo, card), UserCommand::StartSync);
+    // Transfers: `Sync now` button is hidden and card is non-clickable.
+    state.uploading = true;
+    assert!(!sync_button_is_drawn(&mut state, card));
+    assert_eq!(tap_rect(&mut state, &repo, card), UserCommand::None);
+    state.uploading = false;
+    state.sync_in_progress = true;
+    assert!(!sync_button_is_drawn(&mut state, card));
+    assert_eq!(tap_rect(&mut state, &repo, card), UserCommand::None);
     let _ = std::fs::remove_dir_all(&dir);
 }
 

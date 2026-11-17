@@ -61,7 +61,7 @@ pub static STRINGS_FR: Strings = Strings {
     app_version_label: "v0.1.0",
     sidebar_syncing: "Synchronisation...",
     sidebar_uploading: "Envoi...",
-    sidebar_last_sync: "Dernière session",
+    sidebar_sync_cta: "Synchroniser",
     protocol_tls: "BEP/1.0 TLS 1.3",
     protocol_discovery: "UDP 21027...",
 

@@ -68,7 +68,7 @@ pub const TAB_SETTINGS: &str = "Settings";
 pub const APP_TITLE: &str = "VitaSync";
 pub const APP_VERSION_LABEL: &str = "v0.1.0";
 pub const SIDEBAR_SYNCING: &str = "Syncing...";
-pub const SIDEBAR_LAST_SYNC: &str = "Last sync session";
+pub const SIDEBAR_SYNC_CTA: &str = "Sync now";
 pub const PROTOCOL_TLS: &str = "BEP/1.0 TLS 1.3";
 pub const PROTOCOL_DISCOVERY: &str = "UDP 21027...";
 

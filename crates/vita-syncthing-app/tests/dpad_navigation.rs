@@ -42,7 +42,12 @@ fn test_dashboard_buttons_then_sidebar_tabs() {
     assert_eq!(state.active_tab, ActiveTab::FolderPicker);
     press(&mut state, &repo, BTN_DOWN);
     assert_eq!(state.active_tab, ActiveTab::Settings);
+    // Down from the last tab focuses the sidebar Sync now button; Up returns to Settings,
+    // then FolderPicker.
     press(&mut state, &repo, BTN_DOWN);
+    assert_eq!(state.nav.focus, NavFocus::SyncCard);
+    press(&mut state, &repo, BTN_UP);
+    assert_eq!(state.nav.focus, NavFocus::Sidebar);
     assert_eq!(state.active_tab, ActiveTab::Settings);
     press(&mut state, &repo, BTN_UP);
     assert_eq!(state.active_tab, ActiveTab::FolderPicker);
@@ -135,13 +140,44 @@ fn test_sidebar_up_and_down_stop_at_the_first_and_last_tab() {
     // Up on the first tab: nothing to switch to.
     press(&mut state, &repo, BTN_UP);
     assert_eq!(state.active_tab, ActiveTab::Dashboard);
-    // Down to the last tab, then Down again stays there.
+    // Down through the tabs reaches Settings, then Down again moves to the Sync now button
+    // (and stays there on another Down).
     press(&mut state, &repo, BTN_DOWN);
     press(&mut state, &repo, BTN_DOWN);
     assert_eq!(state.active_tab, ActiveTab::Settings);
     press(&mut state, &repo, BTN_DOWN);
     assert_eq!(state.active_tab, ActiveTab::Settings);
+    assert_eq!(state.nav.focus, NavFocus::SyncCard);
+    press(&mut state, &repo, BTN_DOWN);
+    assert_eq!(state.nav.focus, NavFocus::SyncCard);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_dpad_reaches_sync_card_and_skips_it_while_syncing() {
+    let (dir, repo, mut state) = setup("dpad-sync-card");
+    press(&mut state, &repo, BTN_DOWN);
+    press(&mut state, &repo, BTN_DOWN);
+    press(&mut state, &repo, BTN_DOWN);
+    assert_eq!(state.nav.focus, NavFocus::SyncCard);
+
+    // Cross on the focused Sync now button starts a sync; Right enters the page content.
+    assert_eq!(press(&mut state, &repo, BTN_CROSS), UserCommand::StartSync);
+    press(&mut state, &repo, BTN_RIGHT);
+    assert_eq!(state.nav.focus, NavFocus::Content);
+
+    // Return to Sidebar -> SyncCard, then test while syncing: SyncCard is skipped and Cross is a no-op.
+    press(&mut state, &repo, BTN_LEFT);
     assert_eq!(state.nav.focus, NavFocus::Sidebar);
+    state.sync_in_progress = true;
+    press(&mut state, &repo, BTN_DOWN);
+    assert_eq!(state.nav.focus, NavFocus::Sidebar);
+
+    state.nav.focus = NavFocus::SyncCard;
+    assert_eq!(press(&mut state, &repo, BTN_CROSS), UserCommand::None);
+    state.sync_in_progress = false;
+    state.uploading = true;
+    assert_eq!(press(&mut state, &repo, BTN_CROSS), UserCommand::None);
     let _ = std::fs::remove_dir_all(&dir);
 }
 
