@@ -2,7 +2,7 @@
 //! The button is shown and clickable when `Idle` or `Ready`; during `Downloading` or `Uploading`
 //! it is replaced by the transfer status and progress bar, and the card is non-clickable.
 
-use crate::domain::{AppState, HitMap, Hotspot, Rect, SyncActivity, UiAction};
+use crate::domain::{AppState, HitMap, Hotspot, NavFocus, Rect, SyncActivity, UiAction};
 use crate::ui::gfx::{with_alpha, Align, FontWeight, Gfx, Icon};
 use crate::ui::strings::Strings;
 use crate::ui::theme::{UiTheme, C_GOOD, HINT_Y, SIDEBAR_W};
@@ -46,13 +46,14 @@ pub fn draw_transfer_card(
     }
     gfx.rrect_outline(CARD_X, card_y, CARD_W, CARD_H, 12, 1, th.border);
 
+    let focused = state.nav.focus == NavFocus::SyncCard;
     match activity {
         SyncActivity::Ready => {
-            draw_sync_button(gfx, th, s, card_y);
+            draw_sync_button(gfx, th, s, card_y, focused);
             draw_ready(gfx, s, card_y);
         }
         SyncActivity::Idle => {
-            draw_sync_button(gfx, th, s, card_y);
+            draw_sync_button(gfx, th, s, card_y, focused);
             draw_idle(gfx, th, s, state, card_y);
         }
         SyncActivity::Downloading => {
@@ -68,7 +69,7 @@ pub fn draw_transfer_card(
 }
 
 /// Draws the `Sync now` pill button at the top of the card.
-fn draw_sync_button(gfx: &mut Gfx, th: &UiTheme, s: &Strings, card_y: i32) {
+fn draw_sync_button(gfx: &mut Gfx, th: &UiTheme, s: &Strings, card_y: i32, focused: bool) {
     let cta_y = card_y + 12;
     gfx.rrect(INNER_X, cta_y, INNER_W, CTA_H, CTA_H / 2, th.accent_bg);
     gfx.rrect_outline(
@@ -80,6 +81,17 @@ fn draw_sync_button(gfx: &mut Gfx, th: &UiTheme, s: &Strings, card_y: i32) {
         1,
         with_alpha(th.accent, 160),
     );
+    if focused {
+        gfx.rrect_outline(
+            INNER_X - 3,
+            cta_y - 3,
+            INNER_W + 6,
+            CTA_H + 6,
+            (CTA_H + 6) / 2,
+            2,
+            th.accent_hi,
+        );
+    }
 
     // Refresh icon and label, centred together in the button.
     let icon_w = 16;
