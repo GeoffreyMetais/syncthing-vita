@@ -2,7 +2,7 @@
 //! device is linked to it in the `ManageDevices` modal that follows creation.
 
 use crate::application::ShareService;
-use crate::domain::{ActiveTab, AppState, ModalDialog, PickerMode, UiText, NEW_SHARE_TEMPLATES};
+use crate::domain::{ActiveTab, AppState, ModalDialog, UiText, NEW_SHARE_TEMPLATES};
 use crate::infrastructure::ConfigRepository;
 
 pub struct ShareCreation;
@@ -52,7 +52,6 @@ impl ShareCreation {
             })
             .collect();
         let label = format!("Vita {}", raw_name);
-        state.picker.mode = PickerMode::ChangeShareTarget;
         state.active_tab = ActiveTab::Dashboard;
         Self::begin(state, repo, &folder_id, &label, &chosen_path)
     }
@@ -61,7 +60,6 @@ impl ShareCreation {
     /// `Files` browser, and switches to the `Overview` tab (share list).
     pub fn begin_from_template(state: &mut AppState, repo: &ConfigRepository, idx: usize) -> usize {
         let (folder_id, label, path) = NEW_SHARE_TEMPLATES[idx];
-        state.picker.mode = PickerMode::ChangeShareTarget;
         state.active_tab = ActiveTab::Dashboard;
         Self::begin(state, repo, folder_id, label, path)
     }

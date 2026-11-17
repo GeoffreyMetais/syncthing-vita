@@ -17,11 +17,11 @@ fn setup(name: &str) -> (String, ConfigRepository, AppState) {
 }
 
 #[test]
-fn change_target_rows_offer_the_default_folder_of_the_selected_share() {
+fn accepted_target_rows_offer_the_default_folder_of_the_selected_share() {
     let (dir, repo, mut state) = setup("browser-default-folder");
     ShareService::create_share(&mut state, &repo, "docs", "Docs", &format!("{}/docs", dir));
     state.selected_share_idx = 0;
-    state.picker.mode = PickerMode::ChangeShareTarget;
+    state.picker.mode = PickerMode::AcceptedShareTarget;
     state.picker.current_dir = format!("{}/sub", dir);
 
     FolderBrowser::refresh(&mut state, &repo);
@@ -45,7 +45,7 @@ fn change_target_rows_offer_the_default_folder_of_the_selected_share() {
 fn subdirectories_are_joined_to_the_browsed_directory_with_one_separator() {
     let (dir, repo, mut state) = setup("browser-subdirs");
     std::fs::create_dir_all(format!("{}/photos", dir)).unwrap();
-    state.picker.mode = PickerMode::ChangeShareTarget;
+    state.picker.mode = PickerMode::AcceptedShareTarget;
 
     for current in [dir.clone(), format!("{}/", dir)] {
         state.picker.current_dir = current;
@@ -66,7 +66,7 @@ fn subdirectories_are_joined_to_the_browsed_directory_with_one_separator() {
 #[test]
 fn refresh_keeps_the_selected_row_when_it_still_exists() {
     let (dir, repo, mut state) = setup("browser-selection");
-    state.picker.mode = PickerMode::ChangeShareTarget;
+    state.picker.mode = PickerMode::AcceptedShareTarget;
     state.picker.current_dir = format!("{}/empty", dir);
     state.picker.selected_idx = 1;
     FolderBrowser::refresh(&mut state, &repo);
@@ -84,7 +84,7 @@ fn refresh_keeps_the_selected_row_when_it_still_exists() {
 #[test]
 fn navigate_up_walks_one_level_then_leaves_the_tab_at_a_device_root() {
     let (dir, repo, mut state) = setup("browser-up");
-    state.picker.mode = PickerMode::ChangeShareTarget;
+    state.picker.mode = PickerMode::AcceptedShareTarget;
     state.active_tab = ActiveTab::FolderPicker;
 
     // A sceIo-style path: `ux0:data` -> `ux0:`, then `ux0:` is a root.
@@ -123,10 +123,21 @@ fn create_new_share_root_lists_only_the_presets_not_shared_yet() {
     state.picker.mode = PickerMode::CreateNewShare;
     state.picker.current_dir = "ux0:".to_owned();
     // `screenshots` is already shared (same folder ID): its preset row must disappear.
-    ShareService::create_share(&mut state, &repo, "screenshots", "Shots", &format!("{}/s", dir));
+    ShareService::create_share(
+        &mut state,
+        &repo,
+        "screenshots",
+        "Shots",
+        &format!("{}/s", dir),
+    );
 
     FolderBrowser::refresh(&mut state, &repo);
-    let templates: Vec<usize> = state.picker.items.iter().filter_map(|i| i.template).collect();
+    let templates: Vec<usize> = state
+        .picker
+        .items
+        .iter()
+        .filter_map(|i| i.template)
+        .collect();
     assert!(!templates.is_empty());
     assert!(state
         .picker
@@ -150,7 +161,7 @@ fn a_folder_already_targeted_by_another_share_is_marked_shared() {
     ShareService::create_share(&mut state, &repo, "a", "A", &format!("{}/music", dir));
     ShareService::create_share(&mut state, &repo, "b", "B", &format!("{}/other", dir));
 
-    state.picker.mode = PickerMode::ChangeShareTarget;
+    state.picker.mode = PickerMode::AcceptedShareTarget;
     state.selected_share_idx = 1;
     state.picker.current_dir = dir.clone();
     FolderBrowser::refresh(&mut state, &repo);
@@ -164,7 +175,7 @@ fn a_folder_already_targeted_by_another_share_is_marked_shared() {
 
     // The selected share may keep its own folder.
     state.selected_share_idx = 0;
-    state.picker.mode = PickerMode::ChangeShareTarget;
+    state.picker.mode = PickerMode::AcceptedShareTarget;
     FolderBrowser::refresh(&mut state, &repo);
     let music = state
         .picker

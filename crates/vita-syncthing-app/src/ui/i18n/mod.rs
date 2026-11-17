@@ -48,7 +48,6 @@ pub struct Strings {
     pub action_pause: &'static str,
     pub action_enable: &'static str,
     pub action_devices: &'static str,
-    pub action_folder: &'static str,
     pub action_folder_path: &'static str,
     pub action_add_by_id: &'static str,
     pub action_add_device: &'static str,

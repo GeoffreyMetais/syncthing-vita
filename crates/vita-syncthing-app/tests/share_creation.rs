@@ -238,14 +238,13 @@ fn begin_from_path_derives_the_folder_id_and_label_from_the_folder_name() {
     let idx = ShareCreation::begin_from_path(&mut state, &repo, &chosen);
     assert_eq!(state.shares[idx].folder_id, "my-save_data-1");
     assert_eq!(state.shares[idx].label, "Vita My Save_Data-1");
-    assert_eq!(state.shares[idx].target_path, format!("{}/My Save_Data-1", dir));
+    assert_eq!(
+        state.shares[idx].target_path,
+        format!("{}/My Save_Data-1", dir)
+    );
     assert_eq!(
         state.pending_share_creation.as_deref(),
         Some("my-save_data-1")
-    );
-    assert_eq!(
-        state.picker.mode,
-        vita_syncthing_app::domain::PickerMode::ChangeShareTarget
     );
     assert_eq!(
         state.active_tab,

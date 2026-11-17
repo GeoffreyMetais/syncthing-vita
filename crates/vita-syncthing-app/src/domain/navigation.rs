@@ -43,12 +43,12 @@ pub const TAB_ORDER: [ActiveTab; 3] = [
 ];
 
 /// Number of focusable action buttons per row, left to right:
-/// Overview share rows `[Devices, Delete, Folder]`, Settings `[Switch Theme]` on Display
+/// Overview share rows `[Devices, Delete]`, Settings `[Switch Theme]` on Display
 /// (row 0) and `[QR / ID, + Add Device]` on Devices (row 1).
 /// Files rows have no buttons (the row is the target).
 pub const fn action_count(tab: ActiveTab) -> usize {
     match tab {
-        ActiveTab::Dashboard => 3,
+        ActiveTab::Dashboard => 2,
         ActiveTab::FolderPicker => 0,
         ActiveTab::Settings => 1,
     }
