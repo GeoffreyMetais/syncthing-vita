@@ -148,21 +148,30 @@ fn test_sidebar_tabs_and_transfer_card() {
 fn transfer_bar_drawn(state: &mut AppState, card: Rect) -> bool {
     let mut gfx = Gfx::new();
     draw_frame(&mut gfx, state);
-    (card.y + 60..card.y + 66).any(|y| {
-        (24..SIDEBAR_W - 64).any(|x| gfx.pixels[(y * GFX_W + x) as usize] == C_PROGRESS_TRACK)
+    (card.y + 70..card.y + 78).any(|y| {
+        (24..SIDEBAR_W - 24).any(|x| gfx.pixels[(y * GFX_W + x) as usize] == C_PROGRESS_TRACK)
     })
 }
 
-/// Draws the frame and tells whether the transfer card shows its `Sync now` button (the
-/// button's accent outline along the card's upper half).
-fn sync_button_drawn(state: &mut AppState, card: Rect) -> bool {
+/// Draws the frame and tells whether the transfer card's `Sync now` button uses its active
+/// accent colour (as opposed to its greyed-out disabled colour).
+fn sync_button_is_accented(state: &mut AppState, card: Rect) -> bool {
     let mut gfx = Gfx::new();
     draw_frame(&mut gfx, state);
-    let card_bg = UiTheme::for_mode(state.theme_mode).card;
-    // Right edge of the button, inside the card's own outline: no text reaches it.
-    let right = card.x + card.w;
-    (card.y + 18..card.y + 34)
-        .any(|y| (right - 15..right - 11).any(|x| gfx.pixels[(y * GFX_W + x) as usize] != card_bg))
+    let th = UiTheme::for_mode(state.theme_mode);
+    // Inside the button pill, checking for the bright accent text/icon pixels.
+    (card.y + 12..card.y + 38)
+        .any(|y| (28..SIDEBAR_W - 28).any(|x| gfx.pixels[(y * GFX_W + x) as usize] == th.accent_hi))
+}
+
+/// Draws the frame and tells whether the transfer card's `Sync now` button is drawn in its
+/// greyed-out (`th.faint`) state.
+fn sync_button_is_greyed_out(state: &mut AppState, card: Rect) -> bool {
+    let mut gfx = Gfx::new();
+    draw_frame(&mut gfx, state);
+    let th = UiTheme::for_mode(state.theme_mode);
+    (card.y + 12..card.y + 38)
+        .any(|y| (28..SIDEBAR_W - 28).any(|x| gfx.pixels[(y * GFX_W + x) as usize] == th.faint))
 }
 
 #[test]
@@ -185,24 +194,29 @@ fn test_transfer_card_progress_bar_only_while_transferring() {
 }
 
 #[test]
-fn test_transfer_card_sync_button_only_while_idle() {
+fn test_transfer_card_sync_button_states() {
     let (dir, repo, mut state) = setup("screens-sync-button");
     let card = rect_of(&mut state, UiAction::StartSync);
     for language in LANGUAGES {
         state.language = language;
-        // Idle (no session): the card shows the `Sync now` button and touching it syncs.
-        assert!(sync_button_drawn(&mut state, card), "{language:?}");
+        // Idle (no session): active `Sync now` button and touching it syncs.
+        assert!(sync_button_is_accented(&mut state, card), "{language:?}");
     }
     assert_eq!(tap_rect(&mut state, &repo, card), UserCommand::StartSync);
-    // Ready (connected, up to date): no button.
+    // Ready (connected, up to date): `Sync now` button stays visible and clickable.
     state.session_connected = true;
-    assert!(!sync_button_drawn(&mut state, card));
-    // Transfers: no button either, and card is not clickable.
+    assert!(sync_button_is_accented(&mut state, card));
+    assert_eq!(tap_rect(&mut state, &repo, card), UserCommand::StartSync);
+    // Transfers: `Sync now` button is greyed out and non-clickable.
     state.uploading = true;
-    assert!(!sync_button_drawn(&mut state, card));
+    assert!(!sync_button_is_accented(&mut state, card));
+    assert!(sync_button_is_greyed_out(&mut state, card));
+    assert_eq!(tap_rect(&mut state, &repo, card), UserCommand::None);
     state.uploading = false;
     state.sync_in_progress = true;
-    assert!(!sync_button_drawn(&mut state, card));
+    assert!(!sync_button_is_accented(&mut state, card));
+    assert!(sync_button_is_greyed_out(&mut state, card));
+    assert_eq!(tap_rect(&mut state, &repo, card), UserCommand::None);
     let _ = std::fs::remove_dir_all(&dir);
 }
 
