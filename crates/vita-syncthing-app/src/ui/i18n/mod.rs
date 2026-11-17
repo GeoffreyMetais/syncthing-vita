@@ -82,7 +82,7 @@ pub struct Strings {
     pub app_version_label: &'static str,
     pub sidebar_syncing: &'static str,
     pub sidebar_uploading: &'static str,
-    pub sidebar_last_sync: &'static str,
+    pub sidebar_sync_cta: &'static str,
     pub protocol_tls: &'static str,
     pub protocol_discovery: &'static str,
 
