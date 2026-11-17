@@ -28,7 +28,7 @@ official Syncthing apps you already run: there is nothing to install on the othe
   Folders that are already shared are greyed out, and the app's own data directory is protected.
 - **Several devices per folder**: link a folder to your PC *and* your Steam Deck, and edits made
   anywhere end up everywhere. Up to four devices sync at the same time.
-- **Read-only shares**: switch a folder to *Read only* (Syncthing's *Receive Only*) and the Vita
+- **Receive-only shares**: switch a folder to *Receive Only* and the Vita
   will receive changes without ever pushing its own. If something changed locally anyway,
   *Revert Local Changes* puts the folder back to what your other devices have.
 - **Pause** any share without losing its configuration.
@@ -76,7 +76,7 @@ official Syncthing apps you already run: there is nothing to install on the othe
 - **Five languages**: English, French, Spanish, German and Italian, following the system
   language by default.
 - **Two themes**: Dark, and Pure Black for the OLED screen of the PS Vita 1000.
-- A **screensaver** for OLED screens kicks in while you leave the Vita syncing on the desk.
+- A **screensaver** kicks in while you leave the Vita syncing on the desk.
 
 <p align="center">
   <img src="docs/readme/3_settings.png" width="640" alt="Settings: theme, language, declined folders and protocol log">
@@ -113,9 +113,6 @@ only drawn when needed:
 - at **30 FPS** for animations (screensaver, QR viewfinder);
 - at **10 FPS** at most for background updates (sync progress, new log lines);
 - **once per second** when nothing changes.
-
-Animations and timers are based on elapsed time, not on the number of frames drawn, so they
-keep the right speed at any frame rate.
 
 ### Standby only when it helps
 
