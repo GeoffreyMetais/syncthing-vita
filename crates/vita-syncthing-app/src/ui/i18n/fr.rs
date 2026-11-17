@@ -29,7 +29,6 @@ pub static STRINGS_FR: Strings = Strings {
     action_pause: "Suspendre",
     action_enable: "Activer",
     action_devices: "Appareils",
-    action_folder: "Dossier",
     action_folder_path: "Chemin du dossier",
     action_add_by_id: "Ajouter par ID",
     action_add_device: "Ajouter appareil",

@@ -1,5 +1,5 @@
 //! Share list of the `Overview` page: one compact card per configured Syncthing share with its
-//! `Devices`, `Delete` and `Folder` actions. The list scrolls to keep the selected share visible.
+//! `Devices` and `Delete` actions. The list scrolls to keep the selected share visible.
 //!
 //! Every interactive element is declared in the frame's `HitMap` where it is drawn; input is
 //! handled from these declarations by `application::SharesController`.
@@ -123,13 +123,11 @@ fn draw_share_card(
         gfx.icon(Icon::Lock, bx, by, 14.0, th.accent_hi);
     }
 
-    // Action buttons on the right: [X Devices] [SQ Delete] [TRI Folder]. While the device
-    // card has the focus, `Triangle` is the page's `New Share` instead.
-    let w_folder = action_width(gfx, PadButton::Triangle, s.action_folder);
+    // Action buttons on the right: [X Devices] [SQ Delete]. A share's folder is chosen once,
+    // when it is created or accepted, and cannot be changed afterwards.
     let w_delete = action_width(gfx, PadButton::Square, s.action_delete);
     let w_devs = action_width(gfx, PadButton::Cross, s.action_devices);
-    let bx_folder = CONTENT_R - 12 - w_folder;
-    let bx_delete = bx_folder - 8 - w_delete;
+    let bx_delete = CONTENT_R - 12 - w_delete;
     let bx_devs = bx_delete - 8 - w_devs;
 
     // Left to right: the column order is the D-pad order within the row.
@@ -145,12 +143,6 @@ fn draw_share_card(
             PadButton::Square,
             s.action_delete,
             UiAction::DeleteShare(i),
-        ),
-        (
-            bx_folder,
-            PadButton::Triangle,
-            s.action_folder,
-            UiAction::ChangeShareFolder(i),
         ),
     ];
     for (col, (bx, pad, label, action)) in buttons.into_iter().enumerate() {

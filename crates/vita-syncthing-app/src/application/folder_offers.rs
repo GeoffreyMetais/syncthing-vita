@@ -126,7 +126,7 @@ impl FolderOfferService {
             });
             state.active_tab = ActiveTab::Dashboard;
         } else {
-            state.picker.mode = PickerMode::ChangeShareTarget;
+            state.picker.mode = PickerMode::AcceptedShareTarget;
             FolderBrowser::refresh(state, repo);
             state.active_tab = ActiveTab::FolderPicker;
             state.reset_nav_for_tab();

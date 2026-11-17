@@ -31,7 +31,7 @@ fn setup(name: &str, folders: usize) -> (String, ConfigRepository, AppState) {
     state.active_tab = ActiveTab::FolderPicker;
     state.reset_nav_for_tab();
     state.nav.focus = NavFocus::Content;
-    state.picker.mode = PickerMode::ChangeShareTarget;
+    state.picker.mode = PickerMode::AcceptedShareTarget;
     state.picker.current_dir = dir.clone();
     vita_syncthing_app::application::FolderBrowser::refresh(&mut state, &repo);
     (dir, repo, state)

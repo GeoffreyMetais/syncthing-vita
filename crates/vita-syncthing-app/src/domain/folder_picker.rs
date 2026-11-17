@@ -6,7 +6,7 @@ use crate::domain::models::{PickerItem, PickerMode, BROWSER_ROWS};
 /// The folder browser of the `Files` tab.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FolderPicker {
-    /// Creating a share, or choosing the target folder of the selected one.
+    /// Creating a share, or choosing the target folder of an accepted folder offer.
     pub mode: PickerMode,
     pub current_dir: String,
     /// Presets and subfolders of `current_dir`.
@@ -19,7 +19,7 @@ pub struct FolderPicker {
 impl FolderPicker {
     pub fn new(browse_root: &str) -> Self {
         Self {
-            mode: PickerMode::ChangeShareTarget,
+            mode: PickerMode::CreateNewShare,
             current_dir: browse_root.to_owned(),
             items: Vec::new(),
             selected_idx: 0,

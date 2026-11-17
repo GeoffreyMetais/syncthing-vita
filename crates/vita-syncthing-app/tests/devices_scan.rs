@@ -112,8 +112,14 @@ fn test_on_input_arms_or_fires_the_scan_only_when_the_dialog_opens() {
 
     // Opening with a linked device arms the delayed scan without scanning now.
     state.modal = dialog;
-    assert_eq!(DevicesScan::on_input(ModalDialog::None, &mut state), UserCommand::None);
-    assert_eq!(state.devices_scan_countdown, Some(DEVICES_DIALOG_SCAN_DELAY));
+    assert_eq!(
+        DevicesScan::on_input(ModalDialog::None, &mut state),
+        UserCommand::None
+    );
+    assert_eq!(
+        state.devices_scan_countdown,
+        Some(DEVICES_DIALOG_SCAN_DELAY)
+    );
 
     // The dialog was already open before this frame: nothing is re-armed.
     state.devices_scan_countdown = Some(7);
@@ -125,7 +131,10 @@ fn test_on_input_arms_or_fires_the_scan_only_when_the_dialog_opens() {
         share_idx: 9,
         selected_dev_idx: 0,
     };
-    assert_eq!(DevicesScan::on_input(ModalDialog::None, &mut state), UserCommand::ScanLan);
+    assert_eq!(
+        DevicesScan::on_input(ModalDialog::None, &mut state),
+        UserCommand::ScanLan
+    );
     assert_eq!(state.devices_scan_countdown, None);
 
     // No dialog open: the countdown is dropped.

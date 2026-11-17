@@ -29,7 +29,6 @@ pub static STRINGS_IT: Strings = Strings {
     action_pause: "Pausa",
     action_enable: "Abilita",
     action_devices: "Dispositivi",
-    action_folder: "Cartella",
     action_folder_path: "Percorso cartella",
     action_add_by_id: "Aggiungi con ID",
     action_add_device: "Aggiungi dispositivo",

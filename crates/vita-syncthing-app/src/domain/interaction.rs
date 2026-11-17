@@ -61,13 +61,11 @@ pub enum UiAction {
     ManageDevices(usize),
     /// Ask for confirmation before deleting the share.
     DeleteShare(usize),
-    /// Browse for another target folder of the share.
-    ChangeShareFolder(usize),
 
     // --- `Files` ---
     /// `Files`: go to the parent folder (or leave the browser at the root).
     PickerUp,
-    /// `Files`: choose the folder of the row (share it / use it as target).
+    /// `Files`: choose the folder of the row (share it / store an accepted folder offer in it).
     PickerSelect(usize),
     /// `Files`: enter the folder of the row.
     PickerOpen(usize),

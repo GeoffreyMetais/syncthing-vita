@@ -36,11 +36,7 @@ fn test_overview_device_card_has_two_header_buttons() {
 
 #[test]
 fn test_action_count_per_tab() {
-    assert_eq!(
-        action_count(ActiveTab::Dashboard),
-        3,
-        "Devices, Delete, Folder"
-    );
+    assert_eq!(action_count(ActiveTab::Dashboard), 2, "Devices, Delete");
     assert_eq!(
         action_count(ActiveTab::FolderPicker),
         0,

@@ -1,6 +1,6 @@
 //! `Files` tab folder browser (`FolderBrowser`): lists the presets and subfolders of the
-//! browsed directory, walks up and down, and applies the selection (new share or new target
-//! folder of the selected share).
+//! browsed directory, walks up and down, and applies the selection (new share, or target folder
+//! of a folder offer just accepted).
 
 use crate::application::{ShareCreation, ShareService};
 use crate::domain::{
@@ -106,8 +106,8 @@ impl FolderBrowser {
             });
         }
 
-        // In `ChangeShareTarget` mode the selected share may keep its own folder.
-        let own_share = (state.picker.mode == PickerMode::ChangeShareTarget)
+        // In `AcceptedShareTarget` mode the accepted share may keep its default folder.
+        let own_share = (state.picker.mode == PickerMode::AcceptedShareTarget)
             .then_some(state.selected_share_idx);
         for item in &mut items {
             let path = item.path.trim_end_matches('/');
@@ -168,7 +168,7 @@ impl FolderBrowser {
     /// Applies selection in the `ux0:` directory browser (folders already shared are ignored):
     /// - If `enter_subdir == true` and item is a directory, descends into it.
     /// - If `state.picker.mode == PickerMode::CreateNewShare`, creates a new share and opens device assignment.
-    /// - Otherwise, assigns the chosen target path to the selected share.
+    /// - Otherwise, assigns the chosen target path to the share just accepted from an offer.
     pub fn apply_selection(state: &mut AppState, repo: &ConfigRepository, enter_subdir: bool) {
         let Some(item) = state.picker.items.get(state.picker.selected_idx).cloned() else {
             return;

@@ -170,13 +170,13 @@ fn test_shortcut_prefers_the_selected_row_over_page_elements() {
     let page = spot(BOX, UiAction::NewShare, None, Some(ShortcutKey::Triangle));
     let row0 = spot(
         BOX,
-        UiAction::ChangeShareFolder(0),
+        UiAction::ManageDevices(0),
         Some(FocusSlot::RowAction { row: 0, col: 2 }),
         Some(ShortcutKey::Triangle),
     );
     let row1 = spot(
         BOX,
-        UiAction::ChangeShareFolder(1),
+        UiAction::ManageDevices(1),
         Some(FocusSlot::RowAction { row: 1, col: 2 }),
         Some(ShortcutKey::Triangle),
     );
@@ -186,11 +186,11 @@ fn test_shortcut_prefers_the_selected_row_over_page_elements() {
 
     assert_eq!(
         map.shortcut_action(ShortcutKey::Triangle, Some(1)),
-        Some(UiAction::ChangeShareFolder(1))
+        Some(UiAction::ManageDevices(1))
     );
     assert_eq!(
         map.shortcut_action(ShortcutKey::Triangle, Some(0)),
-        Some(UiAction::ChangeShareFolder(0))
+        Some(UiAction::ManageDevices(0))
     );
     // No selected row: the page-level element answers.
     assert_eq!(

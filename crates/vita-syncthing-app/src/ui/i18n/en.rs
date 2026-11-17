@@ -29,7 +29,6 @@ pub static STRINGS_EN: Strings = Strings {
     action_pause: "Pause",
     action_enable: "Enable",
     action_devices: "Devices",
-    action_folder: "Folder",
     action_folder_path: "Folder Path",
     action_add_by_id: "Add by ID",
     action_add_device: "Add Device",

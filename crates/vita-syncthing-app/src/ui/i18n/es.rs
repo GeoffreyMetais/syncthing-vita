@@ -29,7 +29,6 @@ pub static STRINGS_ES: Strings = Strings {
     action_pause: "Pausar",
     action_enable: "Activar",
     action_devices: "Dispositivos",
-    action_folder: "Carpeta",
     action_folder_path: "Ruta de carpeta",
     action_add_by_id: "Añadir por ID",
     action_add_device: "Añadir dispositivo",

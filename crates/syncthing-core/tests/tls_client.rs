@@ -101,7 +101,9 @@ fn a_flush_reports_output_the_stalled_peer_never_took() {
     let short_timeout = Duration::from_millis(300);
     let (mut stream, _) =
         open_bep_tls_stream(&test_identity(0x87), addr, None, short_timeout).expect("BEP stream");
-    stream.write_all(b"x").expect("first byte drives the handshake");
+    stream
+        .write_all(b"x")
+        .expect("first byte drives the handshake");
 
     let chunk = vec![0u8; 256 * 1024];
     let mut stalled = false;

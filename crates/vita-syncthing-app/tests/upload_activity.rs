@@ -25,7 +25,10 @@ fn uploading_without_any_served_block_ends_at_once() {
     state.uploading = true;
     assert!(activity.update(&mut state, Instant::now()));
     assert!(!state.uploading);
-    assert!(!activity.update(&mut state, Instant::now()), "nothing changes twice");
+    assert!(
+        !activity.update(&mut state, Instant::now()),
+        "nothing changes twice"
+    );
 }
 
 #[test]
@@ -44,7 +47,10 @@ fn upload_state_lasts_until_exactly_one_grace_period_after_the_last_block() {
     assert!(state.uploading);
 
     // One millisecond later, the state ends and the screen must be redrawn.
-    assert!(activity.update(&mut state, t0 + UPLOAD_DISPLAY_GRACE + Duration::from_millis(1)));
+    assert!(activity.update(
+        &mut state,
+        t0 + UPLOAD_DISPLAY_GRACE + Duration::from_millis(1)
+    ));
     assert!(!state.uploading);
 }
 
