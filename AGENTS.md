@@ -112,6 +112,7 @@ syncthing-vita
                 ├── theme.rs          # UiTheme (Dark & OLED palettes) and layout constants
                 ├── strings.rs        # Factorized UI string resources, labels, controller hints & formatting helpers
                 ├── widgets.rs        # Reusable VitaSend UI components (cards, chips, actions, checkboxes, chrome, toast)
+                ├── transfer_card.rs  # Sidebar transfer card (sync state, progress bar, `Sync now` button while idle; touching it starts a sync)
                 ├── screens/          # Feature-split screen views (Overview + its share list, Files, Settings, OLED Screensaver)
                 │   ├── mod.rs
                 │   ├── dashboard.rs
@@ -212,6 +213,7 @@ Dependencies strictly point **inward**. Inner layers never import or depend on o
      - `screens/`: Independent full-screen views (`dashboard.rs` drawing the share list of `shares.rs`, `folder_picker.rs`, `settings.rs`, `logs.rs`, `screensaver.rs`).
      - `modals/`: Isolated modal dialogs (`create_share.rs`, `manage_devices.rs`, `add_device.rs`, `device_id.rs`, `confirm_quit.rs`, `confirm_delete_share.rs`, `fallback_keyboard.rs`).
      - `widgets.rs`: Reusable UI elements (cards, chips, checkboxes, buttons, chrome, toast).
+     - `transfer_card.rs`: The sidebar transfer card drawn by `draw_chrome`. While idle it shows a `Sync now` button: touching the card is the way to (re)connect to the paired devices, including those not linked to an active share (which are not dialed automatically).
      - `gfx.rs`: Software 2D rendering primitives, anti-aliased geometry, and TrueType rasterization.
      - `renderer.rs`: Main UI coordinator invoking active screen and modal renderers.
    - **Strict Rule**: Pure read-only view. Receives `&AppState` and visual context. **Never mutate domain state directly, and never perform disk I/O or network calls.**
@@ -436,7 +438,7 @@ cargo test --workspace
 - `folder_offers.rs`: offered folders need consent, accept / decline / later, a crafted folder label cannot inject a share, declined offers persisted, deleted shares are declined and do not come back, `Settings` · `Clear Declined` (D-pad and touch)
 - `share_service.rs`: share deletion, share creation, device linking, paused accepted folders, `ConfigRepository` roundtrip, manual LAN pairing
 - `input_controller.rs`: global routing — an active screensaver swallows input and wakes on a button press or touch only
-- `main_screens.rs`: sidebar tabs and transfer card (progress bar only while downloading / uploading), `Overview` device card / share list / hints, `Files` rows and `Open` chip, `Settings` hints; geometry of every page in all 5 languages (elements on screen, hints not overlapping)
+- `main_screens.rs`: sidebar tabs and transfer card (progress bar only while downloading / uploading, `Sync now` button only while idle), `Overview` device card / share list / hints, `Files` rows and `Open` chip, `Settings` hints; geometry of every page in all 5 languages (elements on screen, hints not overlapping)
 - `modal_touch.rs`: modal touch resolved from declared elements (template rows, device rows, pause / done buttons, `Scan QR` button in every language, `Triangle` LAN scan without devices, text box -> system keyboard, keypad keys, folder offer buttons, outside / inside touches); geometry of every modal in all 5 languages (on screen, hints and buttons not overlapping)
 - `dialogs.rs`: `START` -> `ConfirmQuit` -> `Cross` quits, `ConfirmQuit` touch targets, `ConfirmDeleteShare` (`Square` on the Overview, cancel / confirm)
 - `add_device.rs`: add-device-by-short-ID via system keyboard (placeholder upgraded on discovery), virtual keyboard hidden until requested

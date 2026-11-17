@@ -9,6 +9,7 @@ use crate::domain::models::ActiveTab;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum NavFocus {
     Sidebar,
+    SyncCard,
     Content,
 }
 

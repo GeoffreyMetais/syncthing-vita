@@ -5,7 +5,7 @@
 //! the focus, and what it does, is declared by the screen in the frame's `HitMap`.
 
 use crate::application::{DashboardController, FilesController, SettingsController};
-use crate::domain::{ActiveTab, AppState, NavFocus, UiAction, TAB_ORDER};
+use crate::domain::{ActiveTab, AppState, NavFocus, SyncActivity, UiAction, TAB_ORDER};
 use crate::infrastructure::{BTN_CROSS, BTN_DOWN, BTN_LEFT, BTN_RIGHT, BTN_UP};
 
 /// Buttons handled here; they are removed from the frame so shortcuts do not see them.
@@ -22,8 +22,10 @@ impl DpadNavigation {
         if buttons == 0 {
             return None;
         }
-        if state.nav.focus == NavFocus::Sidebar {
-            return Self::sidebar(state, buttons);
+        match state.nav.focus {
+            NavFocus::Sidebar => return Self::sidebar(state, buttons),
+            NavFocus::SyncCard => return Self::sync_card(state, buttons),
+            NavFocus::Content => {}
         }
         let moved = match state.active_tab {
             ActiveTab::Dashboard => DashboardController::move_focus(state, buttons),
@@ -52,8 +54,36 @@ impl DpadNavigation {
         if buttons & BTN_UP != 0 && pos > 0 {
             return Some(UiAction::SwitchTab(TAB_ORDER[pos - 1]));
         }
-        if buttons & BTN_DOWN != 0 && pos + 1 < TAB_ORDER.len() {
-            return Some(UiAction::SwitchTab(TAB_ORDER[pos + 1]));
+        if buttons & BTN_DOWN != 0 {
+            if pos + 1 < TAB_ORDER.len() {
+                return Some(UiAction::SwitchTab(TAB_ORDER[pos + 1]));
+            }
+            if !matches!(
+                state.sync_activity(),
+                SyncActivity::Downloading | SyncActivity::Uploading
+            ) {
+                state.nav.focus = NavFocus::SyncCard;
+            }
+        }
+        None
+    }
+
+    fn sync_card(state: &mut AppState, buttons: u32) -> Option<UiAction> {
+        if buttons & BTN_UP != 0 {
+            state.nav.focus = NavFocus::Sidebar;
+            return None;
+        }
+        if buttons & BTN_RIGHT != 0 {
+            state.nav.focus = NavFocus::Content;
+            return None;
+        }
+        if buttons & BTN_CROSS != 0
+            && !matches!(
+                state.sync_activity(),
+                SyncActivity::Downloading | SyncActivity::Uploading
+            )
+        {
+            return Some(UiAction::StartSync);
         }
         None
     }

@@ -2,17 +2,18 @@
 //! `draw_progress`, `draw_scrollbar`, `draw_page_title`, `draw_chrome`, `draw_hints`, `draw_toast`).
 
 use crate::domain::{
-    ActiveTab, AppState, FocusSlot, HitMap, Hotspot, NavFocus, PadKey, Rect, ShortcutKey,
-    SyncActivity, UiAction, UiText,
+    ActiveTab, AppState, FocusSlot, HitMap, Hotspot, NavFocus, PadKey, Rect, ShortcutKey, UiAction,
+    UiText,
 };
 use crate::ui::gfx::{
     rgb, with_alpha, Align, Color, FontWeight, Gfx, Icon, PadButton, GFX_H, GFX_W,
 };
 use crate::ui::strings::{self, Strings};
 use crate::ui::theme::{
-    UiTheme, ACTION_TOUCH_H, CONTENT_R, CONTENT_W, CONTENT_X, C_GOOD, C_WARN, HINT_TOUCH_MARGIN,
-    HINT_Y, SIDEBAR_W,
+    UiTheme, ACTION_TOUCH_H, CONTENT_R, CONTENT_W, CONTENT_X, C_GOOD, C_PROGRESS_TRACK, C_WARN,
+    HINT_TOUCH_MARGIN, HINT_Y, SIDEBAR_W,
 };
+use crate::ui::transfer_card::draw_transfer_card;
 
 pub fn draw_card(gfx: &mut Gfx, th: &UiTheme, x: i32, y: i32, w: i32, h: i32, focused: bool) {
     let bg = if focused { th.card_hi } else { th.card };
@@ -116,7 +117,7 @@ pub fn draw_row_tick(gfx: &mut Gfx, th: &UiTheme, cx: i32, cy: i32, on: bool) {
 }
 
 pub fn draw_progress(gfx: &mut Gfx, x: i32, y: i32, w: i32, h: i32, pct: u32, col: Color) {
-    gfx.rrect(x, y, w, h, h / 2, rgb(38, 47, 56));
+    gfx.rrect(x, y, w, h, h / 2, C_PROGRESS_TRACK);
     let p = pct.min(100);
     if p == 0 {
         return;
@@ -135,7 +136,7 @@ pub fn draw_indeterminate_progress(
     tick: u32,
     col: Color,
 ) {
-    gfx.rrect(x, y, w, h, h / 2, rgb(38, 47, 56));
+    gfx.rrect(x, y, w, h, h / 2, C_PROGRESS_TRACK);
     let seg_w = (w / 3).max(h * 2).min(w);
     let travel = (w - seg_w).max(0);
     let phase = (tick % 120) as i32;
@@ -246,101 +247,7 @@ pub fn draw_chrome(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut Hit
         gfx.text(62, y + 22, 17, FontWeight::Medium, fg, Align::Left, name);
     }
 
-    // Sidebar mini transfer card (like VitaSend xfer card)
-    let card_y = HINT_Y - 150;
-    gfx.rrect(12, card_y, SIDEBAR_W - 24, 82, 12, th.card);
-    // Touching the transfer card starts a sync.
-    hits.add(Hotspot {
-        rect: Rect::new(12, card_y, SIDEBAR_W - 24, 82),
-        action: UiAction::StartSync,
-        focus: None,
-        shortcut: None,
-    });
-    gfx.rrect_outline(12, card_y, SIDEBAR_W - 24, 82, 12, 1, th.border);
-    let activity = state.sync_activity();
-    if activity == SyncActivity::Ready {
-        // Connected and up to date: just a green check and "Ready".
-        gfx.icon(Icon::Check, 44.0, (card_y + 41) as f32, 26.0, C_GOOD);
-        gfx.text_fit(
-            66,
-            card_y + 41,
-            SIDEBAR_W - 90,
-            18,
-            FontWeight::Medium,
-            C_GOOD,
-            Align::Left,
-            s.status_ready,
-        );
-    } else {
-        let xfer_title = match activity {
-            SyncActivity::Downloading => s.sidebar_syncing,
-            SyncActivity::Uploading => s.sidebar_uploading,
-            SyncActivity::Ready | SyncActivity::Idle => s.sidebar_last_sync,
-        };
-        // The progress bar is only drawn while a transfer runs: `Some(None)` is an indeterminate
-        // bar (uploads have no known total), `None` no bar at all.
-        let bar = match activity {
-            SyncActivity::Downloading => Some(state.progress_pct),
-            SyncActivity::Uploading => Some(None),
-            SyncActivity::Ready | SyncActivity::Idle => None,
-        };
-        // Without a bar, the two text lines are centred vertically in the card.
-        let text_y = if bar.is_some() {
-            card_y + 20
-        } else {
-            card_y + 28
-        };
-        gfx.text(
-            24,
-            text_y,
-            13,
-            FontWeight::Regular,
-            th.dim,
-            Align::Left,
-            xfer_title,
-        );
-        gfx.text_fit(
-            24,
-            text_y + 22,
-            SIDEBAR_W - 48,
-            14,
-            FontWeight::Medium,
-            th.text,
-            Align::Left,
-            &s.text(&state.peer_label),
-        );
-        let pct_str = match bar {
-            Some(Some(p)) => {
-                let p = p.min(100);
-                draw_progress(gfx, 24, card_y + 58, SIDEBAR_W - 88, 8, p, th.accent);
-                Some(format!("{}%", p))
-            }
-            Some(None) => {
-                draw_indeterminate_progress(
-                    gfx,
-                    24,
-                    card_y + 58,
-                    SIDEBAR_W - 88,
-                    8,
-                    state.progress_anim_tick,
-                    th.accent,
-                );
-                Some("...".to_owned())
-            }
-            None => None,
-        };
-        if let Some(pct_str) = pct_str {
-            gfx.text(
-                SIDEBAR_W - 24,
-                card_y + 62,
-                12,
-                FontWeight::Medium,
-                th.dim,
-                Align::Right,
-                &pct_str,
-            );
-        }
-    }
+    draw_transfer_card(gfx, th, s, state, hits);
 
     // Sidebar bottom Wi-Fi & version status
     let base = HINT_Y - 18;

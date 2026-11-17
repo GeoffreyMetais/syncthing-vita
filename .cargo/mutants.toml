@@ -16,6 +16,7 @@ exclude_globs = [
     "crates/vita-syncthing-app/src/ui/renderer.rs",
     "crates/vita-syncthing-app/src/ui/theme.rs",
     "crates/vita-syncthing-app/src/ui/widgets.rs",
+    "crates/vita-syncthing-app/src/ui/transfer_card.rs",
     "crates/vita-syncthing-app/src/ui/screens/**",
     "crates/vita-syncthing-app/src/ui/modals/**",
     "crates/vita-syncthing-app/src/infrastructure/framebuffer.rs",
