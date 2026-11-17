@@ -11,20 +11,22 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use syncthing_core::{
-    lookup_global_peer, run_discovery_cycle, Announce, BepHello, CycleDrain, SyncControl,
-    SyncTuning, DISCOVERY_BROADCAST_ADDR,
+    lookup_global_peer, run_discovery_cycle, Announce, BepFolder, BepHello, CycleDrain,
+    SyncControl, SyncTuning, DISCOVERY_BROADCAST_ADDR,
 };
 
 use crate::abort::{AbortSignal, CycleWatcher, StopCause};
 use crate::config::{DeviceRecord, WorkerConfig};
 use crate::defaults::{
     CLIENT_NAME, CYCLE_DRAIN_IDLE, CYCLE_DRAIN_MAX, CYCLE_MAX_DURATION, DEVICE_NAME,
-    DISCOVERY_LISTEN, GLOBAL_DISCOVERY_TIMEOUT, KEEPALIVE_INTERVAL, WORKER_CONNECTIONS,
+    DISCOVERY_LISTEN, GLOBAL_DISCOVERY_TIMEOUT, KEEPALIVE_INTERVAL, MAX_PENDING_OFFERS,
+    WORKER_CONNECTIONS,
 };
 use crate::endpoints::KnownEndpoints;
 use crate::log::WorkerLog;
+use crate::offers::{NewOffer, OfferBook, OfferVerdict};
 use crate::peer_session::{sync_with_peer, PeerOutcome, SessionShared};
-use crate::plan::{unknown_offers, SkipReason, SyncPlan};
+use crate::plan::{SkipReason, SyncPlan};
 use crate::plugin_cfg::PluginSettings;
 
 /// How a cycle runs. [`CycleOptions::background`] is what the PS Vita worker uses.
@@ -80,6 +82,8 @@ pub struct CycleReport {
     pub outcome: CycleOutcome,
     /// Each peer tried, by name, with what came of it.
     pub peers: Vec<(String, PeerOutcome)>,
+    /// Folder offers recorded in `pending_offers.cfg` by this cycle (what to notify).
+    pub new_offers: Vec<NewOffer>,
 }
 
 impl CycleReport {
@@ -87,6 +91,7 @@ impl CycleReport {
         Self {
             outcome,
             peers: Vec::new(),
+            new_offers: Vec::new(),
         }
     }
 }
@@ -136,7 +141,8 @@ pub fn run_cycle(data_dir: &Path, abort: AbortSignal, options: &CycleOptions) ->
     );
     let watcher = CycleWatcher::start(abort, Arc::clone(&control), options.max_duration);
     log.line(&format!("cycle started ({} device(s))", plan.peers.len()));
-    let peers = sync_all_peers(&config, &plan, &control, &log, options);
+    let mut offers = OfferBook::load(data_dir);
+    let peers = sync_all_peers(&config, &plan, &control, &log, options, &mut offers);
     let outcome = match watcher.finish() {
         Some(StopCause::Aborted) => CycleOutcome::Aborted,
         Some(StopCause::DeadlineReached) => CycleOutcome::DeadlineReached,
@@ -147,7 +153,14 @@ pub fn run_cycle(data_dir: &Path, abort: AbortSignal, options: &CycleOptions) ->
         plan.storage.flush_folder_db(&share.folder_id);
     }
     log.line(&summary(&outcome, &peers));
-    CycleReport { outcome, peers }
+    if let Err(e) = offers.save() {
+        log.line(&format!("cannot record the folder offers for the app: {e}"));
+    }
+    CycleReport {
+        outcome,
+        peers,
+        new_offers: offers.new_offers().to_vec(),
+    }
 }
 
 /// Synchronizes with each peer of `plan` in turn, until a stop is requested.
@@ -157,6 +170,7 @@ fn sync_all_peers(
     control: &Arc<SyncControl>,
     log: &WorkerLog,
     options: &CycleOptions,
+    offers: &mut OfferBook,
 ) -> Vec<(String, PeerOutcome)> {
     let mut hello = BepHello::new(DEVICE_NAME, CLIENT_NAME, env!("CARGO_PKG_VERSION"));
     hello.num_connections = WORKER_CONNECTIONS;
@@ -169,21 +183,29 @@ fn sync_all_peers(
     };
     let mut endpoints = KnownEndpoints::default();
     let mut lan_searched = false;
-    let mut reported_offers: Vec<String> = Vec::new();
+    let mut full_logged = false;
     let mut results = Vec::new();
     for peer in &plan.peers {
         if control.is_stop_requested() {
             break;
         }
-        let mut on_offer = |offered: Vec<String>| {
-            for folder in unknown_offers(config, peer.device_id, offered.iter().map(String::as_str))
-            {
-                if !reported_offers.contains(&folder) {
-                    log.line(&format!(
-                        "{} offers folder {folder}: open the app to accept it",
-                        peer.name
-                    ));
-                    reported_offers.push(folder);
+        let mut on_offer = |device: syncthing_core::DeviceId, folders: Vec<BepFolder>| {
+            for folder in folders {
+                let verdict =
+                    offers.consider(config, device, &peer.name, &folder.id, &folder.label);
+                match verdict {
+                    OfferVerdict::Recorded => log.line(&format!(
+                        "{} offers folder {}: open the app to accept it",
+                        peer.name, folder.id
+                    )),
+                    OfferVerdict::Full if !full_logged && offers.newly_full() => {
+                        full_logged = true;
+                        log.line(&format!(
+                            "{MAX_PENDING_OFFERS} folder offers are already waiting for the app: \
+                             further offers are dropped until it is opened"
+                        ));
+                    }
+                    _ => {}
                 }
             }
         };

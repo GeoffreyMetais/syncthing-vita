@@ -16,6 +16,7 @@
 #include <psp2/kernel/processmgr.h>
 #include <psp2/kernel/threadmgr.h>
 #include <psp2/net/netctl.h>
+#include <psp2/sysmodule.h>
 
 #include "../../include/syncthing_plugin.h"
 #include "log.h"
@@ -140,6 +141,11 @@ static int run_cycle(const char *why)
         stp_log("cycle skipped: " STP_WORKER_FILE " not found in ux0:tai/ or ur0:tai/");
         return 1;
     }
+    /* The worker's notification of new folder offers imports SceNotificationUtil weakly: the
+     * library must be loaded before the worker so that its import gets bound. It stays loaded
+     * (unloading a sysmodule SceShell may also use is not ours to do). */
+    if (sceSysmoduleIsLoaded(SCE_SYSMODULE_NOTIFICATION_UTIL) != SCE_SYSMODULE_LOADED)
+        sceSysmoduleLoadModule(SCE_SYSMODULE_NOTIFICATION_UTIL);
     sceClibMemset(&g_link, 0, sizeof(g_link));
     g_link.magic = STP_LINK_MAGIC;
     g_link.version = STP_LINK_VERSION;

@@ -15,6 +15,8 @@ pub mod defaults;
 pub mod endpoints;
 pub mod link;
 pub mod log;
+pub mod notification;
+pub mod offers;
 pub mod peer_session;
 pub mod plan;
 pub mod plugin_cfg;

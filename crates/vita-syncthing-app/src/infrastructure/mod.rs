@@ -7,6 +7,7 @@ pub mod framebuffer;
 pub mod identity_store;
 pub mod input;
 pub mod peer_endpoints;
+pub mod pending_offers;
 pub mod plugin_host;
 pub mod plugin_mutex;
 pub mod qr_camera;
@@ -25,7 +26,9 @@ pub use input::{
     BTN_RIGHT, BTN_SELECT, BTN_SQUARE, BTN_START, BTN_TRIANGLE, BTN_UP,
 };
 pub use plugin_host::{FixedLauncherProbe, LauncherProbe, PluginHost, PLUGIN_CFG_FILE};
-pub use plugin_mutex::GuiRunningLock;
+pub use plugin_mutex::{
+    system_worker_probe, BackgroundWorkerProbe, GuiRunningLock, NoBackgroundWorker,
+};
 pub use qr_camera::{QrScanEvent, QrScanner, CAMERA_H, CAMERA_W};
 pub use qr_decoder::QrDecoder;
 pub use sync_worker::{spawn_sync_worker, WorkerMsg};

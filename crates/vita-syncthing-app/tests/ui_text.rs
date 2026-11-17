@@ -99,6 +99,8 @@ fn all_messages() -> Vec<UiText> {
         },
         UiText::NoDeclinedFolders,
         UiText::DeclinedCleared { count: 2 },
+        UiText::WaitingForBackgroundSync,
+        UiText::BackgroundSyncStopping,
         UiText::Plugin(PluginNotice::Installed),
         UiText::Plugin(PluginNotice::InstalledRebootNeeded),
         UiText::Plugin(PluginNotice::Uninstalled),

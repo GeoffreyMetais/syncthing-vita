@@ -48,7 +48,8 @@ arm-vita-eabi-gcc -Os -std=gnu11 -Wall -Wextra -Werror -ffreestanding -fno-built
     -Iplugin/include plugin/launcher/src/*.c \
     "${MODULE_LDFLAGS[@]}" -Wl,-Map,"${OBJ_DIR}/syncthing_launcher.map" -o "${LAUNCHER_ELF}" \
     -lSceLibKernel_stub -lSceKernelThreadMgr_stub -lSceKernelModulemgr_stub \
-    -lSceIofilemgr_stub -lSceAppMgr_stub -lSceNetCtl_stub -lSceProcessmgr_stub -lgcc
+    -lSceIofilemgr_stub -lSceAppMgr_stub -lSceNetCtl_stub -lSceProcessmgr_stub \
+    -lSceSysmodule_stub -lgcc
 vita-elf-create -e plugin/launcher/exports.yml "${LAUNCHER_ELF}" "${OBJ_DIR}/syncthing_launcher.velf" >/dev/null
 vita-make-fself -c "${OBJ_DIR}/syncthing_launcher.velf" "${OUT_DIR}/syncthing_launcher.suprx" >/dev/null
 
@@ -71,7 +72,8 @@ arm-vita-eabi-gcc -nostartfiles "${CPU_FLAGS[@]}" "${MODULE_LDFLAGS[@]}" \
     -lpthread -lm -lc \
     -lSceSysmodule_stub -lSceSysmem_stub -lSceNet_stub -lSceNetCtl_stub \
     -lSceKernelThreadMgr_stub -lSceKernelModulemgr_stub -lSceLibKernel_stub \
-    -lSceIofilemgr_stub -lSceProcessmgr_stub -lSceRtc_stub -lgcc \
+    -lSceIofilemgr_stub -lSceProcessmgr_stub -lSceRtc_stub \
+    -lSceNotificationUtil_stub_weak -lSceRegistryMgr_stub_weak -lgcc \
     "${CRT_DIR}/crtend.o" "${CRT_DIR}/crtn.o"
 vita-elf-create -e plugin/worker/exports.yml "${WORKER_ELF}" "${OBJ_DIR}/syncthing_worker.velf" >/dev/null
 vita-make-fself -c "${OBJ_DIR}/syncthing_worker.velf" "${OUT_DIR}/syncthing_worker.suprx" >/dev/null

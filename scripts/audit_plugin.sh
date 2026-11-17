@@ -80,6 +80,16 @@ if grep -q "crt0.o" "${WORKER_MAP}"; then
     fail "syncthing_worker: crt0 is linked into a module"
 fi
 echo "    syncthing_worker: abort / _exit end the failing thread, never SceShell"
+# Libraries that may be missing from SceShell when the worker loads must be imported weakly:
+# a strong import of an absent library makes sceKernelLoadStartModule fail.
+for lib in SceNotificationUtil SceRegistryMgr; do
+    if grep -q "lib${lib}_stub\.a(" "${WORKER_MAP}"; then
+        fail "syncthing_worker: ${lib} is imported strongly (use lib${lib}_stub_weak)"
+    fi
+    grep -q "lib${lib}_stub_weak\.a(" "${WORKER_MAP}" ||
+        fail "syncthing_worker: the weak ${lib} import is missing (offer notification)"
+done
+echo "    syncthing_worker: SceNotificationUtil / SceRegistryMgr imported weakly"
 
 if [[ -n "${VPK}" ]]; then
     LISTING="$(unzip -l "${VPK}")"

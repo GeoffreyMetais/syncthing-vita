@@ -107,6 +107,14 @@ pub const LOG_HISTORY_MAX_LINES: usize = 2000;
 
 // --- Background sync plugin --------------------------------------------------------------
 
+/// How long the app's first sync worker waits for a background worker of the plugin to stop
+/// (`SyncthingWorkerRunning`; the launcher asks it to abort when the app starts, which can take
+/// up to a block timeout of 20 s). After that, the app starts anyway.
+pub const BACKGROUND_WORKER_WAIT: Duration = Duration::from_secs(30);
+/// Folder offers kept in `pending_offers.cfg` (written by the background worker, imported at
+/// startup); extra lines are ignored.
+pub const MAX_PENDING_OFFERS: usize = 32;
+
 /// `enabled` of `plugin.cfg` when the key is missing (and the value written at install).
 pub const PLUGIN_DEFAULT_ENABLED: bool = true;
 /// `sync_on_game_exit` of `plugin.cfg` when the key is missing: sync right after a game exits.

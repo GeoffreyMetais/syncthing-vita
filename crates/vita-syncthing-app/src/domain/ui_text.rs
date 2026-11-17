@@ -35,6 +35,10 @@ pub enum UiText {
     },
     /// All connection attempts to a configured peer failed (e.g. off-LAN).
     WaitingForLan,
+    /// Status line while a background worker of the plugin is still stopping.
+    WaitingForBackgroundSync,
+    /// Peer label (sidebar card, short) while a background worker is still stopping.
+    BackgroundSyncStopping,
     ExchangingIndex,
     FileUpToDate {
         file: String,

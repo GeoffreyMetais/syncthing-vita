@@ -4,8 +4,9 @@
 use std::sync::Arc;
 
 use syncthing_core::{
-    connect_and_sync, connect_and_sync_stream, connect_via_relay, BepHello, DeviceIdentity,
-    FsSyncStorage, PeerEndpoint, SessionParams, SyncControl, SyncEvent, SyncSessionStatus,
+    connect_and_sync, connect_and_sync_stream, connect_via_relay, BepFolder, BepHello, DeviceId,
+    DeviceIdentity, FsSyncStorage, PeerEndpoint, SessionParams, SyncControl, SyncEvent,
+    SyncSessionStatus,
 };
 
 use crate::config::DeviceRecord;
@@ -37,6 +38,9 @@ pub struct PeerStats {
     pub bytes_uploaded: u64,
 }
 
+/// Receives the folders a peer lists in its `ClusterConfig`, with its verified device ID.
+pub type OfferSink<'a> = dyn FnMut(DeviceId, Vec<BepFolder>) + 'a;
+
 /// What a peer session needs, shared by every peer of a cycle.
 pub struct SessionShared<'a> {
     pub identity: &'a DeviceIdentity,
@@ -47,12 +51,12 @@ pub struct SessionShared<'a> {
 }
 
 /// Synchronizes with `peer` through the first endpoint that works. `on_offer` receives the
-/// folder IDs of every `ClusterConfig` the peer sends.
+/// peer's verified device ID and the folders of every `ClusterConfig` it sends.
 pub fn sync_with_peer(
     shared: &SessionShared<'_>,
     peer: &DeviceRecord,
     endpoints: &KnownEndpoints,
-    on_offer: &mut dyn FnMut(Vec<String>),
+    on_offer: &mut OfferSink<'_>,
 ) -> PeerOutcome {
     let (target_id, targets) = endpoints.targets(peer);
     let mut outcome = PeerOutcome::Unreachable;
@@ -112,7 +116,7 @@ pub fn sync_with_peer(
 }
 
 /// Logs the events worth a line (never per block or per up-to-date file).
-fn log_event(log: &WorkerLog, on_offer: &mut dyn FnMut(Vec<String>), event: SyncEvent) {
+fn log_event(log: &WorkerLog, on_offer: &mut OfferSink<'_>, event: SyncEvent) {
     match event {
         SyncEvent::PeerConnected {
             peer_addr,
@@ -132,9 +136,10 @@ fn log_event(log: &WorkerLog, on_offer: &mut dyn FnMut(Vec<String>), event: Sync
         SyncEvent::FolderUnavailable { folder, error } => {
             log.line(&format!("folder {folder} unavailable: {error}"))
         }
-        SyncEvent::ClusterConfigReceived { folders, .. } => {
-            on_offer(folders.into_iter().map(|f| f.id).collect())
-        }
+        SyncEvent::ClusterConfigReceived {
+            peer_device_id,
+            folders,
+        } => on_offer(peer_device_id, folders),
         SyncEvent::SessionEnded { reason, .. } => log.line(&format!("session ended: {reason}")),
         _ => {}
     }

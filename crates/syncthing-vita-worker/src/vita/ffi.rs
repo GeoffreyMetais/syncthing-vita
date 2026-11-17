@@ -87,3 +87,23 @@ extern "C" {
     pub static pte_rwlock_test_init_lock: c_int;
     pub static pte_spinlock_test_init_lock: c_int;
 }
+
+/// `SCE_SYSMODULE_NOTIFICATION_UTIL` (psp2/sysmodule.h).
+pub const SCE_SYSMODULE_NOTIFICATION_UTIL: u16 = 0x0033;
+
+// Weak imports: the module still loads if a library is missing; the shim only calls them once
+// it checked the library is there (the launcher loads `SceNotificationUtil` before the worker).
+#[link(name = "SceNotificationUtil_stub_weak")]
+extern "C" {
+    /// `text`: 0x410 bytes of NUL-terminated UTF-16 (psp2/notificationutil.h).
+    pub fn sceNotificationUtilSendNotification(text: *const u16) -> c_int;
+}
+
+#[link(name = "SceRegistryMgr_stub_weak")]
+extern "C" {
+    pub fn sceRegMgrGetKeyInt(
+        category: *const c_char,
+        name: *const c_char,
+        buf: *mut c_int,
+    ) -> c_int;
+}

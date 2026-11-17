@@ -32,6 +32,10 @@ pub struct Messages {
     /// `{name}`, `{addr}`.
     pub connecting_to: &'static str,
     pub waiting_for_lan: &'static str,
+    /// Status line while the plugin's background worker stops.
+    pub waiting_for_background_sync: &'static str,
+    /// Sidebar card label (short) while the plugin's background worker stops.
+    pub background_sync_stopping: &'static str,
     pub exchanging_index: &'static str,
     /// `{file}`.
     pub file_up_to_date: &'static str,
@@ -179,6 +183,8 @@ impl Strings {
             UiText::StartingSync => m.starting_sync,
             UiText::ScanningLan => m.scanning_lan,
             UiText::WaitingForLan => m.waiting_for_lan,
+            UiText::WaitingForBackgroundSync => m.waiting_for_background_sync,
+            UiText::BackgroundSyncStopping => m.background_sync_stopping,
             UiText::ExchangingIndex => m.exchanging_index,
             UiText::SyncFinished => m.sync_finished,
             UiText::NoPeerAddDevice => m.no_peer_add_device,

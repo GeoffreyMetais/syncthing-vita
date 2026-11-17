@@ -16,6 +16,7 @@
 
 mod ffi;
 mod net;
+mod notify;
 mod runtime;
 
 use std::cell::UnsafeCell;
@@ -129,6 +130,7 @@ fn cycle_thread(link: &'static WorkerLink) {
         Ok(net) => {
             let report = run_cycle(data_dir, abort, &CycleOptions::background());
             drop(net);
+            notify::notify_new_offers(&report.new_offers, &WorkerLog::new(data_dir));
             outcome_code(&report.outcome)
         }
         Err(code) => {

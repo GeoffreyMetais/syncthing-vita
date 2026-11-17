@@ -6,7 +6,7 @@ mod common;
 
 use common::{data_dir_with_identity, device, fresh_temp_dir, ignored, repo, share, VITA_SEED};
 use syncthing_core::{DeviceId, DeviceIdentity, FolderType};
-use syncthing_vita_worker::config::fields::unescape_field;
+use syncthing_vita_worker::config::fields::{escape_field as worker_escape, unescape_field};
 use syncthing_vita_worker::config::records::{parse_devices, parse_ignored, parse_shares};
 use syncthing_vita_worker::config::{is_protected_share_path, WorkerConfig};
 use vita_syncthing_app::domain::ShareMode;
@@ -131,6 +131,7 @@ fn test_unescape_matches_the_app_encoder() {
         "ünïcødé|名前",
     ] {
         assert_eq!(unescape_field(&escape_field(text)), text, "{text:?}");
+        assert_eq!(worker_escape(text), escape_field(text), "{text:?}");
     }
     assert_eq!(unescape_field("a%7cb%0a%0D%25"), "a|b\n\r%");
     assert_eq!(unescape_field("50% off %ZZ %"), "50% off %ZZ %");

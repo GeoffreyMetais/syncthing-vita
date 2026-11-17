@@ -311,3 +311,48 @@ fn test_offers_protected_shares_and_extra_devices_are_logged() {
     }
     assert_eq!(log.matches("offers folder offered").count(), 1);
 }
+
+#[test]
+fn test_offered_folder_is_recorded_once_and_never_synchronized() {
+    let data = data_dir_with_identity("cycle_offer_record", true);
+    let saves = data.join("saves");
+    std::fs::create_dir_all(&saves).unwrap();
+    let mut new_offers_per_cycle = Vec::new();
+    for round in 0..2u8 {
+        let peer_root = fresh_temp_dir(&format!("cycle_offer_record_peer{round}"));
+        std::fs::create_dir_all(peer_root.join("saves")).unwrap();
+        std::fs::create_dir_all(peer_root.join("photos")).unwrap();
+        std::fs::write(peer_root.join("photos/p.jpg"), b"jpeg").unwrap();
+        let peer = ListeningPeer::spawn(0x37, &peer_root, &["saves", "photos"]);
+        let app = repo(&data);
+        app.save_devices(&[device(peer.device_id, "Desktop", &peer.addr.to_string())]);
+        app.save_shares(&[share("saves", &saves, true, vec![peer.device_id])]);
+
+        let peer_id = peer.device_id;
+        let report = run_cycle(&data, never_abort(), &test_options());
+        peer.join();
+        assert_eq!(report.outcome, CycleOutcome::Completed);
+        new_offers_per_cycle.push(report.new_offers.clone());
+        assert!(!data.join("sync/photos").exists() && !saves.join("p.jpg").exists());
+        let pending = std::fs::read_to_string(data.join("pending_offers.cfg")).unwrap();
+        assert_eq!(
+            pending,
+            format!("photos|photos|{}\n", peer_id.to_hex()),
+            "round {round}"
+        );
+    }
+    assert_eq!(
+        new_offers_per_cycle[0].len(),
+        1,
+        "recorded by the first cycle"
+    );
+    assert_eq!(new_offers_per_cycle[0][0].device_name, "Desktop");
+    assert_eq!(new_offers_per_cycle[0][0].label, "photos");
+    assert!(new_offers_per_cycle[1].is_empty(), "never notified twice");
+    assert_eq!(
+        read_log(&data)
+            .matches("Desktop offers folder photos")
+            .count(),
+        1
+    );
+}

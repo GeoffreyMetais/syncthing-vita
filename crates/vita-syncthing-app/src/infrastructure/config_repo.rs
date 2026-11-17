@@ -338,7 +338,7 @@ fn path_components(path: &str) -> Vec<String> {
 
 /// Replaces `path` with `content` through a temp file, keeping the previous version as
 /// `<path>.bak` until the new one is in place (see `syncthing_core::storage::atomic`).
-fn write_replacing(path: &str, content: &str) {
+pub(super) fn write_replacing(path: &str, content: &str) {
     let tmp = format!("{}.tmp", path);
     if write_file_synced(Path::new(&tmp), content.as_bytes()).is_ok() {
         let _ = replace_file(
@@ -350,11 +350,11 @@ fn write_replacing(path: &str, content: &str) {
 }
 
 /// Reads `path`, first restoring it from its backup if a replacement was interrupted.
-fn read_recovering(path: &str) -> std::io::Result<String> {
+pub(super) fn read_recovering(path: &str) -> std::io::Result<String> {
     recover_replaced_file(Path::new(path), Path::new(&backup_path(path)));
     fs::read_to_string(path)
 }
 
-fn backup_path(path: &str) -> String {
+pub(super) fn backup_path(path: &str) -> String {
     format!("{}.bak", path)
 }

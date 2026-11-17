@@ -6,6 +6,9 @@
 //!   if the app dies.
 //! - `SyncthingLauncherAlive`: created by the launcher at `module_start`. Opening it tells
 //!   whether the launcher is loaded (`KernelLauncherProbe`).
+//! - `SyncthingWorkerRunning`: held by the launcher while a background worker module is loaded.
+//!   The app's first sync worker waits for it to disappear (`KernelWorkerProbe`,
+//!   `application::BackgroundHandover`).
 //!
 //! Host builds have no kernel objects: the lock is a no-op.
 
@@ -13,6 +16,35 @@
 pub const GUI_RUNNING_MUTEX: &str = "SyncthingGuiRunning";
 /// Name of the mutex the plugin's launcher creates once loaded.
 pub const LAUNCHER_ALIVE_MUTEX: &str = "SyncthingLauncherAlive";
+/// Name of the mutex the launcher holds while a background worker module is loaded.
+pub const WORKER_RUNNING_MUTEX: &str = "SyncthingWorkerRunning";
+
+/// Tells whether a background worker of the plugin is loaded (`SyncthingWorkerRunning`).
+pub trait BackgroundWorkerProbe {
+    fn worker_running(&self) -> bool;
+}
+
+/// Probe of a system without the plugin (host builds): no background worker ever runs.
+#[derive(Debug, Clone, Copy, Default)]
+pub struct NoBackgroundWorker;
+
+impl BackgroundWorkerProbe for NoBackgroundWorker {
+    fn worker_running(&self) -> bool {
+        false
+    }
+}
+
+/// Probe of the running system: `SyncthingWorkerRunning` on the PS Vita, none on host builds.
+pub fn system_worker_probe() -> Box<dyn BackgroundWorkerProbe> {
+    #[cfg(target_os = "vita")]
+    {
+        Box::new(KernelWorkerProbe)
+    }
+    #[cfg(not(target_os = "vita"))]
+    {
+        Box::new(NoBackgroundWorker)
+    }
+}
 
 #[cfg(target_os = "vita")]
 mod ffi {
@@ -113,14 +145,41 @@ impl super::plugin_host::LauncherProbe for KernelLauncherProbe {
         if let Ok(forced) = std::fs::read_to_string(UI_SCRIPT_PROBE_FILE) {
             return forced.trim() == "1";
         }
-        let name = ffi::c_name(LAUNCHER_ALIVE_MUTEX);
-        let uid = unsafe { ffi::sceKernelOpenMutex(name.as_ptr() as *const libc::c_char) };
-        if uid < 0 {
-            return false;
+        mutex_exists(LAUNCHER_ALIVE_MUTEX)
+    }
+}
+
+/// True if the named openable mutex `name` exists (the handle is closed at once).
+#[cfg(target_os = "vita")]
+fn mutex_exists(name: &str) -> bool {
+    let name = ffi::c_name(name);
+    let uid = unsafe { ffi::sceKernelOpenMutex(name.as_ptr() as *const libc::c_char) };
+    if uid < 0 {
+        return false;
+    }
+    unsafe {
+        ffi::sceKernelCloseMutex(uid);
+    }
+    true
+}
+
+/// Opens `SyncthingWorkerRunning` to tell whether a background worker is loaded.
+///
+/// With the `ui-script` feature, the file `ux0:data/syncthing/ui_script_worker_running`
+/// holding `1` or `0` overrides the answer (Vita3K has no taiHEN).
+#[cfg(target_os = "vita")]
+pub struct KernelWorkerProbe;
+
+#[cfg(all(target_os = "vita", feature = "ui-script"))]
+const UI_SCRIPT_WORKER_FILE: &str = "ux0:data/syncthing/ui_script_worker_running";
+
+#[cfg(target_os = "vita")]
+impl BackgroundWorkerProbe for KernelWorkerProbe {
+    fn worker_running(&self) -> bool {
+        #[cfg(feature = "ui-script")]
+        if let Ok(forced) = std::fs::read_to_string(UI_SCRIPT_WORKER_FILE) {
+            return forced.trim() == "1";
         }
-        unsafe {
-            ffi::sceKernelCloseMutex(uid);
-        }
-        true
+        mutex_exists(WORKER_RUNNING_MUTEX)
     }
 }

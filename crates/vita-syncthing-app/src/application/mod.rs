@@ -1,6 +1,7 @@
 //! Application Layer: Use cases (`ShareService`, `ShareCreation`, `FolderOfferService`), QR code pairing (`QrScanFlow`), background worker event coordinator
 //! (`SyncCoordinator`), and user input presenter/controller (`InputController`).
 
+pub mod background_handover;
 pub mod controllers;
 pub mod device_registry;
 pub mod devices_scan;
@@ -20,6 +21,7 @@ pub mod sync_coordinator;
 pub mod sync_supervisor;
 pub mod upload_activity;
 
+pub use background_handover::{BackgroundHandover, HandoverStep, ReleaseReason};
 pub use controllers::{
     DashboardController, FilesController, InputController, LogsController, SettingsController,
     SharesController, UserCommand,

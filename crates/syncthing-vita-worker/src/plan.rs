@@ -11,7 +11,7 @@
 
 use std::path::Path;
 
-use syncthing_core::{DeviceId, FsSyncStorage};
+use syncthing_core::FsSyncStorage;
 
 use crate::config::{is_protected_share_path, DeviceRecord, ShareRecord, WorkerConfig};
 use crate::defaults::MAX_PEERS_PER_CYCLE;
@@ -85,24 +85,4 @@ fn register_share(storage: &mut FsSyncStorage, share: &ShareRecord) {
     storage.set_folder_paused(&share.folder_id, !share.enabled);
     storage.set_folder_type(&share.folder_id, share.folder_type());
     storage.set_folder_devices(&share.folder_id, share.devices.clone());
-}
-
-/// Folders a peer offered (`ClusterConfig`) that no share holds and that were not declined:
-/// the worker only reports them, the app asks for consent.
-pub fn unknown_offers<'a>(
-    config: &WorkerConfig,
-    peer: DeviceId,
-    offered: impl IntoIterator<Item = &'a str>,
-) -> Vec<String> {
-    offered
-        .into_iter()
-        .filter(|id| !config.shares.iter().any(|s| s.folder_id == *id))
-        .filter(|id| {
-            !config
-                .ignored
-                .iter()
-                .any(|i| i.folder_id == *id && i.device_id.matches_peer(&peer))
-        })
-        .map(str::to_owned)
-        .collect()
 }

@@ -297,6 +297,15 @@ pub struct FolderOffer {
     pub snoozed: bool,
 }
 
+/// Folder offer recorded by the plugin's background worker while the app was closed
+/// (`pending_offers.cfg`), imported at the next start.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct PendingOffer {
+    pub folder_id: String,
+    pub label: String,
+    pub device_id: DeviceId,
+}
+
 /// Folder offer declined by the user: never prompted again for this device.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct IgnoredFolder {

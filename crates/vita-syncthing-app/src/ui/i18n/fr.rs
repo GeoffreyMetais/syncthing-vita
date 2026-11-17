@@ -232,6 +232,8 @@ pub static MESSAGES_FR: Messages = Messages {
     scanning_lan: "Recherche de pairs Syncthing sur le LAN (UDP 21027)...",
     connecting_to: "Connexion TLS 1.3 à {name} ({addr})...",
     waiting_for_lan: "Pair inaccessible (en attente du LAN)",
+    waiting_for_background_sync: "Attente de l'arrêt de la synchro en arrière-plan...",
+    background_sync_stopping: "Arrêt du plugin...",
     exchanging_index: "Échange du ClusterConfig et de l'index BEP...",
     file_up_to_date: "À jour : {file}",
     downloading: "Téléchargement de {file} ({pct} %)",

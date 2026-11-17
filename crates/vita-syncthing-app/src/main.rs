@@ -19,8 +19,8 @@ use vita_syncthing_app::domain::defaults::{
 use vita_syncthing_app::domain::AppState;
 use vita_syncthing_app::infrastructure::{
     detect_system_language, init_vita_network, is_on_external_power, keep_system_awake,
-    set_cpu_clock_mhz, ConfigRepository, GuiRunningLock, IdentityStore, PluginHost, QrScanner,
-    VitaInput,
+    set_cpu_clock_mhz, system_worker_probe, ConfigRepository, GuiRunningLock, IdentityStore,
+    PluginHost, QrScanner, VitaInput,
 };
 use vita_syncthing_app::ui::VitaUiRenderer;
 
@@ -122,7 +122,8 @@ fn main() {
     );
 
     // Auto-connect on startup if at least one peer has an active share (or no share exists yet)
-    let mut sync = SyncSupervisor::new(identity);
+    // The first worker waits for a background worker of the plugin to stop.
+    let mut sync = SyncSupervisor::with_background_probe(identity, system_worker_probe());
     sync.start_at_launch(&mut state, &repo);
 
     let mut last_activity = Instant::now();

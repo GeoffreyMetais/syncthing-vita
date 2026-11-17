@@ -230,6 +230,8 @@ pub static MESSAGES_EN: Messages = Messages {
     scanning_lan: "Scanning LAN (UDP 21027) for Syncthing peers...",
     connecting_to: "Connecting over TLS 1.3 to {name} ({addr})...",
     waiting_for_lan: "Peer unreachable (waiting for LAN)",
+    waiting_for_background_sync: "Waiting for background sync to stop...",
+    background_sync_stopping: "Plugin stopping...",
     exchanging_index: "Exchanging ClusterConfig & BEP Index...",
     file_up_to_date: "Up to date: {file}",
     downloading: "Downloading {file} ({pct}%)",

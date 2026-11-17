@@ -1,6 +1,10 @@
 //! Life cycle of the background sync worker (`SyncSupervisor`): when it starts, is replaced
 //! after a configuration change, is asked for a rescan or a discovery, and is restarted after
 //! it ended. The composition root only forwards user commands and calls `tick` once per loop.
+//!
+//! The first worker waits for a background worker of the plugin to stop
+//! (`BackgroundHandover`); folder offers the plugin recorded meanwhile are imported once that
+//! wait is over, so the plugin can no longer add any.
 
 use std::sync::mpsc::Receiver;
 use std::sync::Arc;
@@ -8,10 +12,14 @@ use std::time::Instant;
 
 use syncthing_core::{DeviceIdentity, SyncControl};
 
+use crate::application::background_handover::{BackgroundHandover, HandoverStep, ReleaseReason};
 use crate::application::{FolderOfferService, ShareService, SyncCoordinator};
 use crate::domain::defaults::{AUTO_RECONNECT_DELAY, QUIT_WORKER_WAIT};
 use crate::domain::{AppState, KnownDevice, ModalDialog, UiText};
-use crate::infrastructure::{spawn_sync_worker, wait_for_worker, ConfigRepository, WorkerMsg};
+use crate::infrastructure::{
+    spawn_sync_worker, wait_for_worker, BackgroundWorkerProbe, ConfigRepository,
+    NoBackgroundWorker, WorkerMsg,
+};
 
 /// Owns the running sync worker (its message channel and control handle), if any.
 pub struct SyncSupervisor {
@@ -19,16 +27,76 @@ pub struct SyncSupervisor {
     worker_rx: Option<Receiver<WorkerMsg>>,
     control: Option<Arc<SyncControl>>,
     last_finished: Instant,
+    /// Wait for a background worker of the plugin before the first worker.
+    handover: BackgroundHandover,
+    background: Box<dyn BackgroundWorkerProbe>,
+    /// Peers of a worker start postponed by the hand-over.
+    deferred: Option<Vec<KnownDevice>>,
 }
 
 impl SyncSupervisor {
+    /// Supervisor of a system without the background sync plugin.
     pub fn new(identity: DeviceIdentity) -> Self {
+        Self::with_background_probe(identity, Box::new(NoBackgroundWorker))
+    }
+
+    /// Supervisor whose first worker waits while `background` reports a running background
+    /// worker (at most `BACKGROUND_WORKER_WAIT`).
+    pub fn with_background_probe(
+        identity: DeviceIdentity,
+        background: Box<dyn BackgroundWorkerProbe>,
+    ) -> Self {
         Self {
             identity,
             worker_rx: None,
             control: None,
             last_finished: Instant::now(),
+            handover: BackgroundHandover::new(),
+            background,
+            deferred: None,
         }
+    }
+
+    /// True while a worker start waits for the background worker to stop.
+    pub fn is_waiting_for_background(&self) -> bool {
+        self.deferred.is_some()
+    }
+
+    /// Polls the hand-over at `now`. On release: logs it, imports the background worker's
+    /// folder offers and starts the postponed worker. Returns `true` if that changed the screen
+    /// (a postponed worker started, offers were imported).
+    fn poll_handover(
+        &mut self,
+        state: &mut AppState,
+        repo: &ConfigRepository,
+        now: Instant,
+    ) -> bool {
+        let running = !self.handover.is_released() && self.background.worker_running();
+        let HandoverStep::Released(reason) = self.handover.check(running, now) else {
+            return false;
+        };
+        let line = match reason {
+            ReleaseReason::NoWorker => None,
+            ReleaseReason::Stopped(waited) => Some(format!(
+                "Background sync worker stopped after {} ms.",
+                waited.as_millis()
+            )),
+            ReleaseReason::TimedOut => {
+                Some("Background sync worker still running: starting anyway.".to_owned())
+            }
+        };
+        if let Some(line) = line {
+            ShareService::log_event(state, repo, &line);
+        }
+        let imported = FolderOfferService::import_pending(state, repo);
+        let deferred = self.deferred.take();
+        let resumed = deferred.is_some();
+        if let Some(peers) = deferred {
+            state.peer_label = UiText::ReadyManualPairing;
+            state.status_line = UiText::StartingSync;
+            self.spawn(state, repo, peers);
+        }
+        imported > 0 || resumed
     }
 
     /// True while a worker runs (connected or not).
@@ -39,6 +107,7 @@ impl SyncSupervisor {
     /// Application start: connects to the devices linked to an enabled share (or to every
     /// approved device while no share exists yet), if any.
     pub fn start_at_launch(&mut self, state: &mut AppState, repo: &ConfigRepository) {
+        self.poll_handover(state, repo, Instant::now());
         let peers = state.sync_peers();
         if peers.is_empty() {
             state.peer_label = UiText::NoPeerLinked;
@@ -96,7 +165,12 @@ impl SyncSupervisor {
     /// a configuration change, applies the worker's messages to `state` and restarts a worker
     /// that ended. Returns `true` if the screen must be redrawn.
     pub fn tick(&mut self, state: &mut AppState, repo: &ConfigRepository) -> bool {
-        let mut changed = false;
+        self.tick_at(state, repo, Instant::now())
+    }
+
+    /// `tick` at `now` (the hand-over deadline is checked against it).
+    pub fn tick_at(&mut self, state: &mut AppState, repo: &ConfigRepository, now: Instant) -> bool {
+        let mut changed = self.poll_handover(state, repo, now);
 
         // Revert requests of read-only shares go to the running worker (its sessions take
         // them), unless that worker is about to be replaced by one with the new configuration.
@@ -131,6 +205,7 @@ impl SyncSupervisor {
 
         // A worker that ended (session dropped) is restarted after a short delay.
         if !self.is_running()
+            && self.deferred.is_none()
             && state.auto_reconnect_enabled
             && self.last_finished.elapsed() >= AUTO_RECONNECT_DELAY
         {
@@ -152,6 +227,19 @@ impl SyncSupervisor {
     /// Starts a worker for `peers` with the current shares, replacing the previous one (which
     /// must have been asked to stop: `worker_slot` makes the new one wait for it).
     fn spawn(&mut self, state: &mut AppState, repo: &ConfigRepository, peers: Vec<KnownDevice>) {
+        if !self.handover.is_released() {
+            if self.deferred.is_none() {
+                ShareService::log_event(
+                    state,
+                    repo,
+                    "Waiting for the background sync worker to stop...",
+                );
+            }
+            state.peer_label = UiText::BackgroundSyncStopping;
+            state.status_line = UiText::WaitingForBackgroundSync;
+            self.deferred = Some(peers);
+            return;
+        }
         state.progress_pct = None;
         let offered = std::mem::take(&mut state.pending_folder_offers);
         let (rx, control) = spawn_sync_worker(

@@ -1,6 +1,8 @@
 //! Folder offers received from remote devices (`FolderOfferService`): a folder shared by a peer in
 //! its `ClusterConfig` only becomes a share once the user accepts it. Declined offers are
-//! remembered in `ignored_folders.cfg` so they are never prompted again.
+//! remembered in `ignored_folders.cfg` so they are never prompted again. Offers the plugin's
+//! background worker received while the app was closed (`pending_offers.cfg`) are imported at
+//! startup into the same flow, and removed from that file once answered.
 
 use syncthing_core::DeviceId;
 
@@ -66,6 +68,41 @@ impl FolderOfferService {
         ShareService::log_event(state, repo, &msg);
     }
 
+    /// Startup: queues the offers recorded by the background worker (`pending_offers.cfg`) like
+    /// offers received live. Offers from a device this PS Vita does not know, or no longer
+    /// relevant (folder already shared with that device, declined before), are dropped from the
+    /// file; the others stay there until answered (`Later` keeps them for the next start).
+    /// Returns the number of offers queued.
+    pub fn import_pending(state: &mut AppState, repo: &ConfigRepository) -> usize {
+        let pending = repo.load_pending_offers();
+        let mut kept = Vec::with_capacity(pending.len());
+        for offer in &pending {
+            let known = state
+                .devices
+                .iter()
+                .any(|d| d.device_id.matches_peer(&offer.device_id));
+            if !known {
+                continue;
+            }
+            Self::receive(state, repo, offer.device_id, &offer.folder_id, &offer.label);
+            if Self::is_pending(state, &offer.folder_id, &offer.device_id) {
+                kept.push(offer.clone());
+            }
+        }
+        if kept.len() != pending.len() {
+            repo.save_pending_offers(&kept);
+        }
+        kept.len()
+    }
+
+    /// True if an offer of `folder_id` by `device_id` waits for the user's answer.
+    fn is_pending(state: &AppState, folder_id: &str, device_id: &DeviceId) -> bool {
+        state
+            .folder_offers
+            .iter()
+            .any(|o| o.folder_id == folder_id && o.device_id.matches_peer(device_id))
+    }
+
     /// Opens the `FolderOffer` modal for the next pending offer when no other modal is open.
     pub fn prompt_next(state: &mut AppState) {
         if state.modal != ModalDialog::None {
@@ -84,6 +121,7 @@ impl FolderOfferService {
             return;
         }
         let offer = state.folder_offers.remove(offer_idx);
+        repo.remove_pending_offer(&offer.folder_id, &offer.device_id);
         let share_idx = match state
             .shares
             .iter()
@@ -161,6 +199,7 @@ impl FolderOfferService {
         devices: &[DeviceId],
     ) {
         for device_id in devices {
+            repo.remove_pending_offer(folder_id, device_id);
             state
                 .folder_offers
                 .retain(|o| !(o.folder_id == folder_id && o.device_id.matches_peer(device_id)));

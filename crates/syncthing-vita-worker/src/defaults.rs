@@ -53,3 +53,17 @@ pub const LOG_MAX_BYTES: u64 = 512 * 1024;
 pub const LOG_LINE_PREFIX: &str = "[VITA-SYNCTHING] ";
 /// Marks the worker's lines in the shared log.
 pub const LOG_TAG: &str = "Background sync: ";
+
+/// Folder offers kept in `pending_offers.cfg` for the app; further ones are dropped.
+pub const MAX_PENDING_OFFERS: usize = 32;
+/// Longest folder ID of an offer worth recording (bytes); longer ones are ignored.
+pub const MAX_OFFER_FOLDER_ID_BYTES: usize = 256;
+/// Longest label of a recorded offer (characters); longer ones are cut.
+pub const MAX_OFFER_LABEL_CHARS: usize = 128;
+
+/// UTF-16 units of the buffer `sceNotificationUtilSendNotification` reads (0x410 bytes).
+pub const NOTIFICATION_BUFFER_UNITS: usize = 0x410 / 2;
+/// Longest notification text, in UTF-16 units (the rest of the buffer stays NUL).
+pub const NOTIFICATION_TEXT_UNITS: usize = 160;
+/// Longest device name or label quoted in a notification (characters).
+pub const NOTIFICATION_NAME_CHARS: usize = 32;

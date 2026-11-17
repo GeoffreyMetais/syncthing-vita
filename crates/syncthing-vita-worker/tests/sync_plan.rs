@@ -6,7 +6,7 @@ use common::{data_dir_with_identity, device, repo, share};
 use syncthing_core::{DeviceId, DeviceIdentity, FolderType};
 use syncthing_vita_worker::config::WorkerConfig;
 use syncthing_vita_worker::defaults::MAX_PEERS_PER_CYCLE;
-use syncthing_vita_worker::plan::{unknown_offers, SkipReason, SyncPlan};
+use syncthing_vita_worker::plan::{SkipReason, SyncPlan};
 use vita_syncthing_app::domain::ShareMode;
 
 fn id(seed: u8) -> DeviceId {
@@ -107,23 +107,4 @@ fn test_without_enabled_share_there_is_nothing_to_do() {
     app.save_shares(&[share("p", &data.join("p"), false, vec![a])]);
     let plan = SyncPlan::from_config(&WorkerConfig::load(&data).unwrap());
     assert!(plan.is_empty());
-}
-
-#[test]
-fn test_unknown_offers_skip_shares_and_declined_folders() {
-    let data = data_dir_with_identity("plan_offers", true);
-    let (a, b) = (id(30), id(31));
-    let app = repo(&data);
-    app.save_shares(&[share("mine", &data.join("mine"), true, vec![a])]);
-    app.save_ignored_folders(&[common::ignored("declined", a)]);
-    let cfg = WorkerConfig::load(&data).unwrap();
-    assert_eq!(
-        unknown_offers(&cfg, a, ["mine", "declined", "new"]),
-        vec!["new".to_owned()]
-    );
-    // Declined for another device only.
-    assert_eq!(
-        unknown_offers(&cfg, b, ["declined"]),
-        vec!["declined".to_owned()]
-    );
 }

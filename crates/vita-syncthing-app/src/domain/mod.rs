@@ -24,8 +24,8 @@ pub use interaction::{
 pub use log_view::{sanitize_log_line, LogScope, LogView, LOG_VIEW_PAGE, LOG_VIEW_ROWS};
 pub use models::{
     fmt_size, ActiveTab, CameraPreview, FolderOffer, IgnoredFolder, KnownDevice, Language,
-    LanguagePreference, ModalDialog, PickerItem, PickerMode, ShareConfigEntry, ShareMode,
-    SyncActivity, ThemeMode, ADD_DEVICE_KEYPAD, BROWSER_ROWS, BROWSE_TEMPLATE_ID,
+    LanguagePreference, ModalDialog, PendingOffer, PickerItem, PickerMode, ShareConfigEntry,
+    ShareMode, SyncActivity, ThemeMode, ADD_DEVICE_KEYPAD, BROWSER_ROWS, BROWSE_TEMPLATE_ID,
     NEW_SHARE_TEMPLATES, VISIBLE_DEVICES,
 };
 pub use navigation::{
