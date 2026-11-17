@@ -28,6 +28,8 @@
 #define WORKER_POLL_US (500u * 1000u)
 /* plugin.cfg is re-read at most this often while idle (and always before a cycle). */
 #define SETTINGS_REFRESH_SECS 30u
+/* plugin.cfg is re-read this often while a worker runs (disabling aborts the cycle). */
+#define SETTINGS_REFRESH_RUNNING_SECS 5u
 /* Interval of the power ticks keeping the console out of auto-standby during a cycle. */
 #define POWER_TICK_SECS 10u
 /* Time a worker gets to stop after an abort request before the launcher says so in the log
@@ -87,6 +89,8 @@ static int watch_worker(void)
     StpObservation obs;
     uint32_t last_tick = 0;
     uint32_t abort_at = 0;
+    uint32_t settings_read = 0;
+    int have = 0;
     int grace_logged = 0;
     for (;;) {
         uint32_t state = g_link.state;
@@ -101,7 +105,10 @@ static int watch_worker(void)
             sceKernelPowerTick(SCE_KERNEL_POWER_TICK_DISABLE_AUTO_SUSPEND);
         }
         if (g_link.abort == 0) {
-            int have = settings_load(&settings);
+            if (settings_read == 0 || obs.now_secs - settings_read >= SETTINGS_REFRESH_RUNNING_SECS) {
+                have = settings_load(&settings);
+                settings_read = obs.now_secs;
+            }
             if (g_quit || stp_must_abort(have ? &settings : 0, &obs)) {
                 g_link.abort = 1;
                 abort_at = obs.now_secs;

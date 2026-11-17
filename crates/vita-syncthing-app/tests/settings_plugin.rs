@@ -13,7 +13,8 @@ use vita_syncthing_app::domain::{
     UiAction, SETTINGS_ROW_LOG, SETTINGS_ROW_PLUGIN,
 };
 use vita_syncthing_app::infrastructure::{
-    ConfigRepository, BTN_CIRCLE, BTN_CROSS, BTN_DOWN, BTN_LEFT, BTN_RIGHT, BTN_START, BTN_UP,
+    ConfigRepository, BTN_CIRCLE, BTN_CROSS, BTN_DOWN, BTN_LEFT, BTN_RIGHT, BTN_SQUARE, BTN_START,
+    BTN_TRIANGLE, BTN_UP,
 };
 
 /// `Settings` page, content focused, plugin `info`.
@@ -81,9 +82,9 @@ fn test_install_button_opens_the_confirmation_then_cross_confirms() {
 }
 
 #[test]
-fn test_confirmation_is_cancelled_by_circle_start_and_outside_touch() {
+fn test_confirmation_is_cancelled_by_other_face_buttons_and_outside_touch() {
     let (dir, repo, mut state) = setup("settings-plugin-cancel", not_installed());
-    for cancel in [BTN_CIRCLE, BTN_START] {
+    for cancel in [BTN_CIRCLE, BTN_START, BTN_SQUARE, BTN_TRIANGLE] {
         tap_action(&mut state, &repo, UiAction::InstallPlugin);
         assert!(matches!(state.modal, ModalDialog::ConfirmPlugin { .. }));
         assert_eq!(press(&mut state, &repo, cancel), UserCommand::None);

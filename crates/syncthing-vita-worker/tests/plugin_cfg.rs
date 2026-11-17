@@ -60,6 +60,8 @@ fn test_spaces_invalid_values_and_repeated_keys() {
     assert_eq!(s, PluginSettings::DEFAULTS);
     assert_eq!(parse("interval_secs=4294967295").interval_secs, u32::MAX);
     assert_eq!(parse("interval_secs=+7").interval_secs, 7);
+    let s = parse("enabled=0\nsync_on_game_exit=0\nenabled=1\nsync_on_game_exit=1");
+    assert!(s.enabled && s.sync_on_game_exit, "1 turns a flag back on");
 }
 
 #[test]
