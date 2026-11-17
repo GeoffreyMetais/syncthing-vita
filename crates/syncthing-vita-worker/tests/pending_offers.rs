@@ -163,12 +163,10 @@ fn test_filtering_dedupe_and_crash_safe_save() {
     assert_eq!(std::fs::read_to_string(&path).unwrap(), "tampered\n");
 
     // An interrupted replacement is completed from the backup.
+    std::fs::write(&path, serialize_pending(&saved)).unwrap();
     std::fs::rename(&path, data.join("pending_offers.cfg.bak")).unwrap();
-    assert_eq!(
-        OfferBook::load(&data).offers().len(),
-        0,
-        "tampered content is unparseable"
-    );
+    assert_eq!(OfferBook::load(&data).offers(), saved.as_slice());
+    assert!(path.exists(), "restored from the backup");
 }
 
 #[test]

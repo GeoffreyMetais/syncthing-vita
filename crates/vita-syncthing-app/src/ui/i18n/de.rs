@@ -227,7 +227,7 @@ pub static MESSAGES_DE: Messages = Messages {
     scanning_lan: "Suche nach Syncthing-Peers im LAN (UDP 21027)...",
     connecting_to: "TLS-1.3-Verbindung zu {name} ({addr})...",
     waiting_for_lan: "Peer nicht erreichbar (warte auf LAN)",
-    waiting_for_background_sync: "Warte, bis die Hintergrund-Sync stoppt...",
+    waiting_for_background_sync: "Warte auf Hintergrund-Sync...",
     background_sync_stopping: "Plugin stoppt...",
     exchanging_index: "ClusterConfig und BEP-Index werden ausgetauscht...",
     file_up_to_date: "Aktuell: {file}",

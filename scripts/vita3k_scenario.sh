@@ -7,7 +7,8 @@
 # `ime <text>`, `shot <name>` — see crates/vita-syncthing-app/src/infrastructure/ui_script.rs.
 # The app data directory (ux0:data/syncthing) and ux0:tai are backed up and restored around the run.
 # Optional: VITA3K_SEED=<dir> is copied onto ux0: before the run (e.g. data/syncthing/plugin.cfg,
-# tai/config.txt) to start from a given state.
+# tai/config.txt) to start from a given state; VITA3K_INSPECT=<dir> receives a copy of ux0:tai,
+# ur0:tai and ux0:data/syncthing as the app left them, before they are restored.
 # Works without Sony firmware and without a display (see scripts/vita3k_launch.sh).
 set -euo pipefail
 
@@ -24,6 +25,12 @@ BACKUP="$(mktemp -d)"
 [[ -d "$UX0/tai" ]] && cp -a "$UX0/tai" "$BACKUP/tai"
 restore() {
     pkill -x Vita3K 2>/dev/null || true
+    if [[ -n "${VITA3K_INSPECT:-}" ]]; then
+        mkdir -p "$VITA3K_INSPECT"
+        for d in "$UX0/tai:ux0_tai" "$UX0/../ur0/tai:ur0_tai" "$DATA:data"; do
+            [[ -d "${d%%:*}" ]] && cp -a "${d%%:*}" "$VITA3K_INSPECT/${d##*:}"
+        done
+    fi
     rm -rf "$DATA" "$UX0/tai"
     [[ -d "$BACKUP/syncthing" ]] && cp -a "$BACKUP/syncthing" "$DATA"
     [[ -d "$BACKUP/tai" ]] && cp -a "$BACKUP/tai" "$UX0/tai"

@@ -87,6 +87,7 @@ syncthing-vita
             │   ├── dpad_navigation.rs # DpadNavigation (sidebar <-> page focus, Cross on focused element)
             │   ├── qr_scan.rs        # QrScanFlow (scanner events -> AddDeviceById confirmation), extract_device_id
             │   ├── sync_supervisor.rs # SyncSupervisor (sync worker life cycle: start, restart on configuration change, rescan / discovery requests, reconnection)
+            │   ├── background_handover.rs # BackgroundHandover (first worker waits for the plugin's background worker, bounded)
             │   ├── sync_coordinator.rs # SyncCoordinator (maps WorkerMsg & SyncEvent into AppState & ShareService)
             │   ├── upload_activity.rs # UploadActivity ("Uploading" state ends UPLOAD_DISPLAY_GRACE after the last block served)
             │   ├── input_controller.rs # InputController (resolves touch / Cross / shortcuts against the frame's HitMap, executes UiActions)
@@ -97,7 +98,8 @@ syncthing-vita
             │   ├── config_fields.rs  # escape_field / unescape_field (peer-supplied text can never forge `.cfg` fields or lines)
             │   ├── worker_slot.rs    # spawn_after_previous / wait_for_worker (a new sync worker starts only once the previous one ended)
             │   ├── plugin_host.rs    # PluginHost (app0:plugins, ux0:/ur0:tai, plugin.cfg; host builds map device paths below a root), LauncherProbe
-            │   ├── plugin_mutex.rs   # GuiRunningLock (`SyncthingGuiRunning` held while the app runs), KernelLauncherProbe (`SyncthingLauncherAlive`)
+            │   ├── plugin_mutex.rs   # GuiRunningLock (`SyncthingGuiRunning` held while the app runs), KernelLauncherProbe (`SyncthingLauncherAlive`), BackgroundWorkerProbe (`SyncthingWorkerRunning`)
+            │   ├── pending_offers.rs # `impl ConfigRepository`: pending_offers.cfg (folder offers recorded by the background worker)
             │   ├── identity_store.rs # IdentityStore (sceKernelGetRandomNumber, device_seed.bin, cert.der)
             │   ├── vita_system.rs    # init_vita_network (SceSysmodule + SceSysmem + SceNet + SceNetCtl) & detect_system_language (SceAppUtil)
             │   ├── ui_script.rs      # Opt-in `ui-script` feature: scripted input replay + frame dumps for Vita3K
@@ -192,9 +194,9 @@ Dependencies strictly point **inward**. Inner layers never import or depend on o
      - `share_service.rs`: Share creation, deletion, pause, target folder and device linkage. `device_registry.rs`: known devices (discovered, added by ID, placeholder upgrade). `folder_browser.rs`: the `Files` tab browser.
      - `share_creation.rs`: Share creation workflow — a new share is discarded if `ManageDevices` closes with no linked device.
      - `share_mode.rs`: `ShareModeService::toggle` switches a share between `ShareMode::ReadWrite` and `ShareMode::ReadOnly`, saves it and restarts the worker (`config_dirty`). `ShareModeService::request_revert` queues a read-only share in `AppState::pending_reverts`; `main.rs` hands it to the running worker (`SyncControl::request_revert`) once no configuration change is pending, and a sync is started if none runs.
-     - `folder_offers.rs`: Consent for folders offered by peers (`FolderOffer` modal); declined offers persisted.
+     - `folder_offers.rs`: Consent for folders offered by peers (`FolderOffer` modal); declined offers persisted. `FolderOfferService::import_pending` queues the offers the plugin's background worker recorded in `pending_offers.cfg` (once, at startup, after the hand-over below) through the same filtering as live offers (unknown device, already shared, declined, duplicate dropped, and removed from the file); `accept` / `decline` / `ignore` remove the answered offer from the file (also when it arrived live), `Later` keeps it for the next start.
      - `sync_coordinator.rs`: Maps background `WorkerMsg` protocol events into `AppState` updates. `AppState::session_connected` follows `connected_peers` (a peer enters on `SyncCycleCompleted`, leaves on `SessionEnded`). Per-file and per-block events (`FileUpToDate`, `BlockUploaded`) are never logged.
-     - `sync_supervisor.rs`: `SyncSupervisor` owns the running worker (message channel + `SyncControl`). `main.rs` forwards `UserCommand::StartSync` / `ScanLan` / quit to it and calls `tick` once per loop iteration; it never calls `spawn_sync_worker` itself.
+     - `sync_supervisor.rs`: `SyncSupervisor` owns the running worker (message channel + `SyncControl`). `main.rs` forwards `UserCommand::StartSync` / `ScanLan` / quit to it and calls `tick` once per loop iteration; it never calls `spawn_sync_worker` itself. Its first worker start waits while the plugin's background worker runs (`background_handover.rs`: `SyncthingWorkerRunning` polled once per loop iteration through `BackgroundWorkerProbe`, at most `BACKGROUND_WORKER_WAIT` = 30 s; the main loop keeps rendering, the sidebar card shows `UiText::BackgroundSyncStopping` and the status line `UiText::WaitingForBackgroundSync`); `pending_offers.cfg` is imported when that wait ends, so the background worker can no longer write it.
      - `controllers/`: `input.rs` (`InputController`: translates main-screen button/touch inputs into actions, modal triggers, and commands) and one controller per page (`dashboard.rs` with the share list's `shares.rs`, `files.rs`, `settings.rs`; see §3.4).
      - `modal_input/`: Input handling for open modals, one file per modal (mirrors `ui/modals/`).
      - `dpad_navigation.rs`: D-pad focus between the sidebar and the page elements.
@@ -216,7 +218,8 @@ Dependencies strictly point **inward**. Inner layers never import or depend on o
      - `worker_slot.rs`: Sequential hand-over between sync workers. Never spawn a sync worker thread directly: two generations of sessions must not write the same files concurrently.
      - `vita_system.rs`: Network stack, sysmodule initialization, and automatic system language detection (`detect_system_language` via `SceAppUtil` on Vita and `LANG`/`LC_ALL` on host).
      - `plugin_host.rs`: `PluginHost` file access for the background sync plugin (device paths as is on the Vita; below `<data>/devices` on host builds, `PluginHost::rooted` in tests), crash-safe writes, `plugin.cfg`, and the `LauncherProbe` trait (`FixedLauncherProbe` on host).
-     - `plugin_mutex.rs`: named openable kernel mutexes shared with the plugin. `main.rs` holds `GuiRunningLock` (`SyncthingGuiRunning`, created locked) for the app's whole lifetime: the plugin never syncs while it exists, so enabling background sync in `Settings` never starts a sync while the app is open. `KernelLauncherProbe` opens `SyncthingLauncherAlive` (created by the launcher). With the `ui-script` feature only, `ux0:data/syncthing/ui_script_launcher_alive` (`1` / `0`) forces the probe (Vita3K has no taiHEN).
+     - `plugin_mutex.rs`: named openable kernel mutexes shared with the plugin. `main.rs` holds `GuiRunningLock` (`SyncthingGuiRunning`, created locked) for the app's whole lifetime: the plugin never syncs while it exists, so enabling background sync in `Settings` never starts a sync while the app is open. `KernelLauncherProbe` opens `SyncthingLauncherAlive` (created by the launcher). `KernelWorkerProbe` opens `SyncthingWorkerRunning` (held by the launcher while a background worker is loaded). With the `ui-script` feature only, `ux0:data/syncthing/ui_script_launcher_alive` / `ui_script_worker_running` (`1` / `0`) force the probes (Vita3K has no taiHEN).
+     - `pending_offers.rs`: `ConfigRepository::{load,save}_pending_offers` / `remove_pending_offer` (`pending_offers.cfg`, §5; at most `MAX_PENDING_OFFERS`, invalid lines and duplicates dropped, file removed once empty).
    - **Strict Rule**: All platform-specific `#[cfg(target_os = "vita")]` hardware syscalls (`sce*`) must be encapsulated here. Never leak them into UI or Domain.
 
 4. **Layer 4: UI / Presentation Layer (`crates/vita-syncthing-app/src/ui/`)**
@@ -421,6 +424,7 @@ Text fields of the `.cfg` files (device names, addresses, folder IDs, labels, pa
 | `theme.cfg` | Persistent colour theme mode (`dark` or `oled`) | `<dark\|oled>\n` |
 | `language.cfg` | UI language chosen in `Settings` (`system` follows the PS Vita language; a missing file means `system`) | `<system\|en\|fr\|es\|de\|it>\n` |
 | `plugin.cfg` | Background sync plugin settings, written by `Settings` (`enabled=1` at install, `0` on uninstall), re-read by the launcher before each cycle; missing keys take their defaults (`PLUGIN_DEFAULT_*` in `defaults.rs`: enabled, sync on game exit, 1800 s), unknown lines are kept | `enabled=<0\|1>\nsync_on_game_exit=<0\|1>\ninterval_secs=<u32>\n` |
+| `pending_offers.cfg` | Folder offers the plugin's background worker received while the app was closed (it never accepts a folder); imported into the `FolderOffer` consent flow at startup, a line removed once answered or no longer relevant (`Later` keeps it); at most 32 lines, deduplicated on folder + device; removed when empty | `<folder_id>\|<label>\|<device_id_hex>\n` |
 | `syncthing.log`, `syncthing.log.1` | Persistent protocol & UI event log, rotated above `LOG_MAX_BYTES` (512 KiB) to `syncthing.log.1` | Plain text lines |
 | `sync/.syncthing_db_<folder>_<root hash>.txt` | Persistent folder database (`local_db/`): version vectors, sequences, blocks and tombstones per entry | `#vita-db-v1` tab-separated text |
 
@@ -479,6 +483,9 @@ cargo test --workspace
 - `plugin_status.rs`: plugin module names / `tai` paths, active `tai` directory, status resolution, card buttons per status
 - `plugin_host.rs`: `PluginHost` device path mapping, crash-safe writes and recovery, `plugin.cfg` persistence, probe
 - `plugin_service.rs`: install (`ux0:` vs `ur0:`, `config.txt.bak`, idempotent, stale entries, `enabled=1`, settings kept), failures (no bundled modules, no taiHEN, unwritable `tai`), uninstall from both directories, status transitions and toasts
+- `background_handover.rs`: the first worker waits while the plugin's background worker runs (released at once without one, after it stopped, or at exactly `BACKGROUND_WORKER_WAIT`), only once
+- `sync_supervisor.rs`: worker life cycle without a reachable device, the postponed first start (status line, `start_sync` postponed too, started once the background worker stopped or after the bound) and the import of offers recorded meanwhile
+- `pending_offers.rs`: `pending_offers.cfg` exact format with escaped fields, invalid / duplicate lines, 32-line bound, removal and empty file, import into the consent flow (`Later` keeps, `Accept` / `Decline` / live answer / `ignore` remove), unknown devices and irrelevant offers dropped, hostile labels
 - `settings_plugin.rs`: `Settings` plugin card (D-pad, touch, `ConfirmPlugin` confirm / cancel, stale elements, end-to-end with `PluginService`); `main_screens.rs` checks the card's buttons and texts in every status and language, `modal_touch.rs` the `ConfirmPlugin` modal
 
 `syncthing-cli` tests live in `crates/syncthing-cli/tests/` (`cargo test -p syncthing-cli`): `config.rs`, `identity.rs`, `cli_commands.rs` (the real binary), `lan.rs` (UDP 21027 shared, bounded reply schedule), `daemon_limits.rs` (bounded "reported once" memory, configured-device reports never crowded out, connection slots given back, relay invitations triaged and capped), `daemon_sync.rs` (two daemons on `127.0.0.1` with discovery and relays off: sync both ways, live changes and deletions, unknown device refused, offered folder not synchronized, receive-only folder).

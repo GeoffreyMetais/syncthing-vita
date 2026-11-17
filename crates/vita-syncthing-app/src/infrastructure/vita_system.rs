@@ -100,7 +100,10 @@ pub fn init_vita_network() -> Result<Vec<u8>, String> {
         SCE_SYSMODULE_NET,
     };
 
-    const SCE_NET_ERROR_EEXIST: u32 = 0x80410118;
+    /// `sceNetInit` when the network stack is already initialized (`SCE_NET_ERROR_EBUSY` in
+    /// VitaSDK's `psp2common/net.h`; newlib's own `_vita_net_init` treats it the same way).
+    /// `0x80410118`, used before, is `SCE_NET_ERROR_EMFILE`.
+    const SCE_NET_ERROR_EBUSY: u32 = 0x80410110;
     const SCE_NET_CTL_ERROR_NOT_TERMINATED: u32 = 0x80412102;
 
     unsafe {
@@ -131,7 +134,7 @@ pub fn init_vita_network() -> Result<Vec<u8>, String> {
         };
 
         let ret = sceNetInit(&mut init_param);
-        if ret < 0 && (ret as u32) != SCE_NET_ERROR_EEXIST {
+        if ret < 0 && (ret as u32) != SCE_NET_ERROR_EBUSY {
             return Err(format!("sceNetInit failed: 0x{:08X}", ret as u32));
         }
 

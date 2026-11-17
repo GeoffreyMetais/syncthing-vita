@@ -8,10 +8,10 @@ use syncthing_core::DeviceId;
 use vita_syncthing_app::application::{DeviceRegistry, ShareService, UserCommand};
 use vita_syncthing_app::domain::{
     ActiveTab, AppState, Language, LanguagePreference, ModalDialog, PickerMode, PluginInfo,
-    PluginRequest, Rect, UiAction, TAB_ORDER,
+    PluginRequest, Rect, UiAction, UiText, TAB_ORDER,
 };
 use vita_syncthing_app::infrastructure::{ConfigRepository, BTN_SQUARE, BTN_START, BTN_TRIANGLE};
-use vita_syncthing_app::ui::gfx::{FontWeight, Gfx, GFX_H, GFX_W};
+use vita_syncthing_app::ui::gfx::{FontWeight, Gfx, PadButton, GFX_H, GFX_W};
 use vita_syncthing_app::ui::modals::confirm_frame::CONFIRM_PAD_X;
 use vita_syncthing_app::ui::renderer::draw_frame;
 use vita_syncthing_app::ui::screens::settings_plugin::{
@@ -22,6 +22,7 @@ use vita_syncthing_app::ui::theme::{
     UiTheme, CONFIRM_PLUGIN_W, CONTENT_R, CONTENT_X, HINT_Y, SETTINGS_PLUGIN_B, SETTINGS_PLUGIN_Y,
     SIDEBAR_W,
 };
+use vita_syncthing_app::ui::widgets::action_width;
 
 const PEER: DeviceId = DeviceId([0x42; 32]);
 const LANGUAGES: [Language; 5] = [
@@ -421,5 +422,28 @@ fn test_confirm_plugin_texts_fit_in_every_language() {
                 );
             }
         }
+    }
+}
+
+#[test]
+fn test_background_worker_wait_texts_fit_in_every_language() {
+    // Same room as the `Overview` device card status line (left of its `QR / ID` and
+    // `New Share` buttons) and the sidebar transfer card label.
+    let mut gfx = Gfx::new();
+    for language in LANGUAGES {
+        let s = strings::strings(language);
+        let new_w = action_width(&mut gfx, PadButton::Triangle, s.action_new_share);
+        let qr_w = action_width(&mut gfx, PadButton::Circle, s.action_qr_id);
+        let status_room = (CONTENT_R - 16 - new_w - 10 - qr_w) - 16 - (CONTENT_X + 20 + 82);
+        let status = s.text(&UiText::WaitingForBackgroundSync);
+        assert!(
+            gfx.text_width(15, FontWeight::Medium, &status) <= status_room,
+            "{status:?} is cut in {language:?}"
+        );
+        let label = s.text(&UiText::BackgroundSyncStopping);
+        assert!(
+            gfx.text_width(14, FontWeight::Medium, &label) <= SIDEBAR_W - 48,
+            "{label:?} is cut in {language:?}"
+        );
     }
 }
