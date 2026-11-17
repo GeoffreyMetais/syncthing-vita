@@ -46,8 +46,10 @@ pub fn drain_for(control: Option<&SyncControl>) -> CycleDrain {
 /// 3. drains upload requests and late `Index` messages (see [`CycleDrain`]) before reporting
 ///    the cycle complete.
 ///
-/// A stop request is honoured between the phases (and between blocks by the download):
-/// the cycle then ends with [`InitialSync::Stopped`].
+/// With a single-cycle handle ([`SyncControl::single_cycle`]), a stop request is honoured
+/// between the phases (and between blocks by the download) and ends the cycle with
+/// [`InitialSync::Stopped`]. Other sessions keep their behaviour: only the download notices a
+/// stop (as an error); a persistent session sees it in its loop, after reporting this cycle.
 pub fn run_initial_sync(
     stream: &mut BepTlsStream,
     ctx: &mut SessionContext<'_>,
@@ -56,18 +58,22 @@ pub fn run_initial_sync(
     secondaries_opened_at: Instant,
     drain: CycleDrain,
 ) -> io::Result<InitialSync> {
-    // A download interrupted by a stop request is a stop, not a failure: the session still
-    // ends with a `Close`.
+    let single_cycle = ctx
+        .control
+        .is_some_and(|c| c.single_cycle_drain().is_some());
+    let stop_now = |ctx: &SessionContext<'_>| single_cycle && ctx.is_stop_requested();
+    // In a single cycle, a download interrupted by a stop request is a stop, not a failure:
+    // the session still ends with a `Close`.
     match initial_download(stream, ctx, folders) {
-        Err(_) if ctx.is_stop_requested() => return Ok(InitialSync::Stopped),
+        Err(_) if stop_now(ctx) => return Ok(InitialSync::Stopped),
         result => result?,
     }
-    if ctx.is_stop_requested() {
+    if stop_now(ctx) {
         return Ok(InitialSync::Stopped);
     }
 
     build_initial_local_indexes(stream, ctx, folders);
-    if ctx.is_stop_requested() {
+    if stop_now(ctx) {
         return Ok(InitialSync::Stopped);
     }
     wait_for_promotion(secondaries, secondaries_opened_at, ctx);
@@ -76,7 +82,7 @@ pub fn run_initial_sync(
     let drain_start = Instant::now();
     let mut last_activity = Instant::now();
     while !drain.is_over(drain_start.elapsed(), last_activity.elapsed()) {
-        if ctx.is_stop_requested() {
+        if stop_now(ctx) {
             return Ok(InitialSync::Stopped);
         }
         let uploaded_before = ctx.stats.blocks_uploaded;
@@ -96,7 +102,10 @@ pub fn run_initial_sync(
         if ctx.stats.blocks_uploaded != uploaded_before {
             last_activity = Instant::now();
         }
-        send_keepalive_if_due(stream, ctx);
+        // A single cycle's drain can last minutes; the fixed drains stay short.
+        if single_cycle {
+            send_keepalive_if_due(stream, ctx);
+        }
     }
 
     ctx.emit_cycle_completed(1 + secondaries.len());
