@@ -128,9 +128,8 @@ fn sync_button_drawn(state: &mut AppState) -> bool {
     let card_bg = UiTheme::for_mode(state.theme_mode).card;
     // Right edge of the button, inside the card's own outline: no text reaches it.
     let right = card.x + card.w;
-    (card.y + 18..card.y + 34).any(|y| {
-        (right - 15..right - 11).any(|x| gfx.pixels[(y * GFX_W + x) as usize] != card_bg)
-    })
+    (card.y + 18..card.y + 34)
+        .any(|y| (right - 15..right - 11).any(|x| gfx.pixels[(y * GFX_W + x) as usize] != card_bg))
 }
 
 #[test]

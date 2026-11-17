@@ -2,18 +2,18 @@
 //! `draw_progress`, `draw_scrollbar`, `draw_page_title`, `draw_chrome`, `draw_hints`, `draw_toast`).
 
 use crate::domain::{
-    ActiveTab, AppState, FocusSlot, HitMap, Hotspot, NavFocus, PadKey, Rect, ShortcutKey,
-    UiAction, UiText,
+    ActiveTab, AppState, FocusSlot, HitMap, Hotspot, NavFocus, PadKey, Rect, ShortcutKey, UiAction,
+    UiText,
 };
 use crate::ui::gfx::{
     rgb, with_alpha, Align, Color, FontWeight, Gfx, Icon, PadButton, GFX_H, GFX_W,
 };
 use crate::ui::strings::{self, Strings};
-use crate::ui::transfer_card::draw_transfer_card;
 use crate::ui::theme::{
-    UiTheme, ACTION_TOUCH_H, CONTENT_R, CONTENT_W, CONTENT_X, C_GOOD, C_PROGRESS_TRACK, C_WARN, HINT_TOUCH_MARGIN,
-    HINT_Y, SIDEBAR_W,
+    UiTheme, ACTION_TOUCH_H, CONTENT_R, CONTENT_W, CONTENT_X, C_GOOD, C_PROGRESS_TRACK, C_WARN,
+    HINT_TOUCH_MARGIN, HINT_Y, SIDEBAR_W,
 };
+use crate::ui::transfer_card::draw_transfer_card;
 
 pub fn draw_card(gfx: &mut Gfx, th: &UiTheme, x: i32, y: i32, w: i32, h: i32, focused: bool) {
     let bg = if focused { th.card_hi } else { th.card };
