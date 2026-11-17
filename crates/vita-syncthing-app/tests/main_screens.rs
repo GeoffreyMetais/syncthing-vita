@@ -7,13 +7,21 @@ use common::{draw, press, rect_of, tap, tap_action, tap_rect, temp_test_dir};
 use syncthing_core::DeviceId;
 use vita_syncthing_app::application::{DeviceRegistry, ShareService, UserCommand};
 use vita_syncthing_app::domain::{
-    ActiveTab, AppState, Language, LanguagePreference, ModalDialog, PickerMode, Rect, UiAction,
-    TAB_ORDER,
+    ActiveTab, AppState, Language, LanguagePreference, ModalDialog, PickerMode, PluginInfo,
+    PluginRequest, Rect, UiAction, TAB_ORDER,
 };
 use vita_syncthing_app::infrastructure::{ConfigRepository, BTN_SQUARE, BTN_START, BTN_TRIANGLE};
-use vita_syncthing_app::ui::gfx::{Gfx, GFX_H, GFX_W};
+use vita_syncthing_app::ui::gfx::{FontWeight, Gfx, GFX_H, GFX_W};
+use vita_syncthing_app::ui::modals::confirm_frame::CONFIRM_PAD_X;
 use vita_syncthing_app::ui::renderer::draw_frame;
-use vita_syncthing_app::ui::theme::{UiTheme, HINT_Y, SIDEBAR_W};
+use vita_syncthing_app::ui::screens::settings_plugin::{
+    plugin_card_layout, plugin_description, PLUGIN_DESC_SIZE,
+};
+use vita_syncthing_app::ui::strings;
+use vita_syncthing_app::ui::theme::{
+    UiTheme, CONFIRM_PLUGIN_W, CONTENT_R, CONTENT_X, HINT_Y, SETTINGS_PLUGIN_B, SETTINGS_PLUGIN_Y,
+    SIDEBAR_W,
+};
 
 const PEER: DeviceId = DeviceId([0x42; 32]);
 const LANGUAGES: [Language; 5] = [
@@ -315,4 +323,103 @@ fn test_settings_devices_card_is_separate_from_theme_card() {
     assert_eq!(state.focused_action(ActiveTab::Settings), Some(0));
 
     let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// Every state of the background sync plugin card (the last one: uninstalled, still loaded).
+fn plugin_states() -> [PluginInfo; 5] {
+    [
+        PluginInfo::new(false, false, true),
+        PluginInfo::new(true, false, true),
+        PluginInfo::new(true, true, true),
+        PluginInfo::new(true, true, false),
+        PluginInfo::new(false, true, false),
+    ]
+}
+
+#[test]
+fn test_settings_plugin_card_fits_in_every_language_and_state() {
+    let (dir, repo, mut state) = setup("screens-plugin-card");
+    tap_action(&mut state, &repo, UiAction::SwitchTab(ActiveTab::Settings));
+    let mut gfx = Gfx::new();
+    let card = Rect::new(
+        CONTENT_X,
+        SETTINGS_PLUGIN_Y,
+        CONTENT_R - CONTENT_X,
+        SETTINGS_PLUGIN_B - SETTINGS_PLUGIN_Y,
+    );
+    let plugin_actions = [
+        UiAction::InstallPlugin,
+        UiAction::UninstallPlugin,
+        UiAction::TogglePluginEnabled,
+    ];
+    for language in LANGUAGES {
+        state.set_language_preference(LanguagePreference::Fixed(language));
+        for info in plugin_states() {
+            state.plugin = info;
+            draw(&mut state);
+            let hotspots = state.hit_map.hotspots().to_vec();
+            let buttons: Vec<Rect> = hotspots
+                .iter()
+                .filter(|h| plugin_actions.contains(&h.action))
+                .map(|h| h.rect)
+                .collect();
+            assert_eq!(buttons.len(), info.action_count());
+            for b in &buttons {
+                assert!(
+                    b.x >= card.x && b.x + b.w <= card.x + card.w,
+                    "{b:?} outside the card ({language:?}, {info:?})"
+                );
+                assert!(b.y >= card.y - 4 && b.y + b.h <= card.y + card.h);
+            }
+            // Focusable buttons of the whole page never cover each other.
+            let focusable: Vec<Rect> = hotspots
+                .iter()
+                .filter(|h| h.focus.is_some())
+                .map(|h| h.rect)
+                .collect();
+            for (i, a) in focusable.iter().enumerate() {
+                for b in &focusable[i + 1..] {
+                    assert!(!overlap(a, b), "{a:?} / {b:?} ({language:?}, {info:?})");
+                }
+            }
+            // No text of the card is cut.
+            let layout = plugin_card_layout(&mut gfx, &state);
+            let p = strings::strings(language).plugin;
+            assert!(
+                gfx.text_width(12, FontWeight::Bold, p.section) <= layout.title_max_w,
+                "section title cut in {language:?} ({info:?})"
+            );
+            let desc = plugin_description(&state);
+            assert!(
+                gfx.text_width(PLUGIN_DESC_SIZE, FontWeight::Regular, desc) <= layout.desc_max_w,
+                "description cut in {language:?} ({info:?}): {desc}"
+            );
+        }
+    }
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_confirm_plugin_texts_fit_in_every_language() {
+    let mut gfx = Gfx::new();
+    let inner = CONFIRM_PLUGIN_W - 2 * CONFIRM_PAD_X;
+    for language in LANGUAGES {
+        let p = strings::strings(language).plugin;
+        for request in [PluginRequest::Install, PluginRequest::Uninstall] {
+            let t = p.confirm(request);
+            let checks = [
+                (21, FontWeight::Bold, t.title, inner - 52),
+                (14, FontWeight::Regular, t.subtitle, inner - 52),
+                (14, FontWeight::Regular, t.lines[0], inner),
+                (14, FontWeight::Regular, t.lines[1], inner),
+                (14, FontWeight::Medium, t.reboot, inner),
+            ];
+            for (size, weight, text, max) in checks {
+                assert!(
+                    gfx.text_width(size, weight, text) <= max,
+                    "{text:?} is cut in {language:?} ({request:?})"
+                );
+            }
+        }
+    }
 }

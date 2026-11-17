@@ -9,7 +9,10 @@ pub mod interaction;
 pub mod log_view;
 pub mod models;
 pub mod navigation;
+pub mod plugin;
+pub mod plugin_config;
 pub mod screensaver;
+pub mod tai_config;
 pub mod ui_text;
 
 pub use app_state::AppState;
@@ -28,7 +31,9 @@ pub use models::{
 pub use navigation::{
     action_count, default_col, settings_row_action_count, starts_on_header, NavFocus, NavState,
     DASHBOARD_HEADER_ACTIONS, SETTINGS_ROWS, SETTINGS_ROW_DECLINED, SETTINGS_ROW_DEVICES,
-    SETTINGS_ROW_DISPLAY, SETTINGS_ROW_LANGUAGE, SETTINGS_ROW_LOG, TAB_ORDER,
+    SETTINGS_ROW_DISPLAY, SETTINGS_ROW_LANGUAGE, SETTINGS_ROW_LOG, SETTINGS_ROW_PLUGIN, TAB_ORDER,
 };
+pub use plugin::{PluginInfo, PluginNotice, PluginRequest, PluginStatus};
+pub use plugin_config::PluginConfig;
 pub use screensaver::ScreensaverMotion;
 pub use ui_text::UiText;

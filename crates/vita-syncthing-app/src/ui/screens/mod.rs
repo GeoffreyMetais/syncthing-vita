@@ -3,6 +3,7 @@
 //! - `shares`: share list of the `Overview` (share cards with `Devices`, `Delete`, `Folder`)
 //! - `folder_picker`: Tab 2 (`Files` — interactive `ux0:` directory browser & presets)
 //! - `settings`: Tab 3 (`Settings & Log` — Dark/OLED theme switcher & BEP/1.0 protocol log)
+//! - `settings_plugin`: background sync plugin card of `Settings` (status, install, enable)
 //! - `logs`: full-screen protocol log viewer opened from `Settings` (session lines / `Show All`)
 //! - `screensaver`: Bouncing DVD-style OLED screensaver (`#000000` background)
 
@@ -11,6 +12,7 @@ pub mod folder_picker;
 pub mod logs;
 pub mod screensaver;
 pub mod settings;
+pub mod settings_plugin;
 pub mod shares;
 
 pub use dashboard::render_dashboard_tab;

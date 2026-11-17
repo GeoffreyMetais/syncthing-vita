@@ -13,8 +13,10 @@ use crate::domain::models::{
     LanguagePreference, ModalDialog, ShareConfigEntry, SyncActivity, ThemeMode,
 };
 use crate::domain::navigation::{
-    default_col, starts_on_header, NavFocus, NavState, DASHBOARD_HEADER_ACTIONS,
+    default_col, settings_row_action_count, starts_on_header, NavFocus, NavState,
+    DASHBOARD_HEADER_ACTIONS, SETTINGS_ROW_PLUGIN,
 };
+use crate::domain::plugin::PluginInfo;
 use crate::domain::screensaver::ScreensaverMotion;
 use crate::domain::ui_text::UiText;
 
@@ -107,6 +109,8 @@ pub struct AppState {
     pub qr_preview: CameraPreview,
     /// Camera failure reported while scanning (e.g. PlayStation TV has no camera).
     pub qr_camera_error: Option<String>,
+    /// Background sync plugin status (`Settings`), refreshed by `application::PluginService`.
+    pub plugin: PluginInfo,
 }
 
 impl AppState {
@@ -165,6 +169,7 @@ impl AppState {
             fallback_keypad_visible: false,
             qr_preview: CameraPreview::default(),
             qr_camera_error: None,
+            plugin: PluginInfo::default(),
         }
     }
 
@@ -295,8 +300,17 @@ impl AppState {
                 col: self
                     .nav
                     .col
-                    .min(crate::domain::settings_row_action_count(self.nav.row).saturating_sub(1)),
+                    .min(self.settings_row_actions(self.nav.row).saturating_sub(1)),
             },
+        }
+    }
+
+    /// Number of buttons on the Settings card `row` as currently drawn.
+    pub fn settings_row_actions(&self, row: usize) -> usize {
+        if row == SETTINGS_ROW_PLUGIN {
+            self.plugin.action_count()
+        } else {
+            settings_row_action_count(row)
         }
     }
 

@@ -1,11 +1,12 @@
 //! German (`de`) string catalog for VitaSyncthing.
 
-use super::{Messages, Strings};
+use super::{Messages, PluginStrings, Strings};
 use crate::domain::Language;
 
 pub static STRINGS_DE: Strings = Strings {
     messages: &MESSAGES_DE,
     language: Language::German,
+    plugin: &PLUGIN_DE,
 
     // Common Actions
     action_cancel: "Abbrechen",
@@ -293,4 +294,45 @@ pub static MESSAGES_DE: Messages = Messages {
     device_row_short: "Kurz-ID: {prefix} (Auflösung im LAN)  ·  Adresse: {addr}",
     device_row_full: "ID: {id}  ·  Adresse: {addr}",
     unknown_device: "Gerät {short}",
+};
+
+/// DE background sync plugin strings.
+pub static PLUGIN_DE: PluginStrings = PluginStrings {
+    section: "HINTERGRUND-SYNC-PLUGIN",
+    status_not_installed: "Nicht installiert",
+    status_reboot: "Neustart nötig",
+    status_active: "Aktiv",
+    status_disabled: "Deaktiviert",
+    desc_not_installed: "taiHEN-Plugin: Sync, wenn kein Spiel läuft, auch bei geschlossener App",
+    desc_unload_pending: "Deinstalliert · PS Vita neu starten, um es aus dem Speicher zu entfernen",
+    desc_reboot: "Installiert · PS Vita neu starten, um die Hintergrund-Sync zu starten",
+    desc_active: "Synchronisiert, wenn kein Spiel läuft · Pausiert, solange diese App offen ist",
+    desc_disabled: "Hintergrund-Sync aus · Jederzeit wieder aktivierbar, ohne Neustart",
+    action_install: "Installieren",
+    action_uninstall: "Deinstallieren",
+    action_enable: "Aktivieren",
+    action_disable: "Deaktivieren",
+    install_title: "Hintergrund-Sync installieren?",
+    install_subtitle: "Fügt dem LiveArea ein taiHEN-Plugin hinzu (config.txt wird gesichert)",
+    install_lines: [
+        "Freigaben werden synchronisiert, wenn weder ein Spiel noch diese App läuft.",
+        "Das Sync-Modul wird nur für eine Synchronisierung geladen.",
+    ],
+    install_reboot: "PS Vita neu starten, um es zu starten.",
+    uninstall_title: "Hintergrund-Sync deinstallieren?",
+    uninstall_subtitle: "Entfernt die Plugin-Dateien und ihren Eintrag in config.txt",
+    uninstall_lines: [
+        "Freigaben, Geräte und Einstellungen bleiben erhalten.",
+        "Die Hintergrund-Sync stoppt sofort.",
+    ],
+    uninstall_reboot: "PS Vita neu starten, um es aus dem Speicher zu entfernen.",
+    notice_installed: "Hintergrund-Sync-Plugin installiert",
+    notice_installed_reboot: "Plugin installiert · PS Vita neu starten, um es zu starten",
+    notice_uninstalled: "Hintergrund-Sync-Plugin deinstalliert",
+    notice_uninstalled_reboot: "Plugin deinstalliert · Neustart entfernt es aus dem Speicher",
+    notice_enabled: "Hintergrund-Sync an · Startet, sobald diese App geschlossen ist",
+    notice_disabled: "Hintergrund-Sync aus",
+    notice_bundle_missing: "Diese Version enthält kein Plugin (app0:plugins)",
+    notice_tai_missing: "taiHEN-config.txt nicht gefunden (ux0:tai, ur0:tai)",
+    notice_write_failed: "Plugin-Dateien konnten nicht geschrieben werden (siehe Log)",
 };

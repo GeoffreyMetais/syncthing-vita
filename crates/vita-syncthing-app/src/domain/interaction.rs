@@ -81,6 +81,12 @@ pub enum UiAction {
     ClearDeclinedFolders,
     /// `Settings`: open the full-screen protocol log viewer.
     OpenLogs,
+    /// `Settings`: ask for confirmation before installing the background sync plugin.
+    InstallPlugin,
+    /// `Settings`: ask for confirmation before uninstalling the background sync plugin.
+    UninstallPlugin,
+    /// `Settings`: allow / stop background sync (`plugin.cfg`, no reboot needed).
+    TogglePluginEnabled,
 
     // --- Log viewer ---
     /// Close the log viewer (back to `Settings`).

@@ -3,7 +3,7 @@
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 
-use super::tuning::SyncTuning;
+use super::tuning::{CycleDrain, SyncTuning};
 
 /// Thread-safe control handle allowing the UI thread to request an immediate local folder rescan
 /// or a clean shutdown of a persistent BEP/1.0 session.
@@ -16,6 +16,8 @@ pub struct SyncControl {
     /// Receive-only folders whose local changes must be reverted, until a session takes them.
     revert_requests: Mutex<Vec<String>>,
     tuning: SyncTuning,
+    /// `Some`: sessions end after their first sync cycle (see [`Self::single_cycle`]).
+    single_cycle: Option<CycleDrain>,
 }
 
 impl SyncControl {
@@ -29,6 +31,24 @@ impl SyncControl {
             tuning,
             ..Self::default()
         })
+    }
+
+    /// Creates a control handle for sessions that run **one** sync cycle and then end:
+    /// initial download, publication of the local index, then `drain` (answering the peer's
+    /// requests until it is idle), a `Close` and `SessionEnded`. Unlike a session without any
+    /// control handle, it still honours [`Self::request_stop`] at every phase, so a background
+    /// worker can be aborted at any time.
+    pub fn single_cycle(tuning: SyncTuning, drain: CycleDrain) -> Arc<Self> {
+        Arc::new(Self {
+            tuning,
+            single_cycle: Some(drain),
+            ..Self::default()
+        })
+    }
+
+    /// The drain of a single-cycle handle, `None` for a persistent one.
+    pub fn single_cycle_drain(&self) -> Option<CycleDrain> {
+        self.single_cycle
     }
 
     /// Timings of the sessions driven by this handle.

@@ -105,6 +105,16 @@ pub const LOG_MAX_BYTES: u64 = 512 * 1024;
 /// Newest `syncthing.log` lines loaded by the log viewer's `Show All` (bounds its memory use).
 pub const LOG_HISTORY_MAX_LINES: usize = 2000;
 
+// --- Background sync plugin --------------------------------------------------------------
+
+/// `enabled` of `plugin.cfg` when the key is missing (and the value written at install).
+pub const PLUGIN_DEFAULT_ENABLED: bool = true;
+/// `sync_on_game_exit` of `plugin.cfg` when the key is missing: sync right after a game exits.
+pub const PLUGIN_DEFAULT_SYNC_ON_GAME_EXIT: bool = true;
+/// `interval_secs` of `plugin.cfg` when the key is missing: one background sync every 30 min
+/// while no game runs.
+pub const PLUGIN_DEFAULT_INTERVAL_SECS: u32 = 30 * 60;
+
 // --- Shares --------------------------------------------------------------------------------
 
 /// Folder ID of the `NEW_SHARE_TEMPLATES` entry that opens the folder browser.

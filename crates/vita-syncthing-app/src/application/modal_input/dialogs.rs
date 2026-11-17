@@ -1,10 +1,10 @@
 //! Input for the simple dialogs: `ShowDeviceId`, `ConfirmDeleteShare`, `ConfirmRevertShare`,
-//! `ConfirmQuit`.
+//! `ConfirmQuit`, `ConfirmPlugin`.
 //! Touches arrive as the pad button of the element touched (see `ModalInput`).
 
 use super::open_add_device_modal;
 use crate::application::{QrScanFlow, ShareModeService, ShareService, UserCommand};
-use crate::domain::{AppState, ModalDialog, UiText};
+use crate::domain::{AppState, ModalDialog, PluginRequest, UiText};
 use crate::infrastructure::{
     ConfigRepository, InputFrame, BTN_CIRCLE, BTN_CROSS, BTN_R, BTN_SQUARE, BTN_START, BTN_TRIANGLE,
 };
@@ -75,6 +75,23 @@ pub fn confirm_quit(state: &mut AppState, input: InputFrame) -> UserCommand {
     if (input.pressed & (BTN_CIRCLE | BTN_START | BTN_SQUARE | BTN_TRIANGLE)) != 0 {
         state.modal = ModalDialog::None;
         return UserCommand::None;
+    }
+    UserCommand::None
+}
+
+/// Handles input in the `ConfirmPlugin` modal: `Cross` hands `request` to the main loop
+/// (`PluginService::execute`), `Circle` / `START` / `Square` / `Triangle` cancel.
+pub fn confirm_plugin(
+    state: &mut AppState,
+    input: InputFrame,
+    request: PluginRequest,
+) -> UserCommand {
+    if (input.pressed & BTN_CROSS) != 0 {
+        state.modal = ModalDialog::None;
+        return UserCommand::Plugin(request);
+    }
+    if (input.pressed & (BTN_CIRCLE | BTN_START | BTN_SQUARE | BTN_TRIANGLE)) != 0 {
+        state.modal = ModalDialog::None;
     }
     UserCommand::None
 }

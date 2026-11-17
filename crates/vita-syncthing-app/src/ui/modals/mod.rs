@@ -9,11 +9,13 @@
 //! - `confirm_quit`: Application exit confirmation modal (`ConfirmQuit`)
 //! - `confirm_delete_share`: Share deletion confirmation modal (`ConfirmDeleteShare`)
 //! - `confirm_revert_share`: Read-only share revert confirmation modal (`ConfirmRevertShare`)
+//! - `confirm_plugin`: Background sync plugin install / uninstall confirmation modal (`ConfirmPlugin`)
 //! - `folder_offer`: Consent dialog for a folder offered by a remote device (`FolderOffer`)
 
 pub mod add_device;
 pub mod confirm_delete_share;
 pub mod confirm_frame;
+pub mod confirm_plugin;
 pub mod confirm_quit;
 pub mod confirm_revert_share;
 pub mod create_share;
@@ -25,6 +27,7 @@ pub mod scan_qr;
 
 pub use add_device::render_add_device_modal;
 pub use confirm_delete_share::render_confirm_delete_share_modal;
+pub use confirm_plugin::render_confirm_plugin_modal;
 pub use confirm_quit::render_confirm_quit_modal;
 pub use confirm_revert_share::render_confirm_revert_share_modal;
 pub use create_share::render_create_share_modal;

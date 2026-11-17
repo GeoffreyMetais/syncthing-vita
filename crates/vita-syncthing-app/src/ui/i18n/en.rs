@@ -1,11 +1,12 @@
 //! English (`en`) string catalog for VitaSyncthing.
 
-use super::{Messages, Strings};
+use super::{Messages, PluginStrings, Strings};
 use crate::domain::Language;
 
 pub static STRINGS_EN: Strings = Strings {
     messages: &MESSAGES_EN,
     language: Language::English,
+    plugin: &PLUGIN_EN,
 
     // Common Actions
     action_cancel: "Cancel",
@@ -296,4 +297,46 @@ pub static MESSAGES_EN: Messages = Messages {
     device_row_short: "Short ID: {prefix} (resolved on LAN)  ·  Address: {addr}",
     device_row_full: "ID: {id}  ·  Address: {addr}",
     unknown_device: "Device {short}",
+};
+
+/// EN background sync plugin strings.
+pub static PLUGIN_EN: PluginStrings = PluginStrings {
+    section: "BACKGROUND SYNC PLUGIN",
+    status_not_installed: "Not installed",
+    status_reboot: "Reboot required",
+    status_active: "Active",
+    status_disabled: "Disabled",
+    desc_not_installed:
+        "taiHEN plugin: syncs your shares while no game runs, even with this app closed",
+    desc_unload_pending: "Uninstalled · Reboot the PS Vita to unload it from memory",
+    desc_reboot: "Installed · Reboot the PS Vita to start background sync",
+    desc_active: "Syncs while no game is running · Paused while this app is open",
+    desc_disabled: "Background sync is off · Enable it again at any time, no reboot needed",
+    action_install: "Install",
+    action_uninstall: "Uninstall",
+    action_enable: "Enable",
+    action_disable: "Disable",
+    install_title: "Install background sync?",
+    install_subtitle: "Adds a taiHEN plugin to the LiveArea (config.txt is backed up)",
+    install_lines: [
+        "Your shares sync while no game is running and this app is closed.",
+        "The sync worker is only loaded for a sync, then unloaded.",
+    ],
+    install_reboot: "Reboot the PS Vita to start it.",
+    uninstall_title: "Uninstall background sync?",
+    uninstall_subtitle: "Removes the plugin files and its taiHEN config.txt entry",
+    uninstall_lines: [
+        "Your shares, devices and settings are kept.",
+        "Background sync stops right away.",
+    ],
+    uninstall_reboot: "Reboot the PS Vita to unload it from memory.",
+    notice_installed: "Background sync plugin installed",
+    notice_installed_reboot: "Plugin installed · Reboot the PS Vita to start it",
+    notice_uninstalled: "Background sync plugin uninstalled",
+    notice_uninstalled_reboot: "Plugin uninstalled · Reboot to unload it",
+    notice_enabled: "Background sync on · It starts once you close this app",
+    notice_disabled: "Background sync off",
+    notice_bundle_missing: "This build has no plugin files (app0:plugins)",
+    notice_tai_missing: "taiHEN config.txt not found (ux0:tai, ur0:tai)",
+    notice_write_failed: "Could not write the plugin files (see the log)",
 };

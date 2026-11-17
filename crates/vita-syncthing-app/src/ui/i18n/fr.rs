@@ -1,11 +1,12 @@
 //! French (`fr`) string catalog for VitaSyncthing.
 
-use super::{Messages, Strings};
+use super::{Messages, PluginStrings, Strings};
 use crate::domain::Language;
 
 pub static STRINGS_FR: Strings = Strings {
     messages: &MESSAGES_FR,
     language: Language::French,
+    plugin: &PLUGIN_FR,
 
     // Common Actions
     action_cancel: "Annuler",
@@ -298,4 +299,46 @@ pub static MESSAGES_FR: Messages = Messages {
     device_row_short: "ID court : {prefix} (résolu sur le LAN)  ·  Adresse : {addr}",
     device_row_full: "ID : {id}  ·  Adresse : {addr}",
     unknown_device: "Appareil {short}",
+};
+
+/// FR background sync plugin strings.
+pub static PLUGIN_FR: PluginStrings = PluginStrings {
+    section: "PLUGIN DE SYNCHRO EN ARRIÈRE-PLAN",
+    status_not_installed: "Non installé",
+    status_reboot: "Redémarrage requis",
+    status_active: "Actif",
+    status_disabled: "Désactivé",
+    desc_not_installed: "Plugin taiHEN : synchronise vos partages sans jeu lancé, même app fermée",
+    desc_unload_pending: "Désinstallé · Redémarrez la PS Vita pour le retirer de la mémoire",
+    desc_reboot: "Installé · Redémarrez la PS Vita pour lancer la synchro en arrière-plan",
+    desc_active: "Synchronise quand aucun jeu ne tourne · En pause tant que cette app est ouverte",
+    desc_disabled:
+        "Synchro en arrière-plan désactivée · Réactivable à tout moment, sans redémarrage",
+    action_install: "Installer",
+    action_uninstall: "Désinstaller",
+    action_enable: "Activer",
+    action_disable: "Désactiver",
+    install_title: "Installer la synchro en arrière-plan ?",
+    install_subtitle: "Ajoute un plugin taiHEN au LiveArea (config.txt est sauvegardé)",
+    install_lines: [
+        "Vos partages se synchronisent sans jeu lancé, l'app fermée.",
+        "Le module de synchro n'est chargé que le temps d'une synchro.",
+    ],
+    install_reboot: "Redémarrez la PS Vita pour le démarrer.",
+    uninstall_title: "Désinstaller la synchro en arrière-plan ?",
+    uninstall_subtitle: "Supprime les fichiers du plugin et son entrée dans config.txt",
+    uninstall_lines: [
+        "Vos partages, appareils et réglages sont conservés.",
+        "La synchro en arrière-plan s'arrête aussitôt.",
+    ],
+    uninstall_reboot: "Redémarrez la PS Vita pour le retirer de la mémoire.",
+    notice_installed: "Plugin de synchro installé",
+    notice_installed_reboot: "Plugin installé · Redémarrez la PS Vita pour le démarrer",
+    notice_uninstalled: "Plugin de synchro désinstallé",
+    notice_uninstalled_reboot: "Plugin désinstallé · Redémarrez pour le retirer",
+    notice_enabled: "Synchro en arrière-plan activée · Elle démarre à la fermeture de l'app",
+    notice_disabled: "Synchro en arrière-plan désactivée",
+    notice_bundle_missing: "Cette version ne contient pas le plugin (app0:plugins)",
+    notice_tai_missing: "config.txt de taiHEN introuvable (ux0:tai, ur0:tai)",
+    notice_write_failed: "Impossible d'écrire les fichiers du plugin (voir le journal)",
 };

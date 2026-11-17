@@ -97,6 +97,9 @@ impl ModalInput {
             ModalDialog::FolderOffer { offer_idx } => {
                 folder_offer::handle(state, repo, input, offer_idx)
             }
+            ModalDialog::ConfirmPlugin { request } => {
+                dialogs::confirm_plugin(state, input, request)
+            }
         }
     }
 }

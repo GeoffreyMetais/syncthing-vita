@@ -44,6 +44,10 @@ fi
 echo "    Found exported symbols:"
 grep -E "_newlib_heap_size_user|sceUserMainThread" <<< "${SYMBOLS}"
 
+echo "    Auditing the background sync plugin modules bundled in the VPK..."
+# Static only: Vita3K cannot load taiHEN plugins into SceShell (see AGENTS.md §8).
+./scripts/audit_plugin.sh "$(dirname "${ELF_PATH}")" "${VPK_PATH}"
+
 if [[ -x "${VITA3K_BIN:-${HOME}/.local/bin/Vita3K}" ]]; then
     echo "==> [4/4] Installing SYNCTHING.vpk into Vita3K (ux0:/app/SYNCTHING)..."
     mkdir -p "${VITA3K_APP_DIR}"

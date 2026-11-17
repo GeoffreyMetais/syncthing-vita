@@ -2,7 +2,7 @@
 //! with all `{placeholders}` filled.
 
 use syncthing_core::DeviceIdParseError;
-use vita_syncthing_app::domain::{Language, UiText};
+use vita_syncthing_app::domain::{Language, PluginNotice, UiText};
 use vita_syncthing_app::ui::strings;
 
 fn s(v: &str) -> String {
@@ -99,6 +99,15 @@ fn all_messages() -> Vec<UiText> {
         },
         UiText::NoDeclinedFolders,
         UiText::DeclinedCleared { count: 2 },
+        UiText::Plugin(PluginNotice::Installed),
+        UiText::Plugin(PluginNotice::InstalledRebootNeeded),
+        UiText::Plugin(PluginNotice::Uninstalled),
+        UiText::Plugin(PluginNotice::UninstalledRebootNeeded),
+        UiText::Plugin(PluginNotice::Enabled),
+        UiText::Plugin(PluginNotice::Disabled),
+        UiText::Plugin(PluginNotice::BundleMissing),
+        UiText::Plugin(PluginNotice::TaiConfigMissing),
+        UiText::Plugin(PluginNotice::WriteFailed),
         UiText::NoDevicesLinked,
         UiText::SharedWith {
             devices: s("PC (MFZWI3D)"),

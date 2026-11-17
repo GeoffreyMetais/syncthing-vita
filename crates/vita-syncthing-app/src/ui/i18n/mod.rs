@@ -9,6 +9,7 @@ pub mod es;
 pub mod fr;
 pub mod it;
 pub mod messages;
+pub mod plugin;
 
 use crate::domain::Language;
 
@@ -18,6 +19,7 @@ pub use es::STRINGS_ES;
 pub use fr::STRINGS_FR;
 pub use it::STRINGS_IT;
 pub use messages::Messages;
+pub use plugin::{ConfirmPluginText, PluginStrings};
 
 /// Strongly-typed string catalog containing all UI labels, actions, hints, and screen titles.
 #[derive(Debug, Clone, Copy)]
@@ -25,6 +27,8 @@ pub struct Strings {
     pub language: Language,
     /// Templates for domain `UiText` messages (see `messages.rs`).
     pub messages: &'static Messages,
+    /// Background sync plugin card, modal and toasts (see `plugin.rs`).
+    pub plugin: &'static PluginStrings,
 
     // Common Actions
     pub action_cancel: &'static str,

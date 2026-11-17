@@ -14,15 +14,26 @@ pub const HINT_Y: i32 = 500;
 pub const BROWSER_TOP: i32 = 134;
 pub const BROWSER_STEP: i32 = 42;
 
+/// Height of the `Display` (theme) card at the top of the Settings page.
+pub const SETTINGS_DISPLAY_H: i32 = 92;
 /// Top / bottom of the `Devices & Pairing` card on the Settings page.
-pub const SETTINGS_DEVICES_Y: i32 = CONTENT_Y + 118;
+pub const SETTINGS_DEVICES_Y: i32 = CONTENT_Y + SETTINGS_DISPLAY_H + 8;
 pub const SETTINGS_DEVICES_B: i32 = SETTINGS_DEVICES_Y + 52;
 /// Top / bottom of the `Language` card on the Settings page (tapping it cycles the language).
 pub const SETTINGS_LANGUAGE_Y: i32 = SETTINGS_DEVICES_B + 8;
 pub const SETTINGS_LANGUAGE_B: i32 = SETTINGS_LANGUAGE_Y + 50;
 /// Top / bottom of the `Declined folders` card on the Settings page.
 pub const SETTINGS_DECLINED_Y: i32 = SETTINGS_LANGUAGE_B + 8;
-pub const SETTINGS_DECLINED_B: i32 = SETTINGS_DECLINED_Y + 56;
+pub const SETTINGS_DECLINED_B: i32 = SETTINGS_DECLINED_Y + 52;
+/// Top / bottom of the background sync plugin card on the Settings page.
+pub const SETTINGS_PLUGIN_Y: i32 = SETTINGS_DECLINED_B + 8;
+pub const SETTINGS_PLUGIN_B: i32 = SETTINGS_PLUGIN_Y + 64;
+/// Top of the protocol log card, the last one of the Settings page (down to `CONTENT_B`).
+pub const SETTINGS_LOG_Y: i32 = SETTINGS_PLUGIN_B + 8;
+
+/// Size of the `ConfirmPlugin` modal (install / uninstall the background sync plugin).
+pub const CONFIRM_PLUGIN_W: i32 = 660;
+pub const CONFIRM_PLUGIN_H: i32 = 226;
 
 /// Size of the `ManageDevices` modal (wide enough for its five bottom actions).
 pub const MANAGE_DEVICES_W: i32 = 780;

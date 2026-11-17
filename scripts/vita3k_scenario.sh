@@ -5,7 +5,9 @@
 # Requires a VPK built with `CARGO_FEATURES=ui-script just vpk`.
 # Script steps (one per line): `wait <frames>`, `press <BUTTON>`, `tap <x> <y>`,
 # `ime <text>`, `shot <name>` — see crates/vita-syncthing-app/src/infrastructure/ui_script.rs.
-# The app data directory (ux0:data/syncthing) is backed up and restored around the run.
+# The app data directory (ux0:data/syncthing) and ux0:tai are backed up and restored around the run.
+# Optional: VITA3K_SEED=<dir> is copied onto ux0: before the run (e.g. data/syncthing/plugin.cfg,
+# tai/config.txt) to start from a given state.
 # Works without Sony firmware and without a display (see scripts/vita3k_launch.sh).
 set -euo pipefail
 
@@ -19,16 +21,19 @@ VPK="target/armv7-sony-vita-newlibeabihf/release/SYNCTHING.vpk"
 cd "$(dirname "$0")/.."
 BACKUP="$(mktemp -d)"
 [[ -d "$DATA" ]] && cp -a "$DATA" "$BACKUP/syncthing"
+[[ -d "$UX0/tai" ]] && cp -a "$UX0/tai" "$BACKUP/tai"
 restore() {
     pkill -x Vita3K 2>/dev/null || true
-    rm -rf "$DATA"
+    rm -rf "$DATA" "$UX0/tai"
     [[ -d "$BACKUP/syncthing" ]] && cp -a "$BACKUP/syncthing" "$DATA"
+    [[ -d "$BACKUP/tai" ]] && cp -a "$BACKUP/tai" "$UX0/tai"
     rm -rf "$BACKUP"
 }
 trap restore EXIT
 
 mkdir -p "$DATA" "$OUT_DIR" "$UX0/app"
 rm -rf "$DATA/shots"
+if [[ -n "${VITA3K_SEED:-}" ]]; then cp -a "$VITA3K_SEED/." "$UX0/"; fi
 cp "$SCRIPT" "$DATA/ui_script.txt"
 unzip -qo "$VPK" -d "$UX0/app/SYNCTHING"
 

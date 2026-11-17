@@ -6,7 +6,7 @@
 # - pixel rendering (`ui/gfx.rs`, screens, modals, widgets, theme): checked in
 #   Vita3K with screenshots (AGENTS.md §6); their hit-map declarations are
 #   covered through the application tests instead;
-# - PS Vita hardware drivers (`sce*` syscalls), the `ui-script` replay feature
+# - PS Vita hardware drivers (`sce*` syscalls, kernel mutexes), the `ui-script` replay feature
 #   and the binaries' entry points (`main.rs`).
 
 exclude_globs = [
@@ -23,6 +23,7 @@ exclude_globs = [
     "crates/vita-syncthing-app/src/infrastructure/qr_camera.rs",
     "crates/vita-syncthing-app/src/infrastructure/ui_script.rs",
     "crates/vita-syncthing-app/src/infrastructure/vita_system.rs",
+    "crates/vita-syncthing-app/src/infrastructure/plugin_mutex.rs",
 ]
 
 # Debug output is not part of any contract.

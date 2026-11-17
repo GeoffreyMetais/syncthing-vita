@@ -29,9 +29,13 @@ setup:
 run-host:
     cargo run -p vita-syncthing-app
 
-# Cross-check compilation for PS Vita target without packaging
+# Cross-check compilation for PS Vita target without packaging (app and background sync worker)
 check-vita:
-    cargo +nightly check -Z build-std=std,panic_abort --package vita-syncthing-app --target {{target}}
+    cargo +nightly check -Z build-std=std,panic_abort --package vita-syncthing-app --package syncthing-vita-worker --target {{target}}
+
+# Build and audit the background sync plugin modules (syncthing_launcher.suprx, syncthing_worker.suprx) into target/<target>/release/plugins
+plugin:
+    ./scripts/build_plugin.sh
 
 # Cross-compile for PS Vita target and generate .vpk package
 vpk:

@@ -1,9 +1,10 @@
 //! `Settings` page controller: D-pad focus over the cards and execution of the settings
-//! `UiAction`s. The elements are declared by `ui/screens/settings.rs`.
+//! `UiAction`s. The elements are declared by `ui/screens/settings.rs` (and
+//! `settings_plugin.rs` for the background sync plugin card).
 
-use crate::application::{DpadNavigation, FolderOfferService};
+use crate::application::{DpadNavigation, FolderOfferService, UserCommand};
 use crate::domain::{
-    default_col, settings_row_action_count, ActiveTab, AppState, NavFocus, UiAction, SETTINGS_ROWS,
+    default_col, ActiveTab, AppState, ModalDialog, NavFocus, PluginRequest, UiAction, SETTINGS_ROWS,
 };
 use crate::infrastructure::{ConfigRepository, BTN_DOWN, BTN_LEFT, BTN_UP};
 
@@ -20,7 +21,7 @@ impl SettingsController {
             state.nav.row += 1;
             state.nav.col = 0;
         }
-        let cols = settings_row_action_count(state.nav.row);
+        let cols = state.settings_row_actions(state.nav.row);
         if cols > 1 {
             DpadNavigation::move_in_row(state, cols, buttons);
         } else if buttons & BTN_LEFT != 0 {
@@ -45,5 +46,29 @@ impl SettingsController {
             }
             _ => {}
         }
+    }
+
+    /// Background sync plugin card: `Install` / `Uninstall` ask for confirmation first (the
+    /// operation is carried out by `PluginService` once confirmed); `Enable / Disable` is
+    /// applied right away. Elements of a stale frame (wrong status) are ignored.
+    pub fn plugin_action(state: &mut AppState, action: UiAction) -> UserCommand {
+        let installed = state.plugin.status.is_installed();
+        match action {
+            UiAction::InstallPlugin if !installed => {
+                state.modal = ModalDialog::ConfirmPlugin {
+                    request: PluginRequest::Install,
+                };
+            }
+            UiAction::UninstallPlugin if installed => {
+                state.modal = ModalDialog::ConfirmPlugin {
+                    request: PluginRequest::Uninstall,
+                };
+            }
+            UiAction::TogglePluginEnabled if installed => {
+                return UserCommand::Plugin(PluginRequest::SetEnabled(!state.plugin.enabled));
+            }
+            _ => {}
+        }
+        UserCommand::None
     }
 }

@@ -11,7 +11,8 @@ use crate::application::{
     SharesController,
 };
 use crate::domain::{
-    ActiveTab, AppState, ModalDialog, PickerMode, ScrollTarget, ShortcutKey, UiAction, TAB_ORDER,
+    ActiveTab, AppState, ModalDialog, PickerMode, PluginRequest, ScrollTarget, ShortcutKey,
+    UiAction, TAB_ORDER,
 };
 use crate::infrastructure::{
     ConfigRepository, InputFrame, TouchDrag, BTN_CIRCLE, BTN_L, BTN_R, BTN_SQUARE, BTN_START,
@@ -34,6 +35,8 @@ pub enum UserCommand {
     /// cycle, or starts a sync (whose first step is a discovery) when no worker runs.
     ScanLan,
     OpenSystemKeyboard,
+    /// Carry out a confirmed background sync plugin operation (`PluginService::execute`).
+    Plugin(PluginRequest),
     QuitApp,
 }
 
@@ -160,6 +163,9 @@ impl InputController {
             }
             UiAction::ToggleTheme | UiAction::CycleLanguage | UiAction::ClearDeclinedFolders => {
                 SettingsController::apply(state, repo, action)
+            }
+            UiAction::InstallPlugin | UiAction::UninstallPlugin | UiAction::TogglePluginEnabled => {
+                return SettingsController::plugin_action(state, action)
             }
             UiAction::OpenLogs
             | UiAction::CloseLogs

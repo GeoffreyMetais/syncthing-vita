@@ -2,6 +2,7 @@
 
 use syncthing_core::DeviceId;
 
+use crate::domain::plugin::PluginRequest;
 use crate::domain::ui_text::UiText;
 
 /// Devices visible in the `ManageDevices` dialog (the list does not scroll yet).
@@ -211,6 +212,11 @@ pub enum ModalDialog {
     /// A remote device offers to share a folder: the user accepts, declines or postpones it.
     FolderOffer {
         offer_idx: usize,
+    },
+    /// Confirmation dialog before installing or uninstalling the background sync plugin
+    /// (`PluginRequest::Install` / `Uninstall`), opened from `Settings`.
+    ConfirmPlugin {
+        request: PluginRequest,
     },
 }
 

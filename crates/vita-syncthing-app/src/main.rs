@@ -11,7 +11,7 @@ use std::time::Instant;
 use vita_syncthing_app::application::power_policy::{cpu_clock, should_block_standby, CpuClock};
 use vita_syncthing_app::application::{
     DevicesScan, FolderBrowser, FramePacer, FrameSignals, InputController, InputGestures,
-    QrScanFlow, ShareService, SyncSupervisor, UploadActivity, UserCommand,
+    PluginService, QrScanFlow, ShareService, SyncSupervisor, UploadActivity, UserCommand,
 };
 use vita_syncthing_app::domain::defaults::{
     POWER_TICK_INTERVAL, SCREENSAVER_TIMEOUT_IDLE, SCREENSAVER_TIMEOUT_SYNCING,
@@ -19,7 +19,8 @@ use vita_syncthing_app::domain::defaults::{
 use vita_syncthing_app::domain::AppState;
 use vita_syncthing_app::infrastructure::{
     detect_system_language, init_vita_network, is_on_external_power, keep_system_awake,
-    set_cpu_clock_mhz, ConfigRepository, IdentityStore, QrScanner, VitaInput,
+    set_cpu_clock_mhz, ConfigRepository, GuiRunningLock, IdentityStore, PluginHost, QrScanner,
+    VitaInput,
 };
 use vita_syncthing_app::ui::VitaUiRenderer;
 
@@ -52,6 +53,8 @@ const BASE_DATA_DIR: &str = "/tmp/syncthing-vita";
 const HOST_FRAME_SLEEP: Duration = Duration::from_millis(16);
 
 fn main() {
+    // Held until `main` returns: the background sync plugin never syncs while this app runs.
+    let gui_lock = GuiRunningLock::acquire();
     let identity_res = IdentityStore::load_or_create(BASE_DATA_DIR);
     let repo = ConfigRepository::new(BASE_DATA_DIR);
 
@@ -70,6 +73,8 @@ fn main() {
         state.vita_device_id = id.device_id.to_syncthing_string();
     }
     FolderBrowser::refresh(&mut state, &repo);
+    let plugin_host = PluginHost::system(BASE_DATA_DIR);
+    PluginService::refresh(&mut state, &plugin_host);
 
     let mut renderer = Box::new(VitaUiRenderer::new());
     renderer.render(&mut state, 1);
@@ -82,6 +87,13 @@ fn main() {
         &repo,
         "=== VitaSyncthing // Gamepad + Touch UI + Share Manager + OLED Saver ===",
     );
+    if gui_lock.is_held() {
+        ShareService::log_event(
+            &mut state,
+            &repo,
+            "Background sync plugin paused (app open).",
+        );
+    }
 
     let _net_pool = match init_vita_network() {
         Ok(pool) => {
@@ -168,6 +180,9 @@ fn main() {
         signals.user_change |= command != UserCommand::None;
         match command {
             UserCommand::None | UserCommand::ScanLan => {}
+            UserCommand::Plugin(request) => {
+                PluginService::execute(&mut state, &repo, &plugin_host, request);
+            }
             UserCommand::OpenSystemKeyboard => {
                 state.ime_active = input_ctl.open_ime(&state.device_id_input);
             }

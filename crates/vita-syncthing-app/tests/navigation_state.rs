@@ -3,7 +3,7 @@
 use vita_syncthing_app::domain::{
     action_count, default_col, settings_row_action_count, starts_on_header, ActiveTab, NavFocus,
     NavState, DASHBOARD_HEADER_ACTIONS, SETTINGS_ROWS, SETTINGS_ROW_DECLINED, SETTINGS_ROW_DEVICES,
-    SETTINGS_ROW_DISPLAY, SETTINGS_ROW_LANGUAGE, SETTINGS_ROW_LOG, TAB_ORDER,
+    SETTINGS_ROW_DISPLAY, SETTINGS_ROW_LANGUAGE, SETTINGS_ROW_LOG, SETTINGS_ROW_PLUGIN, TAB_ORDER,
 };
 
 #[test]
@@ -24,8 +24,9 @@ fn test_settings_card_indices_are_consecutive_and_counted() {
     assert_eq!(SETTINGS_ROW_DEVICES, 1);
     assert_eq!(SETTINGS_ROW_LANGUAGE, 2);
     assert_eq!(SETTINGS_ROW_DECLINED, 3);
-    assert_eq!(SETTINGS_ROW_LOG, 4);
-    assert_eq!(SETTINGS_ROWS, 5);
+    assert_eq!(SETTINGS_ROW_PLUGIN, 4);
+    assert_eq!(SETTINGS_ROW_LOG, 5);
+    assert_eq!(SETTINGS_ROWS, 6);
     assert_eq!(SETTINGS_ROW_LOG + 1, SETTINGS_ROWS);
 }
 
@@ -50,11 +51,12 @@ fn test_action_count_per_tab() {
 }
 
 #[test]
-fn test_settings_row_action_count_only_devices_card_has_two_buttons() {
+fn test_settings_row_action_count_devices_and_plugin_cards_have_two_buttons() {
     assert_eq!(settings_row_action_count(SETTINGS_ROW_DISPLAY), 1);
     assert_eq!(settings_row_action_count(SETTINGS_ROW_DEVICES), 2);
     assert_eq!(settings_row_action_count(SETTINGS_ROW_LANGUAGE), 1);
     assert_eq!(settings_row_action_count(SETTINGS_ROW_DECLINED), 1);
+    assert_eq!(settings_row_action_count(SETTINGS_ROW_PLUGIN), 2);
     assert_eq!(settings_row_action_count(SETTINGS_ROW_LOG), 1);
     // Unknown rows have the single default button.
     assert_eq!(settings_row_action_count(SETTINGS_ROWS), 1);

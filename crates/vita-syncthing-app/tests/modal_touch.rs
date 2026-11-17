@@ -10,8 +10,8 @@ use vita_syncthing_app::application::{
     DeviceRegistry, FolderOfferService, ShareService, UserCommand,
 };
 use vita_syncthing_app::domain::{
-    AppState, Language, LanguagePreference, ModalDialog, PadKey, Rect, UiAction, ADD_DEVICE_KEYPAD,
-    NEW_SHARE_TEMPLATES,
+    AppState, Language, LanguagePreference, ModalDialog, PadKey, PluginRequest, Rect, UiAction,
+    ADD_DEVICE_KEYPAD, NEW_SHARE_TEMPLATES,
 };
 use vita_syncthing_app::infrastructure::{ConfigRepository, BTN_TRIANGLE};
 use vita_syncthing_app::ui::gfx::{GFX_H, GFX_W};
@@ -59,6 +59,12 @@ fn test_every_modal_element_is_on_screen_and_hints_do_not_overlap() {
         ModalDialog::ConfirmRevertShare { share_idx: 0 },
         ModalDialog::ConfirmQuit,
         ModalDialog::FolderOffer { offer_idx: 0 },
+        ModalDialog::ConfirmPlugin {
+            request: PluginRequest::Install,
+        },
+        ModalDialog::ConfirmPlugin {
+            request: PluginRequest::Uninstall,
+        },
     ];
     for language in [
         Language::English,

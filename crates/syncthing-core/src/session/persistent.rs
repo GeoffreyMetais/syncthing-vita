@@ -20,6 +20,10 @@ use crate::tls::BepTlsStream;
 const PRIMARY_POLL: Duration = Duration::from_millis(150);
 const SECONDARY_RETRY_INTERVAL: Duration = Duration::from_secs(15);
 const SECONDARY_RETRY_TIMEOUT: Duration = Duration::from_millis(1500);
+/// `SessionEnded` reason of a session ended by [`SyncControl::request_stop`].
+pub const STOPPED_LOCALLY: &str = "stopped locally";
+/// `SessionEnded` reason of a single-cycle session that completed its cycle.
+pub const CYCLE_COMPLETED: &str = "sync cycle completed";
 
 /// Connections and peer information owned by the persistent loop.
 pub struct PersistentLinks {
@@ -44,15 +48,24 @@ pub fn run_persistent_session(
     control: &SyncControl,
 ) {
     let reason = match session_loop(stream, ctx, folders, &mut links, control) {
-        Ok(()) => String::from("stopped locally"),
+        Ok(()) => String::from(STOPPED_LOCALLY),
         Err(reason) => reason,
     };
+    close_session(stream, ctx, links.secondaries, reason);
+}
 
+/// Sends `Close` on every connection of the session and emits `SessionEnded` with `reason`.
+pub fn close_session(
+    stream: &mut BepTlsStream,
+    ctx: &mut SessionContext<'_>,
+    secondaries: Vec<SecondaryBepConn>,
+    reason: String,
+) {
     let close_payload = BepClose {
         reason: "closing".to_owned(),
     }
     .encode();
-    for mut sec in links.secondaries {
+    for mut sec in secondaries {
         let _ = write_bep_message(&mut sec.stream, BepMessageType::Close, &close_payload);
     }
     let _ = write_bep_message(stream, BepMessageType::Close, &close_payload);

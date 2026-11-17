@@ -1,6 +1,7 @@
 //! Tab 4 (`Settings & Log` / `Settings`): Dark / Pure-Black OLED theme switcher,
 //! `QR / ID` modal shortcut, UI language (`Change Language`), declined folder offers (`Clear Declined`), and the latest
-//! BEP/1.0 & TLS 1.3 protocol log lines (`Open`: full-screen log viewer, `ui/screens/logs.rs`).
+//! background sync plugin (`settings_plugin.rs`), and the latest BEP/1.0 & TLS 1.3 protocol log
+//! line (`Open`: full-screen log viewer, `ui/screens/logs.rs`).
 
 use crate::domain::{
     AppState, FocusSlot, HitMap, Hotspot, LanguagePreference, Rect, ShortcutKey, ThemeMode,
@@ -9,22 +10,23 @@ use crate::domain::{
 };
 use crate::ui::gfx::{Align, FontWeight, Gfx, PadButton};
 use crate::ui::screens::logs::log_line_colour;
+use crate::ui::screens::settings_plugin::render_plugin_card;
 use crate::ui::strings;
 use crate::ui::theme::{
     UiTheme, CONTENT_B, CONTENT_R, CONTENT_W, CONTENT_X, CONTENT_Y, SETTINGS_DECLINED_B,
-    SETTINGS_DECLINED_Y, SETTINGS_DEVICES_B, SETTINGS_DEVICES_Y, SETTINGS_LANGUAGE_B,
-    SETTINGS_LANGUAGE_Y,
+    SETTINGS_DECLINED_Y, SETTINGS_DEVICES_B, SETTINGS_DEVICES_Y, SETTINGS_DISPLAY_H,
+    SETTINGS_LANGUAGE_B, SETTINGS_LANGUAGE_Y, SETTINGS_LOG_Y,
 };
 use crate::ui::widgets::{
     action_width, draw_action_hotspot, draw_card, draw_hint_bar, draw_page_title, Hint,
 };
 
 /// Height of the display & theme card.
-const DISPLAY_CARD_H: i32 = 110;
+const DISPLAY_CARD_H: i32 = SETTINGS_DISPLAY_H;
 
 /// Vertical centre of the theme card action: beside the short "Colour Theme"
 /// label, between the section header and the full-width description line.
-const THEME_ACTIONS_Y: i32 = CONTENT_Y + 42;
+const THEME_ACTIONS_Y: i32 = CONTENT_Y + 38;
 
 /// Renders Tab 4: **Settings & Log** (`Settings`).
 pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut HitMap) {
@@ -51,7 +53,7 @@ pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: 
     let lx = CONTENT_X + 24;
     gfx.text(
         lx,
-        CONTENT_Y + 18,
+        CONTENT_Y + 16,
         12,
         FontWeight::Bold,
         th.accent_hi,
@@ -65,7 +67,7 @@ pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: 
     };
     gfx.text(
         lx,
-        CONTENT_Y + 46,
+        CONTENT_Y + 38,
         16,
         FontWeight::Medium,
         th.text,
@@ -78,7 +80,7 @@ pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: 
     // The action ends above this line, so the description gets the full card width.
     gfx.text_fit(
         lx,
-        CONTENT_Y + 72,
+        CONTENT_Y + 59,
         CONTENT_R - 24 - lx,
         14,
         FontWeight::Regular,
@@ -105,7 +107,7 @@ pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: 
 
     gfx.text(
         lx,
-        CONTENT_Y + 94,
+        CONTENT_Y + 77,
         13,
         FontWeight::Regular,
         th.faint,
@@ -122,7 +124,10 @@ pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: 
     // 4. Declined Folder Offers Card
     render_declined_folders(gfx, th, state, hits);
 
-    // 5. Protocol Event Log Card (latest lines; the full log opens on its own screen)
+    // 5. Background Sync Plugin Card
+    render_plugin_card(gfx, th, state, hits);
+
+    // 6. Protocol Event Log Card (latest line; the full log opens on its own screen)
     render_log_card(gfx, th, state, hits);
 
     draw_hint_bar(
@@ -280,7 +285,7 @@ fn render_declined_folders(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: 
     let lx = CONTENT_X + 24;
     gfx.text(
         lx,
-        y + 20,
+        y + 18,
         12,
         FontWeight::Bold,
         th.accent_hi,
@@ -308,7 +313,7 @@ fn render_declined_folders(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: 
     };
     gfx.text_fit(
         lx,
-        y + 44,
+        y + 37,
         bx - lx - 16,
         14,
         FontWeight::Regular,
@@ -334,11 +339,11 @@ fn render_declined_folders(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: 
     );
 }
 
-/// Card with the latest protocol log lines. Touching it, or its `Open` button, opens the
+/// Card with the latest protocol log line. Touching it, or its `Open` button, opens the
 /// full-screen log viewer.
 fn render_log_card(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut HitMap) {
     let s = strings::strings(state.language);
-    let ly = SETTINGS_DECLINED_B + 8;
+    let ly = SETTINGS_LOG_Y;
     let lh = CONTENT_B - ly;
     draw_card(gfx, th, CONTENT_X, ly, CONTENT_W, lh, false);
     hits.add(Hotspot {
@@ -353,7 +358,7 @@ fn render_log_card(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut Hit
     let bx = CONTENT_R - 20 - w_open;
     gfx.text_fit(
         lx,
-        ly + 22,
+        ly + 18,
         bx - lx - 16,
         12,
         FontWeight::Bold,
@@ -370,7 +375,7 @@ fn render_log_card(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut Hit
         th,
         hits,
         bx,
-        ly + 22,
+        ly + lh / 2,
         PadButton::Cross,
         label,
         UiAction::OpenLogs,
@@ -378,12 +383,11 @@ fn render_log_card(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut Hit
         state.is_focused(slot),
     );
 
-    let max_lines = ((lh - 56) / 22).max(0) as usize;
-    for (i, line) in state.logs.iter().rev().take(max_lines).enumerate() {
+    if let Some(line) = state.logs.last() {
         gfx.text_fit(
             lx,
-            ly + 52 + (i as i32) * 22,
-            CONTENT_W - 48,
+            ly + 37,
+            bx - lx - 16,
             13,
             FontWeight::Regular,
             log_line_colour(th, line),

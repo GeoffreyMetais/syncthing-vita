@@ -1,0 +1,21 @@
+[package]
+name = "syncthing-vita-worker"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Stage 2 of the PS Vita background sync plugin (syncthing_worker.suprx): one bounded sync cycle in SceShell"
+
+# `rlib`: the cycle logic, host-tested in `tests/`. `staticlib`: what `scripts/build_plugin.sh`
+# links into `syncthing_worker.suprx` (the `vita` module holds the module entry points).
+[lib]
+crate-type = ["rlib", "staticlib"]
+
+[dependencies]
+syncthing-core = { workspace = true }
+
+[target.'cfg(target_os = "vita")'.dependencies]
+libc = { workspace = true }
+
+[dev-dependencies]
+# Format compatibility: the tests write the configuration with the app's own repository.
+vita-syncthing-app = { path = "../vita-syncthing-app" }

@@ -190,6 +190,7 @@ impl Strings {
             UiText::FolderProtected => m.folder_protected,
             UiText::NoDeclinedFolders => m.no_declined_folders,
             UiText::NoDevicesLinked => m.no_devices_linked,
+            UiText::Plugin(notice) => self.plugin.notice(*notice),
             UiText::InvalidDeviceId(err) => return Cow::Owned(self.device_id_error(*err)),
             UiText::Connections { count } => return Cow::Owned(self.connections(*count)),
             other => return Cow::Owned(self.text_with_params(other)),

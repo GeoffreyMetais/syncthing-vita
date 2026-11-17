@@ -22,3 +22,30 @@ impl Default for SyncTuning {
         }
     }
 }
+
+/// How a single-cycle session ([`super::SyncControl::single_cycle`]) ends once its index is
+/// published: it keeps answering the peer (block `Request`s of our local changes, `Ping`s,
+/// late `Index` updates) until the peer has been silent for `idle`, and never longer than
+/// `max` in total.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct CycleDrain {
+    /// Silence of the peer after which the cycle is over.
+    pub idle: Duration,
+    /// Upper bound of the whole drain, whatever the peer does.
+    pub max: Duration,
+}
+
+impl CycleDrain {
+    /// A drain of exactly `window`, however active the peer is.
+    pub fn fixed(window: Duration) -> Self {
+        Self {
+            idle: window,
+            max: window,
+        }
+    }
+
+    /// Returns `true` once the drain is over: `since_activity` of silence, or `elapsed` in total.
+    pub fn is_over(&self, elapsed: Duration, since_activity: Duration) -> bool {
+        elapsed >= self.max || since_activity >= self.idle
+    }
+}

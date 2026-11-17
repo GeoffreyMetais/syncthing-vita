@@ -1,11 +1,12 @@
 //! Spanish (`es`) string catalog for VitaSyncthing.
 
-use super::{Messages, Strings};
+use super::{Messages, PluginStrings, Strings};
 use crate::domain::Language;
 
 pub static STRINGS_ES: Strings = Strings {
     messages: &MESSAGES_ES,
     language: Language::Spanish,
+    plugin: &PLUGIN_ES,
 
     // Common Actions
     action_cancel: "Cancelar",
@@ -294,4 +295,46 @@ pub static MESSAGES_ES: Messages = Messages {
     device_row_short: "ID corto: {prefix} (se resuelve en la LAN)  ·  Dirección: {addr}",
     device_row_full: "ID: {id}  ·  Dirección: {addr}",
     unknown_device: "Dispositivo {short}",
+};
+
+/// ES background sync plugin strings.
+pub static PLUGIN_ES: PluginStrings = PluginStrings {
+    section: "PLUGIN DE SINCRONIZACIÓN EN SEGUNDO PLANO",
+    status_not_installed: "No instalado",
+    status_reboot: "Reinicio necesario",
+    status_active: "Activo",
+    status_disabled: "Desactivado",
+    desc_not_installed:
+        "Plugin taiHEN: sincroniza tus carpetas sin juego abierto, incluso con la app cerrada",
+    desc_unload_pending: "Desinstalado · Reinicia la PS Vita para quitarlo de la memoria",
+    desc_reboot: "Instalado · Reinicia la PS Vita para iniciar la sincronización en segundo plano",
+    desc_active: "Sincroniza sin juego abierto · En pausa mientras esta app esté abierta",
+    desc_disabled: "Sincronización en segundo plano desactivada · Reactívala sin reiniciar",
+    action_install: "Instalar",
+    action_uninstall: "Desinstalar",
+    action_enable: "Activar",
+    action_disable: "Desactivar",
+    install_title: "¿Instalar la sincronización en segundo plano?",
+    install_subtitle: "Añade un plugin taiHEN al LiveArea (se guarda una copia de config.txt)",
+    install_lines: [
+        "Tus carpetas se sincronizan sin juego abierto y con la app cerrada.",
+        "El módulo de sincronización solo se carga durante una sincronización.",
+    ],
+    install_reboot: "Reinicia la PS Vita para iniciarlo.",
+    uninstall_title: "¿Desinstalar la sincronización en segundo plano?",
+    uninstall_subtitle: "Elimina los archivos del plugin y su entrada en config.txt",
+    uninstall_lines: [
+        "Tus carpetas, dispositivos y ajustes se conservan.",
+        "La sincronización en segundo plano se detiene de inmediato.",
+    ],
+    uninstall_reboot: "Reinicia la PS Vita para quitarlo de la memoria.",
+    notice_installed: "Plugin de sincronización instalado",
+    notice_installed_reboot: "Plugin instalado · Reinicia la PS Vita para iniciarlo",
+    notice_uninstalled: "Plugin de sincronización desinstalado",
+    notice_uninstalled_reboot: "Plugin desinstalado · Reinicia para quitarlo",
+    notice_enabled: "Sincronización en segundo plano activada · Empieza al cerrar la app",
+    notice_disabled: "Sincronización en segundo plano desactivada",
+    notice_bundle_missing: "Esta versión no incluye el plugin (app0:plugins)",
+    notice_tai_missing: "No se encontró config.txt de taiHEN (ux0:tai, ur0:tai)",
+    notice_write_failed: "No se pudieron escribir los archivos del plugin (ver el registro)",
 };

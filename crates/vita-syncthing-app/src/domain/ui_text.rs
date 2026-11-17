@@ -6,6 +6,7 @@
 use syncthing_core::DeviceIdParseError;
 
 use crate::domain::models::Language;
+use crate::domain::plugin::PluginNotice;
 
 /// A translatable message with its parameters (status line, peer / folder labels, toasts).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -145,6 +146,8 @@ pub enum UiText {
     DeclinedCleared {
         count: usize,
     },
+    /// Outcome of a background sync plugin operation (`Settings`).
+    Plugin(PluginNotice),
 
     // Overview share list
     /// Share card line when no device is linked yet.

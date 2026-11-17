@@ -73,6 +73,9 @@ jobs:
             exit 1
           }
 
+      - name: Audit the bundled background sync plugin modules
+        run: ./scripts/audit_plugin.sh target/armv7-sony-vita-newlibeabihf/release "${VPK_PATH}"
+
       - name: Publish GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}

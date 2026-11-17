@@ -54,10 +54,11 @@ pub const fn action_count(tab: ActiveTab) -> usize {
     }
 }
 
-/// Number of focusable action buttons on each Settings card.
+/// Number of focusable action buttons on each Settings card (the background sync plugin card
+/// has two once installed, one before: see `AppState::settings_row_actions`).
 pub const fn settings_row_action_count(row: usize) -> usize {
     match row {
-        SETTINGS_ROW_DEVICES => 2,
+        SETTINGS_ROW_DEVICES | SETTINGS_ROW_PLUGIN => 2,
         _ => 1,
     }
 }
@@ -70,10 +71,12 @@ pub const SETTINGS_ROW_DEVICES: usize = 1;
 pub const SETTINGS_ROW_LANGUAGE: usize = 2;
 /// Settings card with the `Clear Declined` button.
 pub const SETTINGS_ROW_DECLINED: usize = 3;
+/// Settings card of the background sync plugin (`Install`, or `Enable / Disable` + `Uninstall`).
+pub const SETTINGS_ROW_PLUGIN: usize = 4;
 /// Settings card with the protocol log and its `Open` button (full-screen log viewer).
-pub const SETTINGS_ROW_LOG: usize = 4;
+pub const SETTINGS_ROW_LOG: usize = 5;
 /// Number of focusable cards on the Settings page.
-pub const SETTINGS_ROWS: usize = 5;
+pub const SETTINGS_ROWS: usize = 6;
 
 /// Focusable buttons of the `Overview` device card (`[QR / ID, New Share]`), its header row.
 pub const DASHBOARD_HEADER_ACTIONS: usize = 2;

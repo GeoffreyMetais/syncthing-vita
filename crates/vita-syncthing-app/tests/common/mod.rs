@@ -1,6 +1,8 @@
 //! Shared helpers for `vita-syncthing-app` integration tests (each test binary uses a subset).
 #![allow(dead_code)]
 
+pub mod plugin;
+
 /// Creates an empty, unique directory under `/tmp` for one test.
 pub fn temp_test_dir(suffix: &str) -> String {
     let nanos = std::time::SystemTime::now()

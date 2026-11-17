@@ -4,6 +4,7 @@ members = [
     "crates/syncthing-core",
     "crates/vita-syncthing-app",
     "crates/syncthing-cli",
+    "crates/syncthing-vita-worker",
 ]
 
 [workspace.package]

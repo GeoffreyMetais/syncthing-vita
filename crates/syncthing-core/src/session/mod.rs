@@ -46,14 +46,16 @@ pub use control::SyncControl;
 pub use events::SyncEvent;
 pub use outcome::{PeerHandshakeResult, SyncSessionStatus};
 pub use params::SessionParams;
-pub use tuning::SyncTuning;
+pub use tuning::{CycleDrain, SyncTuning};
 
 use cluster_exchange::{exchange_cluster_config, ClusterExchange};
 use context::SessionContext;
 use dispatch::with_context;
 use folders::FolderSyncState;
-use initial_sync::{run_initial_sync, InitialSync};
-use persistent::{run_persistent_session, PersistentLinks};
+use initial_sync::{drain_for, run_initial_sync, InitialSync};
+use persistent::{
+    close_session, run_persistent_session, PersistentLinks, CYCLE_COMPLETED, STOPPED_LOCALLY,
+};
 use secondary::{desired_secondary_count, open_secondary_bep_stream, SecondaryBepConn};
 
 use std::net::TcpStream;
@@ -73,7 +75,9 @@ const SECONDARY_OPEN_TIMEOUT: Duration = Duration::from_millis(2000);
 /// 3. scan of the local folders and publication of the local `Index`;
 /// 4. with [`SessionParams::control`], a persistent loop serving block requests, answering
 ///    `Ping`s, applying live `IndexUpdate`s and rescanning until a stop is requested or the
-///    connection ends. Without it, the call returns after one sync cycle.
+///    connection ends. Without it, the call returns after one sync cycle; with a
+///    [`SyncControl::single_cycle`] handle too, but stop requests are honoured and the
+///    session ends with a `Close` once the peer is idle ([`CycleDrain`]).
 pub fn connect_and_sync<F>(
     params: &SessionParams<'_>,
     peer_addr: SocketAddr,
@@ -247,21 +251,40 @@ where
         &mut folders,
         &mut secondaries,
         secondaries_opened_at,
-        control.is_some(),
+        drain_for(control),
     )?;
-    if let InitialSync::ClosedByPeer(reason) = initial {
-        result.session_status = SyncSessionStatus::ClosedByPeer(reason);
-        return Ok(result);
-    }
 
-    // 5. Persistent session loop
-    if let Some(ctrl) = control {
-        let links = PersistentLinks {
-            peer_addr,
-            secondaries,
-            desired_secondary,
-        };
-        run_persistent_session(&mut stream, &mut ctx, &mut folders, links, ctrl);
+    // 5. Persistent session loop, or the end of a single cycle
+    match (initial, control) {
+        (InitialSync::ClosedByPeer(reason), _) => {
+            result.session_status = SyncSessionStatus::ClosedByPeer(reason);
+            return Ok(result);
+        }
+        (InitialSync::Completed, Some(ctrl)) if ctrl.single_cycle_drain().is_none() => {
+            let links = PersistentLinks {
+                peer_addr,
+                secondaries,
+                desired_secondary,
+            };
+            run_persistent_session(&mut stream, &mut ctx, &mut folders, links, ctrl);
+        }
+        (InitialSync::Completed, Some(_)) => {
+            close_session(
+                &mut stream,
+                &mut ctx,
+                secondaries,
+                CYCLE_COMPLETED.to_owned(),
+            );
+        }
+        (InitialSync::Stopped, _) => {
+            close_session(
+                &mut stream,
+                &mut ctx,
+                secondaries,
+                STOPPED_LOCALLY.to_owned(),
+            );
+        }
+        (InitialSync::Completed, None) => {}
     }
 
     let stats = ctx.stats;

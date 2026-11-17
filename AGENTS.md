@@ -20,6 +20,8 @@ syncthing-vita
 ├── Cargo.toml                        # Workspace manifest (Edition 2021, LTO + opt-level = "z")
 ├── Justfile                          # Task runner (test-host, check-vita, build-vita, vpk)
 ├── scripts/build_vpk.sh              # Full VPK build pipeline (vita-elf-create, vita-make-fself, vita-mksfoex, vita-pack-vpk); APP_VER from the Cargo version
+├── scripts/build_plugin.sh           # Background sync plugin modules (syncthing_launcher.suprx, syncthing_worker.suprx), audited by scripts/audit_plugin.sh (see §8)
+├── plugin/                           # Background sync plugin: include/syncthing_plugin.h (launcher <-> worker contract), launcher/ (stage 1, C), worker/exports.yml (see §8)
 ├── docs/screenshots/<branch>/        # Vita3K screenshots of visual changes, embedded in PR descriptions (see §6)
 ├── scripts/gen_livearea.py           # Generates the LiveArea images (assets/sce_sys/: icon, background, gate — PS Vita + Syncthing emblem)
 └── crates/
@@ -46,6 +48,7 @@ syncthing-vita
     │   │   ├── commands/             # One file per command: id, device, folder, config, discover, run
     │   │   └── daemon/               # `run`: listener, dialer, lan, global, relay, sessions, events, reports, connection_slots, timing
     │   └── tests/                    # Config, identity, commands, and CLI <-> CLI sync over localhost
+    ├── syncthing-vita-worker/        # Stage 2 of the background sync plugin (syncthing_worker.suprx): one bounded cycle, host-tested (see §8)
     └── vita-syncthing-app/           # Native PlayStation Vita GUI application (Title ID: SYNCTHING, Clean Architecture)
         ├── assets/fonts/             # Embedded Poppins TrueType fonts (Regular, Medium, Bold — SIL OFL 1.1)
         ├── assets/sce_sys/           # Packed into the VPK: icon0.png (128x128), livearea/contents/{bg.png (840x500), startup.png (280x158), template.xml}; 8-bit indexed PNGs
@@ -64,6 +67,9 @@ syncthing-vita
             │   ├── defaults.rs       # Every tunable value of the app: sync / discovery / power / display timings, limits, share presets
             │   ├── log_view.rs       # LogView (full-screen protocol log viewer: session lines / `Show All` history, scroll window)
             │   ├── initial_sync.rs   # PeerSet: InitialSyncPeers (initial sync phase; full CPU speed meanwhile) and ConnectedPeers (established sessions)
+            │   ├── plugin.rs         # Background sync plugin: module names / tai paths, PluginStatus, PluginInfo, PluginRequest, PluginNotice
+            │   ├── plugin_config.rs  # PluginConfig (`plugin.cfg` codec: enabled, sync_on_game_exit, interval_secs, unknown lines kept)
+            │   ├── tai_config.rs     # Pure taiHEN `config.txt` editor (`*main` entry lookup / add / remove, CRLF kept)
             │   └── ui_text.rs        # UiText: translatable messages (status line, labels, toasts) chosen by inner layers
             ├── application/          # Layer 2: Use Cases, Input Controller & Sync Event Coordinator
             │   ├── mod.rs
@@ -73,6 +79,7 @@ syncthing-vita
             │   ├── dashboard_controller.rs / shares_controller.rs / files_controller.rs / settings_controller.rs / logs.rs # One controller per page: D-pad focus movement, execution of the page's UiActions (`LogsController`: log viewer scrolling)
             │   ├── share_creation.rs # ShareCreation (new share kept only once a device is linked)
             │   ├── share_mode.rs     # ShareModeService (share read & write <-> read only, revert of local changes)
+            │   ├── plugin_service.rs # PluginService (background sync plugin: install / uninstall / enable / status)
             │   ├── folder_offers.rs  # FolderOfferService (folders offered by peers need consent: accept / decline / later)
             │   ├── frame_pacing.rs   # FramePacer (dynamic frame rate: render only when the screen changes)
             │   ├── input_gestures.rs # InputGestures (held Up / Down repeat, touch tap on release, touch drag)
@@ -89,6 +96,8 @@ syncthing-vita
             │   ├── config_repo.rs    # ConfigRepository (devices.cfg, shares.cfg, ignored_folders.cfg, theme.cfg, language.cfg, syncthing.log, ux0: directory listing)
             │   ├── config_fields.rs  # escape_field / unescape_field (peer-supplied text can never forge `.cfg` fields or lines)
             │   ├── worker_slot.rs    # spawn_after_previous / wait_for_worker (a new sync worker starts only once the previous one ended)
+            │   ├── plugin_host.rs    # PluginHost (app0:plugins, ux0:/ur0:tai, plugin.cfg; host builds map device paths below a root), LauncherProbe
+            │   ├── plugin_mutex.rs   # GuiRunningLock (`SyncthingGuiRunning` held while the app runs), KernelLauncherProbe (`SyncthingLauncherAlive`)
             │   ├── identity_store.rs # IdentityStore (sceKernelGetRandomNumber, device_seed.bin, cert.der)
             │   ├── vita_system.rs    # init_vita_network (SceSysmodule + SceSysmem + SceNet + SceNetCtl) & detect_system_language (SceAppUtil)
             │   ├── ui_script.rs      # Opt-in `ui-script` feature: scripted input replay + frame dumps for Vita3K
@@ -106,7 +115,8 @@ syncthing-vita
                 │   ├── es.rs         # Spanish static catalog (STRINGS_ES)
                 │   ├── de.rs         # German static catalog (STRINGS_DE)
                 │   ├── it.rs         # Italian static catalog (STRINGS_IT)
-                │   └── messages.rs   # Messages templates, Strings::text(&UiText), device_id_error
+                │   ├── messages.rs   # Messages templates, Strings::text(&UiText), device_id_error
+                │   └── plugin.rs     # PluginStrings (background sync plugin card, modal, toasts; catalogs PLUGIN_EN..IT in each language file)
                 ├── image.rs          # Greyscale camera frame blit (QR viewfinder)
                 ├── gfx.rs            # 960x544 RGBA8888 2D anti-aliased vector & TrueType software renderer
                 ├── theme.rs          # UiTheme (Dark & OLED palettes) and layout constants
@@ -118,6 +128,7 @@ syncthing-vita
                 │   ├── shares.rs
                 │   ├── folder_picker.rs
                 │   ├── settings.rs
+                │   ├── settings_plugin.rs # Background sync plugin card of Settings (status chip, Install / Enable / Uninstall)
                 │   ├── logs.rs       # Full-screen protocol log viewer (opened from the Settings log card)
                 │   └── screensaver.rs
                 ├── modals/           # Modal dialog views & fallback keypad
@@ -132,6 +143,7 @@ syncthing-vita
                 │   ├── confirm_quit.rs
                 │   ├── confirm_delete_share.rs
                 │   ├── confirm_revert_share.rs
+                │   ├── confirm_plugin.rs # Install / uninstall the background sync plugin (reboot notice)
                 │   └── folder_offer.rs
                 └── renderer.rs       # VitaUiRenderer (coordinates Gfx + VitaFramebuffer presentation)
 ```
@@ -188,6 +200,7 @@ Dependencies strictly point **inward**. Inner layers never import or depend on o
      - `dpad_navigation.rs`: D-pad focus between the sidebar and the page elements.
      - **No screen coordinate and no `crate::ui` import in this layer**: what is interactive, and where, is declared by the views (§3.4).
      - `frame_pacing.rs`: `FramePacer` dynamic frame rate (see §7).
+     - `plugin_service.rs`: `PluginService` (background sync plugin). `install` copies `app0:plugins/syncthing_{launcher,worker}.suprx` into the active `tai` directory (`ux0:tai/` when `ux0:tai/config.txt` exists, else `ur0:tai/`), copies `config.txt` to `config.txt.bak`, lists only the launcher under `*main` (`domain::tai_config`: deduplicated, stale entries of the other `tai` directory and of the worker dropped, CRLF kept) and writes `enabled=1` to `plugin.cfg`; nothing is written if a module or `config.txt` is missing (toast). `uninstall` cleans both `tai` directories and leaves `enabled=0`. `Enable / Disable` only rewrites `plugin.cfg` (no reboot). Status: `NotInstalled` (no launcher file or no `*main` entry), `InstalledNeedsReboot` (launcher not loaded: `SyncthingLauncherAlive` absent), `Enabled` / `Disabled` (`enabled` flag). The settings controller returns `UserCommand::Plugin(PluginRequest)` and `main.rs` calls `PluginService::execute` with its `PluginHost`.
      - `power_policy.rs`: automatic standby blocking and CPU clock level (`cpu_clock`: 333 MHz during the initial sync phase (`domain::InitialSyncPeers`, from `PeerConnected` to that peer's first `SyncCycleCompleted` / `SessionEnded`) and transfers + 10 s, 222 MHz for 3 s after input or while scanning a QR code, 111 MHz otherwise; applied by `set_cpu_clock_mhz` in `vita_system.rs`).
    - **Strict Rule**: No UI rendering code or direct hardware drivers.
 
@@ -202,6 +215,8 @@ Dependencies strictly point **inward**. Inner layers never import or depend on o
      - `sync_worker.rs`: Background sync thread (UDP discovery, BEP protocol, TLS 1.3).
      - `worker_slot.rs`: Sequential hand-over between sync workers. Never spawn a sync worker thread directly: two generations of sessions must not write the same files concurrently.
      - `vita_system.rs`: Network stack, sysmodule initialization, and automatic system language detection (`detect_system_language` via `SceAppUtil` on Vita and `LANG`/`LC_ALL` on host).
+     - `plugin_host.rs`: `PluginHost` file access for the background sync plugin (device paths as is on the Vita; below `<data>/devices` on host builds, `PluginHost::rooted` in tests), crash-safe writes, `plugin.cfg`, and the `LauncherProbe` trait (`FixedLauncherProbe` on host).
+     - `plugin_mutex.rs`: named openable kernel mutexes shared with the plugin. `main.rs` holds `GuiRunningLock` (`SyncthingGuiRunning`, created locked) for the app's whole lifetime: the plugin never syncs while it exists, so enabling background sync in `Settings` never starts a sync while the app is open. `KernelLauncherProbe` opens `SyncthingLauncherAlive` (created by the launcher). With the `ui-script` feature only, `ux0:data/syncthing/ui_script_launcher_alive` (`1` / `0`) forces the probe (Vita3K has no taiHEN).
    - **Strict Rule**: All platform-specific `#[cfg(target_os = "vita")]` hardware syscalls (`sce*`) must be encapsulated here. Never leak them into UI or Domain.
 
 4. **Layer 4: UI / Presentation Layer (`crates/vita-syncthing-app/src/ui/`)**
@@ -321,13 +336,14 @@ A host-only binary built on `syncthing-core` (never cross-compiled for the Vita;
   - `cluster_exchange.rs` — initial `ClusterConfig` exchange + initial remote `Index`
   - `secondary.rs` — `+2` secondary connections (open, promotion, polling, keepalive)
   - `initial_sync.rs` — initial download, local `Index` publication, request draining
-  - `persistent.rs` — persistent keepalive / rescan loop
+  - `persistent.rs` — persistent keepalive / rescan loop; `close_session` (`Close` on every connection + `SessionEnded`)
   - `revert.rs` — revert of a receive-only folder's local changes (UI-requested through `SyncControl`)
   - `dispatch.rs` — routing of primary-connection messages in an established session
   - `index_exchange.rs` — local index publication and runtime `ClusterConfig` / `Index` handling
   - `download.rs` / `upload.rs` — block transfers (pull / serve)
   - `folders.rs` — per-session folder state (pure); `context.rs` — `SessionContext` (identity, storage, stats, event sink, deferred messages); `params.rs` (`SessionParams`), `control.rs`, `events.rs`, `outcome.rs` — public API types
-  - `keepalive.rs` — `Ping` when the keepalive interval elapsed; `tuning.rs` — `SyncTuning` (rescan / keepalive intervals chosen by the app, passed through `SyncControl::with_tuning`)
+  - `keepalive.rs` — `Ping` when the keepalive interval elapsed; `tuning.rs` — `SyncTuning` (rescan / keepalive intervals chosen by the app, passed through `SyncControl::with_tuning`) and `CycleDrain`
+- **Single-cycle sessions** (`SyncControl::single_cycle(tuning, CycleDrain)`, used by the background worker, §8): the session runs its initial cycle (download, local `Index` publication), then drains — answering the peer's `Request`s / `Ping`s / late `Index`es until the peer has been silent for `CycleDrain::idle`, never longer than `CycleDrain::max` — and ends with `Close` + `SessionEnded { reason: "sync cycle completed" }` instead of entering the persistent loop. Unlike a session without a control handle (fixed 4 s drain), it honours `request_stop` at every phase: a stop during the download, after it or during the scan / drain ends the cycle with `InitialSync::Stopped` (`Close`, `SessionEnded "stopped locally"`, no `SyncCycleCompleted`), for persistent handles too.
 - **Session invariants** (covered by `tests/session.rs` with the fake peer):
   - *No message is dropped during a download*: while waiting for a block `Response`, `Index` / `IndexUpdate` / `ClusterConfig` / `Close` are deferred (`SessionContext::defer_message`) and the session loops read through `dispatch::next_primary_message`, never `try_read_bep_message` directly.
   - *Index publication is incremental*: always publish through `index_exchange::publish_index` (`FolderSyncState::take_unpublished`): one full `Index` per folder and session, then `IndexUpdate`s holding only entries with a newer sequence, in batches of `INDEX_BATCH_FILES`.
@@ -404,6 +420,7 @@ Text fields of the `.cfg` files (device names, addresses, folder IDs, labels, pa
 | `ignored_folders.cfg` | Folder offers declined by the user or deleted shares (not prompted again until `Settings` · `Clear Declined`) | `<folder_id>\|<device_id_hex>\n` |
 | `theme.cfg` | Persistent colour theme mode (`dark` or `oled`) | `<dark\|oled>\n` |
 | `language.cfg` | UI language chosen in `Settings` (`system` follows the PS Vita language; a missing file means `system`) | `<system\|en\|fr\|es\|de\|it>\n` |
+| `plugin.cfg` | Background sync plugin settings, written by `Settings` (`enabled=1` at install, `0` on uninstall), re-read by the launcher before each cycle; missing keys take their defaults (`PLUGIN_DEFAULT_*` in `defaults.rs`: enabled, sync on game exit, 1800 s), unknown lines are kept | `enabled=<0\|1>\nsync_on_game_exit=<0\|1>\ninterval_secs=<u32>\n` |
 | `syncthing.log`, `syncthing.log.1` | Persistent protocol & UI event log, rotated above `LOG_MAX_BYTES` (512 KiB) to `syncthing.log.1` | Plain text lines |
 | `sync/.syncthing_db_<folder>_<root hash>.txt` | Persistent folder database (`local_db/`): version vectors, sequences, blocks and tombstones per entry | `#vita-db-v1` tab-separated text |
 
@@ -429,6 +446,7 @@ cargo test --workspace
 - `https.rs` / `global_discovery.rs`: `HttpsServer` URLs and certificate pins, HTTP parsing, Global Discovery lookups and announcements against local HTTPS servers (`tests/common/tls_server.rs`)
 - `http_proxy.rs`: proxy URLs, a request tunnelled through a local `CONNECT` proxy (with `Proxy-Authorization`), refused `CONNECT`, extra PEM roots
 - `relay.rs`: relay wire codec, relay pool list, `RelayListener` (join, ping / pong, invitations, refusals)
+- `session_single_cycle.rs`: `SyncControl::single_cycle` (pull, publish, idle drain, `Close`), a drain extended while the peer keeps requesting and bounded by its maximum, stop requests before the download and during the drain, persistent handles unchanged
 - `session.rs`: folder authorization (per-device sharing gate, block requests refused for unlinked peers, unconfigured or paused folders) and end-to-end sessions against the fake peer (only shared folders are announced / pulled, an `IndexUpdate` received during a download is applied, a local change is published as an incremental `IndexUpdate`, batched publication, scan progress for keepalives, a receive-only folder is announced as such, pulls the peer's changes and publishes its local changes as invalid, a revert request restores it once)
 
 `vita-syncthing-app` tests live in `crates/vita-syncthing-app/tests/` (`cargo test -p vita-syncthing-app`):
@@ -456,6 +474,12 @@ cargo test --workspace
 - `devices_scan.rs`: `ManageDevices` LAN scan — immediate without a linked device, after the delay with one, cancelled on close (and re-armed on reopening), also while another device is connected
 - `log_viewer.rs`: log viewer opened from the `Settings` log card (touch, D-pad `Open`), closed with `Circle`, scrolling by line / page (D-pad, `L` / `R`, touch) within bounds, new lines followed at the bottom and a scrolled-back window kept, `Show All` loading `syncthing.log` and back, session buffer size, geometry in all 5 languages
 - `language_settings.rs`: language preference codec / cycle, `language.cfg` persistence (defaults to the system language), `Settings` language card (D-pad and touch)
+- `tai_config.rs`: taiHEN `config.txt` editing (`*main` lookup, insertion at the end of the section or a new section, removal, stale / duplicate entries dropped, idempotency, comments and CRLF kept)
+- `plugin_config.rs`: `plugin.cfg` codec (exact serialized form, defaults, invalid values, unknown lines kept)
+- `plugin_status.rs`: plugin module names / `tai` paths, active `tai` directory, status resolution, card buttons per status
+- `plugin_host.rs`: `PluginHost` device path mapping, crash-safe writes and recovery, `plugin.cfg` persistence, probe
+- `plugin_service.rs`: install (`ux0:` vs `ur0:`, `config.txt.bak`, idempotent, stale entries, `enabled=1`, settings kept), failures (no bundled modules, no taiHEN, unwritable `tai`), uninstall from both directories, status transitions and toasts
+- `settings_plugin.rs`: `Settings` plugin card (D-pad, touch, `ConfirmPlugin` confirm / cancel, stale elements, end-to-end with `PluginService`); `main_screens.rs` checks the card's buttons and texts in every status and language, `modal_touch.rs` the `ConfirmPlugin` modal
 
 `syncthing-cli` tests live in `crates/syncthing-cli/tests/` (`cargo test -p syncthing-cli`): `config.rs`, `identity.rs`, `cli_commands.rs` (the real binary), `lan.rs` (UDP 21027 shared, bounded reply schedule), `daemon_limits.rs` (bounded "reported once" memory, configured-device reports never crowded out, connection slots given back, relay invitations triaged and capped), `daemon_sync.rs` (two daemons on `127.0.0.1` with discovery and relays off: sync both ways, live changes and deletions, unknown device refused, offered folder not synchronized, receive-only folder).
 
@@ -531,7 +555,7 @@ The opt-in `ui-script` Cargo feature (never in release builds) replays inputs fr
 printf 'wait 60\npress R\nwait 10\nshot shares\n' > /tmp/shares.txt
 just ui-scenario /tmp/shares.txt
 ```
-PNGs land in `target/ui-shots/`; the Vita3K app data directory is backed up and restored around the run. It needs neither firmware nor a display (see above). `wait` frames count as activity (the automatic screensaver never starts during a script). `START` (or its hint on `Overview` and `Settings`) asks to quit.
+PNGs land in `target/ui-shots/`; the Vita3K app data directory and `ux0:tai` are backed up and restored around the run (`VITA3K_SEED=<dir>` copies a directory onto `ux0:` first, e.g. `data/syncthing/plugin.cfg` + `tai/config.txt` to start from a given background sync plugin state). It needs neither firmware nor a display (see above). `wait` frames count as activity (the automatic screensaver never starts during a script). `START` (or its hint on `Overview` and `Settings`) asks to quit.
 
 If `target/ui-shots/` only holds `vita3k.log` and it reports `qt.qpa.wayland: There are no outputs` (desktop session with its screen off or locked), run the scenario through XWayland instead:
 ```bash
@@ -564,7 +588,7 @@ The UI (`gfx.rs` + `ui/screens/*` + `ui/modals/*` + `ui/renderer.rs`) renders at
 - **Left Sidebar Tabs** (`L` / `R` shoulder buttons, D-pad from the sidebar, or touch tap):
   1. `Overview` (`ActiveTab::Dashboard`): compact device status card (the page header row: `QR / ID` modal (`Circle`) and `New Share` modal (`Triangle`) buttons), then the list of shared folders (4 visible, scrolling with the selection): `Devices` assignment modal (`Cross`), `Delete` with confirmation (`Square`) and `Folder` path picker (`Triangle`) on each card. A row's face buttons answer only while that row has the D-pad focus (`HitMap::shortcut_action` prefers the focused row, then page-level elements): `Triangle` is `Folder` on a share row and `New Share` anywhere else, and the hint bar shows which. A sync is started by tapping the sidebar transfer card. The protocol log is only on `Settings`.
   2. `Files` (`ActiveTab::FolderPicker`): Interactive `ux0:` directory browser. At its root, the `CreateShare` presets not shared yet are listed first. Selecting a folder (`Cross` or tap) starts creating a share of it (folders already shared are greyed out and cannot be selected or opened); `Triangle` (or tapping the `Open` chip) enters a subfolder, `Circle` goes up/back. The list scrolls with a held `Up` / `Down` or by dragging a finger over it. The `Overview` share `Folder` action reuses this browser to change a share's target path.
-  3. `Settings` (`ActiveTab::Settings`): Dark / Pure-Black OLED theme switcher (`Cross`), `QR / ID` modal (`Circle`), `Language` card (D-pad `Down` + `Cross` or tap: System -> English -> Français -> Español -> Deutsch -> Italiano, saved in `language.cfg`), `Declined folders` card (D-pad `Down` + `Cross` or tap `Clear Declined` to forget declined folder offers so peers can offer them again), and the protocol log card (latest lines). Tapping the log card, or `Cross` on its `Open` button, opens the **log viewer** (`AppState::log_view`, `ui/screens/logs.rs`): a full-screen page (no sidebar) listing this session's lines (`AppState::logs`, last `LOG_BUFFER_LINES`), newest at the bottom; D-pad `Up`/`Down` scroll one line, `L`/`R` (or `Left`/`Right`, or touching the upper / lower half of the list) one page, `Triangle · Show All` loads the whole `syncthing.log` history (last `LOG_HISTORY_MAX_LINES` lines) and toggles back, `Circle · Back` returns to `Settings`.
+  3. `Settings` (`ActiveTab::Settings`): Dark / Pure-Black OLED theme switcher (`Cross`), `QR / ID` modal (`Circle`), `Language` card (D-pad `Down` + `Cross` or tap: System -> English -> Français -> Español -> Deutsch -> Italiano, saved in `language.cfg`), `Declined folders` card (D-pad `Down` + `Cross` or tap `Clear Declined` to forget declined folder offers so peers can offer them again), the **Background sync plugin** card (`ui/screens/settings_plugin.rs`: status chip `Not installed` / `Reboot required` / `Active` / `Disabled` with what it means; `Install`, or `Enable / Disable` (applied at once, no reboot) + `Uninstall`; install / uninstall go through the `ConfirmPlugin` modal, which says a reboot is needed), and the protocol log card (latest line). Tapping the log card, or `Cross` on its `Open` button, opens the **log viewer** (`AppState::log_view`, `ui/screens/logs.rs`): a full-screen page (no sidebar) listing this session's lines (`AppState::logs`, last `LOG_BUFFER_LINES`), newest at the bottom; D-pad `Up`/`Down` scroll one line, `L`/`R` (or `Left`/`Right`, or touching the upper / lower half of the list) one page, `Triangle · Show All` loads the whole `syncthing.log` history (last `LOG_HISTORY_MAX_LINES` lines) and toggles back, `Circle · Back` returns to `Settings`.
 - **Modal Dialogs** (`ModalDialog` in `domain/models.rs`, rendered by `ui/modals/*`):
   - `CreateShare`: Create a share from PS Vita folder presets (`ux0:user/00/savedata`, `ux0:picture`, `ux0:music`, RetroArch saves) or browse `ux0:`. The share is only kept once a device is linked in the `ManageDevices` modal that follows.
   - `ManageDevices`: Link/unlink discovered Syncthing peers to a share with circular checkboxes (`draw_row_tick`), add one by ID (`Square`) or by QR code (`R · Scan QR`); changes apply when the dialog closes (`Circle · Done`: `config_dirty` restarts the worker, which advertises the folder in its `ClusterConfig`); opening the dialog scans the LAN (`DevicesScan`): at once for a share with no linked device, after `DEVICES_DIALOG_SCAN_DELAY` (3 s, counted in VBlanks by `main.rs`, cancelled when the dialog closes) otherwise, also while another device is connected (`UserCommand::ScanLan`: `main.rs` asks the running worker for a discovery cycle now with `SyncControl::request_discovery`, or starts a sync when none runs); while no device is known, `Triangle` (hint `Scan LAN`) scans again; `SELECT` pauses / enables the share; `L` (header button showing the current mode) switches it between **Read & write** and **Read only** (Syncthing "Receive Only": the Vita receives its peers' changes but never sends its own). On a read-only share, `START · Revert` (header) opens `ConfirmRevertShare`. Read-only shares carry a lock badge on their `Overview` card.
@@ -575,5 +599,58 @@ The UI (`gfx.rs` + `ui/screens/*` + `ui/modals/*` + `ui/renderer.rs`) renders at
   - `ConfirmDeleteShare`: Triggered by `Square` on the `Overview` share list; removes the share from `shares.cfg` (files on `ux0:` are kept) and registers the folder as declined for its linked devices (`ignored_folders.cfg`), so peers do not offer it back until `Settings` · `Clear Declined`.
   - `FolderOffer`: Opens when a peer's `ClusterConfig` lists a folder that is not shared with it yet (including a deleted share). `Cross · Accept` creates a paused share and opens `Files` to choose its target, `Square · Decline` ignores it (`ignored_folders.cfg`, cleared from `Settings` · `Clear Declined`), `Circle · Later` postpones it until the app restarts.
   - `ConfirmQuit`: Triggered by `START` (or tapping `Quit`), warns if a sync is in progress before exiting to LiveArea.
+  - `ConfirmPlugin`: Install or uninstall the background sync plugin (`Settings`): what it does, that `config.txt` is backed up, and that a reboot of the PS Vita is needed to load / unload it. `Cross` confirms (`PluginService::execute`, result as a toast), `Circle` cancels.
 - **Sync activity** (`AppState::sync_activity`: `Downloading` / `Uploading` / `Ready` / `Idle`): the single source for the sidebar transfer card and the OLED screensaver status line, so they never disagree. Both draw a progress bar only while `Downloading` / `Uploading`.
 - **OLED Screensaver**: Activates automatically after 10s of inactivity during active sync (or 30s when idle; there is no manual activation), rendering a pure `#000000` black background with a bouncing status widget to protect PS Vita 1000 OLED screens. Its progress bar is only drawn while a transfer runs (`Downloading` / `Uploading`), never when `Ready` or `Idle`.
+
+---
+
+## 8. Background Sync Plugin (taiHEN user modules in `SceShell`)
+
+Background sync runs **without the app**, inside `SceShell`, as two taiHEN user modules bundled in the VPK (`app0:plugins/`) and installed by the app's `Settings` into the active `tai` directory (§3.1, `plugin_service.rs`). **Vita3K cannot load taiHEN plugins into `SceShell`**: the modules are only built, statically audited (`scripts/audit_plugin.sh`) and their logic host-tested here. Every change to them must be described as *unverified on hardware* until someone ran it on a PS Vita.
+
+```text
+SceShell process
+ ├── syncthing_launcher.suprx  (stage 1, resident: ~8 KiB, no libc, one 16 KiB-stack thread)
+ │     polls every 5 s ── nothing runs + Wi-Fi + cycle due ──▶ sceKernelLoadStartModule(worker, &link)
+ │     polls every 0.5 s while it runs ── game / app / SYNCTHING starts, plugin disabled ──▶ link.abort = 1
+ │     link.state == DONE ──▶ sceKernelStopUnloadModule(worker)   (SceShell memory back to baseline)
+ └── syncthing_worker.suprx    (stage 2, on demand: ~1 MiB SELF, 8 MiB heap, syncthing-core)
+       module_start: newlib + pthread run-time, cycle thread ── run_cycle() ── link.result, STATE_DONE
+       module_stop:  joins the cycle thread, frees the heap memory block and the run-time's kernel objects
+```
+
+### 8.1 Contract (`plugin/include/syncthing_plugin.h`, mirrored by `crates/syncthing-vita-worker/src/link.rs`)
+
+- **Files**: `syncthing_launcher.suprx` and `syncthing_worker.suprx`, side by side in the active `tai` directory. Only the launcher is listed under `*main` in `config.txt`; it loads the worker from `ux0:tai/` when `ux0:tai/config.txt` exists (taiHEN's own choice), else `ur0:tai/`, falling back to the other directory.
+- **`plugin.cfg`** (`ux0:data/syncthing/`, §5): re-read before every cycle (and every 30 s while idle), so `Settings` changes apply without a reboot. Same parsing in C (`policy.c`) and Rust (`plugin_cfg.rs`, checked against the app's `PluginConfig` by `tests/plugin_cfg.rs`): trimmed `key=value` lines, flags exactly `0` / `1`, invalid values keep the previous one, the last valid one wins. A missing *file* means idle; a missing *key* takes the app's default (`enabled=1`, `sync_on_game_exit=1`, `interval_secs=1800`). `interval_secs=0` disables periodic cycles; values below 120 s are raised to 120 s.
+- **Named kernel mutexes** (`SCE_KERNEL_ATTR_OPENABLE`): `SyncthingGuiRunning` (held by the app for its whole life), `SyncthingLauncherAlive` (created by the launcher's `module_start`, deleted by its `module_stop`: the app's "installed, needs reboot" vs "active"), `SyncthingWorkerRunning` (created locked by the launcher before loading a worker, deleted once it is unloaded: the app should wait while it exists before its own first sync).
+- **`SyncthingWorkerLink`**: passed by pointer as `module_start`'s argument (both modules live in the same process). `abort` (launcher -> worker), `state` (`LOADING` / `RUNNING` / `DONE` / `FATAL`) and `result` (`STP_RESULT_*`) (worker -> launcher). `tests/plugin_contract.rs` checks the names, codes and layout agree.
+
+### 8.2 Launcher (`plugin/launcher/src/`, C, no libc)
+
+- `main.c` (module entry points, thread, worker life cycle), `system.c` (system queries), `log.c` (lines in `syncthing.log`, same prefix `[VITA-SYNCTHING] Background sync: ` and 512 KiB rotation as the app), `policy.c` (pure decisions, host-tested by `crates/syncthing-vita-worker/tests/launcher_policy.rs`, which builds `plugin/launcher/tests/policy_test.c` with the host C compiler).
+- **Blocking check** (`stp_observe_apps`): `sceAppMgrGetRunningAppIdListForShell` (SceAppMgrUser NID `0x613A70E2`, callable from `SceShell`) lists the running applications; each is named with `sceAppMgrGetProcessIdByAppIdForShell` (`0x63FAC2A9`) + `sceAppMgrGetNameById` (`0xF4D6AE3A`). **Any** running app blocks cycles (a game suspended with the PS button still runs and may write its save when resumed); `SYNCTHING` is told apart only to know it is not a "game exit". A failing list counts as "something runs". `sceKernelOpenMutex("SyncthingGuiRunning")` (SceThreadmgr `0x52E17182`, handle closed at once) also blocks, as defence in depth.
+- **Triggers** (`stp_policy_tick`): a cycle starts only after 15 s of LiveArea idle (`STP_EXIT_SETTLE_SECS`), with Wi-Fi connected (`sceNetCtlInetGetState`): once after a game / app exits (`sync_on_game_exit`), and every `interval_secs` while nothing runs. Closing the app restarts the interval (it just synchronized) without an exit cycle. A cycle that could not start (no Wi-Fi, worker missing, load error) is retried after 300 s.
+- **Abort**: while a worker runs, a game / app / `SYNCTHING` starting, the plugin being disabled or the launcher stopping sets `link.abort`; the launcher keeps the console out of auto-standby (`sceKernelPowerTick`) meanwhile. It **never unloads a worker whose threads may still run**: it waits for `STATE_DONE` (logging after 60 s), and after `STATE_FATAL` it keeps the module loaded and disables background sync until the next reboot.
+
+### 8.3 Worker (`crates/syncthing-vita-worker`)
+
+- Host-tested library (`rlib`) + `staticlib` linked by `scripts/build_plugin.sh`. `lib.rs` declares modules only. `cycle.rs` (`run_cycle(data_dir, abort, &CycleOptions)`), `config/` (read-only readers of `device_seed.bin`, `devices.cfg`, `shares.cfg`, `ignored_folders.cfg`: same formats, unescaping, crash recovery and protected-path rule as the app, checked against the app's `ConfigRepository` by `tests/config_formats.rs`), `plan.rs` (shares registered exactly like the app's `spawn_sync_worker`: path, paused, `ReceiveOnly` for read-only shares, `set_folder_devices` authorization; peers = devices of enabled shares, at most 4), `endpoints.rs`, `peer_session.rs`, `abort.rs` (watcher thread: abort signal / deadline -> `SyncControl::request_stop`), `log.rs`, `plugin_cfg.rs`, `link.rs`, `defaults.rs` (every timing and limit). `vita/` (`#[cfg(target_os = "vita")]` only): `module_start` / `module_stop`, newlib run-time, network, fatal-error path.
+- **One bounded cycle**: one `SyncControl::single_cycle` session per peer, one after the other, a single TLS connection each (no `+2`), configured address first, then one LAN discovery round (UDP only: the 16-thread TCP scan is too heavy for `SceShell`), then Global Discovery / relays. Drain: 6 s idle, 120 s max; whole cycle capped at 15 min. The worker never creates an identity, never writes a `.cfg` file, never accepts a folder offer (it logs it: the app asks for consent).
+- **Memory in `SceShell`**: `_newlib_heap_size_user = 8 MiB` (`WORKER_HEAP_BYTES`, read-only symbol checked by the audit), cycle thread stack 512 KiB, watcher 64 KiB, module image ~1.3 MiB text + 280 KiB BSS (newlib's per-thread reentrancy table). `tests/memory_budget.rs` measures a cycle's heap on its thread (≈ 0.9 MiB for 400 files + a 2 MiB file on the 64-bit host; ≈ 4.3 MiB for 3,000 files), `tests/stack_budget.rs` runs a cycle of the unoptimized host build in a 512 KiB thread.
+- **Module run-time** (`vita/runtime.rs`): a module has no crt0, so `module_start` calls what crt0's `_init_vita_newlib` would (`_init_vita_heap` / `_reent` / `_malloc` / `_io`), checks the heap block was allocated (`sbrk(0) != -1`, else `STP_RESULT_NO_MEMORY`), then `__libc_init_array` (pthread-embedded's `pthread_init`). `module_stop` refuses unless `STATE_DONE`, joins the cycle thread, then runs `__libc_fini_array`, `pthread_terminate`, deletes pthread-embedded's six global kernel mutexes and frees newlib (heap memory block included). Linked with `crti.o` / `crtbegin.o` / `crtend.o` / `crtn.o` but **without `crt0.o`**.
+- **Never take `SceShell` down**: the shim defines `abort` (Rust panics and allocation failures end there) and crt0's `_free_vita_newlib` (newlib's `_exit` calls it before `sceKernelExitProcess`): both mark the link `STATE_FATAL` and end only the calling thread (`sceKernelExitDeleteThread`). The audit fails if newlib's `abort` or crt0 get linked.
+- **Network**: `SceShell` already runs `SceNet` / `SceNetCtl`; the worker only initializes (and later terminates) what is not (`sceNetShowNetstat() == SCE_NET_ERROR_ENOTINIT`, `sceNetCtlInit` != `NOT_TERMINATED`), with its own memory block. It never terminates the shell's network stack. newlib's own lazy `_vita_net_init` treats `SCE_NET_ERROR_EBUSY` as "already initialized" and never calls `sceNetTerm` then.
+
+### 8.4 Build & verification
+
+```bash
+just plugin        # scripts/build_plugin.sh -> target/armv7-sony-vita-newlibeabihf/release/plugins/
+just vpk           # also builds the plugin and bundles plugins/*.suprx in SYNCTHING.vpk (audited)
+cargo test -p syncthing-vita-worker
+```
+- Both modules: `vita-elf-create -e plugin/<stage>/exports.yml`, then `vita-make-fself -c` (compressed, **unsafe**: VitaSDK adds `-s` only for "safe" homebrew). The app's eboot is the same unsafe SELF, which is what writing `ux0:tai/` / `ur0:tai/` requires; no `param.sfo` attribute is involved (`ATTRIBUTE2=12` is extended memory).
+- `scripts/audit_plugin.sh <build dir> [<vpk>]` (run by `build_plugin.sh`, `build_vpk.sh`, `just verify` and the release workflow): SELF headers, `module_start` / `module_stop` exported, no `main`, launcher without heap and ≤ 32 KiB, worker heap symbol = 8 MiB, shim overrides linked, both modules bundled unchanged in the VPK.
+- Tests (`crates/syncthing-vita-worker/tests/`): `cycle.rs` (against a `syncthing-core` peer on `127.0.0.1`: pulls and sends a file then ends with the folder database saved and no temp file left, paused share untouched, abort within 3 s, deadline, disabled / missing `plugin.cfg`, unreachable peer, nothing to sync, no identity), `config_formats.rs`, `sync_plan.rs`, `endpoints.rs`, `plugin_cfg.rs`, `plugin_contract.rs`, `launcher_policy.rs`, `abort_watcher.rs`, `worker_log.rs`, `memory_budget.rs`, `stack_budget.rs`.
+- **Unverified on hardware** (keep this list current): loading a newlib + Rust std module into `SceShell` and unloading it repeatedly; the 8 MiB heap block being available in `SceShell`; cross-process visibility of the openable mutexes; what `sceAppMgrGetRunningAppIdListForShell` lists (a resident system app would block every cycle: the launcher logs the running title IDs at start); ForShell calls from a plugin; abort latency (between blocks, at most a block timeout of 20 s, or one folder scan); a few kernel objects of Rust's lazily created static mutexes leak per cycle.
