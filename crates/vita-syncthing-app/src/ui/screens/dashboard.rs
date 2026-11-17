@@ -27,20 +27,10 @@ pub fn render_dashboard_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits:
 
     let selected = state.selected_share_idx;
     let has_selection = selected < state.shares.len();
-    // `Triangle` is the focused share's `Folder`, and `New Share` anywhere else.
-    let triangle = if state.is_share_row_focused() {
-        Hint::action(
-            PadButton::Triangle,
-            s.action_folder,
-            UiAction::ChangeShareFolder(selected),
-        )
-    } else {
-        Hint::action(PadButton::Triangle, s.action_new_share, UiAction::NewShare)
-    };
     let mut hints = vec![
         Hint::info(PadButton::Dpad, Some(PadButton::Cross), s.hint_navigate),
         Hint::action(PadButton::Circle, s.action_qr_id, UiAction::ShowDeviceId),
-        triangle,
+        Hint::action(PadButton::Triangle, s.action_new_share, UiAction::NewShare),
     ];
     // `Delete` is only offered when there is a share to delete.
     if has_selection {

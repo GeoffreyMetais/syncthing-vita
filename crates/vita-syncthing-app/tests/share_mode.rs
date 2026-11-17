@@ -226,7 +226,10 @@ fn test_toggle_switches_mode_saves_and_reports_each_direction() {
             id: "saves".to_owned()
         })
     );
-    assert!(state.logs.iter().any(|l| l == "Share saves is now read only"));
+    assert!(state
+        .logs
+        .iter()
+        .any(|l| l == "Share saves is now read only"));
 
     ShareModeService::toggle(&mut state, &repo, 0);
     assert_eq!(state.shares[0].mode, ShareMode::ReadWrite);
@@ -237,7 +240,10 @@ fn test_toggle_switches_mode_saves_and_reports_each_direction() {
             id: "saves".to_owned()
         })
     );
-    assert!(state.logs.iter().any(|l| l == "Share saves is now read & write"));
+    assert!(state
+        .logs
+        .iter()
+        .any(|l| l == "Share saves is now read & write"));
 
     // An unknown share is ignored.
     state.config_dirty = false;

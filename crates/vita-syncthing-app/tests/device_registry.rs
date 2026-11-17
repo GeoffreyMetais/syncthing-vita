@@ -52,7 +52,10 @@ fn discovered_peer_without_name_gets_a_placeholder_label() {
     // "LAN Peer" is the placeholder name sent by the discovery layer: same label.
     let other = full(0x11);
     DeviceRegistry::register_discovered_peer(&mut state, other, "LAN Peer", "");
-    assert_eq!(state.devices[1].name, format!("LAN Peer ({})", other.short()));
+    assert_eq!(
+        state.devices[1].name,
+        format!("LAN Peer ({})", other.short())
+    );
     assert!(state.is_unpaired_lan_peer(&other));
 
     // A real name is kept as is.
@@ -285,8 +288,7 @@ fn add_by_input_parses_the_optional_address_part() {
     let known = format!("{}@10.9.9.9", a.to_syncthing_string());
     DeviceRegistry::add_device_by_input(&mut state, &repo, &known, None).unwrap();
     assert_eq!(address_of(&state, a), "10.9.9.9:22000");
-    DeviceRegistry::add_device_by_input(&mut state, &repo, &a.to_syncthing_string(), None)
-        .unwrap();
+    DeviceRegistry::add_device_by_input(&mut state, &repo, &a.to_syncthing_string(), None).unwrap();
     assert_eq!(address_of(&state, a), "10.9.9.9:22000");
     assert_eq!(state.devices.len(), 4);
 
@@ -303,13 +305,9 @@ fn add_rejects_invalid_input_and_the_own_device_id() {
     assert!(matches!(err, UiText::InvalidDeviceId(_)));
     assert!(state.devices.is_empty());
 
-    let err = DeviceRegistry::add_device_by_input(
-        &mut state,
-        &repo,
-        &own.to_syncthing_string(),
-        None,
-    )
-    .unwrap_err();
+    let err =
+        DeviceRegistry::add_device_by_input(&mut state, &repo, &own.to_syncthing_string(), None)
+            .unwrap_err();
     assert_eq!(err, UiText::OwnDeviceId);
     assert!(state.devices.is_empty());
     assert!(!state.config_dirty);

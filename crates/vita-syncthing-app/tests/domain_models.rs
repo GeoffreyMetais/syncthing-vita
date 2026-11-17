@@ -117,7 +117,7 @@ fn test_active_tab_discriminants_match_the_sidebar_order() {
     assert_eq!(ActiveTab::Dashboard as u8, 0);
     assert_eq!(ActiveTab::FolderPicker as u8, 1);
     assert_eq!(ActiveTab::Settings as u8, 2);
-    assert_ne!(PickerMode::ChangeShareTarget, PickerMode::CreateNewShare);
+    assert_ne!(PickerMode::AcceptedShareTarget, PickerMode::CreateNewShare);
 }
 
 #[test]

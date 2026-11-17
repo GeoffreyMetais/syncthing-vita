@@ -245,7 +245,10 @@ fn create_share_on_an_existing_folder_updates_it_and_offers_it_when_linked() {
     assert_eq!(state.shares[0].target_path, second);
     assert!(state.shares[0].enabled);
     assert!(state.pending_folder_offers.is_empty());
-    assert!(std::path::Path::new(&second).is_dir(), "target directory is created");
+    assert!(
+        std::path::Path::new(&second).is_dir(),
+        "target directory is created"
+    );
     assert_eq!(repo.load_shares()[0].target_path, second);
 
     // Once a device is linked, re-creating the share queues its folder offer.
@@ -273,7 +276,10 @@ fn update_selected_share_target_trims_saves_and_returns_to_overview() {
     ShareService::update_selected_share_target(&mut state, &repo, &chosen);
 
     let expected = format!("{}/moved", dir);
-    assert_eq!(state.shares[1].target_path, expected, "trailing slash is trimmed");
+    assert_eq!(
+        state.shares[1].target_path, expected,
+        "trailing slash is trimmed"
+    );
     assert_eq!(state.shares[0].target_path, format!("{}/a", dir));
     assert!(state.config_dirty);
     assert_eq!(repo.load_shares()[1].target_path, expected);
@@ -391,8 +397,7 @@ fn toggle_device_reports_the_known_device_name_and_the_link_state() {
     assert_eq!(name, unknown.short());
 
     // Unlinking reports `added == false`; an unknown share index yields nothing.
-    let (_, _, added) =
-        ShareService::toggle_device_for_share(&mut state, &repo, 0, phone).unwrap();
+    let (_, _, added) = ShareService::toggle_device_for_share(&mut state, &repo, 0, phone).unwrap();
     assert!(!added);
     assert!(ShareService::toggle_device_for_share(&mut state, &repo, 4, phone).is_none());
 
@@ -412,7 +417,10 @@ fn linking_a_discovered_peer_only_clears_that_peer_from_the_unpaired_list() {
 
     ShareService::toggle_device_for_share(&mut state, &repo, 0, a).unwrap();
     assert!(!state.is_unpaired_lan_peer(&a));
-    assert!(state.is_unpaired_lan_peer(&b), "other discovered peers stay unpaired");
+    assert!(
+        state.is_unpaired_lan_peer(&b),
+        "other discovered peers stay unpaired"
+    );
 
     // Unlinking the only share of `a`: it is no longer approved, so it is listed as discovered again.
     ShareService::toggle_device_for_share(&mut state, &repo, 0, a).unwrap();
@@ -436,11 +444,17 @@ fn unlinking_a_device_still_linked_to_another_share_keeps_it_approved() {
 
     ShareService::toggle_device_for_share(&mut state, &repo, 0, dev).unwrap();
     assert!(state.shares[1].is_linked_to(&dev));
-    assert!(!state.is_unpaired_lan_peer(&dev), "still linked to share two");
+    assert!(
+        !state.is_unpaired_lan_peer(&dev),
+        "still linked to share two"
+    );
     assert!(state.has_configured_peers());
 
     ShareService::toggle_device_for_share(&mut state, &repo, 1, dev).unwrap();
-    assert!(state.is_unpaired_lan_peer(&dev), "linked to no share any more");
+    assert!(
+        state.is_unpaired_lan_peer(&dev),
+        "linked to no share any more"
+    );
     assert!(!state.has_configured_peers());
 
     let _ = std::fs::remove_dir_all(&dir);

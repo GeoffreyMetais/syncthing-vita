@@ -59,7 +59,8 @@ impl ShareService {
         idx
     }
 
-    /// Updates the target path of the currently selected share and returns to the `Overview` tab.
+    /// Sets the target path of the selected share, a folder offer just accepted (its folder is
+    /// chosen once, in the `Files` browser), and returns to the `Overview` tab.
     pub fn update_selected_share_target(
         state: &mut AppState,
         repo: &ConfigRepository,
