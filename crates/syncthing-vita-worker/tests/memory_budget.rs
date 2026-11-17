@@ -43,9 +43,22 @@ unsafe impl GlobalAlloc for Counting {
 
     unsafe fn dealloc(&self, ptr: *mut u8, layout: Layout) {
         if counted() {
-            let _ = CURRENT.fetch_update(Ordering::SeqCst, Ordering::SeqCst, |c| {
-                Some(c.saturating_sub(layout.size()))
-            });
+            // An explicit compare-exchange loop: `fetch_update` is deprecated on
+            // recent toolchains and its `try_update` replacement is not on every
+            // supported one (same choice as syncthing-cli's connection slots).
+            let mut current = CURRENT.load(Ordering::SeqCst);
+            loop {
+                let next = current.saturating_sub(layout.size());
+                match CURRENT.compare_exchange_weak(
+                    current,
+                    next,
+                    Ordering::SeqCst,
+                    Ordering::SeqCst,
+                ) {
+                    Ok(_) => break,
+                    Err(actual) => current = actual,
+                }
+            }
         }
         System.dealloc(ptr, layout)
     }
