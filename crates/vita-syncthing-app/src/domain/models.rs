@@ -165,8 +165,9 @@ pub enum ActiveTab {
 /// Mode for the `Files` (`FolderPicker`) tab.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum PickerMode {
-    /// Change target directory for `selected_share_idx`.
-    ChangeShareTarget,
+    /// Choose the target directory of `selected_share_idx`, a folder just accepted from a
+    /// peer's offer (`FolderOfferService::accept`). A share's folder cannot be changed later.
+    AcceptedShareTarget,
     /// Create a brand-new Syncthing share from the chosen directory.
     CreateNewShare,
 }

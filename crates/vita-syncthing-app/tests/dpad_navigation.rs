@@ -81,15 +81,10 @@ fn test_overview_share_rows_buttons_and_device_card() {
     );
     state.modal = ModalDialog::None;
 
-    // Right reaches the Folder button, which has no face button shortcut
+    // Delete is the row's last button: Right stays on it
     press(&mut state, &repo, BTN_RIGHT);
     press(&mut state, &repo, BTN_RIGHT);
-    assert_eq!(state.focused_action(ActiveTab::Dashboard), Some(2));
-    press(&mut state, &repo, BTN_CROSS);
-    assert_eq!(state.active_tab, ActiveTab::FolderPicker);
-    state.active_tab = ActiveTab::Dashboard;
-    state.nav.header = false;
-    state.nav.col = 1;
+    assert_eq!(state.focused_action(ActiveTab::Dashboard), Some(1));
 
     // Up twice reaches the device card, on its last button (New Share)
     press(&mut state, &repo, BTN_UP);

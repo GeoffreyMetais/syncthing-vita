@@ -93,7 +93,7 @@ fn test_l_and_r_cycle_the_tabs_in_both_directions() {
 #[test]
 fn test_switching_to_files_opens_the_share_creation_browser() {
     let (dir, repo, mut state) = overview("input-files-tab", 0);
-    state.picker.mode = PickerMode::ChangeShareTarget;
+    state.picker.mode = PickerMode::AcceptedShareTarget;
     press(&mut state, &repo, BTN_R);
     assert_eq!(state.active_tab, ActiveTab::FolderPicker);
     assert_eq!(state.picker.mode, PickerMode::CreateNewShare);
@@ -148,17 +148,18 @@ fn test_square_deletes_the_selected_share_from_any_focus_on_the_overview() {
 }
 
 #[test]
-fn test_triangle_is_folder_on_a_share_row_and_new_share_elsewhere() {
+fn test_triangle_is_new_share_on_the_header_and_on_a_share_row() {
     let (dir, repo, mut state) = overview("input-triangle", 1);
     // Header focused: Triangle is New Share.
     press(&mut state, &repo, BTN_TRIANGLE);
     assert_eq!(state.modal, ModalDialog::CreateShare { selected_idx: 0 });
     state.modal = ModalDialog::None;
-    // Share row focused: Triangle is Folder, which switches to the Files browser.
+    // Share row focused: still New Share (a share's folder cannot be changed).
     press(&mut state, &repo, BTN_DOWN);
+    assert!(state.is_share_row_focused());
     press(&mut state, &repo, BTN_TRIANGLE);
-    assert_eq!(state.active_tab, ActiveTab::FolderPicker);
-    assert_eq!(state.picker.mode, PickerMode::ChangeShareTarget);
+    assert_eq!(state.modal, ModalDialog::CreateShare { selected_idx: 0 });
+    assert_eq!(state.active_tab, ActiveTab::Dashboard);
     let _ = std::fs::remove_dir_all(&dir);
 }
 

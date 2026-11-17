@@ -255,7 +255,12 @@ fn test_scanner_open_and_close_keep_the_return_target() {
     QrScanFlow::open(&mut state, Some(2));
     assert!(!state.ime_active);
     assert_eq!(state.qr_camera_error, None);
-    assert_eq!(state.modal, ModalDialog::ScanDeviceQr { return_share_idx: Some(2) });
+    assert_eq!(
+        state.modal,
+        ModalDialog::ScanDeviceQr {
+            return_share_idx: Some(2)
+        }
+    );
     assert!(state.is_scanning_qr());
 
     QrScanFlow::close(&mut state, Some(2));
@@ -284,7 +289,11 @@ fn test_scanner_events_outside_the_scanner_are_ignored_and_errors_are_kept() {
 
     QrScanFlow::open(&mut state, None);
     assert_eq!(
-        QrScanFlow::handle_event(&mut state, &repo, Event::CameraError("no camera".to_owned())),
+        QrScanFlow::handle_event(
+            &mut state,
+            &repo,
+            Event::CameraError("no camera".to_owned())
+        ),
         UserCommand::None
     );
     assert_eq!(state.qr_camera_error.as_deref(), Some("no camera"));

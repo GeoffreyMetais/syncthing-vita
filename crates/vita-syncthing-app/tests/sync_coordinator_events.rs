@@ -145,7 +145,9 @@ fn finished_message_closes_the_worker_and_reports_its_summary() {
 
     // Nothing pending: nothing to redraw.
     let mut empty: Option<mpsc::Receiver<WorkerMsg>> = None;
-    assert!(!SyncCoordinator::process_worker_messages(&mut state, &repo, &mut empty));
+    assert!(!SyncCoordinator::process_worker_messages(
+        &mut state, &repo, &mut empty
+    ));
     let _ = std::fs::remove_dir_all(&dir);
 }
 
@@ -193,7 +195,10 @@ fn peer_connected_names_the_peer_and_starts_the_index_exchange() {
         },
     );
     assert_eq!(state.peer_label, UiText::raw("NAS @ 10.0.0.7:22000 (v2)"));
-    assert!(state.logs.iter().any(|l| l == "Connected via TLS 1.3 to NAS (10.0.0.7:22000)"));
+    assert!(state
+        .logs
+        .iter()
+        .any(|l| l == "Connected via TLS 1.3 to NAS (10.0.0.7:22000)"));
     let _ = std::fs::remove_dir_all(&dir);
 }
 
@@ -222,7 +227,10 @@ fn cluster_config_turns_the_remote_folders_into_offers_and_a_label() {
     );
     assert_eq!(state.folder_offers.len(), 2);
     assert_eq!(state.folder_offers[0].label, "Docs");
-    assert_eq!(state.folder_offers[1].label, "pics", "folder ID is the fallback label");
+    assert_eq!(
+        state.folder_offers[1].label, "pics",
+        "folder ID is the fallback label"
+    );
     assert_eq!(state.folder_label, UiText::raw("docs (Docs), pics ()"));
     assert!(state
         .logs
@@ -261,8 +269,17 @@ fn file_events_update_the_counters_the_status_and_the_log() {
     );
     assert_eq!(state.files_up_to_date, 1);
     assert_eq!(state.current_file, UiText::raw("a.txt"));
-    assert_eq!(state.status_line, UiText::FileUpToDate { file: "a.txt".to_owned() });
-    assert_eq!(state.logs.len(), logs_before, "up-to-date files are not logged");
+    assert_eq!(
+        state.status_line,
+        UiText::FileUpToDate {
+            file: "a.txt".to_owned()
+        }
+    );
+    assert_eq!(
+        state.logs.len(),
+        logs_before,
+        "up-to-date files are not logged"
+    );
 
     event(
         &mut state,
@@ -340,7 +357,10 @@ fn file_events_update_the_counters_the_status_and_the_log() {
         },
     );
     assert_eq!(state.status_line, UiText::IndexPublished { files: 7 });
-    assert!(state.logs.iter().any(|l| l == "Local index sent for docs (7 files)"));
+    assert!(state
+        .logs
+        .iter()
+        .any(|l| l == "Local index sent for docs (7 files)"));
 
     let logs_before = state.logs.len();
     event(
@@ -357,8 +377,17 @@ fn file_events_update_the_counters_the_status_and_the_log() {
     assert_eq!(state.blocks_uploaded, 1);
     assert_eq!(state.bytes_transferred, 250 + 10 + 200 + 128);
     assert_eq!(state.current_file, UiText::raw("c.bin"));
-    assert_eq!(state.status_line, UiText::Uploading { file: "c.bin".to_owned() });
-    assert_eq!(state.logs.len(), logs_before, "served blocks are not logged");
+    assert_eq!(
+        state.status_line,
+        UiText::Uploading {
+            file: "c.bin".to_owned()
+        }
+    );
+    assert_eq!(
+        state.logs.len(),
+        logs_before,
+        "served blocks are not logged"
+    );
     let _ = std::fs::remove_dir_all(&dir);
 }
 
@@ -386,13 +415,17 @@ fn completed_cycle_marks_the_session_connected_with_its_summary() {
             uploaded_bytes: 128,
         }
     );
-    assert!(state.logs.iter().any(|l| l
-        == "Connected (1+2 connections) · 5 up-to-date | 2 DL (4 KB) | 1 UL (128 B)"));
+    assert!(state
+        .logs
+        .iter()
+        .any(|l| l == "Connected (1+2 connections) · 5 up-to-date | 2 DL (4 KB) | 1 UL (128 B)"));
 
     let other = DeviceId([0x97; 32]);
     event(&mut state, &repo, cycle(other, 1));
-    assert!(state.logs.iter().any(|l| l
-        == "Connected (1 connection) · 5 up-to-date | 2 DL (4 KB) | 1 UL (128 B)"));
+    assert!(state
+        .logs
+        .iter()
+        .any(|l| l == "Connected (1 connection) · 5 up-to-date | 2 DL (4 KB) | 1 UL (128 B)"));
     let _ = std::fs::remove_dir_all(&dir);
 }
 
@@ -417,7 +450,10 @@ fn session_end_goes_offline_only_when_the_last_connected_peer_leaves() {
     assert!(state.session_connected, "peer b is still connected");
     assert_eq!(state.progress_pct, Some(100));
     assert!(!state.sync_in_progress, "no initial sync is running");
-    assert!(state.uploading, "offline state only starts with the last peer");
+    assert!(
+        state.uploading,
+        "offline state only starts with the last peer"
+    );
     assert!(state
         .logs
         .iter()

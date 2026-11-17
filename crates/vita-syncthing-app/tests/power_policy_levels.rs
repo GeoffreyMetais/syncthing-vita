@@ -24,10 +24,18 @@ fn standby_is_blocked_up_to_exactly_the_transfer_grace() {
     // On battery the grace period is inclusive at its end, and over after it.
     assert!(should_block_standby(true, false, Some(Duration::ZERO)));
     assert!(should_block_standby(true, false, Some(TRANSFER_GRACE)));
-    assert!(!should_block_standby(true, false, Some(TRANSFER_GRACE + ONE_MS)));
+    assert!(!should_block_standby(
+        true,
+        false,
+        Some(TRANSFER_GRACE + ONE_MS)
+    ));
 
     // Charging blocks standby whatever the transfer age, even without a transfer.
-    assert!(should_block_standby(true, true, Some(TRANSFER_GRACE + ONE_MS)));
+    assert!(should_block_standby(
+        true,
+        true,
+        Some(TRANSFER_GRACE + ONE_MS)
+    ));
     assert!(should_block_standby(true, true, None));
 }
 
@@ -50,7 +58,10 @@ fn full_clock_follows_the_transfer_grace_boundary() {
         cpu_clock(false, Some(CPU_TRANSFER_GRACE + ONE_MS), idle, false),
         CpuClock::Low
     );
-    assert_eq!(cpu_clock(false, Some(Duration::ZERO), idle, false), CpuClock::Full);
+    assert_eq!(
+        cpu_clock(false, Some(Duration::ZERO), idle, false),
+        CpuClock::Full
+    );
 }
 
 #[test]
@@ -64,7 +75,10 @@ fn medium_clock_follows_the_interactive_grace_and_the_camera() {
         cpu_clock(false, None, CPU_INTERACTIVE_GRACE + ONE_MS, false),
         CpuClock::Low
     );
-    assert_eq!(cpu_clock(false, None, Duration::ZERO, false), CpuClock::Medium);
+    assert_eq!(
+        cpu_clock(false, None, Duration::ZERO, false),
+        CpuClock::Medium
+    );
 
     // The QR scanner keeps the medium clock even without input.
     assert_eq!(
@@ -85,7 +99,12 @@ fn low_clock_when_nothing_happens() {
     let idle = Duration::from_secs(600);
     assert_eq!(cpu_clock(false, None, idle, false), CpuClock::Low);
     assert_eq!(
-        cpu_clock(false, Some(CPU_TRANSFER_GRACE + Duration::from_secs(1)), idle, false),
+        cpu_clock(
+            false,
+            Some(CPU_TRANSFER_GRACE + Duration::from_secs(1)),
+            idle,
+            false
+        ),
         CpuClock::Low
     );
 }

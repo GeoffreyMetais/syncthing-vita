@@ -153,8 +153,7 @@ impl InputController {
             UiAction::NewShare
             | UiAction::SelectShare(_)
             | UiAction::ManageDevices(_)
-            | UiAction::DeleteShare(_)
-            | UiAction::ChangeShareFolder(_) => SharesController::apply(state, repo, action),
+            | UiAction::DeleteShare(_) => SharesController::apply(state, action),
             UiAction::PickerUp | UiAction::PickerSelect(_) | UiAction::PickerOpen(_) => {
                 FilesController::apply(state, repo, action)
             }

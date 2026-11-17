@@ -95,7 +95,10 @@ fn index_file_entry_uses_bep_field_numbers() {
     let encoded = index_of(vec![file("a")]).encode();
 
     // Folder is field 1 (length-delimited), each file is field 2.
-    assert_eq!(&encoded[..8], &[0x0A, 0x06, b'p', b'h', b'o', b't', b'o', b's']);
+    assert_eq!(
+        &encoded[..8],
+        &[0x0A, 0x06, b'p', b'h', b'o', b't', b'o', b's']
+    );
     let entry = file_entry(&encoded);
     let fields: Vec<u32> = WireIter::new(entry).map(|item| item.unwrap().0).collect();
     // name(1), size(3), permissions(4), modified(5), no_permissions(8), versions(9),

@@ -7,7 +7,7 @@ use common::{draw, press, rect_of, tap, tap_rect, temp_test_dir};
 use syncthing_core::DeviceId;
 use vita_syncthing_app::application::{DeviceRegistry, InputController, ShareService};
 use vita_syncthing_app::domain::{
-    ActiveTab, AppState, FocusSlot, Language, LanguagePreference, ModalDialog, PickerMode, UiAction,
+    ActiveTab, AppState, FocusSlot, Language, LanguagePreference, ModalDialog, UiAction,
 };
 use vita_syncthing_app::infrastructure::{
     ConfigRepository, InputFrame, BTN_CIRCLE, BTN_CROSS, BTN_DOWN, BTN_RIGHT, BTN_SQUARE,
@@ -118,25 +118,26 @@ fn test_face_buttons_trigger_the_element_that_displays_them() {
     assert_eq!(state.modal, ModalDialog::ShowDeviceId);
     state.modal = ModalDialog::None;
 
-    // On a share row, `Triangle` is that row's `Folder` button...
-    press(&mut state, &repo, BTN_TRIANGLE);
-    assert_eq!(state.modal, ModalDialog::None);
-    assert_eq!(state.active_tab, ActiveTab::FolderPicker);
-    assert_eq!(state.picker.mode, PickerMode::ChangeShareTarget);
-    assert_eq!(state.selected_share_idx, 1);
-
-    // ...and on the device card, the page's `New Share`.
-    state.active_tab = ActiveTab::Dashboard;
-    state.nav.header = true;
+    // A share's folder cannot be changed: on a share row, `Triangle` is the page's `New Share`.
     press(&mut state, &repo, BTN_TRIANGLE);
     assert_eq!(state.modal, ModalDialog::CreateShare { selected_idx: 0 });
+    assert_eq!(state.active_tab, ActiveTab::Dashboard);
+    assert_eq!(state.selected_share_idx, 1);
     state.modal = ModalDialog::None;
 
-    // The `Folder` button can also be touched.
-    let folder = rect_of(&mut state, UiAction::ChangeShareFolder(1));
-    tap_rect(&mut state, &repo, folder);
-    assert_eq!(state.active_tab, ActiveTab::FolderPicker);
-    assert_eq!(state.picker.mode, PickerMode::ChangeShareTarget);
+    // Each share row declares only its `Devices` and `Delete` buttons.
+    draw(&mut state);
+    let row_actions: Vec<UiAction> = state
+        .hit_map
+        .hotspots()
+        .iter()
+        .filter(|h| matches!(h.focus, Some(FocusSlot::RowAction { row: 1, .. })))
+        .map(|h| h.action)
+        .collect();
+    assert_eq!(
+        row_actions,
+        vec![UiAction::ManageDevices(1), UiAction::DeleteShare(1)]
+    );
     let _ = std::fs::remove_dir_all(&dir);
 }
 

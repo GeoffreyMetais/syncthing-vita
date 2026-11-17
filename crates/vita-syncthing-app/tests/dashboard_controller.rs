@@ -1,5 +1,5 @@
 //! `Overview` D-pad focus (`DashboardController`): the device card header row, then one row per
-//! share with its `[Devices, Delete, Folder]` buttons, with the edges of the list.
+//! share with its `[Devices, Delete]` buttons, with the edges of the list.
 
 mod common;
 
@@ -90,18 +90,15 @@ fn test_header_row_has_two_buttons_and_left_returns_to_sidebar() {
 }
 
 #[test]
-fn test_share_row_has_three_buttons_and_right_stops_on_folder() {
+fn test_share_row_has_two_buttons_and_right_stops_on_delete() {
     let (dir, repo, mut state) = setup("dash-row-cols", 1);
     press(&mut state, &repo, BTN_DOWN);
     for _ in 0..5 {
         press(&mut state, &repo, BTN_RIGHT);
     }
-    // Devices (0), Delete (1), Folder (2): Right never goes past Folder.
-    assert_eq!(state.nav.col, 2);
-    assert_eq!(state.focused_action(ActiveTab::Dashboard), Some(2));
-    press(&mut state, &repo, BTN_LEFT);
+    // Devices (0), Delete (1): Right never goes past Delete.
     assert_eq!(state.nav.col, 1);
-    press(&mut state, &repo, BTN_LEFT);
+    assert_eq!(state.focused_action(ActiveTab::Dashboard), Some(1));
     press(&mut state, &repo, BTN_LEFT);
     assert_eq!(state.nav.col, 0);
     press(&mut state, &repo, BTN_LEFT);
@@ -110,13 +107,13 @@ fn test_share_row_has_three_buttons_and_right_stops_on_folder() {
 }
 
 #[test]
-fn test_header_column_is_clamped_when_moving_from_a_share_row() {
+fn test_header_column_is_kept_when_moving_from_a_share_row() {
     let (dir, repo, mut state) = setup("dash-clamp-col", 1);
     press(&mut state, &repo, BTN_DOWN);
     press(&mut state, &repo, BTN_RIGHT);
     press(&mut state, &repo, BTN_RIGHT);
-    assert_eq!(state.nav.col, 2);
-    // Up to the header: the column is clamped to the header's last button.
+    assert_eq!(state.nav.col, 1);
+    // Up to the header: the column stays within the header's buttons.
     press(&mut state, &repo, BTN_UP);
     assert!(state.is_header_focused(ActiveTab::Dashboard));
     assert_eq!(state.nav.col, 1);

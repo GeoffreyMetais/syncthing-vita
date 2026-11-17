@@ -17,9 +17,9 @@ fn picker(len: usize) -> FolderPicker {
 }
 
 #[test]
-fn test_new_browses_the_root_in_change_target_mode() {
+fn test_new_browses_the_root_in_share_creation_mode() {
     let p = FolderPicker::new("ux0:data");
-    assert_eq!(p.mode, PickerMode::ChangeShareTarget);
+    assert_eq!(p.mode, PickerMode::CreateNewShare);
     assert_eq!(p.current_dir, "ux0:data");
     assert!(p.items.is_empty());
     assert_eq!((p.selected_idx, p.top_idx), (0, 0));

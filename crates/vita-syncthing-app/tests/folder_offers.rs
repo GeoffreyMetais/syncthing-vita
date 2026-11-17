@@ -268,13 +268,19 @@ fn offer_log_names_the_peer_and_the_folder() {
 
     // A peer unknown to the registry is named by its short ID.
     FolderOfferService::receive(&mut state, &repo, THIRD, "other", "");
-    let unknown = format!("Device {} wants to share 'other' (other): waiting for approval", THIRD.short());
+    let unknown = format!(
+        "Device {} wants to share 'other' (other): waiting for approval",
+        THIRD.short()
+    );
     assert!(state.logs.iter().any(|l| l == &unknown));
 
     // device_name: known name, the placeholder of a known ID, or the short ID.
     assert_eq!(FolderOfferService::device_name(&state, &PEER), "MacBook");
     let placeholder = DeviceId::parse_user_id(&PEER.short()).unwrap();
-    assert_eq!(FolderOfferService::device_name(&state, &placeholder), "MacBook");
+    assert_eq!(
+        FolderOfferService::device_name(&state, &placeholder),
+        "MacBook"
+    );
     assert_eq!(
         FolderOfferService::device_name(&state, &THIRD),
         format!("Device {}", THIRD.short())
@@ -301,7 +307,10 @@ fn accepting_an_offer_links_its_device_to_an_existing_share_once() {
     // Accepting an offer whose device is already linked does not duplicate it.
     FolderOfferService::receive(&mut state, &repo, PEER, "docs", "Docs");
     FolderOfferService::receive(&mut state, &repo, PEER, "docs", "Docs");
-    assert!(state.folder_offers.is_empty(), "linked peers only refresh the label");
+    assert!(
+        state.folder_offers.is_empty(),
+        "linked peers only refresh the label"
+    );
 
     let _ = std::fs::remove_dir_all(&dir);
 }
@@ -331,7 +340,10 @@ fn accepting_a_template_offer_uses_the_preset_folder() {
     // Other folder IDs get a folder inside the app's sync directory.
     FolderOfferService::receive(&mut state, &repo, PEER, "custom-id", "Custom");
     FolderOfferService::accept(&mut state, &repo, 0);
-    assert_eq!(state.shares[1].target_path, repo.default_share_dir("custom-id"));
+    assert_eq!(
+        state.shares[1].target_path,
+        repo.default_share_dir("custom-id")
+    );
     assert!(!state.shares[1].enabled);
 
     let _ = std::fs::remove_dir_all(&dir);
