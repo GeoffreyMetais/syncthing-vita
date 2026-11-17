@@ -95,6 +95,9 @@ fn test_one_cycle_pulls_sends_and_ends() {
     assert!(log.contains("[VITA-SYNCTHING] Background sync: cycle started (1 device(s))"));
     assert!(log.contains("Background sync: pulled saves/from_peer.txt"));
     assert!(log.contains("Background sync: cycle completed: 1/1 device(s) synchronized"));
+    assert!(!log.contains("more device(s) linked"));
+    assert!(!log.contains("skipped"));
+    assert!(log.contains("Background sync: session ended: sync cycle completed"));
 }
 
 #[test]
@@ -192,6 +195,7 @@ fn test_deadline_stops_the_cycle() {
 
     assert_eq!(report.outcome, CycleOutcome::DeadlineReached);
     assert!(started.elapsed() < Duration::from_secs(10));
+    assert!(read_log(&data).contains("Background sync: cycle stopped at its time limit"));
 }
 
 #[test]
@@ -256,4 +260,54 @@ fn test_nothing_to_sync_and_not_configured() {
         !no_identity.join("device_seed.bin").exists(),
         "the worker never creates an identity"
     );
+}
+
+#[test]
+fn test_offers_protected_shares_and_extra_devices_are_logged() {
+    let data = data_dir_with_identity("cycle_log_details", true);
+    let peer_root = fresh_temp_dir("cycle_log_details_peer");
+    std::fs::create_dir_all(peer_root.join("saves")).unwrap();
+    std::fs::create_dir_all(peer_root.join("offered")).unwrap();
+    std::fs::write(peer_root.join("offered/x.txt"), b"not for us").unwrap();
+    let peer = ListeningPeer::spawn(0x36, &peer_root, &["saves", "offered"]);
+    let saves = data.join("saves");
+    std::fs::create_dir_all(&saves).unwrap();
+    // Four more linked devices that nothing answers for: only 3 of them fit in the cycle.
+    let mut devices = vec![device(peer.device_id, "Desktop", &peer.addr.to_string())];
+    let mut linked = vec![peer.device_id];
+    for seed in 0x50..0x54u8 {
+        let closed = std::net::TcpListener::bind("127.0.0.1:0").unwrap();
+        let addr = closed.local_addr().unwrap();
+        drop(closed);
+        let id = syncthing_core::DeviceIdentity::from_seed(&[seed; 32])
+            .unwrap()
+            .device_id;
+        devices.push(device(id, &format!("Off{seed:x}"), &addr.to_string()));
+        linked.push(id);
+    }
+    let app = repo(&data);
+    app.save_devices(&devices);
+    app.save_shares(&[
+        share("saves", &saves, true, linked),
+        share("danger", &data, true, vec![peer.device_id]),
+    ]);
+
+    let report = run_cycle(&data, never_abort(), &test_options());
+    peer.join();
+
+    assert_eq!(report.outcome, CycleOutcome::Completed);
+    assert_eq!(report.peers.len(), 4);
+    assert!(!saves.join("x.txt").exists() && !data.join("offered").exists());
+    let log = read_log(&data);
+    for expected in [
+        "Background sync: share danger skipped: its folder holds the app's data",
+        "Background sync: 1 more device(s) linked: only the first 4 are synchronized in the background",
+        "Background sync: connected to peer (127.0.0.1:",
+        "Background sync: Desktop offers folder offered: open the app to accept it",
+        "Background sync: session ended: sync cycle completed",
+        "Background sync: cycle completed: 1/4 device(s) synchronized",
+    ] {
+        assert!(log.contains(expected), "missing {expected:?} in:\n{log}");
+    }
+    assert_eq!(log.matches("offers folder offered").count(), 1);
 }

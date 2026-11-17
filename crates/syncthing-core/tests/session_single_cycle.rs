@@ -338,3 +338,31 @@ fn test_persistent_handle_still_runs_the_persistent_loop() {
         .as_deref()
         .is_some_and(|r| r != "sync cycle completed"));
 }
+
+#[test]
+fn test_download_failure_without_a_stop_is_still_an_error() {
+    let vita = device_under_test().device_id;
+    let peer = FakePeer::spawn(0x97, move |conn| {
+        conn.send_cluster_config(&[FOLDER], vita);
+        conn.wait_for(BepMessageType::ClusterConfig, Duration::from_secs(5))
+            .expect("ClusterConfig reply");
+        let mut remote = conn.file(FOLDER, "corrupt.txt", b"served content", 1);
+        // The announced hash does not match what is served.
+        remote.blocks[0].hash = vec![0u8; 32];
+        conn.send_index(FOLDER, vec![remote], false);
+        conn.serve_until_idle(Duration::from_secs(2));
+    });
+
+    let storage = storage_for("single_cycle_corrupt", &peer);
+    let control = single_cycle(Duration::from_millis(300), Duration::from_secs(10));
+    let mut events = Vec::new();
+    let result = run_session(&peer, &storage, &hello_under_test(1), Some(control), |e| {
+        events.push(e)
+    });
+    peer.join();
+
+    let err = result.expect_err("an invalid block is a protocol error, not a stop");
+    assert_eq!(err.kind(), std::io::ErrorKind::InvalidData);
+    assert_eq!(ended_reason(&events), None);
+    assert!(!storage.folder_root(FOLDER).join("corrupt.txt").exists());
+}
