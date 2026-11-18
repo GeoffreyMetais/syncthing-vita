@@ -10,6 +10,7 @@ This document provides essential architectural context, build workflows, and **r
 - **Zero Warnings**: Both host tests (`cargo test --workspace`) and the PS Vita release build (`just vpk`) must compile with **zero compiler warnings**. Use `#[cfg(target_os = "vita")]` and `#[cfg(not(target_os = "vita"))]` cleanly so host and Vita targets both stay warning-free.
 - **Visual Changes Are Checked in the Emulator**: any change that alters what is drawn (layout, labels, translations, colours, icons, new screen or modal) must be (1) run in Vita3K, (2) captured with screenshots of every affected screen / state, and (3) shown with those screenshots in the PR description. Host tests passing is not enough. See §6 *Screenshots for Visual Changes*.
 - **No Unapproved C/ASM Crypto Dependencies**: Never add `ring`, `aws-lc-rs`, or `openssl` to the dependency tree. They do not compile for `armv7-sony-vita-newlibeabihf`. Always use pure-Rust cryptography (`rustls` with `default-features = false`, `rustls-rustcrypto`, `p256`, `sha2`, `rcgen`).
+- **Skip `tests/` During Design & Implementation**: The `crates/*/tests/` directories are large. Do **not** read or search (`rg`/`grep`) inside `tests/` while exploring the codebase, designing changes, or implementing features — restrict searches and reads to `crates/*/src/` (e.g., `rg <pattern> crates/*/src`). Only open the specific `tests/<name>.rs` file (or `tests/common/`) when writing new tests, updating existing ones, or diagnosing a test failure.
 
 ---
 
