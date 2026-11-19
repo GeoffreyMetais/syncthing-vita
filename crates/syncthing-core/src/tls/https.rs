@@ -173,7 +173,7 @@ pub fn open_https_stream(
     tcp.set_read_timeout(Some(timeout))?;
     tcp.set_write_timeout(Some(timeout))?;
 
-    let provider: Arc<CryptoProvider> = Arc::new(rustls_rustcrypto::provider());
+    let provider: Arc<CryptoProvider> = Arc::new(super::crypto_provider());
     let mut roots = RootCertStore {
         roots: webpki_roots::TLS_SERVER_ROOTS.to_vec(),
     };

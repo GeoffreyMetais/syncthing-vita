@@ -25,7 +25,7 @@ fn verified_config_builder(
     ConfigBuilder<ClientConfig, WantsClientCert>,
     ObservedDeviceId,
 )> {
-    let provider: Arc<CryptoProvider> = Arc::new(rustls_rustcrypto::provider());
+    let provider: Arc<CryptoProvider> = Arc::new(super::crypto_provider());
     let observed_device_id: ObservedDeviceId = Arc::new(Mutex::new(None));
     let verifier = Arc::new(SyncthingServerVerifier::new(
         Arc::clone(&provider),

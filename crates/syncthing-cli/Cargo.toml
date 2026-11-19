@@ -13,11 +13,10 @@ path = "src/main.rs"
 syncthing-core.workspace = true
 clap = { version = "4.5", features = ["derive"] }
 serde = { version = "1.0", features = ["derive"] }
-toml = "0.8"
+toml = "1.2"
 ctrlc = "3.4"
-socket2 = { version = "0.5", features = ["all"] }
+socket2 = { version = "0.6", features = ["all"] }
 
 [dev-dependencies]
 # Local TLS servers standing in for relays and Global Discovery (tests only).
 rustls = { version = "0.23", default-features = false, features = ["std", "tls12"] }
-rustls-rustcrypto = "0.0.2-alpha"

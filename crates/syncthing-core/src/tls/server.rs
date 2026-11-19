@@ -33,7 +33,7 @@ impl IncomingBepStream {
 /// Server configuration: our certificate, a mandatory client certificate (recorded in the
 /// returned slot) and the BEP ALPN.
 fn bep_server_config(identity: &DeviceIdentity) -> io::Result<(ServerConfig, ObservedDeviceId)> {
-    let provider: Arc<CryptoProvider> = Arc::new(rustls_rustcrypto::provider());
+    let provider: Arc<CryptoProvider> = Arc::new(super::crypto_provider());
     let observed: ObservedDeviceId = Arc::new(Mutex::new(None));
     let verifier = Arc::new(SyncthingClientVerifier::new(
         Arc::clone(&provider),

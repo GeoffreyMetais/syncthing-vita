@@ -1,5 +1,5 @@
 //! TLS 1.3 transport for BEP/1.0 (`ALPN = "bep/1.0"`), using pure Rust primitives
-//! (`rustls` + `rustls-rustcrypto`) compatible with the `armv7-sony-vita-newlibeabihf` target.
+//! (`rustls` + RustCrypto provider) compatible with the `armv7-sony-vita-newlibeabihf` target.
 //!
 //! - [`verifier`] — Syncthing certificate verification (identity = SHA-256 of the peer certificate)
 //! - [`client`] — client connections (mutually authenticated streams and anonymous ID probes)
@@ -13,6 +13,7 @@
 pub mod client;
 pub mod https;
 pub mod polling;
+pub mod provider;
 pub mod proxy;
 pub mod server;
 pub mod verifier;
@@ -23,6 +24,7 @@ use std::net::TcpStream;
 use rustls::{ClientConnection, ServerConnection, StreamOwned};
 
 pub use client::probe_bep_peer_device_id;
+pub use provider::crypto_provider;
 pub use server::{accept_bep_tls_stream, IncomingBepStream};
 
 /// Official ALPN required by Syncthing for BEP/1.0 protocol.
