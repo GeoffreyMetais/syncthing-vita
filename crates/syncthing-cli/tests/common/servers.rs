@@ -54,7 +54,7 @@ where
     let listener = TcpListener::bind("127.0.0.1:0").expect("bind loopback listener");
     let port = listener.local_addr().expect("listener address").port();
 
-    let provider = Arc::new(rustls_rustcrypto::provider());
+    let provider = Arc::new(syncthing_core::tls::crypto_provider());
     let builder = ServerConfig::builder_with_provider(Arc::clone(&provider))
         .with_safe_default_protocol_versions()
         .expect("TLS protocol versions");

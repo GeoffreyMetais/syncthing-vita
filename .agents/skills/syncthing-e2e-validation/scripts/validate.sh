@@ -2,7 +2,8 @@
 # End-to-end validation of the PS Vita app and syncthing-cli.
 #
 # Usage: validate.sh [--only stage,...] [--skip stage,...] [--out DIR]
-# Stages (in order): host, vita, cli-lan, vita3k, internet
+# Stages (in order): quality, host, vita, cli-lan, vita3k, internet
+#   quality   cargo fmt --check, cargo clippy --workspace --all-targets, and cargo audit
 #   host      cargo test --workspace, zero warnings (host targets)
 #   vita      just vpk (zero warnings) + ELF symbol audit (C2-12828-1 prevention)
 #   cli-lan   two syncthing-cli daemons find each other by LAN discovery and sync both ways
@@ -44,7 +45,7 @@ trap cleanup EXIT
 
 declare -A RESULT
 declare -A DETAIL
-STAGES=(host vita cli-lan vita3k internet)
+STAGES=(quality host vita cli-lan vita3k internet)
 
 wanted() {
     [[ -n "$ONLY" && ",$ONLY," != *",$1,"* ]] && return 1
@@ -87,6 +88,29 @@ pair_homes() {
 synced_both_ways() {
     cmp -s "$WORK/$1/share/from_$1.txt" "$WORK/$2/share/from_$1.txt" &&
         cmp -s "$WORK/$2/share/sub/from_$2.txt" "$WORK/$1/share/sub/from_$2.txt"
+}
+
+stage_quality() {
+    local log="$OUT/quality.log"
+    if ! cargo fmt --check > "$log" 2>&1; then
+        result quality FAIL "(cargo fmt --check failed, see quality.log)"
+        return
+    fi
+    if ! cargo clippy --workspace --all-targets >> "$log" 2>&1; then
+        result quality FAIL "(cargo clippy failed, see quality.log)"
+        return
+    fi
+    local clippy_warnings
+    clippy_warnings=$(grep -c "^warning:" "$log" || true)
+    if command -v cargo-audit > /dev/null 2>&1; then
+        if ! (cargo audit >> "$log" 2>&1 || cargo audit --no-fetch >> "$log" 2>&1); then
+            result quality FAIL "(cargo audit found vulnerabilities, see quality.log)"
+            return
+        fi
+        result quality PASS "(fmt ok, clippy: $clippy_warnings warning(s), audit: 0 vulnerabilities)"
+    else
+        result quality PASS "(fmt ok, clippy: $clippy_warnings warning(s), cargo-audit not installed)"
+    fi
 }
 
 stage_host() {

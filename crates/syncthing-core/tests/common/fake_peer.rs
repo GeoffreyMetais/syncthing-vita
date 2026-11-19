@@ -180,7 +180,7 @@ pub struct PeerConn {
 
 impl PeerConn {
     fn accept(identity: &DeviceIdentity, tcp: TcpStream, connections: i32) -> Self {
-        let provider = Arc::new(rustls_rustcrypto::provider());
+        let provider = Arc::new(syncthing_core::tls::crypto_provider());
         let mut config = ServerConfig::builder_with_provider(provider)
             .with_safe_default_protocol_versions()
             .expect("protocol versions")

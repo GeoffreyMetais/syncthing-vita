@@ -33,10 +33,12 @@ fn pinned_verifier(pin: Option<DeviceId>) -> PinnedOrWebPkiVerifier {
     let roots = Arc::new(RootCertStore {
         roots: webpki_roots::TLS_SERVER_ROOTS.to_vec(),
     });
-    let webpki =
-        WebPkiServerVerifier::builder_with_provider(roots, Arc::new(rustls_rustcrypto::provider()))
-            .build()
-            .expect("webpki verifier");
+    let webpki = WebPkiServerVerifier::builder_with_provider(
+        roots,
+        Arc::new(syncthing_core::tls::crypto_provider()),
+    )
+    .build()
+    .expect("webpki verifier");
     PinnedOrWebPkiVerifier::new(pin, webpki)
 }
 
@@ -214,7 +216,7 @@ fn pinned_verifier_without_pin_rejects_self_signed_certificate() {
 fn syncthing_server_verifier_pins_and_records_the_device_id() {
     let peer = test_identity(0x45);
     let other = test_identity(0x46);
-    let provider = Arc::new(rustls_rustcrypto::provider());
+    let provider = Arc::new(syncthing_core::tls::crypto_provider());
 
     let observed = Arc::new(Mutex::new(None));
     let wrong = SyncthingServerVerifier::new(
@@ -243,7 +245,7 @@ fn syncthing_client_verifier_accepts_any_self_signed_certificate_and_records_its
     let client = test_identity(0x47);
     let observed = Arc::new(Mutex::new(None));
     let verifier = SyncthingClientVerifier::new(
-        Arc::new(rustls_rustcrypto::provider()),
+        Arc::new(syncthing_core::tls::crypto_provider()),
         Arc::clone(&observed),
     );
     verifier
