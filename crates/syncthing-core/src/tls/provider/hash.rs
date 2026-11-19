@@ -50,5 +50,17 @@ macro_rules! impl_hash {
     };
 }
 
-impl_hash!(SHA256, HashSha256, HashCtxSha256, Sha256, HashAlgorithm::SHA256);
-impl_hash!(SHA384, HashSha384, HashCtxSha384, Sha384, HashAlgorithm::SHA384);
+impl_hash!(
+    SHA256,
+    HashSha256,
+    HashCtxSha256,
+    Sha256,
+    HashAlgorithm::SHA256
+);
+impl_hash!(
+    SHA384,
+    HashSha384,
+    HashCtxSha384,
+    Sha384,
+    HashAlgorithm::SHA384
+);

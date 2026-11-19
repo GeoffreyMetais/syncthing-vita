@@ -19,6 +19,7 @@ Select stages with `--only host,cli-lan` or `--skip vita3k`; logs land in
 
 | Stage | What it proves | Needs |
 | :--- | :--- | :--- |
+| `quality` | `cargo fmt --check` passes, `cargo clippy --workspace --all-targets` compiles cleanly, and `cargo audit` reports 0 vulnerabilities | Rust, `cargo-audit` |
 | `host` | `cargo test --workspace` passes with zero compiler warnings | Rust |
 | `vita` | `just vpk` builds without warnings; `_newlib_heap_size_user` and `sceUserMainThreadStackSize` are exported (C2-12828-1 prevention) | VitaSDK, nightly |
 | `cli-lan` | two `syncthing-cli` daemons with `dynamic` addresses find each other by LAN discovery (UDP 21027) and sync a folder both ways | UDP broadcast on the host |

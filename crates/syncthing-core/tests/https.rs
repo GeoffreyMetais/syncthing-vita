@@ -33,13 +33,12 @@ fn pinned_verifier(pin: Option<DeviceId>) -> PinnedOrWebPkiVerifier {
     let roots = Arc::new(RootCertStore {
         roots: webpki_roots::TLS_SERVER_ROOTS.to_vec(),
     });
-    let webpki =
-        WebPkiServerVerifier::builder_with_provider(
-            roots,
-            Arc::new(syncthing_core::tls::crypto_provider()),
-        )
-            .build()
-            .expect("webpki verifier");
+    let webpki = WebPkiServerVerifier::builder_with_provider(
+        roots,
+        Arc::new(syncthing_core::tls::crypto_provider()),
+    )
+    .build()
+    .expect("webpki verifier");
     PinnedOrWebPkiVerifier::new(pin, webpki)
 }
 
