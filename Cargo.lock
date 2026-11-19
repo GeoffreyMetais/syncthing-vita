@@ -1215,7 +1215,6 @@ dependencies = [
  "rsa",
  "rustls",
  "rustls-webpki",
- "sec1",
  "sha2 0.11.1",
  "webpki-roots",
  "x25519-dalek",
