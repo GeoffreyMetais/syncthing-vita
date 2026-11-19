@@ -31,6 +31,11 @@ jobs:
           RUSTFLAGS: "-D warnings"
         run: cargo test --workspace
 
+      - name: Run syncthing-cli tests
+        env:
+          RUSTFLAGS: "-D warnings"
+        run: cargo test -p syncthing-cli
+
       - name: Check ui-script feature compilation
         env:
           RUSTFLAGS: "-D warnings"
@@ -84,3 +89,62 @@ jobs:
           name: SYNCTHING-vpk
           path: target/armv7-sony-vita-newlibeabihf/release/SYNCTHING.vpk
           if-no-files-found: error
+
+  e2e-vita3k:
+    name: Vita3K <-> CLI E2E (LAN & Internet)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Rust stable and nightly toolchains
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Rust nightly toolchain with rust-src
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rust-src
+
+      - name: Cache Cargo dependencies and build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: vita3k-e2e
+
+      - name: Install Vita3K runtime dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            xvfb unzip python3-pil libgl1 libegl1 libxkbcommon-x11-0 \
+            libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxcb-render-util0 \
+            libxcb-shape0 libxcb-xinerama0
+
+      - name: Install VitaSDK, just, and Vita3K
+        env:
+          VITASDK: ${{ runner.temp }}/vitasdk
+        run: |
+          ./scripts/setup_env.sh --install-vitasdk
+          ./scripts/setup_env.sh --install-just
+          ./scripts/setup_env.sh --install-vita3k
+          echo "VITASDK=${VITASDK}" >> "$GITHUB_ENV"
+          echo "${VITASDK}/bin" >> "$GITHUB_PATH"
+          echo "${HOME}/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Build PS Vita VPK with ui-script
+        run: CARGO_FEATURES=ui-script just vpk
+
+      - name: E2E Sync Vita3K <-> CLI (LAN)
+        run: ./scripts/vita3k_cli_sync.sh 75 target/e2e-vita3k-lan lan
+
+      - name: E2E Sync Vita3K <-> CLI (Internet / Global Discovery + Relay)
+        run: ./scripts/vita3k_cli_sync.sh 90 target/e2e-vita3k-internet internet
+
+      - name: Upload Vita3K E2E logs and screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: vita3k-e2e-logs
+          path: |
+            target/e2e-vita3k-lan
+            target/e2e-vita3k-internet
+          if-no-files-found: ignore

@@ -41,10 +41,9 @@ macro_rules! impl_ecdsa_verifier {
                 message: &[u8],
                 signature: &[u8],
             ) -> Result<(), InvalidSignature> {
-                let signature =
-                    <$signature>::from_der(signature).map_err(|_| InvalidSignature)?;
-                let verifying_key = <$verifying_key>::from_sec1_bytes(public_key)
-                    .map_err(|_| InvalidSignature)?;
+                let signature = <$signature>::from_der(signature).map_err(|_| InvalidSignature)?;
+                let verifying_key =
+                    <$verifying_key>::from_sec1_bytes(public_key).map_err(|_| InvalidSignature)?;
                 let digest = <$hash>::digest(message);
                 verifying_key
                     .verify_prehash(&digest, &signature)
@@ -153,8 +152,7 @@ macro_rules! impl_rsa_verifier {
             ) -> Result<(), InvalidSignature> {
                 let public_key =
                     PublicKey::from_pkcs1_der(public_key).map_err(|_| InvalidSignature)?;
-                let signature =
-                    <$signature>::try_from(signature).map_err(|_| InvalidSignature)?;
+                let signature = <$signature>::try_from(signature).map_err(|_| InvalidSignature)?;
                 <$verifying_key>::new(public_key)
                     .verify(message, &signature)
                     .map_err(|_| InvalidSignature)

@@ -1,13 +1,17 @@
 #!/usr/bin/env bash
 # End-to-end sync test between the PS Vita app (in Vita3K) and syncthing-cli on this computer.
 #
-# Usage: scripts/vita3k_cli_sync.sh [run_seconds] [out_dir]
+# Usage: scripts/vita3k_cli_sync.sh [run_seconds] [out_dir] [lan|internet]
 # Requires a VPK built with `CARGO_FEATURES=ui-script just vpk` (screenshots of the result).
+#
+# Modes:
+#   lan       (default) CLI listens on 0.0.0.0:22000; Vita finds it via UDP LAN discovery.
+#   internet  CLI disables local discovery and listens on no TCP port; it joins a public relay
+#             and announces to Global Discovery, so Vita must resolve and dial it over Internet.
 #
 # 1. Generates the Vita's identity seed, so its device ID is known in advance (the CLI derives
 #    the same ID from the same seed), and pairs both sides by writing their configuration:
-#    the Vita knows the CLI with a `dynamic` address (found by LAN discovery), the CLI knows
-#    the Vita (which never listens: the Vita always dials, the CLI accepts).
+#    the Vita knows the CLI with a `dynamic` address, the CLI knows the Vita (which never listens).
 # 2. Shares the folder `vita-cli-test`: `ux0:data/synctest` on the Vita, a temp dir on the CLI,
 #    each side starting with a file of its own.
 # 3. Runs the CLI daemon, then the Vita app in Vita3K, and checks that both sides end with
@@ -16,6 +20,11 @@ set -euo pipefail
 
 RUN_SECS="${1:-75}"
 OUT_DIR="$(realpath -m "${2:-target/vita3k-cli-sync}")"
+MODE="${3:-lan}"
+if [[ "$MODE" != "lan" && "$MODE" != "internet" ]]; then
+    echo "Usage: $0 [run_seconds] [out_dir] [lan|internet]" >&2
+    exit 2
+fi
 UX0="${VITA3K_UX0:-$HOME/.local/share/Vita3K/Vita3K/ux0}"
 DATA="$UX0/data/syncthing"
 VITA_SHARE="$UX0/data/synctest"
@@ -76,10 +85,27 @@ printf '%s|%s|ux0:data/synctest|1|%s|rw\n' "$FOLDER" "$FOLDER" "$CLI_HEX" > "$DA
 echo "written on the Vita" > "$VITA_SHARE/from_vita.txt"
 
 # --- Run ----------------------------------------------------------------------------------
-"$CLI" --home "$CLI_HOME" run --listen 0.0.0.0:22000 --no-global-discovery --no-relays \
-    > "$OUT_DIR/cli.log" 2>&1 &
-CLI_PID=$!
-sleep 1
+if [[ "$MODE" == "lan" ]]; then
+    "$CLI" --home "$CLI_HOME" run --listen 0.0.0.0:22000 --no-global-discovery --no-relays \
+        > "$OUT_DIR/cli.log" 2>&1 &
+    CLI_PID=$!
+    sleep 1
+else
+    "$CLI" --home "$CLI_HOME" run --listen none --no-local-discovery \
+        > "$OUT_DIR/cli.log" 2>&1 &
+    CLI_PID=$!
+    for _ in $(seq 1 180); do
+        if grep -qE "Global Discovery: announced .*relay://" "$OUT_DIR/cli.log" 2>/dev/null; then
+            break
+        fi
+        sleep 0.5
+    done
+    if ! grep -qE "Global Discovery: announced .*relay://" "$OUT_DIR/cli.log" 2>/dev/null; then
+        echo "FAIL CLI did not announce a relay URI to Global Discovery within 90s"
+        cat "$OUT_DIR/cli.log" || true
+        exit 1
+    fi
+fi
 
 # Overview once synced, then Settings (protocol log card).
 SCRIPT="$WORK/ui_script.txt"
