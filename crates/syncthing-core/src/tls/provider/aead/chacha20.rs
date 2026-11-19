@@ -169,6 +169,9 @@ impl MessageDecrypter for Tls12Cipher {
         seq: u64,
     ) -> Result<InboundPlainMessage<'a>, Error> {
         let payload = &m.payload;
+        if payload.len() < CHACHAPOLY1305_OVERHEAD {
+            return Err(Error::DecryptError);
+        }
         let nonce: chacha20poly1305::Nonce = cipher::Nonce::new(&self.1, seq).0.into();
         let aad = cipher::make_tls12_aad(
             seq,
@@ -183,5 +186,23 @@ impl MessageDecrypter for Tls12Cipher {
             .map_err(|_| Error::DecryptError)?;
 
         Ok(m.into_plain_message())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn tls12_decrypt_rejects_short_record_without_panicking() {
+        let key = AeadKey::from([0x11u8; 32]);
+        let mut dec = Tls12AeadAlgorithm::decrypter(&Chacha20Poly1305, key, &[0x22u8; 12]);
+        let mut buf = [0u8; 8];
+        let msg = InboundOpaqueMessage::new(
+            ContentType::ApplicationData,
+            ProtocolVersion::TLSv1_2,
+            &mut buf,
+        );
+        assert!(matches!(dec.decrypt(msg, 0), Err(Error::DecryptError)));
     }
 }

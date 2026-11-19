@@ -19,7 +19,6 @@ ed25519-dalek = { version = "2", default-features = false, features = ["pkcs8", 
 hmac = { version = "0.13", default-features = false }
 der = { version = "0.8", default-features = false }
 pkcs8 = { version = "0.11", default-features = false, features = ["pem", "pkcs5"] }
-sec1 = { version = "0.8", default-features = false, features = ["pem"] }
 digest = { version = "0.11", default-features = false }
 rand_core = { version = "0.6.4", default-features = false, features = ["getrandom"] }
 webpki-roots = "1.0.12"
