@@ -2,14 +2,15 @@
 //! and Syncthing Global Discovery v2 (`tcp://` + `relay://`).
 
 use std::net::{SocketAddr, ToSocketAddrs};
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Sender;
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
 use syncthing_core::{
-    connect_and_sync, connect_and_sync_stream, connect_via_relay, lookup_global_peer, BepHello,
-    DeviceId, DeviceIdentity, FsSyncStorage, PeerEndpoint, SessionParams, SyncControl, SyncEvent,
-    SyncSessionStatus,
+    connect_and_sync, connect_and_sync_stream, connect_via_relay, is_local_ip, lookup_global_peer,
+    BepHello, DeviceId, DeviceIdentity, FsSyncStorage, PeerEndpoint, SessionParams, SyncControl,
+    SyncEvent, SyncSessionStatus,
 };
 
 use super::sync_worker::WorkerMsg;
@@ -68,19 +69,25 @@ fn push_unique(out: &mut Vec<PeerEndpoint>, ep: PeerEndpoint) {
     }
 }
 
-/// Collects candidate endpoints for `kd`, ordered with all direct TCP endpoints before relay
-/// endpoints so local/WAN direct connections are always preferred over relayed tunnels.
+/// Collects candidate endpoints for `kd`, ordered with local/LAN direct TCP endpoints first,
+/// followed by non-local/WAN direct endpoints, and relay endpoints last.
 pub fn collect_peer_targets(
     kd: &KnownDevice,
     discovered: &SharedDiscoveredAddrs,
     global: &SharedGlobalEndpoints,
 ) -> (DeviceId, Vec<PeerEndpoint>) {
     let mut resolved_id = kd.device_id;
-    let mut direct = Vec::new();
+    let mut local_direct = Vec::new();
+    let mut wan_direct = Vec::new();
     let mut relays = Vec::new();
 
     for sock in resolve_configured_addr(&kd.address) {
-        push_unique(&mut direct, PeerEndpoint::Direct(sock));
+        let target = if is_local_ip(sock.ip()) {
+            &mut local_direct
+        } else {
+            &mut wan_direct
+        };
+        push_unique(target, PeerEndpoint::Direct(sock));
     }
 
     if let Ok(guard) = discovered.lock() {
@@ -88,7 +95,7 @@ pub fn collect_peer_targets(
             if kd.device_id.matches_peer(disc_id) {
                 resolved_id = *disc_id;
                 for &s in disc_socks {
-                    push_unique(&mut direct, PeerEndpoint::Direct(s));
+                    push_unique(&mut local_direct, PeerEndpoint::Direct(s));
                 }
             }
         }
@@ -100,7 +107,14 @@ pub fn collect_peer_targets(
                 resolved_id = *glob_id;
                 for ep in eps {
                     match ep {
-                        PeerEndpoint::Direct(_) => push_unique(&mut direct, ep.clone()),
+                        PeerEndpoint::Direct(sock) => {
+                            let target = if is_local_ip(sock.ip()) {
+                                &mut local_direct
+                            } else {
+                                &mut wan_direct
+                            };
+                            push_unique(target, ep.clone());
+                        }
                         PeerEndpoint::Relay { .. } => push_unique(&mut relays, ep.clone()),
                     }
                 }
@@ -108,8 +122,13 @@ pub fn collect_peer_targets(
         }
     }
 
-    direct.extend(relays);
-    (resolved_id, direct)
+    for ep in wan_direct {
+        push_unique(&mut local_direct, ep);
+    }
+    for ep in relays {
+        push_unique(&mut local_direct, ep);
+    }
+    (resolved_id, local_direct)
 }
 
 /// Queries Global Discovery v2 for every configured peer that needs it (see
@@ -205,12 +224,14 @@ pub struct PeerSessionShared {
     pub discovered: SharedDiscoveredAddrs,
     pub global: SharedGlobalEndpoints,
     pub connected: SharedConnectedPeers,
+    pub initial_lan_done: Arc<AtomicBool>,
     pub control: Arc<SyncControl>,
     pub tx: Sender<WorkerMsg>,
 }
 
 /// Keeps a session with `kd` running until a stop is requested: tries its known endpoints in
-/// turn (direct ones first, then relays) and retries after each failure or session end.
+/// turn (local/LAN direct ones first, then WAN direct, then relays) and retries after each
+/// failure or session end.
 pub fn run_peer_session_loop(kd: KnownDevice, shared: PeerSessionShared) {
     let PeerSessionShared {
         identity,
@@ -219,6 +240,7 @@ pub fn run_peer_session_loop(kd: KnownDevice, shared: PeerSessionShared) {
         discovered,
         global,
         connected,
+        initial_lan_done,
         control,
         tx,
     } = shared;
@@ -238,6 +260,18 @@ pub fn run_peer_session_loop(kd: KnownDevice, shared: PeerSessionShared) {
                 )));
             }
             if !sleep_interruptible(&control, NO_ADDRESS_POLL) {
+                break;
+            }
+            continue;
+        }
+
+        let has_local_target = targets
+            .iter()
+            .any(|ep| matches!(ep, PeerEndpoint::Direct(sock) if is_local_ip(sock.ip())));
+        if !has_local_target && !initial_lan_done.load(Ordering::Acquire) {
+            if !sleep_unless_stopped(&control, NO_ADDRESS_POLL, || {
+                initial_lan_done.load(Ordering::Acquire)
+            }) {
                 break;
             }
             continue;

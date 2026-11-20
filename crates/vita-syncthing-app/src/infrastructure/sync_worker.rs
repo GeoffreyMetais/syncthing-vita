@@ -1,6 +1,7 @@
 //! Asynchronous BEP/1.0 synchronization worker (`1+2` persistent connections per peer & manual pairing).
 
 use std::net::SocketAddr;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
@@ -203,6 +204,7 @@ pub fn spawn_sync_worker(
         let discovered_addrs: SharedDiscoveredAddrs = Arc::new(Mutex::new(Vec::new()));
         let global_endpoints: SharedGlobalEndpoints = Arc::new(Mutex::new(Vec::new()));
         let connected_peers: SharedConnectedPeers = Arc::new(Mutex::new(Vec::new()));
+        let initial_lan_done = Arc::new(AtomicBool::new(false));
         let mut peer_handles = Vec::new();
 
         let peer_list: Vec<String> = approved_devices
@@ -238,6 +240,7 @@ pub fn spawn_sync_worker(
                 discovered: Arc::clone(&discovered_addrs),
                 global: Arc::clone(&global_endpoints),
                 connected: Arc::clone(&connected_peers),
+                initial_lan_done: Arc::clone(&initial_lan_done),
                 control: Arc::clone(&worker_control),
                 tx: tx.clone(),
             };
@@ -258,51 +261,65 @@ pub fn spawn_sync_worker(
 
         // Continuously run UDP 21027 local discovery + periodic Global Discovery v2 in the coordinator thread so:
         // 1. All LAN peers receive the Vita's Announce packet.
-        // 2. Approved peers with `dynamic` or Short-ID addresses have their IP:port resolved.
+        // 2. Approved peers have their LAN IP:port resolved before falling back to WAN/relay.
         // 3. Peers outside the LAN have their WAN direct & relay endpoints resolved via Global Discovery v2.
         let mut first_pass = true;
         let mut last_global_lookup: Option<Instant> = None;
         let mut global_errors = Vec::new();
         while !worker_control.is_stop_requested() {
-            if let Ok(mut res) =
-                run_discovery_cycle(&announce, DISCOVERY_BROADCAST_ADDR, DISCOVERY_LISTEN)
-            {
-                let needs_dynamic_resolution = approved_devices
-                    .iter()
-                    .any(|kd| kd.address == "dynamic" || kd.device_id.is_short_placeholder());
-                if first_pass && res.discovered_peers.is_empty() && needs_dynamic_resolution {
-                    res.discovered_peers = scan_lan_bep_peers(identity.device_id);
-                }
+            let mut discovered_peers =
+                match run_discovery_cycle(&announce, DISCOVERY_BROADCAST_ADDR, DISCOVERY_LISTEN) {
+                    Ok(res) => res.discovered_peers,
+                    Err(_) => Vec::new(),
+                };
 
-                let mut seen_ids = Vec::new();
-                for (udp_src, peer) in &res.discovered_peers {
-                    if seen_ids.contains(&peer.id) {
-                        continue;
-                    }
-                    seen_ids.push(peer.id);
-
-                    let tcp_targets = resolve_peer_tcp_addrs(*udp_src, &peer.addresses);
-                    let best_tcp = tcp_targets
-                        .first()
-                        .copied()
-                        .unwrap_or_else(|| SocketAddr::new(udp_src.ip(), BEP_DEFAULT_PORT));
-
-                    if let Ok(mut guard) = discovered_addrs.lock() {
-                        if let Some(slot) = guard.iter_mut().find(|(id, _)| *id == peer.id) {
-                            slot.1 = tcp_targets;
-                        } else {
-                            guard.push((peer.id, tcp_targets));
+            if first_pass && !worker_control.is_stop_requested() {
+                let missing_approved = approved_devices.iter().any(|kd| {
+                    !discovered_peers
+                        .iter()
+                        .any(|(_, p)| kd.device_id.matches_peer(&p.id))
+                });
+                if missing_approved {
+                    for (addr, peer) in scan_lan_bep_peers(identity.device_id) {
+                        if !discovered_peers.iter().any(|(_, p)| p.id == peer.id) {
+                            discovered_peers.push((addr, peer));
                         }
                     }
-
-                    let _ = tx.send(WorkerMsg::DeviceDiscovered {
-                        device_id: peer.id,
-                        name: "LAN Peer".to_owned(),
-                        address: best_tcp.to_string(),
-                    });
                 }
             }
-            first_pass = false;
+
+            let mut seen_ids = Vec::new();
+            for (udp_src, peer) in &discovered_peers {
+                if seen_ids.contains(&peer.id) {
+                    continue;
+                }
+                seen_ids.push(peer.id);
+
+                let tcp_targets = resolve_peer_tcp_addrs(*udp_src, &peer.addresses);
+                let best_tcp = tcp_targets
+                    .first()
+                    .copied()
+                    .unwrap_or_else(|| SocketAddr::new(udp_src.ip(), BEP_DEFAULT_PORT));
+
+                if let Ok(mut guard) = discovered_addrs.lock() {
+                    if let Some(slot) = guard.iter_mut().find(|(id, _)| *id == peer.id) {
+                        slot.1 = tcp_targets;
+                    } else {
+                        guard.push((peer.id, tcp_targets));
+                    }
+                }
+
+                let _ = tx.send(WorkerMsg::DeviceDiscovered {
+                    device_id: peer.id,
+                    name: "LAN Peer".to_owned(),
+                    address: best_tcp.to_string(),
+                });
+            }
+
+            if first_pass {
+                initial_lan_done.store(true, Ordering::Release);
+                first_pass = false;
+            }
 
             if last_global_lookup.is_none_or(|t| t.elapsed() >= GLOBAL_DISCOVERY_INTERVAL)
                 && !worker_control.is_stop_requested()

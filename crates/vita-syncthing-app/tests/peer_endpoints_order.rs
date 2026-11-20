@@ -178,3 +178,41 @@ fn test_global_lookup_skips_placeholders_and_connected_devices_only() {
         &[DeviceId([0x82; 32])]
     ));
 }
+
+#[test]
+fn test_lan_discovered_comes_before_non_local_configured_address() {
+    let id = DeviceId([0x83; 32]);
+    let lan = sock("192.168.1.50:22000");
+    let public_configured = sock("203.0.113.7:22000");
+    let (_, targets) = collect_peer_targets(
+        &device(id, "203.0.113.7:22000"),
+        &discovered(vec![(id, vec![lan])]),
+        &global(vec![]),
+    );
+    assert_eq!(
+        targets,
+        vec![
+            PeerEndpoint::Direct(lan),
+            PeerEndpoint::Direct(public_configured),
+        ]
+    );
+}
+
+#[test]
+fn test_global_local_ip_comes_before_global_wan_ip() {
+    let id = DeviceId([0x84; 32]);
+    let wan = sock("203.0.113.8:22000");
+    let lan = sock("192.168.1.60:22000");
+    let (_, targets) = collect_peer_targets(
+        &device(id, "dynamic"),
+        &discovered(vec![]),
+        &global(vec![(
+            id,
+            vec![PeerEndpoint::Direct(wan), PeerEndpoint::Direct(lan)],
+        )]),
+    );
+    assert_eq!(
+        targets,
+        vec![PeerEndpoint::Direct(lan), PeerEndpoint::Direct(wan)]
+    );
+}

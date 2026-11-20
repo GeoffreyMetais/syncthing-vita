@@ -18,7 +18,7 @@ pub mod lan_scan;
 pub mod local_ip;
 pub mod udp;
 
-pub use addresses::resolve_peer_tcp_addrs;
+pub use addresses::{is_local_ip, resolve_peer_tcp_addrs};
 pub use announce::{Announce, DISCOVERY_BROADCAST_ADDR, DISCOVERY_MAGIC, DISCOVERY_PORT};
 pub use global::{
     lookup_global_peer, lookup_peer_on, parse_global_discovery_json, resolve_endpoint_uri,

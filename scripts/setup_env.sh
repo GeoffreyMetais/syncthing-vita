@@ -12,6 +12,7 @@ set -euo pipefail
 #   ./scripts/setup_env.sh --install-firmware   # optional: the app runs in Vita3K without it
 #   ./scripts/setup_env.sh --install-rust
 #   ./scripts/setup_env.sh --install-just
+#   ./scripts/setup_env.sh --install-audit
 
 detect_vitasdk_dir() {
     if [[ -n "${VITASDK:-}" ]]; then
@@ -92,6 +93,12 @@ check_tools() {
         echo "❌ rust-src component missing (run: $0 --install-rust)"
     fi
 
+    if cargo audit --version >/dev/null 2>&1; then
+        echo "✅ cargo-audit: present ($(cargo audit --version))"
+    else
+        echo "❌ cargo-audit: missing (run: $0 --install-audit)"
+    fi
+
     # 5. Check Vita3K Emulator
     if [[ -x "${VITA3K_BIN}" ]]; then
         echo "✅ Vita3K emulator installed at: ${VITA3K_BIN}"
@@ -170,6 +177,17 @@ install_rust() {
         rustup default nightly
     fi
     echo "✅ Rust nightly & rust-src installed successfully."
+}
+
+install_audit() {
+    setup_user_env
+    if cargo audit --version >/dev/null 2>&1; then
+        echo "✅ cargo-audit is already installed: $(cargo audit --version)"
+        return 0
+    fi
+    echo "=== Installing cargo-audit ==="
+    cargo install cargo-audit --locked
+    echo "✅ cargo-audit installed successfully: $(cargo audit --version)"
 }
 
 install_vitasdk() {
@@ -335,6 +353,7 @@ install_all() {
     echo "=== Running Full PS Vita Development Environment Setup ==="
     install_just
     install_rust
+    install_audit
     install_vitasdk
     install_vita3k
     echo "ℹ️  Sony firmware skipped: not needed to run the app (optional: $0 --install-firmware)"
@@ -371,8 +390,11 @@ case "$ACTION" in
     --install-just)
         install_just
         ;;
+    --install-audit)
+        install_audit
+        ;;
     *)
-        echo "Usage: $0 [--check-all | --install-all | --install-vitasdk | --install-vita3k | --prepare-vita3k | --install-firmware | --install-rust | --install-just]"
+        echo "Usage: $0 [--check-all | --install-all | --install-vitasdk | --install-vita3k | --prepare-vita3k | --install-firmware | --install-rust | --install-just | --install-audit]"
         exit 1
         ;;
 esac

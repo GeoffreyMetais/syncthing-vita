@@ -203,6 +203,51 @@ fn peer_connected_names_the_peer_and_starts_the_index_exchange() {
 }
 
 #[test]
+fn peer_connected_over_wan_does_not_overwrite_dynamic_address() {
+    let (dir, repo, mut state) = setup("coord-wan-no-persist");
+    let id = DeviceId([0x9a; 32]);
+    state.devices.push(vita_syncthing_app::domain::KnownDevice {
+        device_id: id,
+        name: "Server".to_owned(),
+        address: "dynamic".to_owned(),
+    });
+
+    // Connecting via a public IP must not overwrite "dynamic" with the public IP.
+    let wan_addr: SocketAddr = "203.0.113.42:22000".parse().unwrap();
+    event(
+        &mut state,
+        &repo,
+        SyncEvent::PeerConnected {
+            peer_addr: wan_addr,
+            peer_device_id: id,
+            peer_name: "Server".to_owned(),
+            client_version: "v1.28".to_owned(),
+        },
+    );
+    assert_eq!(state.devices[0].address, "dynamic");
+    let saved = repo.load_devices();
+    assert_eq!(saved[0].address, "dynamic");
+
+    // Connecting later over LAN updates the address to the local IP.
+    let lan_addr: SocketAddr = "192.168.1.42:22000".parse().unwrap();
+    event(
+        &mut state,
+        &repo,
+        SyncEvent::PeerConnected {
+            peer_addr: lan_addr,
+            peer_device_id: id,
+            peer_name: "Server".to_owned(),
+            client_version: "v1.28".to_owned(),
+        },
+    );
+    assert_eq!(state.devices[0].address, "192.168.1.42:22000");
+    let saved = repo.load_devices();
+    assert_eq!(saved[0].address, "192.168.1.42:22000");
+
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
 fn cluster_config_turns_the_remote_folders_into_offers_and_a_label() {
     let (dir, repo, mut state) = setup("coord-cluster-config");
     let peer = DeviceId([0x95; 32]);
