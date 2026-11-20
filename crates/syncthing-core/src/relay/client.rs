@@ -63,7 +63,14 @@ pub fn join_relay_session(
 ) -> io::Result<TcpStream> {
     let session_ip = invitation.session_ip(relay_addr.ip());
     let session_addr = SocketAddr::new(session_ip, invitation.port);
-    let mut tcp = TcpStream::connect_timeout(&session_addr, timeout)?;
+    let mut tcp = match TcpStream::connect_timeout(&session_addr, timeout) {
+        Ok(tcp) => tcp,
+        Err(_) if session_ip != relay_addr.ip() => {
+            let fallback_addr = SocketAddr::new(relay_addr.ip(), invitation.port);
+            TcpStream::connect_timeout(&fallback_addr, timeout)?
+        }
+        Err(err) => return Err(err),
+    };
     let _ = tcp.set_nodelay(true);
     tcp.set_read_timeout(Some(timeout))?;
     tcp.set_write_timeout(Some(timeout))?;

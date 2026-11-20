@@ -127,6 +127,21 @@ fn test_session_invitation_ip_fallback() {
         make_inv(Ipv6Addr::LOCALHOST.octets().to_vec()).session_ip(fallback),
         IpAddr::V6(Ipv6Addr::LOCALHOST)
     );
+    // Go's `strelaysrv` encodes IPv4 addresses as 16-byte IPv4-mapped IPv6 (`::ffff:a.b.c.d`).
+    assert_eq!(
+        make_inv(
+            Ipv4Addr::new(37, 27, 252, 54)
+                .to_ipv6_mapped()
+                .octets()
+                .to_vec()
+        )
+        .session_ip(fallback),
+        IpAddr::V4(Ipv4Addr::new(37, 27, 252, 54))
+    );
+    assert_eq!(
+        make_inv(Ipv4Addr::UNSPECIFIED.to_ipv6_mapped().octets().to_vec()).session_ip(fallback),
+        fallback
+    );
 }
 
 #[test]
