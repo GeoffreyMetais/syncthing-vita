@@ -1,3 +1,3 @@
 {
-  "install": "sed -i '/case \\$- in/,/esac/d' ~/.bashrc 2>/dev/null || true; for line in 'export RUSTUP_HOME=\"$HOME/.rustup\"' 'export CARGO_HOME=\"$HOME/.cargo\"' 'export VITASDK=\"$HOME/vitasdk\"' 'export PATH=\"$HOME/.local/bin:$CARGO_HOME/bin:$VITASDK/bin:$PATH\"'; do grep -qxF \"$line\" ~/.bashrc || echo \"$line\" >> ~/.bashrc; done; ./scripts/setup_env.sh --install-all"
+  "install": "sed -i '/case \\$- in/,/esac/d' ~/.bashrc 2>/dev/null || true; for line in 'export RUSTUP_HOME=\"$HOME/.rustup\"' 'export CARGO_HOME=\"$HOME/.cargo\"' 'export VITASDK=\"$HOME/vitasdk\"' 'export PATH=\"$HOME/.local/bin:$CARGO_HOME/bin:$VITASDK/bin:$PATH\"'; do grep -qxF \"$line\" ~/.bashrc || echo \"$line\" >> ~/.bashrc; done; export RUSTUP_HOME=\"$HOME/.rustup\" CARGO_HOME=\"$HOME/.cargo\" VITASDK=\"$HOME/vitasdk\" PATH=\"$HOME/.local/bin:$HOME/.cargo/bin:$HOME/vitasdk/bin:$PATH\"; ./scripts/setup_env.sh --install-all && cargo fetch --locked"
 }

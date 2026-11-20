@@ -251,7 +251,7 @@ fn test_list_sizes_and_browse_entry() {
     assert_eq!(VISIBLE_DEVICES, 5);
     assert_eq!(BROWSER_ROWS, 8);
     assert_eq!(BROWSE_TEMPLATE_ID, "__browse__");
-    assert_eq!(NEW_SHARE_TEMPLATES.len(), 5);
+    assert_eq!(NEW_SHARE_TEMPLATES.len(), 6);
     let last = NEW_SHARE_TEMPLATES.last().unwrap();
     assert_eq!(last.0, BROWSE_TEMPLATE_ID);
 }

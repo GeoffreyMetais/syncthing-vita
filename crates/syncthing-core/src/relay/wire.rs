@@ -82,7 +82,13 @@ impl SessionInvitation {
                 let mut octets = [0u8; 16];
                 octets.copy_from_slice(&self.address);
                 let ip = Ipv6Addr::from(octets);
-                if ip.is_unspecified() {
+                if let Some(v4) = ip.to_ipv4_mapped() {
+                    if v4.is_unspecified() {
+                        fallback_ip
+                    } else {
+                        IpAddr::V4(v4)
+                    }
+                } else if ip.is_unspecified() {
                     fallback_ip
                 } else {
                     IpAddr::V6(ip)

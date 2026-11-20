@@ -62,8 +62,30 @@ pub fn join_relay_session(
     timeout: Duration,
 ) -> io::Result<TcpStream> {
     let session_ip = invitation.session_ip(relay_addr.ip());
-    let session_addr = SocketAddr::new(session_ip, invitation.port);
-    let mut tcp = TcpStream::connect_timeout(&session_addr, timeout)?;
+    let session_port = if invitation.port == 0 {
+        relay_addr.port()
+    } else {
+        invitation.port
+    };
+    let session_addr = SocketAddr::new(session_ip, session_port);
+    let mut tcp = if session_addr == relay_addr {
+        TcpStream::connect_timeout(&session_addr, timeout)?
+    } else {
+        // Bound the first attempt so a blackholed NAT port or unroutable IP still leaves
+        // time to fall back to `relay_addr` before the relay's 10s invitation expires.
+        let first_timeout = (timeout / 2)
+            .min(Duration::from_secs(3))
+            .max(Duration::from_millis(100));
+        match TcpStream::connect_timeout(&session_addr, first_timeout) {
+            Ok(tcp) => tcp,
+            Err(_) => {
+                let fallback_timeout = timeout
+                    .saturating_sub(first_timeout)
+                    .max(Duration::from_secs(1));
+                TcpStream::connect_timeout(&relay_addr, fallback_timeout)?
+            }
+        }
+    };
     let _ = tcp.set_nodelay(true);
     tcp.set_read_timeout(Some(timeout))?;
     tcp.set_write_timeout(Some(timeout))?;

@@ -127,6 +127,21 @@ fn test_session_invitation_ip_fallback() {
         make_inv(Ipv6Addr::LOCALHOST.octets().to_vec()).session_ip(fallback),
         IpAddr::V6(Ipv6Addr::LOCALHOST)
     );
+    // Go's `strelaysrv` encodes IPv4 addresses as 16-byte IPv4-mapped IPv6 (`::ffff:a.b.c.d`).
+    assert_eq!(
+        make_inv(
+            Ipv4Addr::new(37, 27, 252, 54)
+                .to_ipv6_mapped()
+                .octets()
+                .to_vec()
+        )
+        .session_ip(fallback),
+        IpAddr::V4(Ipv4Addr::new(37, 27, 252, 54))
+    );
+    assert_eq!(
+        make_inv(Ipv4Addr::UNSPECIFIED.to_ipv6_mapped().octets().to_vec()).session_ip(fallback),
+        fallback
+    );
 }
 
 #[test]
@@ -165,6 +180,50 @@ fn test_join_relay_session_over_loopback_tcp() {
     let mut buf = [0u8; 8];
     tunnel.read_exact(&mut buf).unwrap();
     assert_eq!(&buf, b"TUNNELED");
+    server.join().unwrap();
+}
+
+#[test]
+fn test_join_relay_session_falls_back_to_relay_addr_when_invited_port_fails() {
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let addr = listener.local_addr().unwrap();
+    let closed_port = {
+        let tmp = TcpListener::bind("127.0.0.1:0").unwrap();
+        tmp.local_addr().unwrap().port()
+    };
+
+    let server = thread::spawn(move || {
+        let (mut stream, _) = listener.accept().unwrap();
+        let mut hdr = [0u8; 12];
+        stream.read_exact(&mut hdr).unwrap();
+        let (msg_type, len) = decode_header(hdr).unwrap();
+        assert_eq!(msg_type, RelayMsgType::JoinSessionRequest);
+        let mut payload = vec![0u8; len];
+        stream.read_exact(&mut payload).unwrap();
+        assert_eq!(&payload[4..12], b"nat-key!");
+
+        let mut resp = Vec::new();
+        resp.extend_from_slice(&0i32.to_be_bytes());
+        push_xdr_opaque(&mut resp, b"success");
+        stream
+            .write_all(&frame_relay_msg(RelayMsgType::Response, &resp))
+            .unwrap();
+        stream.write_all(b"FALLBACK").unwrap();
+    });
+
+    // Simulates a NAT-forwarded relay whose invitation advertises its internal port.
+    let inv = SessionInvitation {
+        from: vec![0x33; 32],
+        key: b"nat-key!".to_vec(),
+        address: vec![0, 0, 0, 0],
+        port: closed_port,
+        server_socket: false,
+    };
+
+    let mut tunnel = join_relay_session(addr, &inv, Duration::from_secs(2)).unwrap();
+    let mut buf = [0u8; 8];
+    tunnel.read_exact(&mut buf).unwrap();
+    assert_eq!(&buf, b"FALLBACK");
     server.join().unwrap();
 }
 
