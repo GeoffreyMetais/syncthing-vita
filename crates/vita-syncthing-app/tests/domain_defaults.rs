@@ -80,13 +80,17 @@ fn test_protocol_log_limits() {
 
 #[test]
 fn test_new_share_presets_and_browse_entry_last() {
-    assert_eq!(NEW_SHARE_TEMPLATES.len(), 5);
+    assert_eq!(NEW_SHARE_TEMPLATES.len(), 6);
     assert_eq!(
         NEW_SHARE_TEMPLATES[0],
-        ("screenshots", "Vita Screenshots", "ux0:picture/SCREENSHOT")
+        ("vita-savedata", "Vita Save Data", "ux0:user/00/savedata")
     );
     assert_eq!(
         NEW_SHARE_TEMPLATES[1],
+        ("screenshots", "Vita Screenshots", "ux0:picture/SCREENSHOT")
+    );
+    assert_eq!(
+        NEW_SHARE_TEMPLATES[2],
         (
             "retroarch-saves",
             "RetroArch Savefiles",
@@ -94,7 +98,7 @@ fn test_new_share_presets_and_browse_entry_last() {
         )
     );
     assert_eq!(
-        NEW_SHARE_TEMPLATES[2],
+        NEW_SHARE_TEMPLATES[3],
         (
             "retroarch-savetate",
             "RetroArch Savestates files",
@@ -102,9 +106,9 @@ fn test_new_share_presets_and_browse_entry_last() {
         )
     );
     assert_eq!(
-        NEW_SHARE_TEMPLATES[3],
+        NEW_SHARE_TEMPLATES[4],
         ("music", "Music folder", "ux0:music")
     );
-    assert_eq!(NEW_SHARE_TEMPLATES[4].0, BROWSE_TEMPLATE_ID);
-    assert_eq!(NEW_SHARE_TEMPLATES[4].2, "ux0:");
+    assert_eq!(NEW_SHARE_TEMPLATES[5].0, BROWSE_TEMPLATE_ID);
+    assert_eq!(NEW_SHARE_TEMPLATES[5].2, "ux0:");
 }
