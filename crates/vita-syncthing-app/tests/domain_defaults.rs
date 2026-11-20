@@ -86,7 +86,7 @@ fn test_new_share_presets_and_browse_entry_last() {
         ("vita-savedata", "Vita Games Saves", "ux0:user/00/savedata")
     );
     assert_eq!(
-        NEW_SHARE_TEMPLATES[2],
+        NEW_SHARE_TEMPLATES[1],
         (
             "retroarch-saves",
             "RetroArch Savefiles",
@@ -94,7 +94,7 @@ fn test_new_share_presets_and_browse_entry_last() {
         )
     );
     assert_eq!(
-        NEW_SHARE_TEMPLATES[3],
+        NEW_SHARE_TEMPLATES[2],
         (
             "retroarch-savetate",
             "RetroArch Savestates files",
@@ -102,7 +102,7 @@ fn test_new_share_presets_and_browse_entry_last() {
         )
     );
     assert_eq!(
-        NEW_SHARE_TEMPLATES[1],
+        NEW_SHARE_TEMPLATES[3],
         ("screenshots", "Vita Screenshots", "ux0:picture/SCREENSHOT")
     );
     assert_eq!(
