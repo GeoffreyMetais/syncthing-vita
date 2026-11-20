@@ -83,7 +83,7 @@ fn test_new_share_presets_and_browse_entry_last() {
     assert_eq!(NEW_SHARE_TEMPLATES.len(), 6);
     assert_eq!(
         NEW_SHARE_TEMPLATES[0],
-        ("vita-savedata", "Vita Save Data", "ux0:user/00/savedata")
+        ("vita-savedata", "Vita Games Saves", "ux0:user/00/savedata")
     );
     assert_eq!(
         NEW_SHARE_TEMPLATES[1],
