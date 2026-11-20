@@ -1,6 +1,19 @@
 //! Resolution of the TCP addresses advertised in an `Announce` packet.
 
-use std::net::SocketAddr;
+use std::net::{IpAddr, SocketAddr};
+
+/// Returns `true` when `ip` is a local/private address (RFC 1918, loopback, link-local, or IPv6
+/// ULA) rather than a public WAN address.
+pub fn is_local_ip(ip: IpAddr) -> bool {
+    match ip {
+        IpAddr::V4(v4) => v4.is_private() || v4.is_loopback() || v4.is_link_local(),
+        IpAddr::V6(v6) => {
+            v6.is_loopback()
+                || (v6.segments()[0] & 0xffc0) == 0xfe80
+                || (v6.segments()[0] & 0xfe00) == 0xfc00
+        }
+    }
+}
 
 /// Extracts and orders reachable TCP `SocketAddr` addresses from an `Announce` packet
 /// and the UDP datagram source IP address.

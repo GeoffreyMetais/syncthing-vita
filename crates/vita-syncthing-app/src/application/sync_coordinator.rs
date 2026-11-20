@@ -2,7 +2,7 @@
 
 use std::sync::mpsc::Receiver;
 
-use syncthing_core::SyncEvent;
+use syncthing_core::{is_local_ip, SyncEvent};
 
 use crate::application::{DeviceRegistry, FolderBrowser, FolderOfferService, ShareService};
 use crate::domain::{AppState, UiText};
@@ -85,13 +85,12 @@ impl SyncCoordinator {
                 } else {
                     peer_name
                 };
-                DeviceRegistry::upsert_device(
-                    state,
-                    repo,
-                    peer_device_id,
-                    &name,
-                    &peer_addr.to_string(),
-                );
+                let persisted_addr = if is_local_ip(peer_addr.ip()) {
+                    peer_addr.to_string()
+                } else {
+                    String::new()
+                };
+                DeviceRegistry::upsert_device(state, repo, peer_device_id, &name, &persisted_addr);
                 state.initial_sync.begin(peer_device_id);
                 state.sync_in_progress = true;
                 state.peer_label =
