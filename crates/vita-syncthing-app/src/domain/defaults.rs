@@ -114,8 +114,7 @@ pub const BROWSE_TEMPLATE_ID: &str = "__browse__";
 /// `Files` browser while not shared): `(folder ID, label, target path)`.
 /// The `__browse__` entry opens the folder browser instead of creating a share.
 pub const NEW_SHARE_TEMPLATES: &[(&str, &str, &str)] = &[
-    ("vita-savedata", "Vita Save Data", "ux0:user/00/savedata"),
-    ("screenshots", "Vita Screenshots", "ux0:picture/SCREENSHOT"),
+    ("vita-savedata", "Vita Games Saves", "ux0:user/00/savedata"),
     (
         "retroarch-saves",
         "RetroArch Savefiles",
@@ -126,6 +125,7 @@ pub const NEW_SHARE_TEMPLATES: &[(&str, &str, &str)] = &[
         "RetroArch Savestates files",
         "ux0:data/retroarch/savestates",
     ),
+    ("screenshots", "Vita Screenshots", "ux0:picture/SCREENSHOT"),
     ("music", "Music folder", "ux0:music"),
     (
         "__browse__",
