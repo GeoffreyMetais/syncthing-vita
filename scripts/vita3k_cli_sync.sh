@@ -73,6 +73,7 @@ start_cli_lan() {
 
 start_cli_internet() {
     local log_file="$1"
+    mkdir -p "$(dirname "$log_file")"
     "$CLI" --home "$CLI_HOME" run --listen none --no-local-discovery \
         > "$log_file" 2>&1 &
     CLI_PID=$!
@@ -84,6 +85,27 @@ start_cli_internet() {
     done
     if ! grep -qE "Global Discovery: announced .*relay://" "$log_file" 2>/dev/null; then
         echo "FAIL CLI did not announce a relay URI to Global Discovery within 90s"
+        cat "$log_file" || true
+        exit 1
+    fi
+}
+
+# Starts CLI with LAN discovery, TCP 22000, Global Discovery, and Relays ALL enabled so that
+# Phase 2 genuinely proves the Vita prefers LAN even when Global Discovery / relays are available.
+start_cli_lan_and_global() {
+    local log_file="$1"
+    mkdir -p "$(dirname "$log_file")"
+    "$CLI" --home "$CLI_HOME" run --listen 0.0.0.0:22000 \
+        > "$log_file" 2>&1 &
+    CLI_PID=$!
+    for _ in $(seq 1 180); do
+        if grep -qE "Global Discovery: announced .*relay://" "$log_file" 2>/dev/null; then
+            break
+        fi
+        sleep 0.5
+    done
+    if ! grep -qE "Global Discovery: announced .*relay://" "$log_file" 2>/dev/null; then
+        echo "FAIL CLI did not announce to Global Discovery in LAN+Global mode within 90s"
         cat "$log_file" || true
         exit 1
     fi
@@ -115,7 +137,7 @@ run_vita3k_phase() {
     local vpk="target/armv7-sony-vita-newlibeabihf/release/SYNCTHING.vpk"
     rm -rf "$DATA/shots"
     cp "$script" "$DATA/ui_script.txt"
-    unzip -qo "$VPK" -d "$UX0/app/SYNCTHING"
+    unzip -qo "$vpk" -d "$UX0/app/SYNCTHING"
 
     ./scripts/vita3k_launch.sh -z --frontend sdl -l 2 -r SYNCTHING > "$phase_out/vita3k.log" 2>&1 &
     sleep "$run_secs"
@@ -208,15 +230,16 @@ else
         status=1
     fi
 
-    # Phase 2: LAN sync reusing the exact same Vita DATA dir (preserving devices.cfg, shares.cfg,
-    # device_seed.bin, sync/) and a fresh Vita log so Phase 2 TLS connections are unambiguous.
-    echo "=== Phase 2: LAN reconnection sync ==="
+    # Phase 2: LAN + Global + Relay all enabled, reusing the exact same Vita DATA dir
+    # (preserving devices.cfg, shares.cfg, device_seed.bin, sync/) and a fresh Vita log so Phase 2
+    # TLS connections unambiguously prove LAN preference even when Global/Relay are available.
+    echo "=== Phase 2: LAN + Global reconnection sync ==="
     PHASE2_OUT="$OUT_DIR/phase2-lan"
     rm -f "$DATA/syncthing.log" "$DATA/syncthing.log.1"
     echo "written on the CLI (LAN phase)" > "$WORK/cli-share/from_cli_lan.txt"
     echo "written on the Vita (LAN phase)" > "$VITA_SHARE/from_vita_lan.txt"
 
-    start_cli_lan "$PHASE2_OUT/cli.log"
+    start_cli_lan_and_global "$PHASE2_OUT/cli.log"
     run_vita3k_phase "$PHASE2_OUT" "$RUN_SECS"
     stop_cli
 
