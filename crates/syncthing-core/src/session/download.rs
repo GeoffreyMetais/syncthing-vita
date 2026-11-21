@@ -125,14 +125,43 @@ fn download_file(
     file: &BepFileInfo,
 ) -> io::Result<bool> {
     let storage = ctx.storage;
-    // The local content is only worth copying when some of its blocks are kept.
+    let block_size = file
+        .blocks
+        .first()
+        .map_or(BEP_BLOCK_SIZE as i32, |b| b.size.max(0))
+        .max(BEP_BLOCK_SIZE as i32);
+
+    // The local content is only worth copying when some of its blocks are kept; if all aligned
+    // blocks differ, also look for shifted blocks in the existing local file via rolling weak_hash.
     let prepared = storage
         .find_outdated_blocks(folder_id, file)
         .and_then(|outdated| {
-            let reuse_local = outdated.len() < file.blocks.len();
+            let mut reuse_local = outdated.len() < file.blocks.len();
+            let shifted_sources = if !outdated.is_empty() {
+                find_shifted_sources(storage, folder_id, file, &outdated, block_size as usize)
+            } else {
+                std::collections::HashMap::new()
+            };
+            if !shifted_sources.is_empty() {
+                // Only keep aligned matches in-place if some aligned blocks matched; otherwise
+                // start from an empty temp file and copy shifted blocks from the untouched source.
+                reuse_local = outdated.len() < file.blocks.len();
+            }
             storage.prepare_download_seeded(folder_id, &file.name, reuse_local)?;
-            let tmp = storage.open_download(folder_id, &file.name)?;
-            Ok((outdated, tmp))
+            let mut tmp = storage.open_download(folder_id, &file.name)?;
+            let remaining_outdated = if shifted_sources.is_empty() {
+                outdated
+            } else {
+                apply_shifted_blocks(
+                    storage,
+                    folder_id,
+                    &file.name,
+                    outdated,
+                    &shifted_sources,
+                    &mut tmp,
+                )?
+            };
+            Ok((remaining_outdated, tmp))
         });
     let (outdated_blocks, mut tmp) = match prepared {
         Ok(p) => p,
@@ -144,11 +173,6 @@ fn download_file(
     };
 
     let track_progress = file.blocks.len() > 1;
-    let block_size = file
-        .blocks
-        .first()
-        .map_or(BEP_BLOCK_SIZE as i32, |b| b.size.max(0))
-        .max(BEP_BLOCK_SIZE as i32);
     let mut progress_sent = false;
     let mut pending_indexes: Vec<i32> = Vec::with_capacity(DOWNLOAD_PROGRESS_BLOCK_INTERVAL);
 
@@ -317,6 +341,7 @@ fn fetch_block(
         offset: block.offset,
         size: block.size,
         hash: block.hash.clone(),
+        weak_hash: block.weak_hash,
     };
     write_bep_message(stream, BepMessageType::Request, &req.encode())?;
 
@@ -383,6 +408,126 @@ fn fetch_block(
         total_size,
     });
     Ok(Some(len))
+}
+
+/// Scans the existing local file in one streaming pass for any full-size outdated blocks that
+/// carry a non-zero `weak_hash`. Also checks tail-sized blocks with [`find_shifted_block`] if
+/// needed. Returns `sha256 -> local_byte_offset`.
+fn find_shifted_sources(
+    storage: &crate::storage::FsSyncStorage,
+    folder_id: &str,
+    file: &BepFileInfo,
+    outdated: &[BepBlockInfo],
+    block_size: usize,
+) -> std::collections::HashMap<Vec<u8>, u64> {
+    use std::collections::HashMap;
+    use std::io::{Read, Seek, SeekFrom};
+
+    use crate::storage::weak_hash::{find_shifted_block, find_shifted_blocks_in_file};
+
+    let local_path = storage.resolve_safe_path(folder_id, &file.name);
+    let Ok(mut local_file) = File::open(&local_path) else {
+        return HashMap::new();
+    };
+    let Ok(meta) = local_file.metadata() else {
+        return HashMap::new();
+    };
+    if !meta.is_file() || meta.len() == 0 {
+        return HashMap::new();
+    }
+
+    let mut full_targets: HashMap<u32, Vec<Vec<u8>>> = HashMap::new();
+    let mut small_blocks: Vec<&BepBlockInfo> = Vec::new();
+    for b in outdated {
+        if b.weak_hash == 0 || b.hash.len() != BEP_BLOCK_HASH_LEN || b.size <= 0 {
+            continue;
+        }
+        if b.size as usize == block_size {
+            full_targets
+                .entry(b.weak_hash)
+                .or_default()
+                .push(b.hash.clone());
+        } else {
+            small_blocks.push(b);
+        }
+    }
+
+    let mut found = if !full_targets.is_empty() && meta.len() >= block_size as u64 {
+        find_shifted_blocks_in_file(&mut local_file, block_size, &full_targets).unwrap_or_default()
+    } else {
+        HashMap::new()
+    };
+
+    for b in small_blocks {
+        if found.contains_key(&b.hash) {
+            continue;
+        }
+        let bsize = b.size as usize;
+        if meta.len() < bsize as u64 {
+            continue;
+        }
+        if let Ok(Some(data)) = find_shifted_block(&mut local_file, bsize, b.weak_hash, &b.hash) {
+            // Confirm where the tail block sits or simply verify it exists; for tail blocks we
+            // search again only when needed, or check the end of file first.
+            let _ = data;
+            // Record the exact offset by scanning `small_blocks` with `find_shifted_blocks_in_file`.
+            let mut single = HashMap::with_capacity(1);
+            single.insert(b.weak_hash, vec![b.hash.clone()]);
+            if let Ok(map) = find_shifted_blocks_in_file(&mut local_file, bsize, &single) {
+                found.extend(map);
+            }
+        } else {
+            // Also check exact tail of local file if `find_shifted_block` found nothing.
+            let _ = local_file.seek(SeekFrom::End(-(bsize as i64)));
+            let mut tail = vec![0u8; bsize];
+            if local_file.read_exact(&mut tail).is_ok()
+                && Sha256::digest(&tail).as_slice() == b.hash.as_slice()
+            {
+                found.insert(b.hash.clone(), meta.len() - bsize as u64);
+            }
+        }
+    }
+
+    found
+}
+
+/// Copies matched shifted blocks from the original local file into `tmp`, returning only the
+/// blocks that still need to be requested over the network.
+fn apply_shifted_blocks(
+    storage: &crate::storage::FsSyncStorage,
+    folder_id: &str,
+    rel_path: &str,
+    outdated: Vec<BepBlockInfo>,
+    shifted_sources: &std::collections::HashMap<Vec<u8>, u64>,
+    tmp: &mut File,
+) -> io::Result<Vec<BepBlockInfo>> {
+    use std::io::{Read, Seek, SeekFrom};
+
+    let local_path = storage.resolve_safe_path(folder_id, rel_path);
+    let mut local_file = File::open(&local_path)?;
+    let mut remaining = Vec::with_capacity(outdated.len());
+    let mut buf = Vec::new();
+
+    for block in outdated {
+        let Some(&src_offset) = shifted_sources.get(&block.hash) else {
+            remaining.push(block);
+            continue;
+        };
+        let bsize = block.size.max(0) as usize;
+        if buf.len() < bsize {
+            buf.resize(bsize, 0);
+        }
+        local_file.seek(SeekFrom::Start(src_offset))?;
+        if local_file.read_exact(&mut buf[..bsize]).is_ok()
+            && Sha256::digest(&buf[..bsize]).as_slice() == block.hash.as_slice()
+        {
+            write_block_at(tmp, block.offset.max(0) as u64, &buf[..bsize])?;
+        } else {
+            remaining.push(block);
+        }
+    }
+
+    Ok(remaining)
 }
 
 fn emit_file_error(

@@ -187,6 +187,7 @@ fn test_peer_session_loop_connects_on_lan_after_lan_discovery_despite_wan_and_re
                         expected_device_id: Some(expected_vita),
                         timeout: Duration::from_secs(5),
                         control: Some(Arc::clone(&server_control)),
+                        secondary_inbox: None,
                     };
                     let res = accept_and_sync(&params, incoming, remote_addr, |_| {}).unwrap();
                     return res.session_status;

@@ -67,6 +67,10 @@ fn run_claimed(
     peer: &KnownPeer,
     link: Link,
 ) -> io::Result<PeerHandshakeResult> {
+    let secondary_inbox = match &link {
+        Link::Incoming { .. } => Some(Arc::clone(&ctx.secondary_inbox)),
+        Link::Dial(_) | Link::RelayClient { .. } => None,
+    };
     let params = SessionParams {
         identity: &ctx.identity,
         hello: &ctx.hello,
@@ -74,6 +78,7 @@ fn run_claimed(
         expected_device_id: Some(peer.id),
         timeout: CONNECT_TIMEOUT,
         control: Some(Arc::clone(&ctx.control)),
+        secondary_inbox,
     };
     let on_event = |event| handle_event(ctx, peer, event);
     match link {

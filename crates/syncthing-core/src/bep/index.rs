@@ -24,6 +24,7 @@ pub struct BepBlockInfo {
     pub offset: i64,
     pub size: i32,
     pub hash: Vec<u8>,
+    pub weak_hash: u32,
 }
 
 /// Information about a file in `Index` / `IndexUpdate`.
@@ -137,6 +138,9 @@ impl BepIndex {
                     if !b.hash.is_empty() {
                         encode_bytes_field(&mut bbuf, 3, &b.hash);
                     }
+                    if b.weak_hash != 0 {
+                        encode_varint_field(&mut bbuf, 4, u64::from(b.weak_hash));
+                    }
                     encode_bytes_field(&mut fbuf, 16, &bbuf);
                 }
             }
@@ -236,6 +240,7 @@ impl BepIndex {
         let mut offset = 0i64;
         let mut size = 0i32;
         let mut hash = Vec::new();
+        let mut weak_hash = 0u32;
 
         for item in WireIter::new(bytes) {
             let (field_num, wire_type, data) = item?;
@@ -249,10 +254,19 @@ impl BepIndex {
                     size = v as i32;
                 }
                 (3, 2) => hash = data.to_vec(),
+                (4, 0) => {
+                    let (v, _) = decode_varint(data)?;
+                    weak_hash = v as u32;
+                }
                 _ => {}
             }
         }
 
-        Ok(BepBlockInfo { offset, size, hash })
+        Ok(BepBlockInfo {
+            offset,
+            size,
+            hash,
+            weak_hash,
+        })
     }
 }

@@ -18,7 +18,19 @@ impl FolderDb {
             let blocks: Vec<String> = e
                 .blocks
                 .iter()
-                .map(|b| format!("{}:{}:{}", b.offset, b.size, to_hex(&b.hash)))
+                .map(|b| {
+                    if b.weak_hash != 0 {
+                        format!(
+                            "{}:{}:{}:{:x}",
+                            b.offset,
+                            b.size,
+                            to_hex(&b.hash),
+                            b.weak_hash
+                        )
+                    } else {
+                        format!("{}:{}:{}", b.offset, b.size, to_hex(&b.hash))
+                    }
+                })
                 .collect();
             out.push_str(&format!(
                 "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
@@ -69,11 +81,19 @@ impl FolderDb {
                 .split(',')
                 .filter(|s| !s.is_empty())
                 .filter_map(|b| {
-                    let mut it = b.splitn(3, ':');
+                    let mut it = b.splitn(4, ':');
+                    let offset = it.next()?.parse().ok()?;
+                    let size = it.next()?.parse().ok()?;
+                    let hash = from_hex(it.next()?)?;
+                    let weak_hash = it
+                        .next()
+                        .and_then(|w| u32::from_str_radix(w, 16).ok())
+                        .unwrap_or(0);
                     Some(BepBlockInfo {
-                        offset: it.next()?.parse().ok()?,
-                        size: it.next()?.parse().ok()?,
-                        hash: from_hex(it.next()?)?,
+                        offset,
+                        size,
+                        hash,
+                        weak_hash,
                     })
                 })
                 .collect();

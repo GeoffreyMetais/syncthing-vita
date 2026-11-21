@@ -183,6 +183,7 @@ pub fn spawn_sync_worker(
         let discovered_addrs: SharedDiscoveredAddrs = Arc::new(Mutex::new(Vec::new()));
         let global_endpoints: SharedGlobalEndpoints = Arc::new(Mutex::new(Vec::new()));
         let claims = Arc::new(SessionClaims::new(MAX_PEER_SESSIONS));
+        let secondary_inbox = Arc::new(syncthing_core::SecondaryInbox::new());
         let tcp_slots = Arc::new(ConnectionSlots::new(MAX_INCOMING_HANDSHAKES));
         let unknown_log = Arc::new(UnknownDeviceLog::new(MAX_UNKNOWN_DEVICE_REPORTS));
         let shared_relay_uri: SharedRelayUri = Arc::new(Mutex::new(None));
@@ -197,6 +198,7 @@ pub fn spawn_sync_worker(
                 storage: storage.clone(),
                 approved_devices: approved_devices.clone(),
                 claims: Arc::clone(&claims),
+                secondary_inbox: Arc::clone(&secondary_inbox),
                 slots: Arc::clone(&tcp_slots),
                 unknown_log: Arc::clone(&unknown_log),
                 control: Arc::clone(&worker_control),

@@ -28,6 +28,7 @@ fn test_db_serialization_roundtrip() {
             offset: 0,
             size: 3,
             hash: vec![1, 2, 255],
+            weak_hash: 0,
         }],
     });
     let parsed = FolderDb::parse(&db.serialize()).expect("parse");
@@ -101,6 +102,7 @@ fn block(offset: i64, size: i32, hash: u8) -> BepBlockInfo {
         offset,
         size,
         hash: vec![hash; 32],
+        weak_hash: 0,
     }
 }
 

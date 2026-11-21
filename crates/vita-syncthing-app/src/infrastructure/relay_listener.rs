@@ -371,6 +371,7 @@ fn handle_invitation(
         expected_device_id: Some(from),
         timeout: CONNECT_TIMEOUT,
         control: Some(Arc::clone(&ctx.control)),
+        secondary_inbox: None,
     };
 
     let result = if invitation.server_socket {

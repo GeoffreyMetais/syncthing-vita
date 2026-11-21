@@ -114,6 +114,7 @@ fn test_served_blocks_are_counted_in_the_upload_statistics() {
         offset,
         size,
         hash: Vec::new(),
+        weak_hash: 0,
     };
     let mut wire = Vec::new();
     serve_block_request(&mut wire, &mut ctx, &request(0, 4).encode()).unwrap();

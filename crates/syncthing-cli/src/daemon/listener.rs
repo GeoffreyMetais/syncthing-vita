@@ -4,7 +4,7 @@ use std::io;
 use std::net::{SocketAddr, TcpListener, TcpStream};
 use std::sync::Arc;
 
-use syncthing_core::accept_bep_tls_stream;
+use syncthing_core::{accept_bep_tls_stream, accept_secondary_cluster_config};
 
 use super::connection_slots::{ConnectionSlot, ConnectionSlots};
 use super::context::DaemonContext;
@@ -60,7 +60,9 @@ pub fn run_listener(ctx: Arc<DaemonContext>, listener: TcpListener) {
 }
 
 /// Authenticates the peer, then runs a session if it is a configured device (`slot` is given
-/// back as soon as the peer is known to be one).
+/// back as soon as the peer is known to be one). If the peer already holds an active primary
+/// session and opens a `ClusterConfig { secondary: true }` stream, delivers it to
+/// `ctx.secondary_inbox`.
 fn handle_connection(ctx: &DaemonContext, tcp: TcpStream, addr: SocketAddr, slot: ConnectionSlot) {
     if tcp.set_nonblocking(false).is_err() {
         return;
@@ -82,6 +84,13 @@ fn handle_connection(ctx: &DaemonContext, tcp: TcpStream, addr: SocketAddr, slot
         return;
     };
     drop(slot);
+    if ctx.table().is_claimed(&device) && ctx.secondary_inbox.has_active_session(&device) {
+        let mut tls_stream = stream.into_stream();
+        if let Ok(true) = accept_secondary_cluster_config(&mut tls_stream, &ctx.hello) {
+            let _ = ctx.secondary_inbox.deliver(&device, tls_stream);
+        }
+        return;
+    }
     match run_session(
         ctx,
         peer,

@@ -262,6 +262,7 @@ fn send_only_never_pulls_remote_changes_and_override_bumps_versions() {
         expected_device_id: Some(peer.device_id),
         timeout: Duration::from_secs(5),
         control: Some(control),
+        secondary_inbox: None,
     };
     let result = connect_and_sync(&params, peer.addr, move |ev| {
         let _ = tx.send(ev);

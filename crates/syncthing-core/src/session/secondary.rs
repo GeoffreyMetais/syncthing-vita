@@ -3,14 +3,20 @@
 
 use std::io;
 use std::net::SocketAddr;
+use std::sync::mpsc::{self, Receiver, Sender};
+use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
 
 use super::context::SessionContext;
 use super::upload::serve_block_request;
 use crate::bep::{write_bep_message, BepClusterConfig, BepHello, BepMessageType};
+use crate::device_id::DeviceId;
 use crate::tls::client::open_bep_tls_stream;
 use crate::tls::polling::try_read_bep_message;
 use crate::tls::BepTlsStream;
+
+/// Maximum number of secondary data connections attached per active peer session (`1+2`).
+pub const MAX_SECONDARIES_PER_PEER: usize = 2;
 
 /// Poll budget per secondary connection on each pass of the session loops.
 const SECONDARY_POLL: Duration = Duration::from_millis(35);
@@ -20,12 +26,160 @@ const PROMOTION_BUDGET: Duration = Duration::from_millis(1400);
 const MIN_PROMOTION_WAIT: Duration = Duration::from_millis(250);
 /// Maximum slice of a single promotion poll.
 const PROMOTION_POLL_SLICE: Duration = Duration::from_millis(350);
+/// Timeout used when checking if an incoming duplicate connection is a secondary stream.
+const INBOUND_SECONDARY_CHECK_TIMEOUT: Duration = Duration::from_secs(2);
 
 /// One secondary data connection.
 pub struct SecondaryBepConn {
     pub stream: BepTlsStream,
     /// `true` once the peer sent its own secondary `ClusterConfig` (connection usable).
     pub promoted: bool,
+}
+
+/// Coordinates inbound secondary BEP connections (`ClusterConfig { secondary: true }`) between
+/// an incoming TCP listener and the currently active primary session for a given peer.
+#[derive(Debug, Default)]
+pub struct SecondaryInbox {
+    inboxes: Mutex<Vec<(DeviceId, Sender<BepTlsStream>)>>,
+}
+
+/// RAII registration of an active primary session in [`SecondaryInbox`]. Automatically
+/// unregisters the peer on drop.
+pub struct SecondaryInboxRegistration {
+    inbox: Arc<SecondaryInbox>,
+    peer_device_id: DeviceId,
+}
+
+impl Drop for SecondaryInboxRegistration {
+    fn drop(&mut self) {
+        self.inbox.unregister(&self.peer_device_id);
+    }
+}
+
+impl SecondaryInbox {
+    /// Creates an empty [`SecondaryInbox`].
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Registers an active primary session for `peer_device_id` and returns the receiver for
+    /// inbound secondary streams plus an RAII guard that unregisters on drop.
+    pub fn register(
+        self: &Arc<Self>,
+        peer_device_id: DeviceId,
+    ) -> (Receiver<BepTlsStream>, SecondaryInboxRegistration) {
+        let (tx, rx) = mpsc::channel();
+        let mut guard = self.inboxes.lock().unwrap_or_else(|p| p.into_inner());
+        guard.retain(|(id, _)| !id.matches_peer(&peer_device_id));
+        guard.push((peer_device_id, tx));
+        (
+            rx,
+            SecondaryInboxRegistration {
+                inbox: Arc::clone(self),
+                peer_device_id,
+            },
+        )
+    }
+
+    /// Removes the registered channel for `peer_device_id`.
+    pub fn unregister(&self, peer_device_id: &DeviceId) {
+        let mut guard = self.inboxes.lock().unwrap_or_else(|p| p.into_inner());
+        guard.retain(|(id, _)| !id.matches_peer(peer_device_id));
+    }
+
+    /// Returns `true` if `peer_device_id` currently has an active primary session accepting
+    /// inbound secondary connections.
+    pub fn has_active_session(&self, peer_device_id: &DeviceId) -> bool {
+        let guard = self.inboxes.lock().unwrap_or_else(|p| p.into_inner());
+        guard
+            .iter()
+            .any(|(id, tx)| id.matches_peer(peer_device_id) && !is_disconnected(tx))
+    }
+
+    /// Delivers an authenticated secondary `BepTlsStream` (`ClusterConfig { secondary: true }`)
+    /// to the active primary session for `peer_device_id`.
+    /// Returns `Ok(())` on delivery, or `Err(Box::new(stream))` if no active session is registered.
+    pub fn deliver(
+        &self,
+        peer_device_id: &DeviceId,
+        stream: BepTlsStream,
+    ) -> Result<(), Box<BepTlsStream>> {
+        let sender = {
+            let guard = self.inboxes.lock().unwrap_or_else(|p| p.into_inner());
+            guard
+                .iter()
+                .find(|(id, _)| id.matches_peer(peer_device_id))
+                .map(|(_, tx)| tx.clone())
+        };
+        match sender {
+            Some(tx) => tx.send(stream).map_err(|e| Box::new(e.0)),
+            None => Err(Box::new(stream)),
+        }
+    }
+}
+
+fn is_disconnected(tx: &Sender<BepTlsStream>) -> bool {
+    // `mpsc::Sender` has no `is_closed()` in std without sending; an inactive receiver is
+    // removed on drop via `SecondaryInboxRegistration` anyway.
+    let _ = tx;
+    false
+}
+
+/// Checks an already-TLS-authenticated incoming stream from a peer that already holds a primary
+/// session: exchanges `Hello` (advertising `1+2` connections) and reads the first BEP message.
+/// Returns `Ok(true)` if the peer sent `ClusterConfig { secondary: true }`, or `Ok(false)` if it
+/// did not (primary/duplicate `ClusterConfig` or EOF).
+pub fn accept_secondary_cluster_config(
+    stream: &mut BepTlsStream,
+    our_hello: &BepHello,
+) -> io::Result<bool> {
+    let mut hello = our_hello.clone();
+    if hello.num_connections < 3 {
+        hello.num_connections = 3;
+    }
+    let _peer_hello = hello.exchange(stream)?;
+    let Some((msg_type, payload)) = try_read_bep_message(stream, INBOUND_SECONDARY_CHECK_TIMEOUT)?
+    else {
+        return Ok(false);
+    };
+    if msg_type != BepMessageType::ClusterConfig {
+        return Ok(false);
+    }
+    let cfg = BepClusterConfig::decode(&payload)?;
+    Ok(cfg.secondary)
+}
+
+/// Promotes any newly arrived inbound secondary streams from `rx` (up to `MAX_SECONDARIES_PER_PEER`
+/// total in `secondaries`) by sending our `ClusterConfig { secondary: true }` reply.
+/// Returns `true` if at least one new secondary connection was attached.
+pub fn attach_inbound_secondaries(
+    rx: Option<&Receiver<BepTlsStream>>,
+    secondaries: &mut Vec<SecondaryBepConn>,
+) -> bool {
+    let Some(rx) = rx else {
+        return false;
+    };
+    let mut attached = false;
+    while let Ok(mut sec_stream) = rx.try_recv() {
+        if secondaries.len() >= MAX_SECONDARIES_PER_PEER {
+            drop(sec_stream);
+            continue;
+        }
+        if write_bep_message(
+            &mut sec_stream,
+            BepMessageType::ClusterConfig,
+            &BepClusterConfig::encode_secondary(),
+        )
+        .is_ok()
+        {
+            secondaries.push(SecondaryBepConn {
+                stream: sec_stream,
+                promoted: true,
+            });
+            attached = true;
+        }
+    }
+    attached
 }
 
 /// Number of secondary connections to open, given both `Hello`s (`0..=2`).

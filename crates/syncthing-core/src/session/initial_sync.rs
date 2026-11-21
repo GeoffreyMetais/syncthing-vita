@@ -2,6 +2,7 @@
 //! local index publication and draining of the peer's first upload requests.
 
 use std::io;
+use std::sync::mpsc::Receiver;
 use std::time::{Duration, Instant};
 
 use super::context::SessionContext;
@@ -9,7 +10,9 @@ use super::dispatch::{dispatch_primary_message, next_primary_message, with_conte
 use super::download::download_folder;
 use super::folders::FolderSyncState;
 use super::index_exchange::{build_initial_local_indexes, publish_initial_indexes};
-use super::secondary::{poll_all_secondaries, wait_for_promotion, SecondaryBepConn};
+use super::secondary::{
+    attach_inbound_secondaries, poll_all_secondaries, wait_for_promotion, SecondaryBepConn,
+};
 use crate::tls::BepTlsStream;
 
 /// Drain window when a persistent session follows (it keeps serving requests afterwards).
@@ -34,12 +37,14 @@ pub fn run_initial_sync(
     folders: &mut FolderSyncState,
     secondaries: &mut Vec<SecondaryBepConn>,
     secondaries_opened_at: Instant,
+    inbound_sec_rx: Option<&Receiver<BepTlsStream>>,
     persistent: bool,
 ) -> io::Result<InitialSync> {
     initial_download(stream, ctx, folders)?;
 
     build_initial_local_indexes(stream, ctx, folders);
     wait_for_promotion(secondaries, secondaries_opened_at, ctx);
+    attach_inbound_secondaries(inbound_sec_rx, secondaries);
     publish_initial_indexes(stream, ctx, folders)?;
 
     let drain_window = if persistent {
@@ -49,6 +54,7 @@ pub fn run_initial_sync(
     };
     let drain_start = Instant::now();
     while drain_start.elapsed() < drain_window {
+        attach_inbound_secondaries(inbound_sec_rx, secondaries);
         match next_primary_message(stream, ctx, DRAIN_POLL) {
             Ok(None) => {}
             Ok(Some((msg_type, payload))) => {
@@ -61,6 +67,7 @@ pub fn run_initial_sync(
         }
         poll_all_secondaries(secondaries, ctx);
     }
+    attach_inbound_secondaries(inbound_sec_rx, secondaries);
 
     ctx.emit_cycle_completed(1 + secondaries.len());
     Ok(InitialSync::Completed)

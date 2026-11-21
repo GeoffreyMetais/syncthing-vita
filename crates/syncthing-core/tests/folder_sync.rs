@@ -253,6 +253,7 @@ fn block_of(data: &[u8]) -> syncthing_core::BepBlockInfo {
         offset: 0,
         size: data.len() as i32,
         hash: Sha256::digest(data).to_vec(),
+        weak_hash: syncthing_core::storage::weak_hash::weak_hash(data),
     }
 }
 

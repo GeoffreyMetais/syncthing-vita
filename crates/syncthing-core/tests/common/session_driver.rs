@@ -66,6 +66,7 @@ pub fn run_session(
         expected_device_id: Some(peer.device_id),
         timeout: Duration::from_secs(4),
         control,
+        secondary_inbox: None,
     };
     connect_and_sync(&params, peer.addr, on_event)
 }

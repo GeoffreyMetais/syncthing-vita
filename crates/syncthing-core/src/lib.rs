@@ -50,8 +50,9 @@ pub use relay::{
     RelayResponse, SessionInvitation, DEFAULT_RELAY_POOL,
 };
 pub use session::{
-    accept_and_sync, connect_and_sync, connect_and_sync_stream, PeerHandshakeResult, SessionParams,
-    SyncControl, SyncEvent, SyncSessionStatus, SyncTuning,
+    accept_and_sync, accept_secondary_cluster_config, connect_and_sync, connect_and_sync_stream,
+    PeerHandshakeResult, SecondaryInbox, SessionParams, SyncControl, SyncEvent, SyncSessionStatus,
+    SyncTuning,
 };
 pub use storage::FsSyncStorage;
 pub use tls::https::{HttpsClient, HttpsServer};

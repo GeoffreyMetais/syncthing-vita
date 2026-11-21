@@ -29,6 +29,7 @@ fn expected_blocks(data: &[u8]) -> Vec<BepBlockInfo> {
             offset: 0,
             size: 0,
             hash: sha(&[]),
+            weak_hash: 0,
         }];
     }
     let mut out = Vec::new();
@@ -38,6 +39,7 @@ fn expected_blocks(data: &[u8]) -> Vec<BepBlockInfo> {
             offset,
             size: chunk.len() as i32,
             hash: sha(chunk),
+            weak_hash: syncthing_core::storage::weak_hash::weak_hash(chunk),
         });
         offset += chunk.len() as i64;
     }
@@ -150,6 +152,7 @@ fn test_delta_handles_blocks_larger_than_the_read_buffer() {
             offset: 0,
             size: data.len() as i32,
             hash: sha(&data),
+            weak_hash: syncthing_core::storage::weak_hash::weak_hash(&data),
         }],
         ..remote_of("big.bin", &data)
     };
@@ -185,6 +188,7 @@ fn test_block_size_limit_is_inclusive() {
             offset: 0,
             size: BEP_MAX_BLOCK_SIZE as i32,
             hash: vec![0; 32],
+            weak_hash: 0,
         }],
     };
     // No local file: the announced blocks are returned without reading anything.
@@ -197,6 +201,7 @@ fn test_block_size_limit_is_inclusive() {
             offset: 0,
             size: BEP_MAX_BLOCK_SIZE as i32 + 1,
             hash: vec![0; 32],
+            weak_hash: 0,
         }],
         ..at_limit
     };
@@ -273,6 +278,7 @@ fn test_zero_length_block_of_an_empty_file_is_accepted() {
             offset: 0,
             size: 0,
             hash: sha(&[]),
+            weak_hash: 0,
         }],
     };
     assert_eq!(

@@ -84,6 +84,7 @@ fn incoming_unknown_peer_emits_device_offered_once_with_ip_only() {
         storage: FsSyncStorage::new(&srv_dir),
         approved_devices: Vec::new(),
         claims: Arc::new(SessionClaims::new(4)),
+        secondary_inbox: Arc::new(syncthing_core::SecondaryInbox::new()),
         slots: Arc::new(ConnectionSlots::new(2)),
         unknown_log: Arc::new(UnknownDeviceLog::new(16)),
         control: Arc::clone(&control),
@@ -103,6 +104,7 @@ fn incoming_unknown_peer_emits_device_offered_once_with_ip_only() {
         expected_device_id: Some(server_id.device_id),
         timeout: Duration::from_secs(2),
         control: None,
+        secondary_inbox: None,
     };
     let _ = connect_and_sync(&params, addr, |_| {});
 
@@ -153,6 +155,7 @@ fn incoming_self_connection_is_rejected_without_offer() {
         storage: FsSyncStorage::new(&srv_dir),
         approved_devices: Vec::new(),
         claims: Arc::new(SessionClaims::new(4)),
+        secondary_inbox: Arc::new(syncthing_core::SecondaryInbox::new()),
         slots: Arc::new(ConnectionSlots::new(2)),
         unknown_log: Arc::new(UnknownDeviceLog::new(16)),
         control: Arc::clone(&control),
@@ -171,6 +174,7 @@ fn incoming_self_connection_is_rejected_without_offer() {
         expected_device_id: Some(server_id.device_id),
         timeout: Duration::from_secs(2),
         control: None,
+        secondary_inbox: None,
     };
     let _ = connect_and_sync(&params, addr, |_| {});
 
@@ -210,6 +214,7 @@ fn incoming_approved_peer_runs_sync_and_joins_on_stop() {
             address: "dynamic".to_owned(),
         }],
         claims: Arc::new(SessionClaims::new(4)),
+        secondary_inbox: Arc::new(syncthing_core::SecondaryInbox::new()),
         slots: Arc::new(ConnectionSlots::new(2)),
         unknown_log: Arc::new(UnknownDeviceLog::new(16)),
         control: Arc::clone(&srv_control),
@@ -235,6 +240,7 @@ fn incoming_approved_peer_runs_sync_and_joins_on_stop() {
             expected_device_id: Some(server_dev_id),
             timeout: Duration::from_secs(3),
             control: Some(cli_control_thread),
+            secondary_inbox: None,
         };
         let _ = connect_and_sync(&params, addr, |_| {});
     });
@@ -280,6 +286,7 @@ fn incoming_already_claimed_peer_is_skipped() {
             address: "dynamic".to_owned(),
         }],
         claims: Arc::clone(&claims),
+        secondary_inbox: Arc::new(syncthing_core::SecondaryInbox::new()),
         slots: Arc::new(ConnectionSlots::new(2)),
         unknown_log: Arc::new(UnknownDeviceLog::new(16)),
         control: Arc::clone(&srv_control),
@@ -298,6 +305,7 @@ fn incoming_already_claimed_peer_is_skipped() {
         expected_device_id: Some(server_id.device_id),
         timeout: Duration::from_secs(2),
         control: None,
+        secondary_inbox: None,
     };
     let _ = connect_and_sync(&params, addr, |_| {});
 

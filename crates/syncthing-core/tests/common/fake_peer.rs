@@ -232,6 +232,7 @@ impl PeerConn {
                 offset: 0,
                 size: content.len() as i32,
                 hash: Sha256::digest(content).to_vec(),
+                weak_hash: syncthing_core::storage::weak_hash::weak_hash(content),
             }],
         }
     }
@@ -253,6 +254,7 @@ impl PeerConn {
                 offset: (i * block_size) as i64,
                 size: chunk.len() as i32,
                 hash: Sha256::digest(chunk).to_vec(),
+                weak_hash: syncthing_core::storage::weak_hash::weak_hash(chunk),
             })
             .collect();
         info
@@ -286,6 +288,7 @@ impl PeerConn {
             offset: 0,
             size: 0,
             hash: Vec::new(),
+            weak_hash: 0,
         };
         self.send(BepMessageType::Request, &req.encode());
         let payload = self.wait_for(BepMessageType::Response, timeout)?;
