@@ -28,6 +28,7 @@ fn storage_with(
                 id: (*folder).to_owned(),
                 label: (*folder).to_owned(),
                 device_ids: vec![peer],
+                ..Default::default()
             });
         }
         let dir = storage.folder_root(folder);
@@ -107,6 +108,7 @@ fn test_cluster_config_is_sent_again_when_the_shared_folders_change() {
         id: "alpha".to_owned(),
         label: "alpha".to_owned(),
         device_ids: vec![peer.device_id],
+        ..Default::default()
     });
     for folder in ["alpha", "beta"] {
         let dir = storage.folder_root(folder);

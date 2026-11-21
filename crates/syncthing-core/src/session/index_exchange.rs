@@ -154,6 +154,7 @@ pub fn handle_runtime_cluster_config(
         }
     }
     let peer_device_id = ctx.peer_device_id;
+    super::cluster_exchange::emit_introduced_devices(ctx, &cfg.folders);
     ctx.emit(SyncEvent::ClusterConfigReceived {
         peer_device_id,
         folders: cfg.folders,

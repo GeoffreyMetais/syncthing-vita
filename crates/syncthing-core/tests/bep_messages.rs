@@ -237,6 +237,7 @@ fn folder(id: &str, label: &str) -> BepFolder {
         id: id.to_owned(),
         label: label.to_owned(),
         device_ids: Vec::new(),
+        ..Default::default()
     }
 }
 

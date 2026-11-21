@@ -151,6 +151,7 @@ fn stignore_skips_ignored_entries_in_scan_and_pull() {
                 value: 1,
             }],
             blocks: Vec::new(),
+            ..Default::default()
         },
         BepFileInfo {
             name: "skip.tmp".to_owned(),
@@ -165,6 +166,7 @@ fn stignore_skips_ignored_entries_in_scan_and_pull() {
                 value: 1,
             }],
             blocks: Vec::new(),
+            ..Default::default()
         },
         BepFileInfo {
             name: "wanted.txt".to_owned(),
@@ -179,6 +181,7 @@ fn stignore_skips_ignored_entries_in_scan_and_pull() {
                 value: 1,
             }],
             blocks: Vec::new(),
+            ..Default::default()
         },
     ];
     let plan = storage

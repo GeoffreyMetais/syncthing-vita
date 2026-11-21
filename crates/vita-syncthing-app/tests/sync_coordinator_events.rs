@@ -261,11 +261,13 @@ fn cluster_config_turns_the_remote_folders_into_offers_and_a_label() {
                     id: "docs".to_owned(),
                     label: "Docs".to_owned(),
                     device_ids: Vec::new(),
+                    ..Default::default()
                 },
                 BepFolder {
                     id: "pics".to_owned(),
                     label: String::new(),
                     device_ids: Vec::new(),
+                    ..Default::default()
                 },
             ],
         },

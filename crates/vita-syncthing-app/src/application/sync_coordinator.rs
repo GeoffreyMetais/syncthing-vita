@@ -149,6 +149,27 @@ impl SyncCoordinator {
                     &format!("Received shares from peer: {}", joined),
                 );
             }
+            SyncEvent::DevicesIntroduced {
+                introducer,
+                devices,
+            } => {
+                for (dev_id, dev_name) in devices {
+                    DeviceOfferService::receive(state, repo, dev_id, "", false);
+                    let label = if dev_name.is_empty() {
+                        dev_id.short()
+                    } else {
+                        format!("{dev_name} ({})", dev_id.short())
+                    };
+                    ShareService::log_event(
+                        state,
+                        repo,
+                        &format!(
+                            "Introducer {} introduced device {label}: waiting for approval",
+                            introducer.short()
+                        ),
+                    );
+                }
+            }
             SyncEvent::FileUpToDate { name, .. } => {
                 state.files_up_to_date += 1;
                 state.current_file = UiText::Raw(name.clone());

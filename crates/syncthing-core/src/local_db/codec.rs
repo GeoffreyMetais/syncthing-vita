@@ -32,9 +32,27 @@ impl FolderDb {
                     }
                 })
                 .collect();
+            let kind = if e.symlink_target.is_some() {
+                "L"
+            } else if e.is_dir {
+                "D"
+            } else {
+                "F"
+            };
+            let meta = format!(
+                "m:{:o}:{}:{}:{:x}:{}",
+                e.permissions,
+                u8::from(e.no_permissions),
+                e.modified_ns,
+                e.modified_by,
+                e.symlink_target
+                    .as_deref()
+                    .map(|t| to_hex(t.as_bytes()))
+                    .unwrap_or_default()
+            );
             out.push_str(&format!(
-                "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
-                if e.is_dir { "D" } else { "F" },
+                "{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\t{}\n",
+                kind,
                 u8::from(e.deleted),
                 e.size,
                 e.modified_s,
@@ -42,6 +60,7 @@ impl FolderDb {
                 e.sequence,
                 ver.join(","),
                 blocks.join(","),
+                meta,
                 e.name
             ));
         }
@@ -62,8 +81,23 @@ impl FolderDb {
             dirty: false,
         };
         for line in lines {
-            let p: Vec<&str> = line.splitn(9, '\t').collect();
-            if p.len() != 9 || p[8].is_empty() {
+            let p: Vec<&str> = line.splitn(10, '\t').collect();
+            if p.len() < 9 {
+                continue;
+            }
+            // Backwards compatibility:
+            // - extended 10-column format: column 8 starts with `m:` and column 9 is `name`
+            // - legacy 9-column format: column 8 (and any trailing tabs) is `name`
+            let (meta_col, name_col) = if p.len() == 10 && p[8].starts_with("m:") {
+                (Some(&p[8][2..]), p[9].to_owned())
+            } else {
+                let p9: Vec<&str> = line.splitn(9, '\t').collect();
+                if p9.len() != 9 {
+                    continue;
+                }
+                (None, p9[8].to_owned())
+            };
+            if name_col.is_empty() {
                 continue;
             }
             let version = p[6]
@@ -97,16 +131,60 @@ impl FolderDb {
                     })
                 })
                 .collect();
+
+            let is_dir = p[0] == "D";
+            let is_symlink = p[0] == "L";
+            let (permissions, no_permissions, modified_ns, modified_by, symlink_target) =
+                if let Some(meta) = meta_col {
+                    let mut m = meta.splitn(5, ':');
+                    let perms = m
+                        .next()
+                        .and_then(|s| u32::from_str_radix(s, 8).ok())
+                        .unwrap_or(0);
+                    let no_perms = m.next().is_some_and(|s| s == "1");
+                    let mod_ns = m.next().and_then(|s| s.parse().ok()).unwrap_or(0);
+                    let mod_by = m
+                        .next()
+                        .and_then(|s| u64::from_str_radix(s, 16).ok())
+                        .unwrap_or(0);
+                    let target = if is_symlink {
+                        m.next()
+                            .and_then(from_hex)
+                            .map(|bytes| String::from_utf8_lossy(&bytes).into_owned())
+                            .or_else(|| Some(String::new()))
+                    } else {
+                        None
+                    };
+                    (perms, no_perms, mod_ns, mod_by, target)
+                } else {
+                    (
+                        0,
+                        false,
+                        0,
+                        0,
+                        if is_symlink {
+                            Some(String::new())
+                        } else {
+                            None
+                        },
+                    )
+                };
+
             let entry = LocalEntry {
-                name: p[8].to_owned(),
-                is_dir: p[0] == "D",
+                name: name_col,
+                is_dir,
                 deleted: p[1] == "1",
                 size: p[2].parse().unwrap_or(0),
+                permissions,
+                no_permissions,
                 modified_s: p[3].parse().unwrap_or(0),
+                modified_ns,
+                modified_by,
                 disk_mtime: p[4].parse().unwrap_or(0),
                 sequence: p[5].parse().unwrap_or(0),
                 version,
                 blocks,
+                symlink_target,
             };
             db.max_sequence = db.max_sequence.max(entry.sequence);
             db.entries.insert(entry.name.clone(), entry);

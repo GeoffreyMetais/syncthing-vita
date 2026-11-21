@@ -89,6 +89,7 @@ fn test_bep_block_info_and_request_weak_hash_protobuf_roundtrip() {
                     weak_hash: 0,
                 },
             ],
+            ..Default::default()
         }],
     };
     let decoded_index = BepIndex::decode(&index.encode()).expect("decode BepIndex");
@@ -144,6 +145,7 @@ fn test_shifted_block_reuse_downloads_fewer_blocks_on_prepend() {
         id: folder.to_owned(),
         label: folder.to_owned(),
         device_ids: vec![id_b.device_id],
+        ..Default::default()
     });
 
     let mut storage_b = FsSyncStorage::new(dir_b.join("db"));
@@ -153,6 +155,7 @@ fn test_shifted_block_reuse_downloads_fewer_blocks_on_prepend() {
         id: folder.to_owned(),
         label: folder.to_owned(),
         device_ids: vec![id_a.device_id],
+        ..Default::default()
     });
 
     // Helper: runs one A (listener) -> B (dialer) single-cycle sync and returns B's downloaded
@@ -283,6 +286,7 @@ fn test_inbound_secondary_1_plus_2_attachment_and_sync() {
         id: folder.to_owned(),
         label: folder.to_owned(),
         device_ids: vec![id_cli.device_id],
+        ..Default::default()
     });
 
     let mut storage_cli = FsSyncStorage::new(dir_cli.join("db"));
@@ -292,6 +296,7 @@ fn test_inbound_secondary_1_plus_2_attachment_and_sync() {
         id: folder.to_owned(),
         label: folder.to_owned(),
         device_ids: vec![id_srv.device_id],
+        ..Default::default()
     });
 
     let listener = TcpListener::bind("127.0.0.1:0").unwrap();

@@ -5,14 +5,14 @@ use std::fs;
 use std::io;
 
 use super::ignore::IgnoreMatcher;
-use super::mtime_secs;
+use super::{mtime_parts, posix_permissions};
 use crate::bep::{BepFileInfo, BepIndex, FolderIndexState, FolderType};
 use crate::device_id::DeviceId;
 use crate::local_db::{with_folder_db, FolderDb, LocalEntry};
 use crate::storage::blocks::hash_file_blocks;
 use crate::storage::download::recover_interrupted_commits;
 use crate::storage::vita_fs::{
-    collect_files_recursive, ensure_dir_exists, DiskEntryKind, DiskListing,
+    collect_files_recursive_with_symlinks, ensure_dir_exists, DiskEntryKind, DiskListing,
 };
 use crate::storage::FsSyncStorage;
 use crate::version_vector::{short_device_id, version_bump, version_ge, version_merge};
@@ -30,12 +30,14 @@ impl FsSyncStorage {
         let root = self.folder_root(folder_id);
         ensure_dir_exists(&root)?;
         let ignore = IgnoreMatcher::load(&root);
+        let sync_symlinks = self.sync_symlinks();
+        let ignore_permissions = self.ignore_permissions();
         let mut listing = DiskListing::default();
-        collect_files_recursive(&root, "", &mut listing)?;
+        collect_files_recursive_with_symlinks(&root, "", sync_symlinks, &mut listing)?;
         if recover_interrupted_commits(&listing.download_backups) {
             // A file was restored from its backup: list again so it is seen.
             listing = DiskListing::default();
-            collect_files_recursive(&root, "", &mut listing)?;
+            collect_files_recursive_with_symlinks(&root, "", sync_symlinks, &mut listing)?;
         }
         listing.entries.sort_by(|a, b| a.rel.cmp(&b.rel));
 
@@ -53,20 +55,74 @@ impl FsSyncStorage {
                 unreadable.push(name);
                 continue;
             }
+            if let DiskEntryKind::Symlink(target) = entry.kind {
+                let Ok(meta) = fs::symlink_metadata(root.join(&name)) else {
+                    unreadable.push(name);
+                    continue;
+                };
+                let (mtime, mtime_ns) = mtime_parts(&meta);
+                let permissions = if ignore_permissions {
+                    0o777
+                } else {
+                    posix_permissions(&meta)
+                };
+                seen.insert(name.clone());
+                let unchanged = db.entries.get(&name).is_some_and(|e| {
+                    !e.deleted
+                        && e.symlink_target.as_deref() == Some(target.as_str())
+                        && (ignore_permissions || e.permissions == permissions)
+                });
+                if unchanged {
+                    continue;
+                }
+                let prev_version = db
+                    .entries
+                    .get(&name)
+                    .map(|e| e.version.clone())
+                    .unwrap_or_default();
+                db.put(LocalEntry {
+                    name,
+                    is_dir: false,
+                    deleted: false,
+                    size: 0,
+                    permissions,
+                    no_permissions: ignore_permissions,
+                    modified_s: mtime,
+                    modified_ns: mtime_ns,
+                    modified_by: short_id,
+                    disk_mtime: mtime,
+                    sequence: 0,
+                    version: version_bump(&prev_version, short_id),
+                    blocks: Vec::new(),
+                    symlink_target: Some(target),
+                });
+                continue;
+            }
             let is_dir = entry.kind == DiskEntryKind::Dir;
             let Ok(meta) = fs::metadata(root.join(&name)) else {
                 unreadable.push(name);
                 continue;
             };
-            let mtime = mtime_secs(&meta);
+            let (mtime, mtime_ns) = mtime_parts(&meta);
             let size = if is_dir { 0 } else { meta.len() as i64 };
+            let permissions = if ignore_permissions {
+                if is_dir {
+                    0o755
+                } else {
+                    0o644
+                }
+            } else {
+                posix_permissions(&meta)
+            };
             seen.insert(name.clone());
 
             // Most entries are unchanged: decide that on a borrowed entry, and only copy the
             // previous one (with its block list) when it has to be replaced.
             let unchanged = db.entries.get(&name).is_some_and(|e| {
                 !e.deleted
+                    && e.symlink_target.is_none()
                     && e.is_dir == is_dir
+                    && (ignore_permissions || e.permissions == permissions)
                     && (is_dir || (e.size == size && e.disk_mtime == mtime))
             });
             if unchanged {
@@ -81,11 +137,16 @@ impl FsSyncStorage {
                     is_dir: true,
                     deleted: false,
                     size: 0,
+                    permissions,
+                    no_permissions: ignore_permissions,
                     modified_s: mtime,
+                    modified_ns: mtime_ns,
+                    modified_by: short_id,
                     disk_mtime: mtime,
                     sequence: 0,
                     version: version_bump(&prev_version, short_id),
                     blocks: Vec::new(),
+                    symlink_target: None,
                 });
                 continue;
             }
@@ -95,10 +156,12 @@ impl FsSyncStorage {
             };
             if let Some(e) = &prev {
                 let same_content = !e.deleted
+                    && e.symlink_target.is_none()
                     && !e.is_dir
                     && e.size == size
                     && e.blocks.len() == blocks.len()
-                    && e.blocks.iter().zip(&blocks).all(|(a, b)| a.hash == b.hash);
+                    && e.blocks.iter().zip(&blocks).all(|(a, b)| a.hash == b.hash)
+                    && (ignore_permissions || e.permissions == permissions);
                 if same_content {
                     // Only the timestamp moved (e.g. copied back unchanged): not a new version.
                     db.touch_disk_mtime(&name, mtime);
@@ -110,11 +173,16 @@ impl FsSyncStorage {
                 is_dir: false,
                 deleted: false,
                 size,
+                permissions,
+                no_permissions: ignore_permissions,
                 modified_s: mtime,
+                modified_ns: mtime_ns,
+                modified_by: short_id,
                 disk_mtime: mtime,
                 sequence: 0,
                 version: version_bump(&prev_version, short_id),
                 blocks,
+                symlink_target: None,
             });
         }
 
@@ -135,7 +203,9 @@ impl FsSyncStorage {
             db.put(LocalEntry {
                 deleted: true,
                 size: 0,
+                modified_by: short_id,
                 blocks: Vec::new(),
+                symlink_target: None,
                 version: version_bump(&e.version, short_id),
                 ..e
             });

@@ -94,12 +94,13 @@ impl FsSyncStorage {
                     continue; // Already gone from disk; the peer never had it.
                 }
                 let path = self.resolve_safe_path(folder_id, &entry.name);
-                let removed = if entry.is_dir {
+                let is_link = fs::symlink_metadata(&path).is_ok_and(|m| m.file_type().is_symlink());
+                let removed = if !is_link && entry.is_dir {
                     fs::remove_dir(&path)
                 } else {
                     fs::remove_file(&path)
                 };
-                if removed.is_ok() || !path.exists() {
+                if removed.is_ok() || fs::symlink_metadata(&path).is_err() {
                     reverted += 1;
                 }
             }

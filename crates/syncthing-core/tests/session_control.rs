@@ -32,6 +32,7 @@ fn storage_with(name: &str, peer: &FakePeer, folders: &[&str], linked: &[&str]) 
                 id: (*folder).to_owned(),
                 label: (*folder).to_owned(),
                 device_ids: vec![peer.device_id],
+                ..Default::default()
             });
         }
         let dir = storage.folder_root(folder);

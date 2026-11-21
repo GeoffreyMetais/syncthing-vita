@@ -39,3 +39,33 @@ fn mtime_secs(meta: &fs::Metadata) -> i64 {
         .map(|d| d.as_secs() as i64)
         .unwrap_or(0)
 }
+
+pub(crate) fn mtime_parts(meta: &fs::Metadata) -> (i64, i32) {
+    meta.modified()
+        .ok()
+        .and_then(|t| t.duration_since(UNIX_EPOCH).ok())
+        .map(|d| (d.as_secs() as i64, d.subsec_nanos() as i32))
+        .unwrap_or((0, 0))
+}
+
+#[cfg(unix)]
+pub(crate) fn posix_permissions(meta: &fs::Metadata) -> u32 {
+    use std::os::unix::fs::PermissionsExt;
+    meta.permissions().mode() & 0o777
+}
+
+#[cfg(not(unix))]
+pub(crate) fn posix_permissions(_meta: &fs::Metadata) -> u32 {
+    0
+}
+
+#[cfg(unix)]
+pub(crate) fn apply_posix_permissions(path: &std::path::Path, mode: u32) {
+    use std::os::unix::fs::PermissionsExt;
+    if mode != 0 {
+        let _ = fs::set_permissions(path, fs::Permissions::from_mode(mode & 0o777));
+    }
+}
+
+#[cfg(not(unix))]
+pub(crate) fn apply_posix_permissions(_path: &std::path::Path, _mode: u32) {}

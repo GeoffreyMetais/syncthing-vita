@@ -28,41 +28,68 @@ use sha2::{Digest, Sha256};
 use crate::bep::{BepBlockInfo, BepFileInfo, BepVersionCounter};
 use crate::device_id::DeviceId;
 
-/// One local entry (file, directory or tombstone).
-#[derive(Debug, Clone, PartialEq, Eq)]
+/// One local entry (file, directory, symlink or tombstone).
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct LocalEntry {
     pub name: String,
     pub is_dir: bool,
     pub deleted: bool,
     pub size: i64,
+    pub permissions: u32,
+    pub no_permissions: bool,
     /// Modification time advertised to peers.
     pub modified_s: i64,
+    pub modified_ns: i32,
+    pub modified_by: u64,
     /// Last observed on-disk modification time (change detection only).
     pub disk_mtime: i64,
     pub sequence: i64,
     pub version: Vec<BepVersionCounter>,
     pub blocks: Vec<BepBlockInfo>,
+    pub symlink_target: Option<String>,
 }
 
 impl LocalEntry {
     pub fn to_file_info(&self) -> BepFileInfo {
+        let is_symlink = self.symlink_target.is_some();
+        let permissions = if self.permissions != 0 {
+            self.permissions
+        } else if self.is_dir {
+            0o755
+        } else {
+            0o644
+        };
+        let modified_by = if self.modified_by != 0 {
+            self.modified_by
+        } else {
+            self.version.last().map_or(0, |v| v.short_device_id)
+        };
         BepFileInfo {
             name: self.name.clone(),
             is_dir: self.is_dir,
-            size: if self.deleted || self.is_dir {
+            size: if self.deleted || self.is_dir || is_symlink {
                 0
             } else {
                 self.size
             },
+            permissions,
             modified_s: self.modified_s,
+            modified_ns: self.modified_ns,
+            modified_by,
             deleted: self.deleted,
             invalid: false,
+            no_permissions: self.no_permissions,
             sequence: self.sequence,
             versions: self.version.clone(),
-            blocks: if self.deleted || self.is_dir {
+            blocks: if self.deleted || self.is_dir || is_symlink {
                 Vec::new()
             } else {
                 self.blocks.clone()
+            },
+            symlink_target: if self.deleted {
+                None
+            } else {
+                self.symlink_target.clone()
             },
         }
     }
@@ -71,6 +98,9 @@ impl LocalEntry {
     pub fn content_equals(&self, rf: &BepFileInfo) -> bool {
         if self.deleted || rf.deleted {
             return self.deleted && rf.deleted;
+        }
+        if self.symlink_target.is_some() || rf.symlink_target.is_some() {
+            return self.symlink_target == rf.symlink_target;
         }
         if self.is_dir || rf.is_dir {
             return self.is_dir && rf.is_dir;

@@ -50,25 +50,32 @@ fn test_lz4_output_is_bounded_by_announced_size() {
     assert!(decompress_bep_lz4(&literals).is_err());
 }
 
-/// A symlink entry (BEP type 4) is decoded as invalid: it is never pulled as an empty file.
+/// A symlink entry (BEP type 4 or deprecated 2/3) decodes with `symlink_target` set (not a regular
+/// file or directory), while unknown `FileInfoType` values decode as `invalid`.
 #[test]
-fn test_symlink_entries_are_decoded_as_invalid() {
+fn test_symlink_entries_are_decoded_as_symlinks() {
     use syncthing_core::proto::{encode_bytes_field, encode_varint_field};
     use syncthing_core::BepIndex;
-    let entry = |file_type: u64| {
+    let entry = |file_type: u64, target: Option<&[u8]>| {
         let mut file = Vec::new();
         encode_bytes_field(&mut file, 1, b"link");
         encode_varint_field(&mut file, 2, file_type);
+        if let Some(t) = target {
+            encode_bytes_field(&mut file, 17, t);
+        }
         let mut index = Vec::new();
         encode_bytes_field(&mut index, 1, b"f");
         encode_bytes_field(&mut index, 2, &file);
         BepIndex::decode(&index).unwrap().files.remove(0)
     };
-    assert!(!entry(0).invalid && !entry(0).is_dir);
-    assert!(!entry(1).invalid && entry(1).is_dir);
+    assert!(!entry(0, None).invalid && !entry(0, None).is_dir && !entry(0, None).is_symlink());
+    assert!(!entry(1, None).invalid && entry(1, None).is_dir && !entry(1, None).is_symlink());
     for symlink in [2, 3, 4] {
-        assert!(entry(symlink).invalid && !entry(symlink).is_dir);
+        let decoded = entry(symlink, Some(b"target.txt"));
+        assert!(!decoded.invalid && !decoded.is_dir && decoded.is_symlink());
+        assert_eq!(decoded.symlink_target.as_deref(), Some("target.txt"));
     }
+    assert!(entry(5, None).invalid);
 }
 
 /// The announced `block_size` (field 13) is the size of the file's blocks, not always 128 KiB:
@@ -104,6 +111,7 @@ fn test_announced_block_size_follows_the_blocks() {
                 sequence: 1,
                 versions: Vec::new(),
                 blocks,
+                ..Default::default()
             }],
         };
         let payload = index.encode();

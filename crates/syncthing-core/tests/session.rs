@@ -407,6 +407,7 @@ fn indexed_file(name: String, sequence: i64) -> BepFileInfo {
         sequence,
         versions: Vec::new(),
         blocks: Vec::new(),
+        ..Default::default()
     }
 }
 

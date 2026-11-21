@@ -127,12 +127,58 @@ fn accept_peer_cluster_config(
         .collect();
     folders.peer_folder_ids = accepted.iter().map(|f| f.id.clone()).collect();
     folders.shared_folders = accepted;
+    emit_introduced_devices(ctx, &cfg.folders);
     ctx.emit(SyncEvent::ClusterConfigReceived {
         peer_device_id,
         folders: cfg.folders,
     });
 
     add_local_folders_shared_with_peer(ctx, folders);
+}
+
+/// Emits [`SyncEvent::DevicesIntroduced`] if the peer is marked as an introducer and its
+/// `ClusterConfig` lists third-party devices on a shared folder that are not yet known locally.
+pub(super) fn emit_introduced_devices(ctx: &mut SessionContext<'_>, folders: &[BepFolder]) {
+    let peer_device_id = ctx.peer_device_id;
+    if !ctx.storage.is_device_introducer(&peer_device_id) {
+        return;
+    }
+    let own_id = ctx.own_id();
+    let mut introduced: Vec<(crate::device_id::DeviceId, String)> = Vec::new();
+    for folder in folders {
+        if !ctx
+            .storage
+            .is_folder_shared_with(&folder.id, &peer_device_id)
+        {
+            continue;
+        }
+        for dev in &folder.devices {
+            if dev.id.matches_peer(&own_id)
+                || dev.id.matches_peer(&peer_device_id)
+                || ctx.storage.is_known_device(&dev.id)
+                || introduced.iter().any(|(id, _)| id.matches_peer(&dev.id))
+            {
+                continue;
+            }
+            introduced.push((dev.id, dev.name.clone()));
+        }
+        for &id in &folder.device_ids {
+            if id.matches_peer(&own_id)
+                || id.matches_peer(&peer_device_id)
+                || ctx.storage.is_known_device(&id)
+                || introduced.iter().any(|(seen, _)| seen.matches_peer(&id))
+            {
+                continue;
+            }
+            introduced.push((id, String::new()));
+        }
+    }
+    if !introduced.is_empty() {
+        ctx.emit(SyncEvent::DevicesIntroduced {
+            introducer: peer_device_id,
+            devices: introduced,
+        });
+    }
 }
 
 /// Adds the local shares explicitly shared with the peer to the session's shared folders.

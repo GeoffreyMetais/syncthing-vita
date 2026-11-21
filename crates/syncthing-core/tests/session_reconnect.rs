@@ -26,6 +26,7 @@ fn storage_for(name: &str, peer: &FakePeer) -> FsSyncStorage {
         id: "shared".to_owned(),
         label: "shared".to_owned(),
         device_ids: vec![peer.device_id],
+        ..Default::default()
     });
     let dir = storage.folder_root("shared");
     std::fs::create_dir_all(&dir).unwrap();

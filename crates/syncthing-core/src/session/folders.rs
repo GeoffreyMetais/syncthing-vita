@@ -172,6 +172,6 @@ pub fn published_file_count(index: &BepIndex) -> usize {
     index
         .files
         .iter()
-        .filter(|f| !f.is_dir && !f.deleted)
+        .filter(|f| !f.is_dir && !f.is_symlink() && !f.deleted)
         .count()
 }

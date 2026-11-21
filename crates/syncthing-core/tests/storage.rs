@@ -121,6 +121,7 @@ fn test_peer_supplied_block_sizes_are_bounded() {
                 hash: vec![0; 32],
                 weak_hash: 0,
             }],
+            ..Default::default()
         };
         assert!(storage.find_outdated_blocks("f", &remote).is_err());
     }

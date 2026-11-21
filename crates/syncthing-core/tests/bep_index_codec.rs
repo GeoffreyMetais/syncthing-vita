@@ -9,9 +9,12 @@ fn file(name: &str) -> BepFileInfo {
         name: name.to_owned(),
         is_dir: false,
         size: 5,
+        permissions: 0o644,
         modified_s: 1_700_000_000,
+        modified_by: 0x0102_0304_0506_0708,
         deleted: false,
         invalid: false,
+        no_permissions: true,
         sequence: 7,
         versions: vec![BepVersionCounter {
             short_device_id: 0x0102_0304_0506_0708,
@@ -23,6 +26,7 @@ fn file(name: &str) -> BepFileInfo {
             hash: vec![0xEE; 32],
             weak_hash: 0,
         }],
+        ..Default::default()
     }
 }
 
@@ -135,6 +139,8 @@ fn index_file_entry_values_are_exact() {
 fn index_directory_entry_has_directory_type_and_no_blocks() {
     let mut dir = file("sub");
     dir.is_dir = true;
+    dir.permissions = 0o755;
+    dir.modified_by = 0;
     dir.blocks.clear();
     dir.versions.clear();
     dir.sequence = 0;

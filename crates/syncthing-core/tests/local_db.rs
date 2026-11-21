@@ -30,6 +30,7 @@ fn test_db_serialization_roundtrip() {
             hash: vec![1, 2, 255],
             weak_hash: 0,
         }],
+        ..Default::default()
     });
     let parsed = FolderDb::parse(&db.serialize()).expect("parse");
     assert_eq!(parsed.index_id, db.index_id);
@@ -67,6 +68,7 @@ fn test_downloaded_files_are_saved_in_batches() {
                 value: 1,
             }],
             blocks: Vec::new(),
+            ..Default::default()
         };
         storage.record_downloaded("f", own_id, &rf);
     }
@@ -94,6 +96,7 @@ fn entry(
         sequence: 0,
         version: vec![c(1, 1)],
         blocks,
+        ..Default::default()
     }
 }
 
@@ -142,6 +145,7 @@ fn test_content_equals_compares_type_state_size_and_blocks() {
         sequence: 1,
         versions: Vec::new(),
         blocks,
+        ..Default::default()
     };
     let file = entry("x", false, false, 4, vec![block(0, 4, 1)]);
     assert!(file.content_equals(&info(false, false, 4, vec![block(0, 4, 1)])));

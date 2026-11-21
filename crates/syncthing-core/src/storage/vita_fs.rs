@@ -48,10 +48,11 @@ pub(crate) fn ensure_dir_exists(dir: &Path) -> io::Result<()> {
 }
 
 /// What a directory entry found by [`collect_files_recursive`] is.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) enum DiskEntryKind {
     Dir,
     File,
+    Symlink(String),
     /// The entry exists but cannot be inspected right now (`stat()` failed). It must never be
     /// mistaken for a deleted file.
     Unreadable,
@@ -73,9 +74,22 @@ pub(crate) struct DiskListing {
 }
 
 /// Recursively lists the entries under `base`, skipping Syncthing-internal files.
+#[allow(dead_code)]
 pub(crate) fn collect_files_recursive(
     base: &Path,
     prefix: &str,
+    out: &mut DiskListing,
+) -> io::Result<()> {
+    collect_files_recursive_with_symlinks(base, prefix, false, out)
+}
+
+/// Recursively lists the entries under `base`, skipping Syncthing-internal files.
+/// When `sync_symlinks` is `true`, symbolic links are recorded as [`DiskEntryKind::Symlink`]
+/// without traversing into symlinked directories.
+pub(crate) fn collect_files_recursive_with_symlinks(
+    base: &Path,
+    prefix: &str,
+    sync_symlinks: bool,
     out: &mut DiskListing,
 ) -> io::Result<()> {
     for entry_res in fs::read_dir(base)? {
@@ -95,6 +109,24 @@ pub(crate) fn collect_files_recursive(
             format!("{}/{}", prefix, name)
         };
         let path = entry.path();
+        if sync_symlinks {
+            if let Ok(sym_meta) = fs::symlink_metadata(&path) {
+                if sym_meta.file_type().is_symlink() {
+                    if let Ok(target) = fs::read_link(&path) {
+                        out.entries.push(DiskEntry {
+                            rel,
+                            kind: DiskEntryKind::Symlink(target.to_string_lossy().into_owned()),
+                        });
+                    } else {
+                        out.entries.push(DiskEntry {
+                            rel,
+                            kind: DiskEntryKind::Unreadable,
+                        });
+                    }
+                    continue;
+                }
+            }
+        }
         // The directory entry type needs no extra `stat()`; fall back to one for links and
         // for platforms that do not report it.
         let file_type = match entry.file_type() {
@@ -107,7 +139,7 @@ pub(crate) fn collect_files_recursive(
                     rel: rel.clone(),
                     kind: DiskEntryKind::Dir,
                 });
-                collect_files_recursive(&path, &rel, out)?;
+                collect_files_recursive_with_symlinks(&path, &rel, sync_symlinks, out)?;
             }
             Ok(ft) if ft.is_file() => out.entries.push(DiskEntry {
                 rel,

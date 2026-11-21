@@ -42,6 +42,14 @@ pub struct FsSyncStorage {
     folder_devices: HashMap<String, Vec<DeviceId>>,
     /// Locally configured folders to advertise in `ClusterConfig`
     local_folders: Vec<BepFolder>,
+    /// Known local/paired devices (for introducer deduplication).
+    known_devices: Vec<DeviceId>,
+    /// Peers trusted as cluster introducers.
+    introducer_peers: Vec<DeviceId>,
+    /// Whether symbolic links are scanned and created (`false` by default, e.g. on FAT / PS Vita).
+    sync_symlinks: bool,
+    /// Whether POSIX permissions are ignored (`true` by default, e.g. on FAT / PS Vita).
+    ignore_permissions: bool,
 }
 
 impl FsSyncStorage {
@@ -53,7 +61,71 @@ impl FsSyncStorage {
             folder_types: HashMap::new(),
             folder_devices: HashMap::new(),
             local_folders: Vec::new(),
+            known_devices: Vec::new(),
+            introducer_peers: Vec::new(),
+            sync_symlinks: false,
+            ignore_permissions: true,
         }
+    }
+
+    /// Marks `device` as a known locally configured device.
+    pub fn add_known_device(&mut self, device: DeviceId) {
+        if !self.known_devices.iter().any(|d| d.matches_peer(&device)) {
+            self.known_devices.push(device);
+        }
+    }
+
+    /// Marks `device` as trusted to introduce third-party devices on shared folders.
+    pub fn set_device_introducer(&mut self, device: DeviceId, introducer: bool) {
+        self.add_known_device(device);
+        if introducer {
+            if !self
+                .introducer_peers
+                .iter()
+                .any(|d| d.matches_peer(&device))
+            {
+                self.introducer_peers.push(device);
+            }
+        } else {
+            self.introducer_peers.retain(|d| !d.matches_peer(&device));
+        }
+    }
+
+    /// Returns `true` if `device` is configured as an introducer.
+    pub fn is_device_introducer(&self, device: &DeviceId) -> bool {
+        self.introducer_peers.iter().any(|d| d.matches_peer(device))
+    }
+
+    /// Returns `true` if `device` is already known locally (either in `known_devices` or linked
+    /// to any configured folder).
+    pub fn is_known_device(&self, device: &DeviceId) -> bool {
+        self.known_devices.iter().any(|d| d.matches_peer(device))
+            || self
+                .folder_devices
+                .values()
+                .any(|devs| devs.iter().any(|d| d.matches_peer(device)))
+    }
+
+    /// Enables or disables symbolic link scanning and creation (OS-agnostic flag;
+    /// symlinks are only materialized on Unix targets).
+    pub fn set_sync_symlinks(&mut self, enabled: bool) {
+        self.sync_symlinks = enabled;
+    }
+
+    /// Returns `true` if symbolic links are scanned and pulled.
+    pub fn sync_symlinks(&self) -> bool {
+        self.sync_symlinks
+    }
+
+    /// Configures whether POSIX permission bits are ignored (`true` for FAT/Vita; `false` on Unix
+    /// to preserve `mode & 0o777`).
+    pub fn set_ignore_permissions(&mut self, ignore: bool) {
+        self.ignore_permissions = ignore;
+    }
+
+    /// Returns `true` if POSIX permissions are ignored (`no_permissions = true`).
+    pub fn ignore_permissions(&self) -> bool {
+        self.ignore_permissions
     }
 
     pub fn add_local_folder(&mut self, folder: BepFolder) {

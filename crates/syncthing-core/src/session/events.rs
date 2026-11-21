@@ -18,6 +18,12 @@ pub enum SyncEvent {
         peer_device_id: DeviceId,
         folders: Vec<BepFolder>,
     },
+    /// A peer marked as an introducer announced third-party devices on a shared folder
+    /// that are not yet known locally.
+    DevicesIntroduced {
+        introducer: DeviceId,
+        devices: Vec<(DeviceId, String)>,
+    },
     FileUpToDate {
         folder: String,
         name: String,
