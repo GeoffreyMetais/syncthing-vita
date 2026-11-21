@@ -492,3 +492,26 @@ fn json_string_values_unescapes_slashes() {
 fn json_string_values_missing_key_is_empty() {
     assert!(json_string_values(r#"{"relays":[]}"#, "url").is_empty());
 }
+
+// ---------------------------------------------------------------------------
+// Address family filtering for connect_any
+// ---------------------------------------------------------------------------
+
+#[test]
+fn select_connect_addrs_filters_ipv6_when_ipv4_only_and_preserves_order() {
+    use std::net::SocketAddr;
+    use syncthing_core::tls::https::select_connect_addrs;
+
+    let v6_a: SocketAddr = "[2001:db8::1]:443".parse().unwrap();
+    let v4_a: SocketAddr = "192.0.2.1:443".parse().unwrap();
+    let v6_b: SocketAddr = "[::1]:443".parse().unwrap();
+    let v4_b: SocketAddr = "198.51.100.2:443".parse().unwrap();
+    let addrs = vec![v6_a, v4_a, v6_b, v4_b];
+
+    assert_eq!(select_connect_addrs(addrs.clone(), true), vec![v4_a, v4_b]);
+    assert_eq!(
+        select_connect_addrs(addrs, false),
+        vec![v6_a, v4_a, v6_b, v4_b]
+    );
+    assert!(select_connect_addrs(vec![v6_a, v6_b], true).is_empty());
+}

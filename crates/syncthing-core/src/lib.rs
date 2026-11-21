@@ -43,10 +43,11 @@ pub use discovery::{
     discover_and_map_tcp, encode_natpmp_map_req, encode_natpmp_public_addr_req, is_local_ip,
     lookup_global_peer, lookup_peer_on, natpmp_map_tcp, natpmp_map_tcp_at, parse_external_ip_soap,
     parse_global_discovery_json, parse_igd_control_url, parse_ssdp_location, resolve_endpoint_uri,
-    resolve_peer_tcp_addrs, run_discovery_cycle, scan_lan_bep_peers, Announce, AnnounceOutcome,
-    DiscoveryCycleResult, NatMapping, NatPmpMapResponse, NatPmpPublicAddrResponse, NatProtocol,
-    PeerEndpoint, DEFAULT_ANNOUNCE_SERVERS, DEFAULT_LOOKUP_SERVER, DISCOVERY_BROADCAST_ADDR,
-    DISCOVERY_MAGIC, DISCOVERY_PORT, NATPMP_PORT, SSDP_MULTICAST_ADDR, SSDP_PORT,
+    resolve_peer_tcp_addrs, run_discovery_cycle, scan_lan_bep_peers,
+    scan_lan_bep_peers_interruptible, Announce, AnnounceOutcome, DiscoveryCycleResult, NatMapping,
+    NatPmpMapResponse, NatPmpPublicAddrResponse, NatProtocol, PeerEndpoint,
+    DEFAULT_ANNOUNCE_SERVERS, DEFAULT_LOOKUP_SERVER, DISCOVERY_BROADCAST_ADDR, DISCOVERY_MAGIC,
+    DISCOVERY_PORT, NATPMP_PORT, SSDP_MULTICAST_ADDR, SSDP_PORT,
 };
 pub use folder_sync::{IgnoreMatcher, PullPlan};
 pub use relay::{

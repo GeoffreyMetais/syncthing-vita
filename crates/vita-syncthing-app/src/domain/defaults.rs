@@ -53,6 +53,8 @@ pub const DISCOVERY_SCAN_LISTEN: Duration = Duration::from_secs(2);
 pub const DEVICES_DIALOG_SCAN_DELAY: u32 = 3 * VBLANK_HZ;
 /// Interval between Global Discovery v2 lookups for WAN / relay endpoints.
 pub const GLOBAL_DISCOVERY_INTERVAL: Duration = Duration::from_secs(60);
+/// Retry delay when a Global Discovery lookup failed or returned no endpoints for an unconnected peer.
+pub const GLOBAL_DISCOVERY_RETRY: Duration = Duration::from_secs(10);
 /// Timeout for HTTPS Global Discovery v2 lookups and Relay Protocol v1 handshakes.
 pub const GLOBAL_DISCOVERY_TIMEOUT: Duration = Duration::from_secs(6);
 

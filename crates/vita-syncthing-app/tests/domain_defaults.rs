@@ -31,6 +31,7 @@ fn test_discovery_timings() {
     assert_eq!(DISCOVERY_LISTEN, Duration::from_millis(1500));
     assert_eq!(DISCOVERY_SCAN_LISTEN, Duration::from_secs(2));
     assert_eq!(GLOBAL_DISCOVERY_INTERVAL, Duration::from_secs(60));
+    assert_eq!(GLOBAL_DISCOVERY_RETRY, Duration::from_secs(10));
     assert_eq!(GLOBAL_DISCOVERY_TIMEOUT, Duration::from_secs(6));
 }
 
