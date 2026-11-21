@@ -49,10 +49,10 @@ fn a_recent_transfer_delays_the_sync_until_the_quiet_period_passed() {
 }
 
 #[test]
-fn a_transfer_is_recorded_before_the_sync_is_declared() {
-    // Without any transfer, the quiet period does not apply.
+fn a_recent_cycle_delays_the_sync_until_the_quiet_period_passed() {
     let a = device(54);
     let mut activity = SyncActivity::default();
     activity.record_cycle(a);
-    assert!(activity.is_synced(&[a], Duration::from_secs(3600)));
+    assert!(!activity.is_synced(&[a], Duration::from_secs(3600)));
+    assert!(activity.is_synced(&[a], Duration::ZERO));
 }
