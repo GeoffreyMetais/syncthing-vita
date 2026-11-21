@@ -8,7 +8,10 @@ use super::download::download_folder;
 use super::events::SyncEvent;
 use super::folders::{published_file_count, FolderSyncState};
 use super::keepalive::send_keepalive_if_due;
-use crate::bep::{write_bep_message, BepClusterConfig, BepIndex, FolderIndexState};
+use crate::bep::{
+    write_bep_message, write_bep_message_compressed, BepClusterConfig, BepDeviceCompression,
+    BepIndex, FolderIndexState,
+};
 use crate::folder_sync::mask_local_changes;
 use crate::tls::BepTlsStream;
 
@@ -78,7 +81,12 @@ pub(super) fn publish_index(
     };
     let messages = folders.take_unpublished(index);
     for (msg_type, batch) in &messages {
-        write_bep_message(stream, *msg_type, &batch.encode())?;
+        let encoded = batch.encode();
+        if ctx.peer_compression == BepDeviceCompression::Never {
+            write_bep_message(stream, *msg_type, &encoded)?;
+        } else {
+            write_bep_message_compressed(stream, *msg_type, &encoded)?;
+        }
     }
     if messages.is_empty() {
         return Ok(false);

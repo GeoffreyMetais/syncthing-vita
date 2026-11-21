@@ -12,8 +12,10 @@ use super::events::SyncEvent;
 use super::keepalive::send_keepalive_if_due;
 use super::upload::serve_block_request;
 use crate::bep::{
-    read_bep_message, write_bep_message, BepBlockInfo, BepFileInfo, BepMessageType, BepRequest,
-    BepResponse, BEP_BLOCK_HASH_LEN,
+    read_bep_message, write_bep_message, write_bep_message_compressed, BepBlockInfo,
+    BepDeviceCompression, BepDownloadProgress, BepFileDownloadProgressUpdate, BepFileInfo,
+    BepMessageType, BepRequest, BepResponse, DownloadProgressUpdateType, BEP_BLOCK_HASH_LEN,
+    BEP_BLOCK_SIZE,
 };
 use crate::storage::download::write_block_at;
 use crate::tls::BepTlsStream;
@@ -21,6 +23,8 @@ use crate::tls::BepTlsStream;
 /// Generous per-response timeout: servers on NAS / Docker hosts may take several seconds
 /// to read a block from spinning disks before answering.
 const BLOCK_RESPONSE_TIMEOUT: Duration = Duration::from_secs(20);
+/// Number of downloaded blocks between periodic `DownloadProgress` updates.
+const DOWNLOAD_PROGRESS_BLOCK_INTERVAL: usize = 8;
 
 /// Brings `folder_id` up to date with the peer's `files`.
 /// Directories, deletions and identical content are handled locally (version-vector plan);
@@ -138,6 +142,15 @@ fn download_file(
         }
     };
 
+    let track_progress = file.blocks.len() > 1;
+    let block_size = file
+        .blocks
+        .first()
+        .map_or(BEP_BLOCK_SIZE as i32, |b| b.size.max(0))
+        .max(BEP_BLOCK_SIZE as i32);
+    let mut progress_sent = false;
+    let mut pending_indexes: Vec<i32> = Vec::with_capacity(DOWNLOAD_PROGRESS_BLOCK_INTERVAL);
+
     // Fetches every outdated block: `Ok(None)` if the file must be skipped.
     let mut fetch_all = || -> io::Result<Option<(usize, usize)>> {
         let (mut blocks, mut bytes) = (0usize, 0usize);
@@ -152,6 +165,29 @@ fn download_file(
                 Some(len) => {
                     blocks += 1;
                     bytes += len;
+                    if track_progress {
+                        let block_idx = file
+                            .blocks
+                            .iter()
+                            .position(|b| b.offset == block.offset)
+                            .unwrap_or_else(|| {
+                                (block.offset.max(0) as usize) / (block_size as usize)
+                            });
+                        pending_indexes.push(block_idx as i32);
+                        if pending_indexes.len() >= DOWNLOAD_PROGRESS_BLOCK_INTERVAL {
+                            let batch = std::mem::take(&mut pending_indexes);
+                            send_download_progress(
+                                stream,
+                                ctx.peer_compression,
+                                folder_id,
+                                file,
+                                DownloadProgressUpdateType::Update,
+                                batch,
+                                block_size,
+                            );
+                            progress_sent = true;
+                        }
+                    }
                 }
                 None => return Ok(None),
             }
@@ -164,10 +200,32 @@ fn download_file(
     let (file_blocks, file_bytes) = match fetched {
         Ok(Some(counts)) => counts,
         Ok(None) => {
+            if progress_sent {
+                send_download_progress(
+                    stream,
+                    ctx.peer_compression,
+                    folder_id,
+                    file,
+                    DownloadProgressUpdateType::Forget,
+                    Vec::new(),
+                    block_size,
+                );
+            }
             storage.abort_download(folder_id, &file.name);
             return Ok(false);
         }
         Err(e) => {
+            if progress_sent {
+                send_download_progress(
+                    stream,
+                    ctx.peer_compression,
+                    folder_id,
+                    file,
+                    DownloadProgressUpdateType::Forget,
+                    Vec::new(),
+                    block_size,
+                );
+            }
             storage.abort_download(folder_id, &file.name);
             return Err(e);
         }
@@ -175,9 +233,31 @@ fn download_file(
 
     let total_size = file.size.max(0) as u64;
     if let Err(e) = storage.commit_download(folder_id, &file.name, total_size) {
+        if progress_sent {
+            send_download_progress(
+                stream,
+                ctx.peer_compression,
+                folder_id,
+                file,
+                DownloadProgressUpdateType::Forget,
+                Vec::new(),
+                block_size,
+            );
+        }
         storage.abort_download(folder_id, &file.name);
         emit_file_error(ctx, folder_id, file, &e);
         return Ok(false);
+    }
+    if track_progress {
+        send_download_progress(
+            stream,
+            ctx.peer_compression,
+            folder_id,
+            file,
+            DownloadProgressUpdateType::Forget,
+            Vec::new(),
+            block_size,
+        );
     }
     storage.record_downloaded(folder_id, ctx.own_id(), file);
     ctx.stats.files_downloaded += 1;
@@ -189,6 +269,33 @@ fn download_file(
         total_size,
     });
     Ok(true)
+}
+
+fn send_download_progress(
+    stream: &mut BepTlsStream,
+    peer_compression: BepDeviceCompression,
+    folder_id: &str,
+    file: &BepFileInfo,
+    update_type: DownloadProgressUpdateType,
+    block_indexes: Vec<i32>,
+    block_size: i32,
+) {
+    let msg = BepDownloadProgress {
+        folder: folder_id.to_owned(),
+        updates: vec![BepFileDownloadProgressUpdate {
+            update_type,
+            name: file.name.clone(),
+            version: file.versions.clone(),
+            block_indexes,
+            block_size,
+        }],
+    };
+    let encoded = msg.encode();
+    let _ = if peer_compression == BepDeviceCompression::Never {
+        write_bep_message(stream, BepMessageType::DownloadProgress, &encoded)
+    } else {
+        write_bep_message_compressed(stream, BepMessageType::DownloadProgress, &encoded)
+    };
 }
 
 /// Requests one block and waits for its `Response`, serving peer `Request`s and answering

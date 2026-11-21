@@ -4,7 +4,10 @@ use std::io::{self, Write};
 
 use super::context::SessionContext;
 use super::events::SyncEvent;
-use crate::bep::{write_bep_message, BepMessageType, BepRequest, BepResponse};
+use crate::bep::{
+    write_bep_message, write_bep_message_compressed, BepDeviceCompression, BepMessageType,
+    BepRequest, BepResponse,
+};
 
 /// BEP `ErrorCode::NO_ERROR`.
 const CODE_NO_ERROR: i32 = 0;
@@ -45,7 +48,12 @@ pub fn serve_block_request<W: Write>(
                 data,
                 code: CODE_NO_ERROR,
             };
-            write_bep_message(stream, BepMessageType::Response, &resp.encode())?;
+            let encoded = resp.encode();
+            if ctx.peer_compression == BepDeviceCompression::Always {
+                write_bep_message_compressed(stream, BepMessageType::Response, &encoded)?;
+            } else {
+                write_bep_message(stream, BepMessageType::Response, &encoded)?;
+            }
             ctx.stats.blocks_uploaded += 1;
             ctx.stats.bytes_uploaded += len as u64;
             ctx.emit(SyncEvent::BlockUploaded {

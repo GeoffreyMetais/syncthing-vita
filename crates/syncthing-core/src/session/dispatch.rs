@@ -7,7 +7,7 @@ use super::context::SessionContext;
 use super::folders::FolderSyncState;
 use super::index_exchange::{handle_runtime_cluster_config, handle_runtime_index};
 use super::upload::serve_block_request;
-use crate::bep::{write_bep_message, BepClose, BepMessageType};
+use crate::bep::{write_bep_message, BepClose, BepDownloadProgress, BepMessageType};
 use crate::tls::polling::try_read_bep_message;
 use crate::tls::BepTlsStream;
 
@@ -35,7 +35,7 @@ pub fn next_primary_message(
 }
 
 /// Handles one message of an established session (`ClusterConfig`, `Index` / `IndexUpdate`,
-/// `Request`, `Ping`, `Close`). Errors are prefixed with the failing stage.
+/// `Request`, `DownloadProgress`, `Ping`, `Close`). Errors are prefixed with the failing stage.
 pub fn dispatch_primary_message(
     stream: &mut BepTlsStream,
     ctx: &mut SessionContext<'_>,
@@ -59,6 +59,10 @@ pub fn dispatch_primary_message(
         BepMessageType::Request => serve_block_request(stream, ctx, payload)
             .map(|_| Dispatched::Handled)
             .map_err(|e| with_context("request handling error", e)),
+        BepMessageType::DownloadProgress => {
+            let _ = BepDownloadProgress::decode(payload);
+            Ok(Dispatched::Handled)
+        }
         BepMessageType::Ping => write_bep_message(stream, BepMessageType::Ping, &[])
             .map(|_| Dispatched::Handled)
             .map_err(|e| with_context("ping reply failed", e)),
