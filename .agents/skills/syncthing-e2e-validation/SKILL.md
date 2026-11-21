@@ -23,7 +23,7 @@ Select stages with `--only host,cli-lan` or `--skip vita3k`; logs land in
 | `host` | `cargo test --workspace` passes with zero compiler warnings | Rust |
 | `vita` | `just vpk` builds without warnings; `_newlib_heap_size_user` and `sceUserMainThreadStackSize` are exported (C2-12828-1 prevention) | VitaSDK, nightly |
 | `cli-lan` | two `syncthing-cli` daemons with `dynamic` addresses find each other by LAN discovery (UDP 21027) and sync a folder both ways | UDP broadcast on the host |
-| `vita3k` | the PS Vita app in Vita3K finds the CLI by LAN discovery, dials it and syncs both ways (`scripts/vita3k_cli_sync.sh`, screenshots in `vita3k/`) | Vita3K, VitaSDK |
+| `vita3k` | outbound Vita -> CLI LAN sync (`scripts/vita3k_cli_sync.sh`, which also supports `internet` and `internet-then-lan` modes) **and** inbound CLI -> Vita TCP 22000 sync + `DeviceOffer` accept/decline E2E (`scripts/vita3k_inbound_e2e.sh`, screenshots in `vita3k/` and `vita3k-inbound/`) | Vita3K, VitaSDK |
 | `internet` | relay pool fetched; our announcement accepted by `discovery-announce-v4.syncthing.net` and found back by a lookup; a relay joined; then a CLI <-> CLI sync with no LAN and no address (Global Discovery lookup + relay) | `*.syncthing.net` reachable, outbound TCP to relays (port 22067) |
 
 ## Reading the summary
