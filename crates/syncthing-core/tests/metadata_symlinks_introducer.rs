@@ -132,6 +132,7 @@ fn bep_cluster_config_extended_fields_roundtrip() {
         folders: vec![BepFolder {
             id: "code".to_owned(),
             label: "Code".to_owned(),
+            folder_type: syncthing_core::FolderType::SendReceive,
             ignore_permissions: true,
             ignore_delete: true,
             device_ids: vec![dev_a, dev_b],

@@ -62,6 +62,7 @@ impl Config {
             folder_type,
             receive_only: folder_type == ConfigFolderType::ReceiveOnly,
             paused: false,
+            versioning: super::model::FolderVersioningConfig::None,
         });
         Ok(())
     }

@@ -48,18 +48,18 @@ pub(crate) fn mtime_parts(meta: &fs::Metadata) -> (i64, i32) {
         .unwrap_or((0, 0))
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, not(target_env = "newlib")))]
 pub(crate) fn posix_permissions(meta: &fs::Metadata) -> u32 {
     use std::os::unix::fs::PermissionsExt;
     meta.permissions().mode() & 0o777
 }
 
-#[cfg(not(unix))]
+#[cfg(not(all(unix, not(target_env = "newlib"))))]
 pub(crate) fn posix_permissions(_meta: &fs::Metadata) -> u32 {
     0
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, not(target_env = "newlib")))]
 pub(crate) fn apply_posix_permissions(path: &std::path::Path, mode: u32) {
     use std::os::unix::fs::PermissionsExt;
     if mode != 0 {
@@ -67,5 +67,5 @@ pub(crate) fn apply_posix_permissions(path: &std::path::Path, mode: u32) {
     }
 }
 
-#[cfg(not(unix))]
+#[cfg(not(all(unix, not(target_env = "newlib"))))]
 pub(crate) fn apply_posix_permissions(_path: &std::path::Path, _mode: u32) {}

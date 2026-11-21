@@ -96,7 +96,12 @@ impl IgnoreMatcher {
         if norm.is_empty() {
             return (false, false);
         }
-        if norm == ".stignore" || norm.split('/').any(|c| c == ".stignore") {
+        if norm == ".stignore"
+            || norm == ".stversions"
+            || norm
+                .split('/')
+                .any(|c| c == ".stignore" || c == ".stversions")
+        {
             return (true, false);
         }
         if self.rules.is_empty() {

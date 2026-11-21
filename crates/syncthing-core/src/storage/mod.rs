@@ -14,7 +14,9 @@
 pub mod atomic;
 pub mod blocks;
 pub mod download;
+pub mod encrypted;
 pub mod names;
+pub mod versioning;
 pub mod vita_fs;
 pub mod weak_hash;
 
@@ -25,6 +27,7 @@ use sha2::{Digest, Sha256};
 
 use crate::bep::{BepFolder, FolderType};
 use crate::device_id::DeviceId;
+use versioning::FileVersioning;
 use vita_fs::accessible_root;
 
 /// Local filesystem storage manager (`ux0:data/syncthing/sync` or custom paths).
@@ -37,6 +40,8 @@ pub struct FsSyncStorage {
     paused_folders: HashSet<String>,
     /// Folder types other than the default `SendReceive` (e.g. read-only `ReceiveOnly` shares)
     folder_types: HashMap<String, FolderType>,
+    /// File versioning policy per `folder_id` (`FileVersioning::None` when absent).
+    folder_versionings: HashMap<String, FileVersioning>,
     /// Devices each configured folder is shared with. A folder missing here is not shared with
     /// anyone: it is never announced, indexed, downloaded or served.
     folder_devices: HashMap<String, Vec<DeviceId>>,
@@ -59,6 +64,7 @@ impl FsSyncStorage {
             custom_folder_paths: HashMap::new(),
             paused_folders: HashSet::new(),
             folder_types: HashMap::new(),
+            folder_versionings: HashMap::new(),
             folder_devices: HashMap::new(),
             local_folders: Vec::new(),
             known_devices: Vec::new(),
@@ -199,9 +205,32 @@ impl FsSyncStorage {
         self.folder_type(folder_id) == FolderType::ReceiveOnly
     }
 
+    /// Returns `true` if `folder_id` is configured as [`FolderType::ReceiveEncrypted`].
+    pub fn is_folder_receive_encrypted(&self, folder_id: &str) -> bool {
+        self.folder_type(folder_id) == FolderType::ReceiveEncrypted
+    }
+
     /// Returns `true` if remote changes for `folder_id` must never be applied locally.
     pub fn is_folder_send_only(&self, folder_id: &str) -> bool {
         self.folder_type(folder_id) == FolderType::SendOnly
+    }
+
+    /// Configures `.stversions` file versioning for `folder_id`.
+    pub fn set_folder_versioning(&mut self, folder_id: &str, versioning: FileVersioning) {
+        if versioning == FileVersioning::None {
+            self.folder_versionings.remove(folder_id);
+        } else {
+            self.folder_versionings
+                .insert(folder_id.to_owned(), versioning);
+        }
+    }
+
+    /// Returns the `.stversions` file versioning policy of `folder_id`.
+    pub fn folder_versioning(&self, folder_id: &str) -> FileVersioning {
+        self.folder_versionings
+            .get(folder_id)
+            .copied()
+            .unwrap_or_default()
     }
 
     /// Declares the devices `folder_id` is shared with (replacing any previous list).

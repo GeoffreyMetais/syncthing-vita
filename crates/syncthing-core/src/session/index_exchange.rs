@@ -71,9 +71,11 @@ pub(super) fn publish_index(
     if !folders.is_peer_folder(&index.folder) {
         return Ok(false);
     }
-    // A receive-only folder never offers its local changes to the peer.
+    // A receive-only or receive-encrypted folder never offers local plaintext changes to peers.
     let masked;
-    let index = if ctx.storage.is_folder_receive_only(&index.folder) {
+    let index = if crate::storage::encrypted::suppresses_local_outbound_changes(
+        ctx.storage.folder_type(&index.folder),
+    ) {
         masked = mask_local_changes(index, folders.remote_files(&index.folder));
         &masked
     } else {

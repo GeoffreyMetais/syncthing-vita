@@ -231,6 +231,7 @@ fn build_storage(home: &Path, config: &Config) -> FsSyncStorage {
         storage.set_folder_devices(&folder.id, devices.clone());
         storage.set_folder_paused(&folder.id, folder.paused);
         storage.set_folder_type(&folder.id, folder.effective_folder_type().to_bep());
+        storage.set_folder_versioning(&folder.id, folder.versioning.to_core());
         if !devices.is_empty() {
             storage.add_local_folder(BepFolder {
                 id: folder.id.clone(),

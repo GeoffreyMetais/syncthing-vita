@@ -106,6 +106,39 @@ impl ConfigFolderType {
     }
 }
 
+/// `.stversions` file versioning policy for a folder in `config.toml`.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "lowercase")]
+pub enum FolderVersioningConfig {
+    #[default]
+    None,
+    TrashCan {
+        #[serde(default)]
+        cleanout_days: u32,
+    },
+    Simple {
+        #[serde(default = "default_simple_keep")]
+        keep: usize,
+    },
+}
+
+const fn default_simple_keep() -> usize {
+    5
+}
+
+impl FolderVersioningConfig {
+    /// Converts to [`syncthing_core::FileVersioning`].
+    pub fn to_core(self) -> syncthing_core::FileVersioning {
+        match self {
+            Self::None => syncthing_core::FileVersioning::None,
+            Self::TrashCan { cleanout_days } => {
+                syncthing_core::FileVersioning::TrashCan { cleanout_days }
+            }
+            Self::Simple { keep } => syncthing_core::FileVersioning::Simple { keep },
+        }
+    }
+}
+
 /// A shared folder.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
@@ -121,10 +154,17 @@ pub struct FolderConfig {
     #[serde(skip_serializing_if = "is_false")]
     pub receive_only: bool,
     pub paused: bool,
+    /// Optional `.stversions` file versioning (`none`, `trashcan`, `simple`).
+    #[serde(default, skip_serializing_if = "is_versioning_none")]
+    pub versioning: FolderVersioningConfig,
 }
 
 fn is_false(v: &bool) -> bool {
     !*v
+}
+
+fn is_versioning_none(v: &FolderVersioningConfig) -> bool {
+    *v == FolderVersioningConfig::None
 }
 
 pub(crate) fn default_addresses() -> Vec<String> {

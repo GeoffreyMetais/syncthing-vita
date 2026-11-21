@@ -16,6 +16,7 @@ pub mod global_announce;
 pub mod http;
 pub mod lan_scan;
 pub mod local_ip;
+pub mod nat;
 pub mod udp;
 
 pub use addresses::{is_local_ip, resolve_peer_tcp_addrs};
@@ -27,4 +28,12 @@ pub use global::{
 pub use global_announce::{announce_on, AnnounceOutcome, DEFAULT_ANNOUNCE_SERVERS};
 pub use lan_scan::scan_lan_bep_peers;
 pub use local_ip::detect_local_ipv4;
+pub use nat::{
+    build_add_port_mapping_soap, build_get_external_ip_soap, build_ssdp_msearch,
+    decode_natpmp_map_resp, decode_natpmp_public_addr_resp, discover_and_map_tcp,
+    encode_natpmp_map_req, encode_natpmp_public_addr_req, natpmp_map_tcp, natpmp_map_tcp_at,
+    parse_external_ip_soap, parse_igd_control_url, parse_ssdp_location, NatMapping,
+    NatPmpMapResponse, NatPmpPublicAddrResponse, NatProtocol, NATPMP_PORT, SSDP_MULTICAST_ADDR,
+    SSDP_PORT,
+};
 pub use udp::{run_discovery_cycle, DiscoveryCycleResult};

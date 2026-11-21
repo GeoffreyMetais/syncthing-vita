@@ -174,7 +174,23 @@ impl FsSyncStorage {
                 let removed = if !is_link && path.is_dir() {
                     fs::remove_dir(&path)
                 } else {
-                    fs::remove_file(&path)
+                    let versioning = self.folder_versioning(folder_id);
+                    if !is_link
+                        && path.is_file()
+                        && versioning != crate::storage::versioning::FileVersioning::None
+                        && crate::storage::versioning::archive_file(
+                            &self.folder_root(folder_id),
+                            &rf.name,
+                            &path,
+                            versioning,
+                        )
+                        .is_ok()
+                        && fs::symlink_metadata(&path).is_err()
+                    {
+                        Ok(())
+                    } else {
+                        fs::remove_file(&path)
+                    }
                 };
                 if removed.is_err() && fs::symlink_metadata(&path).is_ok() {
                     return; // Non-empty directory or locked file: retry on the next index.
@@ -344,7 +360,7 @@ impl FsSyncStorage {
     }
 }
 
-#[cfg(unix)]
+#[cfg(all(unix, not(target_env = "newlib")))]
 fn create_or_replace_symlink(target: &str, dest: &Path) -> io::Result<()> {
     let file_name = dest
         .file_name()
@@ -365,7 +381,7 @@ fn create_or_replace_symlink(target: &str, dest: &Path) -> io::Result<()> {
     Ok(())
 }
 
-#[cfg(not(unix))]
+#[cfg(not(all(unix, not(target_env = "newlib"))))]
 fn create_or_replace_symlink(_target: &str, _dest: &Path) -> io::Result<()> {
     Err(io::Error::new(
         io::ErrorKind::Unsupported,
