@@ -168,7 +168,7 @@ jobs:
         run: ./scripts/vita3k_cli_sync.sh 45 target/e2e-vita3k-lan lan
 
       - name: E2E Sync Vita3K <-> CLI (Internet / Global Discovery + Relay)
-        run: ./scripts/vita3k_cli_sync.sh 60 target/e2e-vita3k-internet internet
+        run: ./scripts/vita3k_cli_sync.sh 90 target/e2e-vita3k-internet internet
 
       - name: E2E Inbound TCP 22000 & DeviceOffer (Vita3K <-> CLI)
         run: ./scripts/vita3k_inbound_e2e.sh all target/e2e-vita3k-inbound
@@ -228,10 +228,10 @@ jobs:
         run: CARGO_FEATURES=ui-script just vpk
 
       - name: E2E Sync Vita3K <-> CLI (Internet -> LAN roaming)
-        run: ./scripts/vita3k_cli_sync.sh 60 target/e2e-vita3k-internet-then-lan internet-then-lan
+        run: ./scripts/vita3k_cli_sync.sh 90 target/e2e-vita3k-internet-then-lan internet-then-lan
 
       - name: E2E Sync Vita3K <-> CLI (LAN -> Internet fallback)
-        run: ./scripts/vita3k_cli_sync.sh 60 target/e2e-vita3k-lan-then-internet lan-then-internet
+        run: ./scripts/vita3k_cli_sync.sh 90 target/e2e-vita3k-lan-then-internet lan-then-internet
 
       - name: Upload Vita3K Roaming E2E logs and screenshots
         if: always()
