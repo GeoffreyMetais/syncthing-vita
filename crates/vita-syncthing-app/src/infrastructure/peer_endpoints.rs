@@ -1,6 +1,7 @@
 //! Peer endpoint resolution: configured addresses (IP or DNS hostname), LAN UDP discovery,
 //! and Syncthing Global Discovery v2 (`tcp://` + `relay://`).
 
+use std::cell::Cell;
 use std::net::{SocketAddr, ToSocketAddrs};
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Sender;
@@ -16,8 +17,8 @@ use syncthing_core::{
 use super::session_guard::SessionClaims;
 use super::sync_worker::WorkerMsg;
 use crate::domain::defaults::{
-    CONNECT_TIMEOUT, GLOBAL_DISCOVERY_TIMEOUT, NO_ADDRESS_POLL, RETRY_AFTER_ERROR,
-    RETRY_AFTER_SESSION, RETRY_AWAITING_PAIRING,
+    CONNECT_TIMEOUT, GLOBAL_DISCOVERY_INTERVAL, GLOBAL_DISCOVERY_RETRY, GLOBAL_DISCOVERY_TIMEOUT,
+    NO_ADDRESS_POLL, RETRY_AFTER_ERROR, RETRY_AFTER_SESSION, RETRY_AWAITING_PAIRING,
 };
 use crate::domain::{KnownDevice, UiText};
 
@@ -241,6 +242,108 @@ pub fn format_endpoint_label(ep: &PeerEndpoint) -> String {
     }
 }
 
+/// Returns `true` when `ep` is a direct local/LAN socket address.
+pub fn is_local_endpoint(ep: &PeerEndpoint) -> bool {
+    matches!(ep, PeerEndpoint::Direct(sock) if is_local_ip(sock.ip()))
+}
+
+/// Filters `targets` to endpoints that may be dialed right now.
+///
+/// While `initial_lan_done` is `false`, only local/LAN direct endpoints are dialable so that an
+/// incoming Global Discovery answer never jumps ahead of the initial LAN discovery pass.
+pub fn dialable_targets(targets: &[PeerEndpoint], initial_lan_done: bool) -> Vec<PeerEndpoint> {
+    if initial_lan_done {
+        targets.to_vec()
+    } else {
+        targets
+            .iter()
+            .filter(|ep| is_local_endpoint(ep))
+            .cloned()
+            .collect()
+    }
+}
+
+/// Returns how long the Global Discovery loop should wait before its next refresh pass.
+///
+/// Uses [`GLOBAL_DISCOVERY_RETRY`] whenever any unconnected peer that needs Global Discovery
+/// either recorded a lookup error or has no cached endpoints yet; otherwise waits
+/// [`GLOBAL_DISCOVERY_INTERVAL`].
+pub fn next_global_lookup_delay(
+    dial_peers: &[KnownDevice],
+    connected: &[DeviceId],
+    global: &SharedGlobalEndpoints,
+    last_errors: &[(DeviceId, String)],
+) -> Duration {
+    let global_guard = global.lock().ok();
+    let needs_fast_retry = dial_peers.iter().any(|kd| {
+        if !needs_global_lookup(kd, connected) {
+            return false;
+        }
+        let has_error = last_errors
+            .iter()
+            .any(|(id, err)| kd.device_id.matches_peer(id) && !err.is_empty());
+        let has_endpoints = global_guard.as_ref().is_some_and(|guard| {
+            guard
+                .iter()
+                .any(|(id, eps)| kd.device_id.matches_peer(id) && !eps.is_empty())
+        });
+        has_error || !has_endpoints
+    });
+    drop(global_guard);
+    if needs_fast_retry {
+        GLOBAL_DISCOVERY_RETRY
+    } else {
+        GLOBAL_DISCOVERY_INTERVAL
+    }
+}
+
+/// Runs periodic Global Discovery v2 lookups for `dial_peers` in the background until
+/// `control.is_stop_requested()`, starting with an immediate lookup pass.
+pub fn run_global_discovery_loop(
+    dial_peers: Vec<KnownDevice>,
+    global: SharedGlobalEndpoints,
+    claims: Arc<SessionClaims>,
+    control: Arc<SyncControl>,
+    tx: Sender<WorkerMsg>,
+) {
+    run_global_discovery_loop_with(dial_peers, global, claims, control, tx, |id| {
+        lookup_global_peer(id, GLOBAL_DISCOVERY_TIMEOUT)
+    });
+}
+
+/// Testable core of [`run_global_discovery_loop`] with an injectable Global Discovery lookup.
+pub fn run_global_discovery_loop_with<F>(
+    dial_peers: Vec<KnownDevice>,
+    global: SharedGlobalEndpoints,
+    claims: Arc<SessionClaims>,
+    control: Arc<SyncControl>,
+    tx: Sender<WorkerMsg>,
+    mut lookup: F,
+) where
+    F: FnMut(DeviceId) -> std::io::Result<Vec<PeerEndpoint>>,
+{
+    let mut last_errors = Vec::new();
+    while !control.is_stop_requested() {
+        refresh_global_endpoints_with(
+            &dial_peers,
+            &global,
+            &claims,
+            &control,
+            &tx,
+            &mut last_errors,
+            &mut lookup,
+        );
+        if control.is_stop_requested() {
+            break;
+        }
+        let connected = claims.established_ids();
+        let delay = next_global_lookup_delay(&dial_peers, &connected, &global, &last_errors);
+        if !sleep_interruptible(&control, delay) {
+            break;
+        }
+    }
+}
+
 /// What the peer session threads of one sync worker share.
 #[derive(Clone)]
 pub struct PeerSessionShared {
@@ -275,138 +378,157 @@ pub fn run_peer_session_loop(kd: KnownDevice, shared: PeerSessionShared) {
     let mut report_connecting = true;
     let mut report_unreachable = true;
     let mut last_error = String::new();
+    let mut tried: Vec<PeerEndpoint> = Vec::new();
     while !control.is_stop_requested() {
         if claims.is_claimed(&kd.device_id) {
+            tried.clear();
             if !sleep_interruptible(&control, RETRY_AFTER_SESSION) {
                 break;
             }
             continue;
         }
 
-        let (target_id, targets) = collect_peer_targets(&kd, &discovered, &global);
-        if targets.is_empty() {
-            if !logged_no_addr {
+        let (mut target_id, all_targets) = collect_peer_targets(&kd, &discovered, &global);
+        let dialable = dialable_targets(&all_targets, initial_lan_done.load(Ordering::Acquire));
+        if dialable.is_empty() {
+            tried.clear();
+            if all_targets.is_empty() && !logged_no_addr {
                 logged_no_addr = true;
                 let _ = tx.send(WorkerMsg::Log(format!(
                     "No address for {} (configured: '{}'). Waiting for discovery...",
                     kd.name, kd.address
                 )));
             }
-            if !sleep_interruptible(&control, NO_ADDRESS_POLL) {
-                break;
-            }
-            continue;
-        }
-
-        let has_local_target = targets
-            .iter()
-            .any(|ep| matches!(ep, PeerEndpoint::Direct(sock) if is_local_ip(sock.ip())));
-        if !has_local_target && !initial_lan_done.load(Ordering::Acquire) {
             if !sleep_unless_stopped(&control, NO_ADDRESS_POLL, || {
-                initial_lan_done.load(Ordering::Acquire)
+                let (_, cur_targets) = collect_peer_targets(&kd, &discovered, &global);
+                !dialable_targets(&cur_targets, initial_lan_done.load(Ordering::Acquire)).is_empty()
             }) {
                 break;
             }
             continue;
         }
 
+        let mut pending: Vec<PeerEndpoint> = dialable
+            .iter()
+            .filter(|ep| !tried.contains(ep))
+            .cloned()
+            .collect();
+        if pending.is_empty() {
+            tried.clear();
+            pending = dialable;
+        }
+
         let mut connected_once = false;
         let mut awaiting_pairing = false;
 
-        for ep in targets {
-            if control.is_stop_requested() {
-                return;
-            }
-            let Some(_claim) = claims.try_claim(target_id) else {
-                connected_once = true;
-                break;
-            };
-            let ep_label = format_endpoint_label(&ep);
-            if report_connecting {
-                report_connecting = false;
-                let _ = tx.send(WorkerMsg::Progress {
-                    pct: None,
-                    status: UiText::ConnectingTo {
-                        name: kd.name.clone(),
-                        addr: ep_label.clone(),
-                    },
-                    file: UiText::raw("-"),
-                });
-            }
-            let tx_ev = tx.clone();
-            let claims_ev = Arc::clone(&claims);
-            let emit = move |event: SyncEvent| {
-                if let SyncEvent::PeerConnected { peer_device_id, .. } = &event {
-                    claims_ev.mark_established(peer_device_id);
+        'dial_pass: while !pending.is_empty() {
+            for ep in pending {
+                if control.is_stop_requested() {
+                    return;
                 }
-                let _ = tx_ev.send(WorkerMsg::SyncEvent(event));
-            };
-            let params = SessionParams {
-                identity: &identity,
-                hello: &hello,
-                storage: &storage,
-                expected_device_id: Some(target_id),
-                timeout: CONNECT_TIMEOUT,
-                control: Some(Arc::clone(&control)),
-                secondary_inbox: None,
-            };
-            let result = match ep {
-                PeerEndpoint::Direct(tcp_addr) => connect_and_sync(&params, tcp_addr, emit),
-                PeerEndpoint::Relay {
-                    addr: relay_addr,
-                    device_id: relay_id,
-                } => connect_via_relay(
-                    &identity,
-                    relay_addr,
-                    relay_id,
-                    target_id,
-                    GLOBAL_DISCOVERY_TIMEOUT,
-                )
-                .and_then(|tcp| connect_and_sync_stream(&params, tcp, relay_addr, emit)),
-            };
+                tried.push(ep.clone());
+                let Some(_claim) = claims.try_claim(target_id) else {
+                    connected_once = true;
+                    break 'dial_pass;
+                };
+                let ep_label = format_endpoint_label(&ep);
+                if report_connecting {
+                    report_connecting = false;
+                    let _ = tx.send(WorkerMsg::Progress {
+                        pct: None,
+                        status: UiText::ConnectingTo {
+                            name: kd.name.clone(),
+                            addr: ep_label.clone(),
+                        },
+                        file: UiText::raw("-"),
+                    });
+                }
+                let tx_ev = tx.clone();
+                let claims_ev = Arc::clone(&claims);
+                let emit = move |event: SyncEvent| {
+                    if let SyncEvent::PeerConnected { peer_device_id, .. } = &event {
+                        claims_ev.mark_established(peer_device_id);
+                    }
+                    let _ = tx_ev.send(WorkerMsg::SyncEvent(event));
+                };
+                let params = SessionParams {
+                    identity: &identity,
+                    hello: &hello,
+                    storage: &storage,
+                    expected_device_id: Some(target_id),
+                    timeout: CONNECT_TIMEOUT,
+                    control: Some(Arc::clone(&control)),
+                    secondary_inbox: None,
+                };
+                let result = match ep {
+                    PeerEndpoint::Direct(tcp_addr) => connect_and_sync(&params, tcp_addr, emit),
+                    PeerEndpoint::Relay {
+                        addr: relay_addr,
+                        device_id: relay_id,
+                    } => connect_via_relay(
+                        &identity,
+                        relay_addr,
+                        relay_id,
+                        target_id,
+                        GLOBAL_DISCOVERY_TIMEOUT,
+                    )
+                    .and_then(|tcp| connect_and_sync_stream(&params, tcp, relay_addr, emit)),
+                };
 
-            match result {
-                Ok(hs) => match hs.session_status {
-                    SyncSessionStatus::Active { .. } => {
-                        connected_once = true;
-                        logged_awaiting = false;
-                        report_unreachable = true;
-                        report_connecting = true;
-                        last_error.clear();
-                        break;
-                    }
-                    SyncSessionStatus::AwaitingPairing => {
-                        awaiting_pairing = true;
-                        if !logged_awaiting {
-                            logged_awaiting = true;
-                            let _ = tx.send(WorkerMsg::Log(format!(
-                                "Peer {} ({}) awaiting device acceptance in Syncthing GUI.",
-                                kd.name, ep_label
-                            )));
+                match result {
+                    Ok(hs) => match hs.session_status {
+                        SyncSessionStatus::Active { .. } => {
+                            connected_once = true;
+                            logged_awaiting = false;
+                            report_unreachable = true;
+                            report_connecting = true;
+                            last_error.clear();
+                            break 'dial_pass;
                         }
-                    }
-                    SyncSessionStatus::ClosedByPeer(reason) => {
-                        awaiting_pairing = true;
-                        if !logged_awaiting {
-                            logged_awaiting = true;
-                            let _ = tx.send(WorkerMsg::Log(format!(
-                                "Session with {} ({}) closed by peer: {}",
-                                kd.name, ep_label, reason
-                            )));
+                        SyncSessionStatus::AwaitingPairing => {
+                            awaiting_pairing = true;
+                            if !logged_awaiting {
+                                logged_awaiting = true;
+                                let _ = tx.send(WorkerMsg::Log(format!(
+                                    "Peer {} ({}) awaiting device acceptance in Syncthing GUI.",
+                                    kd.name, ep_label
+                                )));
+                            }
                         }
-                    }
-                },
-                Err(e) => {
-                    let msg = format!(
-                        "Connection attempt to {} ({}) failed: {}",
-                        kd.name, ep_label, e
-                    );
-                    if msg != last_error {
-                        let _ = tx.send(WorkerMsg::Log(msg.clone()));
-                        last_error = msg;
+                        SyncSessionStatus::ClosedByPeer(reason) => {
+                            awaiting_pairing = true;
+                            if !logged_awaiting {
+                                logged_awaiting = true;
+                                let _ = tx.send(WorkerMsg::Log(format!(
+                                    "Session with {} ({}) closed by peer: {}",
+                                    kd.name, ep_label, reason
+                                )));
+                            }
+                        }
+                    },
+                    Err(e) => {
+                        let msg = format!(
+                            "Connection attempt to {} ({}) failed: {}",
+                            kd.name, ep_label, e
+                        );
+                        if msg != last_error {
+                            let _ = tx.send(WorkerMsg::Log(msg.clone()));
+                            last_error = msg;
+                        }
                     }
                 }
             }
+
+            if connected_once || awaiting_pairing || control.is_stop_requested() {
+                break;
+            }
+
+            let (latest_id, latest_all) = collect_peer_targets(&kd, &discovered, &global);
+            target_id = latest_id;
+            pending = dialable_targets(&latest_all, initial_lan_done.load(Ordering::Acquire))
+                .into_iter()
+                .filter(|ep| !tried.contains(ep))
+                .collect();
         }
 
         if control.is_stop_requested() {
@@ -429,8 +551,29 @@ pub fn run_peer_session_loop(kd: KnownDevice, shared: PeerSessionShared) {
         } else {
             RETRY_AFTER_ERROR
         };
-        if !sleep_interruptible(&control, retry_delay) {
-            break;
+        if !connected_once && !awaiting_pairing {
+            let woke_new = Cell::new(false);
+            if !sleep_unless_stopped(&control, retry_delay, || {
+                let (_, cur_targets) = collect_peer_targets(&kd, &discovered, &global);
+                let has_new =
+                    dialable_targets(&cur_targets, initial_lan_done.load(Ordering::Acquire))
+                        .into_iter()
+                        .any(|ep| !tried.contains(&ep));
+                if has_new {
+                    woke_new.set(true);
+                }
+                has_new
+            }) {
+                break;
+            }
+            if !woke_new.get() {
+                tried.clear();
+            }
+        } else {
+            tried.clear();
+            if !sleep_interruptible(&control, retry_delay) {
+                break;
+            }
         }
     }
 }

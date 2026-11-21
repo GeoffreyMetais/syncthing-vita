@@ -14,7 +14,7 @@ use syncthing_core::{
     DEFAULT_ANNOUNCE_SERVERS,
 };
 
-use super::peer_endpoints::sleep_interruptible;
+use super::peer_endpoints::sleep_unless_stopped;
 use super::relay_listener::{get_shared_relay_uri, SharedRelayUri};
 use super::sync_worker::WorkerMsg;
 use crate::domain::defaults::{GLOBAL_ANNOUNCE_POLL, GLOBAL_DISCOVERY_TIMEOUT};
@@ -149,7 +149,10 @@ pub fn run_global_announcer_on(
 
         announced = addresses;
 
-        if !sleep_interruptible(&ctx.control, GLOBAL_ANNOUNCE_POLL) {
+        if !sleep_unless_stopped(&ctx.control, GLOBAL_ANNOUNCE_POLL, || {
+            let current_relay = get_shared_relay_uri(&ctx.shared_relay_uri);
+            build_announced_addresses(ctx.listen_port, current_relay.as_deref()) != announced
+        }) {
             break;
         }
     }

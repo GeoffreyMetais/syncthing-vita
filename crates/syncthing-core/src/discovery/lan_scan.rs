@@ -1,7 +1,7 @@
 //! Fallback LAN peer discovery: TCP `22000` subnet scan verified with a TLS `bep/1.0` probe.
 
 use std::net::{IpAddr, Ipv4Addr, SocketAddr, TcpStream};
-use std::sync::{Arc, Mutex};
+use std::sync::Mutex;
 use std::time::Duration;
 
 use super::announce::Announce;
@@ -10,9 +10,28 @@ use crate::bep::BEP_DEFAULT_PORT;
 use crate::device_id::DeviceId;
 use crate::tls::probe_bep_peer_device_id;
 
-/// and verifies any open port using a TLS 1.3 (`bep/1.0`) handshake to extract its Syncthing `DeviceId`.
-/// Uses bounded concurrency (16 lightweight workers) safe for PS Vita (`sceNet`) and Vita3K.
+const SCAN_WORKERS: usize = if cfg!(target_os = "vita") { 8 } else { 16 };
+
+/// Scans the local `/24` subnet on TCP port `22000` (plus `127.0.0.1:22000`) and verifies any open
+/// port using a TLS 1.3 (`bep/1.0`) handshake to extract its Syncthing `DeviceId`.
+/// Uses bounded concurrency safe for PS Vita (`sceNet`) and Vita3K.
 pub fn scan_lan_bep_peers(own_device_id: DeviceId) -> Vec<(SocketAddr, Announce)> {
+    scan_lan_bep_peers_interruptible(own_device_id, || false)
+}
+
+/// Interruptible variant of [`scan_lan_bep_peers`] that aborts pending TCP connect and TLS probe
+/// steps as soon as `should_stop()` returns `true`.
+pub fn scan_lan_bep_peers_interruptible<F>(
+    own_device_id: DeviceId,
+    should_stop: F,
+) -> Vec<(SocketAddr, Announce)>
+where
+    F: Fn() -> bool + Send + Sync,
+{
+    if should_stop() {
+        return Vec::new();
+    }
+
     let local_ip = detect_local_ipv4().unwrap_or(Ipv4Addr::new(192, 168, 1, 0));
     let octets = local_ip.octets();
     let self_host = octets[3];
@@ -30,45 +49,54 @@ pub fn scan_lan_bep_peers(own_device_id: DeviceId) -> Vec<(SocketAddr, Announce)
         candidates.push(SocketAddr::new(IpAddr::V4(ip), BEP_DEFAULT_PORT));
     }
 
-    let queue = Arc::new(Mutex::new(candidates.into_iter()));
-    let open_addrs = Arc::new(Mutex::new(Vec::new()));
-    let mut handles = Vec::new();
+    let queue = Mutex::new(candidates.into_iter());
+    let open_addrs = Mutex::new(Vec::new());
+    let stop = &should_stop;
 
-    for w in 0..16 {
-        let q = Arc::clone(&queue);
-        let found = Arc::clone(&open_addrs);
-        let builder = std::thread::Builder::new()
-            .name(format!("lan_scan_{w}"))
-            .stack_size(256 * 1024);
-        if let Ok(h) = builder.spawn(move || loop {
-            let next_addr = {
-                let Ok(mut guard) = q.lock() else {
+    std::thread::scope(|scope| {
+        for w in 0..SCAN_WORKERS {
+            let q = &queue;
+            let found = &open_addrs;
+            let builder = std::thread::Builder::new()
+                .name(format!("lan_scan_{w}"))
+                .stack_size(256 * 1024);
+            let _ = builder.spawn_scoped(scope, move || loop {
+                if stop() {
+                    break;
+                }
+                let next_addr = {
+                    let Ok(mut guard) = q.lock() else {
+                        break;
+                    };
+                    guard.next()
+                };
+                let Some(addr) = next_addr else {
                     break;
                 };
-                guard.next()
-            };
-            let Some(addr) = next_addr else {
-                break;
-            };
-            if TcpStream::connect_timeout(&addr, Duration::from_millis(75)).is_ok() {
-                if let Ok(mut out) = found.lock() {
-                    out.push(addr);
+                if stop() {
+                    break;
                 }
-            }
-        }) {
-            handles.push(h);
+                if TcpStream::connect_timeout(&addr, Duration::from_millis(75)).is_ok() {
+                    if let Ok(mut out) = found.lock() {
+                        out.push(addr);
+                    }
+                }
+            });
         }
+    });
+
+    if should_stop() {
+        return Vec::new();
     }
 
-    for h in handles {
-        let _ = h.join();
-    }
-
-    let mut open_list = open_addrs.lock().map(|g| g.clone()).unwrap_or_default();
+    let mut open_list = open_addrs.into_inner().unwrap_or_default();
     open_list.sort();
 
     let mut peers = Vec::new();
     for addr in open_list {
+        if should_stop() {
+            break;
+        }
         if let Some(peer_id) = probe_bep_peer_device_id(addr, Duration::from_millis(1200)) {
             if peer_id != own_device_id {
                 peers.push((

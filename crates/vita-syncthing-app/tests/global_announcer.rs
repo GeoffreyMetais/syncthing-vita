@@ -115,3 +115,85 @@ fn global_announce_omits_unmapped_tcp_behind_nat_and_uses_external_port_when_map
     // Zero external port is ignored.
     assert_eq!(global_announce_port(Some(22000), Some(0)), None);
 }
+
+#[test]
+fn global_announcer_wakes_promptly_when_shared_relay_uri_changes() {
+    use std::net::TcpListener;
+    use std::sync::{mpsc, Arc, Mutex};
+    use std::time::{Duration, Instant};
+    use syncthing_core::{DeviceIdentity, HttpsClient, HttpsServer, SyncControl};
+    use vita_syncthing_app::domain::defaults::GLOBAL_ANNOUNCE_POLL;
+    use vita_syncthing_app::infrastructure::global_announcer::{
+        run_global_announcer_on, GlobalAnnouncerContext,
+    };
+
+    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let port = listener.local_addr().unwrap().port();
+    listener.set_nonblocking(true).unwrap();
+
+    let server = HttpsServer::parse(&format!("https://127.0.0.1:{port}/v2/")).unwrap();
+    let control = SyncControl::new();
+    let shared_relay_uri = Arc::new(Mutex::new(None));
+    let (tx, _rx) = mpsc::channel();
+
+    let ctx = GlobalAnnouncerContext {
+        identity: DeviceIdentity::from_seed(&[0x55; 32]).unwrap(),
+        listen_port: Some(22000),
+        shared_relay_uri: Arc::clone(&shared_relay_uri),
+        control: Arc::clone(&control),
+        tx,
+    };
+
+    let handle = std::thread::spawn(move || {
+        run_global_announcer_on(&[server], &HttpsClient::default(), &ctx);
+    });
+
+    // Wait for the initial announce attempt (only tcp://0.0.0.0:22000).
+    let deadline = Instant::now() + Duration::from_secs(3);
+    loop {
+        match listener.accept() {
+            Ok((stream, _)) => {
+                drop(stream);
+                break;
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                assert!(
+                    Instant::now() < deadline,
+                    "timed out waiting for 1st announce"
+                );
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            Err(e) => panic!("accept failed: {e}"),
+        }
+    }
+
+    // Set the relay URI while the announcer is sleeping on GLOBAL_ANNOUNCE_POLL (5 s).
+    let changed_at = Instant::now();
+    *shared_relay_uri.lock().unwrap() = Some("relay://198.51.100.5:22067/?id=RELAY".to_owned());
+
+    // The announcer must wake and re-attempt well under GLOBAL_ANNOUNCE_POLL.
+    let wake_deadline = Instant::now() + GLOBAL_ANNOUNCE_POLL;
+    let mut second_elapsed = None;
+    while Instant::now() < wake_deadline {
+        match listener.accept() {
+            Ok((stream, _)) => {
+                drop(stream);
+                second_elapsed = Some(changed_at.elapsed());
+                break;
+            }
+            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                std::thread::sleep(Duration::from_millis(10));
+            }
+            Err(e) => panic!("accept failed: {e}"),
+        }
+    }
+
+    control.request_stop();
+    handle.join().unwrap();
+
+    let elapsed = second_elapsed.expect("announcer did not re-announce after relay URI change");
+    assert!(
+        elapsed < Duration::from_secs(2),
+        "announcer took {elapsed:?} to wake after relay URI change (poll={GLOBAL_ANNOUNCE_POLL:?})"
+    );
+}

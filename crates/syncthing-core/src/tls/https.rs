@@ -140,6 +140,18 @@ fn split_host_port(authority: &str) -> Option<(String, u16)> {
     (!host.is_empty()).then(|| (host.to_owned(), port))
 }
 
+/// Filters resolved socket addresses for TCP connection attempts (`SceNet` on PS Vita is IPv4-only).
+pub fn select_connect_addrs(
+    addrs: impl IntoIterator<Item = SocketAddr>,
+    ipv4_only: bool,
+) -> Vec<SocketAddr> {
+    if ipv4_only {
+        addrs.into_iter().filter(SocketAddr::is_ipv4).collect()
+    } else {
+        addrs.into_iter().collect()
+    }
+}
+
 fn connect_any(
     server: &HttpsServer,
     client: &HttpsClient,
@@ -148,9 +160,10 @@ fn connect_any(
     if let Some(proxy) = &client.proxy {
         return proxy.connect(&server.host, server.port, timeout);
     }
-    let addrs: Vec<SocketAddr> = (server.host.as_str(), server.port)
-        .to_socket_addrs()?
-        .collect();
+    let addrs = select_connect_addrs(
+        (server.host.as_str(), server.port).to_socket_addrs()?,
+        cfg!(target_os = "vita"),
+    );
     let mut last_err = None;
     for addr in addrs {
         match TcpStream::connect_timeout(&addr, timeout) {
