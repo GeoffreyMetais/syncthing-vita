@@ -4,18 +4,18 @@ use std::net::SocketAddr;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{self, Receiver, Sender};
 use std::sync::{Arc, Mutex, OnceLock};
-use std::time::{Duration, Instant};
+use std::time::Duration;
 
 use syncthing_core::{
-    resolve_peer_tcp_addrs, run_discovery_cycle, scan_lan_bep_peers, Announce, BepFolder, BepHello,
-    DeviceId, DeviceIdentity, FolderType, FsSyncStorage, SyncControl, SyncEvent, SyncTuning,
-    BEP_DEFAULT_PORT, DISCOVERY_BROADCAST_ADDR,
+    resolve_peer_tcp_addrs, run_discovery_cycle, scan_lan_bep_peers_interruptible, Announce,
+    BepFolder, BepHello, DeviceId, DeviceIdentity, FolderType, FsSyncStorage, SyncControl,
+    SyncEvent, SyncTuning, BEP_DEFAULT_PORT, DISCOVERY_BROADCAST_ADDR,
 };
 
 use super::global_announcer::{run_global_announcer, GlobalAnnouncerContext};
 use super::incoming_listener::{bind_bep_listener, run_tcp_listener, IncomingListenerContext};
 use super::peer_endpoints::{
-    refresh_global_endpoints, run_peer_session_loop, sleep_unless_stopped, PeerSessionShared,
+    run_global_discovery_loop, run_peer_session_loop, sleep_unless_stopped, PeerSessionShared,
     SharedDiscoveredAddrs, SharedGlobalEndpoints,
 };
 use super::relay_listener::{run_relay_listener, RelayListenerContext, SharedRelayUri};
@@ -24,8 +24,8 @@ use super::worker_slot::spawn_after_previous;
 use super::ConfigRepository;
 use crate::domain::defaults::{
     BEP_LISTEN_PORT, CLIENT_NAME, DEVICE_NAME, DISCOVERY_INTERVAL, DISCOVERY_LISTEN,
-    GLOBAL_DISCOVERY_INTERVAL, KEEPALIVE_INTERVAL, MAX_INCOMING_HANDSHAKES, MAX_PEER_SESSIONS,
-    MAX_UNKNOWN_DEVICE_REPORTS, RESCAN_INTERVAL,
+    KEEPALIVE_INTERVAL, MAX_INCOMING_HANDSHAKES, MAX_PEER_SESSIONS, MAX_UNKNOWN_DEVICE_REPORTS,
+    RESCAN_INTERVAL,
 };
 use crate::domain::{KnownDevice, ShareConfigEntry, ShareMode, UiText};
 
@@ -102,6 +102,41 @@ pub fn global_announce_port(
 ) -> Option<u16> {
     listen_port.filter(|&p| p != 0)?;
     mapped_external_port.filter(|&p| p != 0)
+}
+
+/// Records newly discovered LAN peers in `discovered_addrs` and notifies the UI thread.
+pub fn publish_discovered_peers(
+    peers: &[(SocketAddr, Announce)],
+    discovered_addrs: &SharedDiscoveredAddrs,
+    tx: &Sender<WorkerMsg>,
+) {
+    let mut seen_ids = Vec::new();
+    for (udp_src, peer) in peers {
+        if seen_ids.contains(&peer.id) {
+            continue;
+        }
+        seen_ids.push(peer.id);
+
+        let tcp_targets = resolve_peer_tcp_addrs(*udp_src, &peer.addresses);
+        let best_tcp = tcp_targets
+            .first()
+            .copied()
+            .unwrap_or_else(|| SocketAddr::new(udp_src.ip(), BEP_DEFAULT_PORT));
+
+        if let Ok(mut guard) = discovered_addrs.lock() {
+            if let Some(slot) = guard.iter_mut().find(|(id, _)| *id == peer.id) {
+                slot.1 = tcp_targets;
+            } else {
+                guard.push((peer.id, tcp_targets));
+            }
+        }
+
+        let _ = tx.send(WorkerMsg::DeviceDiscovered {
+            device_id: peer.id,
+            name: "LAN Peer".to_owned(),
+            address: best_tcp.to_string(),
+        });
+    }
 }
 
 /// Waits up to `duration` before the next discovery cycle. Returns early when the UI asks for a
@@ -355,80 +390,79 @@ pub fn spawn_sync_worker(
                     }
                 }
             }
+
+            // Start Global Discovery v2 lookups immediately in parallel with UDP Local Discovery.
+            {
+                let global_peers = dial_peers.clone();
+                let global_ref = Arc::clone(&global_endpoints);
+                let global_claims = Arc::clone(&claims);
+                let global_control = Arc::clone(&worker_control);
+                let global_tx = tx.clone();
+                match std::thread::Builder::new()
+                    .name("bep_global".to_owned())
+                    .stack_size(WORKER_STACK_SIZE)
+                    .spawn(move || {
+                        run_global_discovery_loop(
+                            global_peers,
+                            global_ref,
+                            global_claims,
+                            global_control,
+                            global_tx,
+                        )
+                    }) {
+                    Ok(handle) => child_handles.push(handle),
+                    Err(e) => {
+                        let _ = tx.send(WorkerMsg::Log(format!(
+                            "Cannot start Global Discovery lookup thread: {e}"
+                        )));
+                    }
+                }
+            }
         }
 
-        // 5. Continuous UDP 21027 Local Discovery + periodic Global Discovery v2 lookups.
+        // 5. Continuous UDP 21027 Local Discovery (plus first-pass interruptible TCP subnet fallback).
         let mut first_pass = true;
-        let mut last_global_lookup: Option<Instant> = None;
-        let mut global_errors = Vec::new();
         while !worker_control.is_stop_requested() {
-            let mut discovered_peers =
+            let discovered_peers =
                 match run_discovery_cycle(&announce, DISCOVERY_BROADCAST_ADDR, DISCOVERY_LISTEN) {
                     Ok(res) => res.discovered_peers,
                     Err(_) => Vec::new(),
                 };
 
-            if first_pass && !dial_peers.is_empty() && !worker_control.is_stop_requested() {
-                let missing_dial = dial_peers.iter().any(|kd| {
-                    !discovered_peers
-                        .iter()
-                        .any(|(_, p)| kd.device_id.matches_peer(&p.id))
-                });
-                if missing_dial {
-                    for (addr, peer) in scan_lan_bep_peers(identity.device_id) {
-                        if !discovered_peers.iter().any(|(_, p)| p.id == peer.id) {
-                            discovered_peers.push((addr, peer));
-                        }
-                    }
-                }
-            }
-
-            let mut seen_ids = Vec::new();
-            for (udp_src, peer) in &discovered_peers {
-                if seen_ids.contains(&peer.id) {
-                    continue;
-                }
-                seen_ids.push(peer.id);
-
-                let tcp_targets = resolve_peer_tcp_addrs(*udp_src, &peer.addresses);
-                let best_tcp = tcp_targets
-                    .first()
-                    .copied()
-                    .unwrap_or_else(|| SocketAddr::new(udp_src.ip(), BEP_DEFAULT_PORT));
-
-                if let Ok(mut guard) = discovered_addrs.lock() {
-                    if let Some(slot) = guard.iter_mut().find(|(id, _)| *id == peer.id) {
-                        slot.1 = tcp_targets;
-                    } else {
-                        guard.push((peer.id, tcp_targets));
-                    }
-                }
-
-                let _ = tx.send(WorkerMsg::DeviceDiscovered {
-                    device_id: peer.id,
-                    name: "LAN Peer".to_owned(),
-                    address: best_tcp.to_string(),
-                });
-            }
+            publish_discovered_peers(&discovered_peers, &discovered_addrs, &tx);
 
             if first_pass {
                 initial_lan_done.store(true, Ordering::Release);
                 first_pass = false;
-            }
 
-            if !dial_peers.is_empty()
-                && last_global_lookup.is_none_or(|t| t.elapsed() >= GLOBAL_DISCOVERY_INTERVAL)
-                && !worker_control.is_stop_requested()
-            {
-                refresh_global_endpoints(
-                    &dial_peers,
-                    &global_endpoints,
-                    &claims,
-                    &worker_control,
-                    &tx,
-                    &mut global_errors,
-                );
-                last_global_lookup = Some(Instant::now());
+                if !dial_peers.is_empty() && !worker_control.is_stop_requested() {
+                    let established = claims.established_ids();
+                    let missing_dial = dial_peers.iter().any(|kd| {
+                        !discovered_peers
+                            .iter()
+                            .any(|(_, p)| kd.device_id.matches_peer(&p.id))
+                            && !established.iter().any(|id| id.matches_peer(&kd.device_id))
+                    });
+                    if missing_dial {
+                        let mut scanned = Vec::new();
+                        for (addr, peer) in
+                            scan_lan_bep_peers_interruptible(identity.device_id, || {
+                                worker_control.is_stop_requested()
+                            })
+                        {
+                            if !discovered_peers.iter().any(|(_, p)| p.id == peer.id)
+                                && !scanned
+                                    .iter()
+                                    .any(|(_, p): &(SocketAddr, Announce)| p.id == peer.id)
+                            {
+                                scanned.push((addr, peer));
+                            }
+                        }
+                        if !scanned.is_empty() {
+                            publish_discovered_peers(&scanned, &discovered_addrs, &tx);
+                        }
+                    }
+                }
             }
 
             if !wait_for_next_discovery(&worker_control, DISCOVERY_INTERVAL) {
