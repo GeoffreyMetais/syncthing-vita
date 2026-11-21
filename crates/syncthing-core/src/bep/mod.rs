@@ -4,15 +4,17 @@
 //! This module is a pure codec layer (no sockets, no filesystem). One file per message family:
 //! - [`header`] — frame `Header` (`MessageType`, `MessageCompression`)
 //! - [`framing`] — reading / writing complete post-`Hello` frames
-//! - [`lz4`] — LZ4 block decompression of compressed frames
+//! - [`lz4`] — LZ4 block compression and decompression of compressed frames
 //! - [`hello`] — pre-authentication `Hello` handshake
 //! - [`cluster_config`] — `ClusterConfig` (with `index_id` and `max_sequence`)
 //! - [`index`] — `Index` / `IndexUpdate` (files, BEP `Vector` / `Counter`, blocks)
 //! - [`request`] — block `Request` / `Response`
+//! - [`download_progress`] — `DownloadProgress` (type 5)
 //! - [`close`] — `Close`
 
 pub mod close;
 pub mod cluster_config;
+pub mod download_progress;
 pub mod framing;
 pub mod header;
 pub mod hello;
@@ -21,12 +23,20 @@ pub mod lz4;
 pub mod request;
 
 pub use close::BepClose;
-pub use cluster_config::{BepClusterConfig, BepFolder, FolderIndexState, FolderType};
-pub use framing::{read_bep_message, read_bep_message_after_first_byte, write_bep_message};
+pub use cluster_config::{
+    BepClusterConfig, BepDeviceCompression, BepFolder, FolderIndexState, FolderType,
+};
+pub use download_progress::{
+    BepDownloadProgress, BepFileDownloadProgressUpdate, DownloadProgressUpdateType,
+};
+pub use framing::{
+    read_bep_message, read_bep_message_after_first_byte, write_bep_message,
+    write_bep_message_compressed,
+};
 pub use header::{BepCompression, BepHeader, BepMessageType};
 pub use hello::BepHello;
 pub use index::{BepBlockInfo, BepFileInfo, BepIndex, BepVersionCounter};
-pub use lz4::decompress_bep_lz4;
+pub use lz4::{compress_bep_lz4, decompress_bep_lz4};
 pub use request::{BepRequest, BepResponse};
 
 /// BEP magic number (`0x2EA7D90B`), shared with Local Discovery.

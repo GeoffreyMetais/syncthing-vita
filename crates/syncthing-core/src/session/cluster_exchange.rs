@@ -65,6 +65,8 @@ pub fn exchange_cluster_config(
                 if cfg.secondary {
                     continue;
                 }
+                let own_id = ctx.own_id();
+                ctx.peer_compression = BepClusterConfig::decode_peer_compression(&payload, &own_id);
                 if !got_cluster_config {
                     got_cluster_config = true;
                     let peer_device_id = ctx.peer_device_id;

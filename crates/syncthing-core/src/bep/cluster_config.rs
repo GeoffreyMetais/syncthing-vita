@@ -5,6 +5,37 @@ use std::io;
 use crate::device_id::DeviceId;
 use crate::proto::{decode_varint, encode_bytes_field, encode_varint_field, WireIter};
 
+/// Compression preference for a device entry in `ClusterConfig` (`Device.compression`, field 4).
+///
+/// Matches Syncthing BEP v1 `enum Compression`: `METADATA = 0`, `NEVER = 1`, `ALWAYS = 2`.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub enum BepDeviceCompression {
+    /// Compress metadata messages (`Index`, `IndexUpdate`, `ClusterConfig`, etc.).
+    #[default]
+    Metadata = 0,
+    /// Disable compression for all messages.
+    Never = 1,
+    /// Compress all messages including `Response` block data.
+    Always = 2,
+}
+
+impl BepDeviceCompression {
+    /// Decodes a wire varint into `BepDeviceCompression`, defaulting to `Metadata` for unknown values.
+    pub fn from_wire(v: u64) -> Self {
+        match v {
+            0 => Self::Metadata,
+            1 => Self::Never,
+            2 => Self::Always,
+            _ => Self::Metadata,
+        }
+    }
+
+    /// BEP wire value of this compression preference.
+    pub fn wire_value(self) -> u64 {
+        self as u64
+    }
+}
+
 /// Shared folder in `ClusterConfig`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BepFolder {
@@ -77,6 +108,51 @@ impl BepClusterConfig {
         out
     }
 
+    /// Decodes the `compression` preference advertised by `peer_id` across all folders in `payload`
+    /// (BEP `Device.compression`, field 4; defaults to [`BepDeviceCompression::Metadata`]).
+    pub fn decode_peer_compression(payload: &[u8], peer_id: &DeviceId) -> BepDeviceCompression {
+        for item in WireIter::new(payload) {
+            let Ok((field_num, wire_type, data)) = item else {
+                break;
+            };
+            if field_num != 1 || wire_type != 2 {
+                continue;
+            }
+            for f_item in WireIter::new(data) {
+                let Ok((ff, fw, fdata)) = f_item else {
+                    break;
+                };
+                if ff != 16 || fw != 2 {
+                    continue;
+                }
+                let mut dev_id: Option<DeviceId> = None;
+                let mut compression = BepDeviceCompression::Metadata;
+                for d_item in WireIter::new(fdata) {
+                    let Ok((df, dw, ddata)) = d_item else {
+                        break;
+                    };
+                    match (df, dw) {
+                        (1, 2) if ddata.len() == 32 => {
+                            let mut raw = [0u8; 32];
+                            raw.copy_from_slice(ddata);
+                            dev_id = Some(DeviceId(raw));
+                        }
+                        (4, 0) => {
+                            if let Ok((v, _)) = decode_varint(ddata) {
+                                compression = BepDeviceCompression::from_wire(v);
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                if dev_id.is_some_and(|id| id.matches_peer(peer_id)) {
+                    return compression;
+                }
+            }
+        }
+        BepDeviceCompression::Metadata
+    }
+
     fn decode_folder(bytes: &[u8]) -> io::Result<BepFolder> {
         let mut id = String::new();
         let mut label = String::new();
@@ -110,12 +186,31 @@ impl BepClusterConfig {
         })
     }
 
-    /// Encodes a `ClusterConfig` advertising our shared folders, `index_id`, and `max_sequence`.
+    /// Encodes a `ClusterConfig` advertising our shared folders, `index_id`, and `max_sequence`,
+    /// using [`BepDeviceCompression::Metadata`] for device entries.
     pub fn encode_for_peers(
         folders: &[(BepFolder, FolderIndexState)],
         own_id: DeviceId,
         own_name: &str,
         peer_id: DeviceId,
+    ) -> Vec<u8> {
+        Self::encode_for_peers_with_compression(
+            folders,
+            own_id,
+            own_name,
+            peer_id,
+            BepDeviceCompression::Metadata,
+        )
+    }
+
+    /// Encodes a `ClusterConfig` advertising our shared folders, `index_id`, `max_sequence`,
+    /// and the specified `compression` preference on device entries.
+    pub fn encode_for_peers_with_compression(
+        folders: &[(BepFolder, FolderIndexState)],
+        own_id: DeviceId,
+        own_name: &str,
+        peer_id: DeviceId,
+        compression: BepDeviceCompression,
     ) -> Vec<u8> {
         let mut out = Vec::new();
 
@@ -141,7 +236,9 @@ impl BepClusterConfig {
                     encode_bytes_field(&mut dev_buf, 2, own_name.as_bytes());
                 }
                 encode_bytes_field(&mut dev_buf, 3, b"dynamic");
-                encode_varint_field(&mut dev_buf, 4, 1); // COMPRESSION_NEVER
+                if compression != BepDeviceCompression::Metadata {
+                    encode_varint_field(&mut dev_buf, 4, compression.wire_value());
+                }
                 if state.max_sequence > 0 {
                     encode_varint_field(&mut dev_buf, 6, state.max_sequence as u64);
                 }
@@ -156,7 +253,9 @@ impl BepClusterConfig {
                 let mut dev_buf = Vec::new();
                 encode_bytes_field(&mut dev_buf, 1, &peer_id.0);
                 encode_bytes_field(&mut dev_buf, 3, b"dynamic");
-                encode_varint_field(&mut dev_buf, 4, 1); // COMPRESSION_NEVER
+                if compression != BepDeviceCompression::Metadata {
+                    encode_varint_field(&mut dev_buf, 4, compression.wire_value());
+                }
                 encode_bytes_field(&mut folder_buf, 16, &dev_buf);
             }
 

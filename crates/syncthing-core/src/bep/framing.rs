@@ -3,7 +3,7 @@
 use std::io::{self, Read, Write};
 
 use super::header::{BepCompression, BepHeader, BepMessageType};
-use super::lz4::decompress_bep_lz4;
+use super::lz4::{compress_bep_lz4, decompress_bep_lz4};
 
 /// Writes an uncompressed post-`Hello` BEP message to a stream as a single contiguous frame.
 pub fn write_bep_message<W: Write>(
@@ -11,19 +11,42 @@ pub fn write_bep_message<W: Write>(
     msg_type: BepMessageType,
     payload: &[u8],
 ) -> io::Result<()> {
+    write_bep_frame(stream, msg_type, BepCompression::None, payload)
+}
+
+/// Writes a post-`Hello` BEP message, compressing `payload` with LZ4 when doing so produces a
+/// strictly smaller body and falling back to [`BepCompression::None`] otherwise.
+pub fn write_bep_message_compressed<W: Write>(
+    stream: &mut W,
+    msg_type: BepMessageType,
+    payload: &[u8],
+) -> io::Result<()> {
+    if let Some(compressed) = compress_bep_lz4(payload) {
+        write_bep_frame(stream, msg_type, BepCompression::Lz4, &compressed)
+    } else {
+        write_bep_frame(stream, msg_type, BepCompression::None, payload)
+    }
+}
+
+fn write_bep_frame<W: Write>(
+    stream: &mut W,
+    msg_type: BepMessageType,
+    compression: BepCompression,
+    body: &[u8],
+) -> io::Result<()> {
     let hdr = BepHeader {
         msg_type,
-        compression: BepCompression::None,
+        compression,
     };
     let hdr_bytes = hdr.encode();
     let hdr_len = hdr_bytes.len() as u16;
-    let msg_len = payload.len() as u32;
+    let msg_len = body.len() as u32;
 
-    let mut frame = Vec::with_capacity(2 + hdr_bytes.len() + 4 + payload.len());
+    let mut frame = Vec::with_capacity(2 + hdr_bytes.len() + 4 + body.len());
     frame.extend_from_slice(&hdr_len.to_be_bytes());
     frame.extend_from_slice(&hdr_bytes);
     frame.extend_from_slice(&msg_len.to_be_bytes());
-    frame.extend_from_slice(payload);
+    frame.extend_from_slice(body);
 
     stream.write_all(&frame)?;
     stream.flush()

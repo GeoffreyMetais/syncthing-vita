@@ -7,7 +7,7 @@ use std::time::Instant;
 use super::control::SyncControl;
 use super::events::SyncEvent;
 use super::tuning::SyncTuning;
-use crate::bep::{BepHello, BepMessageType};
+use crate::bep::{BepDeviceCompression, BepHello, BepMessageType};
 use crate::cert::DeviceIdentity;
 use crate::device_id::DeviceId;
 use crate::storage::FsSyncStorage;
@@ -49,6 +49,8 @@ pub struct SessionContext<'a> {
     pub hello: &'a BepHello,
     pub storage: &'a FsSyncStorage,
     pub peer_device_id: DeviceId,
+    /// Compression policy negotiated for this peer (defaults to [`BepDeviceCompression::Metadata`]).
+    pub peer_compression: BepDeviceCompression,
     pub stats: SyncStats,
     /// Control handle of a persistent session (`None` for a single-cycle one).
     pub control: Option<&'a SyncControl>,
@@ -77,6 +79,7 @@ impl<'a> SessionContext<'a> {
             hello,
             storage,
             peer_device_id,
+            peer_compression: BepDeviceCompression::Metadata,
             stats: SyncStats::default(),
             control: None,
             tuning: SyncTuning::default(),

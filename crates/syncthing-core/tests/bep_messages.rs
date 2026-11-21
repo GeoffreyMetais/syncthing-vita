@@ -278,7 +278,11 @@ fn encode_for_peers_writes_own_index_state_only_when_set() {
     assert_eq!(devices.len(), 2, "own device then the remote peer");
     assert_eq!(device_varint(&devices[0], 6), Some(5), "max_sequence");
     assert_eq!(device_varint(&devices[0], 8), Some(0x1234), "index_id");
-    assert_eq!(device_varint(&devices[0], 4), Some(1), "compression never");
+    assert_eq!(
+        device_varint(&devices[0], 4),
+        None,
+        "compression metadata (proto3 default)"
+    );
     assert_eq!(device_varint(&devices[1], 6), None);
     assert_eq!(device_varint(&devices[1], 8), None);
 
