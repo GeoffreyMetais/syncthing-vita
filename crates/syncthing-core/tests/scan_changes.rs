@@ -224,6 +224,7 @@ fn test_identical_remote_versions_are_adopted() {
                 hash: Sha256::digest(data).to_vec(),
                 weak_hash: syncthing_core::storage::weak_hash::weak_hash(data),
             }],
+            ..Default::default()
         };
     let peer = |v| BepVersionCounter {
         short_device_id: 0x9A7C,

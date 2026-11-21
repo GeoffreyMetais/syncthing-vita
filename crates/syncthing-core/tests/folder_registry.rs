@@ -10,6 +10,7 @@ fn folder(id: &str, label: &str, devices: Vec<DeviceId>) -> BepFolder {
         id: id.to_owned(),
         label: label.to_owned(),
         device_ids: devices,
+        ..Default::default()
     }
 }
 

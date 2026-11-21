@@ -36,6 +36,26 @@ pub fn handle_event(ctx: &DaemonContext, peer: &KnownPeer, event: SyncEvent) {
         SyncEvent::ClusterConfigReceived { folders, .. } => {
             report_unshared_folders(ctx, peer, &folders)
         }
+        SyncEvent::DevicesIntroduced {
+            introducer,
+            devices,
+        } => {
+            for (dev_id, dev_name) in devices {
+                if ctx.first_report(&format!("introduced:{introducer}"), &dev_id.to_hex()) {
+                    let label = if dev_name.is_empty() {
+                        dev_id.short()
+                    } else {
+                        format!("{dev_name} ({})", dev_id.short())
+                    };
+                    log(&format!(
+                        "{} introduced device {label} ({}). To add: syncthing-cli device add {}",
+                        peer.name,
+                        dev_id.to_syncthing_string(),
+                        dev_id.to_syncthing_string()
+                    ));
+                }
+            }
+        }
         SyncEvent::FileSynced {
             folder,
             name,

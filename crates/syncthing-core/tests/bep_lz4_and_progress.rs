@@ -197,6 +197,7 @@ fn cluster_config_device_compression_roundtrip() {
             id: "docs".to_owned(),
             label: "Docs".to_owned(),
             device_ids: vec![own, peer],
+            ..Default::default()
         },
         FolderIndexState::default(),
     )];
@@ -287,6 +288,7 @@ fn live_session_compressed_index_and_multiblock_download_progress() {
         id: "shared".to_owned(),
         label: "Shared".to_owned(),
         device_ids: vec![own.device_id, peer.device_id],
+        ..Default::default()
     });
 
     run_session(&peer, &storage, &hello_under_test(1), None, |_| {}).expect("sync session");

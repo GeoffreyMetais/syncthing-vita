@@ -17,6 +17,7 @@ fn remote_file(name: &str, versions: Vec<BepVersionCounter>) -> BepFileInfo {
         sequence: 1,
         versions,
         blocks: Vec::new(),
+        ..Default::default()
     }
 }
 

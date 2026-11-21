@@ -115,6 +115,9 @@ pub fn spawn_sync_worker(
             return;
         }
         let mut storage = FsSyncStorage::new(&sync_root);
+        for d in &approved_devices {
+            storage.add_known_device(d.device_id);
+        }
         let repo = ConfigRepository::new(&worker_base_dir);
         for s in &shares_snapshot {
             // Defence in depth (the folder browser refuses such a target): never synchronize
@@ -149,6 +152,7 @@ pub fn spawn_sync_worker(
                     id: s.folder_id.clone(),
                     label: s.label.clone(),
                     device_ids,
+                    ..Default::default()
                 });
             }
         }

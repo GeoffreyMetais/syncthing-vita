@@ -24,7 +24,8 @@ pub mod request;
 
 pub use close::BepClose;
 pub use cluster_config::{
-    BepClusterConfig, BepDeviceCompression, BepFolder, FolderIndexState, FolderType,
+    BepClusterConfig, BepClusterDevice, BepDeviceCompression, BepFolder, FolderIndexState,
+    FolderType,
 };
 pub use download_progress::{
     BepDownloadProgress, BepFileDownloadProgressUpdate, DownloadProgressUpdateType,

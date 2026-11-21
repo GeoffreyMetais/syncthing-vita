@@ -144,6 +144,7 @@ fn file(name: &str, sequence: i64, is_dir: bool, deleted: bool) -> BepFileInfo {
         sequence,
         versions: Vec::new(),
         blocks: Vec::new(),
+        ..Default::default()
     }
 }
 
@@ -199,6 +200,7 @@ fn test_shared_and_peer_folders_are_looked_up_by_id() {
         id: "saves".to_owned(),
         label: "saves".to_owned(),
         device_ids: Vec::new(),
+        ..Default::default()
     });
     folders.peer_folder_ids.push("music".to_owned());
     assert!(folders.is_shared_folder("saves"));

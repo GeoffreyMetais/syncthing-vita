@@ -57,6 +57,7 @@ fn remote_of(name: &str, data: &[u8]) -> BepFileInfo {
         sequence: 1,
         versions: Vec::new(),
         blocks: expected_blocks(data),
+        ..Default::default()
     }
 }
 
@@ -190,6 +191,7 @@ fn test_block_size_limit_is_inclusive() {
             hash: vec![0; 32],
             weak_hash: 0,
         }],
+        ..Default::default()
     };
     // No local file: the announced blocks are returned without reading anything.
     let outdated = storage.find_outdated_blocks("f", &at_limit).unwrap();
@@ -280,6 +282,7 @@ fn test_zero_length_block_of_an_empty_file_is_accepted() {
             hash: sha(&[]),
             weak_hash: 0,
         }],
+        ..Default::default()
     };
     assert_eq!(
         storage.find_outdated_blocks("f", &remote).unwrap(),

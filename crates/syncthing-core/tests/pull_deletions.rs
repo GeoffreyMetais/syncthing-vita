@@ -69,6 +69,7 @@ fn remote_file(
         sequence: 1,
         versions,
         blocks: blocks_of(data),
+        ..Default::default()
     }
 }
 

@@ -234,6 +234,7 @@ impl PeerConn {
                 hash: Sha256::digest(content).to_vec(),
                 weak_hash: syncthing_core::storage::weak_hash::weak_hash(content),
             }],
+            ..Default::default()
         }
     }
 
@@ -305,6 +306,7 @@ impl PeerConn {
                         id: (*id).to_owned(),
                         label: (*id).to_owned(),
                         device_ids: vec![self.device_id, device],
+                        ..Default::default()
                     },
                     FolderIndexState::default(),
                 )

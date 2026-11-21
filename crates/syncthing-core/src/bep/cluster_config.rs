@@ -36,12 +36,37 @@ impl BepDeviceCompression {
     }
 }
 
-/// Shared folder in `ClusterConfig`.
+/// Device entry inside a [`BepFolder`] in `ClusterConfig`.
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct BepClusterDevice {
+    pub id: DeviceId,
+    pub name: String,
+    pub compression: BepDeviceCompression,
+    pub introducer: bool,
+    pub max_request_kib: i32,
+}
+
+impl Default for BepClusterDevice {
+    fn default() -> Self {
+        Self {
+            id: DeviceId([0u8; 32]),
+            name: String::new(),
+            compression: BepDeviceCompression::default(),
+            introducer: false,
+            max_request_kib: 0,
+        }
+    }
+}
+
+/// Shared folder in `ClusterConfig`.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct BepFolder {
     pub id: String,
     pub label: String,
+    pub ignore_permissions: bool,
+    pub ignore_delete: bool,
     pub device_ids: Vec<DeviceId>,
+    pub devices: Vec<BepClusterDevice>,
 }
 
 /// Folder type announced in `ClusterConfig` (BEP `Folder.type`, field 3).
@@ -80,7 +105,7 @@ pub struct FolderIndexState {
 }
 
 /// `ClusterConfig` message (type 0).
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct BepClusterConfig {
     pub folders: Vec<BepFolder>,
     pub secondary: bool,
@@ -159,34 +184,92 @@ impl BepClusterConfig {
     fn decode_folder(bytes: &[u8]) -> io::Result<BepFolder> {
         let mut id = String::new();
         let mut label = String::new();
+        let mut ignore_permissions = false;
+        let mut ignore_delete = false;
         let mut device_ids = Vec::new();
+        let mut devices = Vec::new();
 
         for item in WireIter::new(bytes) {
             let (field_num, wire_type, data) = item?;
-            if wire_type == 2 {
-                match field_num {
-                    1 => id = String::from_utf8_lossy(data).into_owned(),
-                    2 => label = String::from_utf8_lossy(data).into_owned(),
-                    16 => {
-                        for dev_item in WireIter::new(data) {
-                            let (df, dw, ddata) = dev_item?;
-                            if df == 1 && dw == 2 && ddata.len() == 32 {
-                                let mut raw = [0u8; 32];
-                                raw.copy_from_slice(ddata);
-                                device_ids.push(DeviceId(raw));
-                            }
-                        }
-                    }
-                    _ => {}
+            match (field_num, wire_type) {
+                (1, 2) => id = String::from_utf8_lossy(data).into_owned(),
+                (2, 2) => label = String::from_utf8_lossy(data).into_owned(),
+                (4, 0) => {
+                    let (v, _) = decode_varint(data)?;
+                    ignore_permissions = v != 0;
                 }
+                (5, 0) => {
+                    let (v, _) = decode_varint(data)?;
+                    ignore_delete = v != 0;
+                }
+                (16, 2) => {
+                    if let Some(dev) = Self::decode_cluster_device(data)? {
+                        device_ids.push(dev.id);
+                        devices.push(dev);
+                    }
+                }
+                _ => {}
             }
         }
 
         Ok(BepFolder {
             id,
             label,
+            ignore_permissions,
+            ignore_delete,
             device_ids,
+            devices,
         })
+    }
+
+    fn decode_cluster_device(bytes: &[u8]) -> io::Result<Option<BepClusterDevice>> {
+        let mut dev_id: Option<DeviceId> = None;
+        let mut name = String::new();
+        let mut compression = BepDeviceCompression::Metadata;
+        let mut introducer = false;
+        let mut max_request_kib = 0i32;
+
+        for dev_item in WireIter::new(bytes) {
+            let (df, dw, ddata) = dev_item?;
+            match (df, dw) {
+                (1, 2) if ddata.len() == 32 => {
+                    let mut raw = [0u8; 32];
+                    raw.copy_from_slice(ddata);
+                    dev_id = Some(DeviceId(raw));
+                }
+                (2, 2) => name = String::from_utf8_lossy(ddata).into_owned(),
+                (4, 0) => {
+                    let (v, _) = decode_varint(ddata)?;
+                    compression = BepDeviceCompression::from_wire(v);
+                }
+                (6, 0) => {
+                    let (v, _) = decode_varint(ddata)?;
+                    // Field 6 is `introducer` (bool: 0/1) in the extended Device schema when sent
+                    // as bool, or `max_sequence` (int64) in legacy BEP v1.
+                    introducer = v != 0;
+                }
+                (7, 0) => {
+                    let (v, _) = decode_varint(ddata)?;
+                    // Syncthing BEP v1 spec defines `bool introducer = 7`.
+                    if v != 0 {
+                        introducer = true;
+                    }
+                }
+                (10, 0) => {
+                    let (v, _) = decode_varint(ddata)?;
+                    max_request_kib = v as i32;
+                }
+                _ => {}
+            }
+        }
+
+        Ok(dev_id.map(|id| BepClusterDevice {
+            id,
+            name,
+            compression,
+            introducer,
+            max_request_kib,
+        }))
     }
 
     /// Encodes a `ClusterConfig` advertising our shared folders, `index_id`, and `max_sequence`,
@@ -226,6 +309,12 @@ impl BepClusterConfig {
             if state.folder_type != FolderType::SendReceive {
                 encode_varint_field(&mut folder_buf, 3, state.folder_type.wire_value());
             }
+            if folder.ignore_permissions {
+                encode_varint_field(&mut folder_buf, 4, 1);
+            }
+            if folder.ignore_delete {
+                encode_varint_field(&mut folder_buf, 5, 1);
+            }
             if state.paused {
                 encode_varint_field(&mut folder_buf, 7, 1);
             }
@@ -251,15 +340,55 @@ impl BepClusterConfig {
                 encode_bytes_field(&mut folder_buf, 16, &dev_buf);
             }
 
-            // Device entry for remote peer
-            {
-                let mut dev_buf = Vec::new();
-                encode_bytes_field(&mut dev_buf, 1, &peer_id.0);
-                encode_bytes_field(&mut dev_buf, 3, b"dynamic");
-                if compression != BepDeviceCompression::Metadata {
-                    encode_varint_field(&mut dev_buf, 4, compression.wire_value());
+            // Additional devices on this folder (prefer `folder.devices` when populated,
+            // ensuring `peer_id` is always included).
+            let mut peer_encoded = false;
+            for dev in &folder.devices {
+                if dev.id.matches_peer(&own_id) {
+                    continue;
                 }
-                encode_bytes_field(&mut folder_buf, 16, &dev_buf);
+                let is_peer = dev.id.matches_peer(&peer_id);
+                if is_peer {
+                    peer_encoded = true;
+                }
+                let dev_comp = if is_peer && compression != BepDeviceCompression::Metadata {
+                    compression
+                } else {
+                    dev.compression
+                };
+                encode_device_entry(
+                    &mut folder_buf,
+                    dev.id,
+                    &dev.name,
+                    dev_comp,
+                    dev.introducer,
+                    dev.max_request_kib,
+                );
+            }
+            for &id in &folder.device_ids {
+                if id.matches_peer(&own_id) || folder.devices.iter().any(|d| d.id.matches_peer(&id))
+                {
+                    continue;
+                }
+                let is_peer = id.matches_peer(&peer_id);
+                if is_peer {
+                    peer_encoded = true;
+                }
+                encode_device_entry(
+                    &mut folder_buf,
+                    id,
+                    "",
+                    if is_peer {
+                        compression
+                    } else {
+                        BepDeviceCompression::Metadata
+                    },
+                    false,
+                    0,
+                );
+            }
+            if !peer_encoded {
+                encode_device_entry(&mut folder_buf, peer_id, "", compression, false, 0);
             }
 
             encode_bytes_field(&mut out, 1, &folder_buf);
@@ -267,4 +396,76 @@ impl BepClusterConfig {
 
         out
     }
+
+    /// Encodes a [`BepClusterConfig`] struct directly (preserving folder flags and full
+    /// [`BepClusterDevice`] metadata such as `introducer` and `max_request_kib`).
+    pub fn encode(&self) -> Vec<u8> {
+        let mut out = Vec::new();
+        for folder in &self.folders {
+            let mut folder_buf = Vec::new();
+            encode_bytes_field(&mut folder_buf, 1, folder.id.as_bytes());
+            if !folder.label.is_empty() {
+                encode_bytes_field(&mut folder_buf, 2, folder.label.as_bytes());
+            }
+            if folder.ignore_permissions {
+                encode_varint_field(&mut folder_buf, 4, 1);
+            }
+            if folder.ignore_delete {
+                encode_varint_field(&mut folder_buf, 5, 1);
+            }
+            for dev in &folder.devices {
+                encode_device_entry(
+                    &mut folder_buf,
+                    dev.id,
+                    &dev.name,
+                    dev.compression,
+                    dev.introducer,
+                    dev.max_request_kib,
+                );
+            }
+            for &id in &folder.device_ids {
+                if !folder.devices.iter().any(|d| d.id.matches_peer(&id)) {
+                    encode_device_entry(
+                        &mut folder_buf,
+                        id,
+                        "",
+                        BepDeviceCompression::Metadata,
+                        false,
+                        0,
+                    );
+                }
+            }
+            encode_bytes_field(&mut out, 1, &folder_buf);
+        }
+        if self.secondary {
+            encode_varint_field(&mut out, 2, 1);
+        }
+        out
+    }
+}
+
+fn encode_device_entry(
+    folder_buf: &mut Vec<u8>,
+    id: DeviceId,
+    name: &str,
+    compression: BepDeviceCompression,
+    introducer: bool,
+    max_request_kib: i32,
+) {
+    let mut dev_buf = Vec::new();
+    encode_bytes_field(&mut dev_buf, 1, &id.0);
+    if !name.is_empty() {
+        encode_bytes_field(&mut dev_buf, 2, name.as_bytes());
+    }
+    encode_bytes_field(&mut dev_buf, 3, b"dynamic");
+    if compression != BepDeviceCompression::Metadata {
+        encode_varint_field(&mut dev_buf, 4, compression.wire_value());
+    }
+    if introducer {
+        encode_varint_field(&mut dev_buf, 6, 1);
+    }
+    if max_request_kib != 0 {
+        encode_varint_field(&mut dev_buf, 10, max_request_kib as i64 as u64);
+    }
+    encode_bytes_field(folder_buf, 16, &dev_buf);
 }

@@ -38,6 +38,7 @@ fn storage_sharing_with(root: &Path, peer: DeviceId) -> FsSyncStorage {
         id: FOLDER.to_owned(),
         label: FOLDER.to_owned(),
         device_ids: vec![peer],
+        ..Default::default()
     });
     storage
 }

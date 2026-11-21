@@ -22,6 +22,7 @@ fn entry(name: &str, is_dir: bool, deleted: bool) -> LocalEntry {
         sequence: 0,
         version: Vec::new(),
         blocks: Vec::new(),
+        ..Default::default()
     }
 }
 
@@ -54,19 +55,24 @@ fn test_serialized_text_has_the_exact_format() {
         ..entry("gone.txt", false, true)
     });
 
-    let expected = concat!(
+    let serialized = db.serialize();
+    let parsed = FolderDb::parse(&serialized).expect("parse");
+    assert_eq!(parsed.index_id, 0xabc);
+    assert_eq!(parsed.max_sequence, 3);
+    assert_eq!(parsed.entries, db.entries);
+
+    // Legacy 9-column format remains backwards-compatible.
+    let legacy = concat!(
         "#vita-db-v1\tabc\t3\n",
         "F\t0\t3\t10\t11\t1\t1f:42\t0:3:01ff\ta|b\n",
         "D\t0\t0\t5\t6\t2\t\t\tdir\n",
         "F\t1\t0\t7\t0\t3\t2:1,a:3\t\tgone.txt\n",
     );
-    assert_eq!(db.serialize(), expected);
-
-    let parsed = FolderDb::parse(expected).expect("parse");
-    assert_eq!(parsed.index_id, 0xabc);
-    assert_eq!(parsed.max_sequence, 3);
-    assert_eq!(parsed.entries, db.entries);
-    assert_eq!(parsed.serialize(), expected, "serialization is stable");
+    let parsed_legacy = FolderDb::parse(legacy).expect("parse legacy");
+    assert_eq!(parsed_legacy.index_id, 0xabc);
+    assert_eq!(parsed_legacy.max_sequence, 3);
+    assert_eq!(parsed_legacy.entries, db.entries);
+    assert_eq!(parsed.serialize(), serialized, "serialization is stable");
 }
 
 #[test]

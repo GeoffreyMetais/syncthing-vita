@@ -223,6 +223,8 @@ impl PeerTable {
 /// devices they are ever synchronized with), their type, and that we announce them.
 fn build_storage(home: &Path, config: &Config) -> FsSyncStorage {
     let mut storage = FsSyncStorage::new(db_dir(home));
+    storage.set_sync_symlinks(cfg!(unix));
+    storage.set_ignore_permissions(!cfg!(unix));
     for folder in &config.folders {
         let devices = folder.device_ids();
         storage.set_folder_path(&folder.id, &folder.path);
@@ -234,6 +236,7 @@ fn build_storage(home: &Path, config: &Config) -> FsSyncStorage {
                 id: folder.id.clone(),
                 label: folder.label.clone(),
                 device_ids: devices,
+                ..Default::default()
             });
         }
     }

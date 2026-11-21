@@ -83,11 +83,16 @@ impl FsSyncStorage {
                             is_dir: rf.is_dir,
                             deleted: true,
                             size: 0,
+                            permissions: 0,
+                            no_permissions: self.ignore_permissions(),
                             modified_s: rf.modified_s,
+                            modified_ns: rf.modified_ns,
+                            modified_by: short_id,
                             disk_mtime: 0,
                             sequence: 0,
                             version: bumped,
                             blocks: Vec::new(),
+                            symlink_target: None,
                         });
                         overridden += 1;
                     }

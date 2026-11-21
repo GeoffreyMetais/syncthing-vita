@@ -7,9 +7,14 @@ use crate::proto::{decode_varint, encode_bytes_field, encode_varint_field, WireI
 
 /// BEP `FileInfoType::FILE`.
 const FILE_TYPE_FILE: u64 = 0;
-/// BEP `FileInfoType::DIRECTORY`. Every other type is a symlink (`SYMLINK = 4` and the
-/// deprecated `SYMLINK_FILE = 2` / `SYMLINK_DIRECTORY = 3`).
+/// BEP `FileInfoType::DIRECTORY`.
 const FILE_TYPE_DIRECTORY: u64 = 1;
+/// Deprecated BEP `FileInfoType::SYMLINK_FILE`.
+const FILE_TYPE_SYMLINK_FILE: u64 = 2;
+/// Deprecated BEP `FileInfoType::SYMLINK_DIRECTORY`.
+const FILE_TYPE_SYMLINK_DIRECTORY: u64 = 3;
+/// BEP `FileInfoType::SYMLINK`.
+const FILE_TYPE_SYMLINK: u64 = 4;
 
 /// BEP version vector counter (`Counter { uint64 id = 1; uint64 value = 2; }`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -28,17 +33,29 @@ pub struct BepBlockInfo {
 }
 
 /// Information about a file in `Index` / `IndexUpdate`.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct BepFileInfo {
     pub name: String,
     pub is_dir: bool,
     pub size: i64,
+    pub permissions: u32,
     pub modified_s: i64,
+    pub modified_ns: i32,
+    pub modified_by: u64,
     pub deleted: bool,
     pub invalid: bool,
+    pub no_permissions: bool,
     pub sequence: i64,
     pub versions: Vec<BepVersionCounter>,
     pub blocks: Vec<BepBlockInfo>,
+    pub symlink_target: Option<String>,
+}
+
+impl BepFileInfo {
+    /// Returns `true` if this entry represents a symbolic link.
+    pub fn is_symlink(&self) -> bool {
+        self.symlink_target.is_some()
+    }
 }
 
 /// `Index` (type 1) or `IndexUpdate` (type 2) message.
@@ -67,7 +84,7 @@ impl BepIndex {
         Ok(Self { folder, files })
     }
 
-    /// Encodes a full Protobuf `Index` or `IndexUpdate` message advertising local Vita files.
+    /// Encodes a full Protobuf `Index` or `IndexUpdate` message.
     pub fn encode(&self) -> Vec<u8> {
         let mut buf = Vec::new();
         encode_bytes_field(&mut buf, 1, self.folder.as_bytes());
@@ -75,15 +92,26 @@ impl BepIndex {
         for f in &self.files {
             let mut fbuf = Vec::new();
             encode_bytes_field(&mut fbuf, 1, f.name.as_bytes());
-            if f.is_dir {
-                encode_varint_field(&mut fbuf, 2, 1);
-                encode_varint_field(&mut fbuf, 4, 0o755);
+            if let Some(target) = &f.symlink_target {
+                encode_varint_field(&mut fbuf, 2, FILE_TYPE_SYMLINK);
+                if f.permissions != 0 {
+                    encode_varint_field(&mut fbuf, 4, u64::from(f.permissions));
+                }
+                if !target.is_empty() {
+                    encode_bytes_field(&mut fbuf, 17, target.as_bytes());
+                }
+            } else if f.is_dir {
+                encode_varint_field(&mut fbuf, 2, FILE_TYPE_DIRECTORY);
+                if f.permissions != 0 {
+                    encode_varint_field(&mut fbuf, 4, u64::from(f.permissions));
+                }
             } else {
                 if f.size != 0 {
                     encode_varint_field(&mut fbuf, 3, f.size as u64);
                 }
-                // field 4: permissions (0o644 = 420)
-                encode_varint_field(&mut fbuf, 4, 0o644);
+                if f.permissions != 0 {
+                    encode_varint_field(&mut fbuf, 4, u64::from(f.permissions));
+                }
             }
             if f.modified_s != 0 {
                 encode_varint_field(&mut fbuf, 5, f.modified_s as u64);
@@ -94,8 +122,9 @@ impl BepIndex {
             if f.invalid {
                 encode_varint_field(&mut fbuf, 7, 1);
             }
-            // field 8: no_permissions = true (ux0: filesystem has no POSIX permissions)
-            encode_varint_field(&mut fbuf, 8, 1);
+            if f.no_permissions {
+                encode_varint_field(&mut fbuf, 8, 1);
+            }
 
             // field 9: Vector version
             if !f.versions.is_empty() {
@@ -112,11 +141,13 @@ impl BepIndex {
             if f.sequence > 0 {
                 encode_varint_field(&mut fbuf, 10, f.sequence as u64);
             }
-            if let Some(last_ver) = f.versions.last() {
-                // field 12: uint64 modified_by
-                encode_varint_field(&mut fbuf, 12, last_ver.short_device_id);
+            if f.modified_ns != 0 {
+                encode_varint_field(&mut fbuf, 11, f.modified_ns as i64 as u64);
             }
-            if !f.is_dir {
+            if f.modified_by != 0 {
+                encode_varint_field(&mut fbuf, 12, f.modified_by);
+            }
+            if !f.is_dir && f.symlink_target.is_none() {
                 // field 13: int32 block_size. Every block but the last has that size, so the
                 // first one gives it (the blocks of a file pulled from a peer keep the size
                 // that peer chose, 128 KiB to 16 MiB); never below the 128 KiB minimum.
@@ -153,15 +184,19 @@ impl BepIndex {
 
     fn decode_file_info(bytes: &[u8]) -> io::Result<BepFileInfo> {
         let mut name = String::new();
-        let mut is_dir = false;
+        let mut file_type = FILE_TYPE_FILE;
         let mut size = 0i64;
+        let mut permissions = 0u32;
         let mut modified_s = 0i64;
+        let mut modified_ns = 0i32;
+        let mut modified_by = 0u64;
         let mut deleted = false;
         let mut invalid = false;
+        let mut no_permissions = false;
         let mut sequence = 0i64;
         let mut versions = Vec::new();
         let mut blocks = Vec::new();
-        let mut unsupported_type = false;
+        let mut raw_symlink_target: Option<String> = None;
 
         for item in WireIter::new(bytes) {
             let (field_num, wire_type, data) = item?;
@@ -169,12 +204,15 @@ impl BepIndex {
                 (1, 2) => name = String::from_utf8_lossy(data).into_owned(),
                 (2, 0) => {
                     let (v, _) = decode_varint(data)?;
-                    is_dir = v == FILE_TYPE_DIRECTORY;
-                    unsupported_type = v != FILE_TYPE_FILE && v != FILE_TYPE_DIRECTORY;
+                    file_type = v;
                 }
                 (3, 0) => {
                     let (v, _) = decode_varint(data)?;
                     size = v as i64;
+                }
+                (4, 0) => {
+                    let (v, _) = decode_varint(data)?;
+                    permissions = v as u32;
                 }
                 (5, 0) => {
                     let (v, _) = decode_varint(data)?;
@@ -187,6 +225,10 @@ impl BepIndex {
                 (7, 0) => {
                     let (v, _) = decode_varint(data)?;
                     invalid = v != 0;
+                }
+                (8, 0) => {
+                    let (v, _) = decode_varint(data)?;
+                    no_permissions = v != 0;
                 }
                 (9, 2) => {
                     for c_item in WireIter::new(data) {
@@ -216,23 +258,47 @@ impl BepIndex {
                     let (v, _) = decode_varint(data)?;
                     sequence = v as i64;
                 }
+                (11, 0) => {
+                    let (v, _) = decode_varint(data)?;
+                    modified_ns = v as i32;
+                }
+                (12, 0) => {
+                    let (v, _) = decode_varint(data)?;
+                    modified_by = v;
+                }
                 (16, 2) => blocks.push(Self::decode_block_info(data)?),
+                (17, 2) => raw_symlink_target = Some(String::from_utf8_lossy(data).into_owned()),
                 _ => {}
             }
         }
+
+        let is_dir = file_type == FILE_TYPE_DIRECTORY;
+        let is_symlink = matches!(
+            file_type,
+            FILE_TYPE_SYMLINK | FILE_TYPE_SYMLINK_FILE | FILE_TYPE_SYMLINK_DIRECTORY
+        );
+        let unsupported_type = !is_dir && !is_symlink && file_type != FILE_TYPE_FILE;
+        let symlink_target = if is_symlink {
+            Some(raw_symlink_target.unwrap_or_default())
+        } else {
+            None
+        };
 
         Ok(BepFileInfo {
             name,
             is_dir,
             size,
+            permissions,
             modified_s,
+            modified_ns,
+            modified_by,
             deleted,
-            // A symlink cannot exist on PS Vita storage: like an invalid entry, it is known
-            // but never pulled (it must not become an empty regular file).
             invalid: invalid || unsupported_type,
+            no_permissions,
             sequence,
             versions,
             blocks,
+            symlink_target,
         })
     }
 
