@@ -7,6 +7,7 @@
 
 mod add_device;
 mod create_share;
+mod device_offer;
 mod dialogs;
 mod folder_offer;
 mod manage_devices;
@@ -96,6 +97,9 @@ impl ModalInput {
             ModalDialog::ConfirmQuit => dialogs::confirm_quit(state, input),
             ModalDialog::FolderOffer { offer_idx } => {
                 folder_offer::handle(state, repo, input, offer_idx)
+            }
+            ModalDialog::DeviceOffer { offer_idx } => {
+                device_offer::handle(state, repo, input, offer_idx)
             }
         }
     }

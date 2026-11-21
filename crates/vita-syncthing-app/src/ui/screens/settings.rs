@@ -287,25 +287,23 @@ fn render_declined_folders(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: 
         Align::Left,
         s.settings_sec_declined,
     );
-    let summary = if state.ignored_folders.is_empty() {
+    let has_declined = !state.ignored_folders.is_empty() || !state.ignored_devices.is_empty();
+    let summary = if !has_declined {
         s.settings_no_declined.to_owned()
     } else {
-        let ids: Vec<&str> = state
+        let mut ids: Vec<String> = state
             .ignored_folders
             .iter()
-            .map(|f| f.folder_id.as_str())
+            .map(|f| f.folder_id.clone())
             .collect();
+        ids.extend(state.ignored_devices.iter().map(|d| d.short()));
         s.fmt_declined_summary(ids.len(), &ids.join(", "))
     };
     let label = s.action_clear_declined;
     let w_clear = action_width(gfx, PadButton::Cross, label);
     let bx = CONTENT_R - 20 - w_clear;
     let cy = y + h / 2;
-    let col = if state.ignored_folders.is_empty() {
-        th.faint
-    } else {
-        th.dim
-    };
+    let col = if !has_declined { th.faint } else { th.dim };
     gfx.text_fit(
         lx,
         y + 44,

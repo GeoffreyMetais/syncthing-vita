@@ -91,6 +91,7 @@ pub static STRINGS_IT: Strings = Strings {
     hint_add_remote_device_id: "Aggiungi ID remoto",
     hint_close_qr_device_id: "Chiudi QR / ID",
     hint_accept_share: "Accetta condivisione",
+    hint_accept_device: "Accetta dispositivo",
     hint_confirm_add: "Conferma e aggiungi",
     hint_type_key: "Premi tasto",
 
@@ -210,6 +211,12 @@ pub static STRINGS_IT: Strings = Strings {
     modal_folder_offer_hint:
         "Accetta per scegliere una cartella su ux0:. Nessun sync prima dell'attivazione.",
 
+    // Modals: Device Offer
+    modal_device_offer_title: "Nuovo dispositivo",
+    modal_device_offer_hint:
+        "Accettare consente a questo dispositivo di connettersi e proporre cartelle condivise.",
+    modal_device_offer_via_relay: "un relay Syncthing",
+
     // Modals: Scan QR
     modal_scan_qr_title: "Scansiona codice QR del dispositivo",
     modal_scan_qr_subtitle:
@@ -265,6 +272,8 @@ pub static MESSAGES_IT: Messages = Messages {
     offer_accepted: "Condivisione '{label}' accettata ({id})",
     choose_where_to_store: "Scegli dove salvare '{label}'",
     offer_declined: "Condivisione '{label}' rifiutata ({id})",
+    device_offer_accepted: "Dispositivo {short} accettato",
+    device_offer_declined: "Dispositivo {short} rifiutato",
     no_declined_folders: "Nessuna cartella rifiutata",
     declined_cleared: "{count} cartella/e rifiutata/e cancellata/e: verranno riproposte",
     id_empty: "L'ID dispositivo non può essere vuoto",

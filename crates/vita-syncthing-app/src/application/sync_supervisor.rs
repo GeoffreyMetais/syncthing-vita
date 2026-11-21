@@ -8,7 +8,7 @@ use std::time::Instant;
 
 use syncthing_core::{DeviceIdentity, SyncControl};
 
-use crate::application::{FolderOfferService, ShareService, SyncCoordinator};
+use crate::application::{DeviceOfferService, FolderOfferService, ShareService, SyncCoordinator};
 use crate::domain::defaults::{AUTO_RECONNECT_DELAY, QUIT_WORKER_WAIT};
 use crate::domain::{AppState, KnownDevice, ModalDialog, UiText};
 use crate::infrastructure::{spawn_sync_worker, wait_for_worker, ConfigRepository, WorkerMsg};
@@ -36,20 +36,21 @@ impl SyncSupervisor {
         self.worker_rx.is_some()
     }
 
-    /// Application start: connects to the devices linked to an enabled share (or to every
-    /// approved device while no share exists yet), if any.
+    /// Application start: always starts the worker so the Vita is reachable inbound (TCP 22000,
+    /// LAN announce, Relay, Global Discovery) even with 0 paired devices, while dialing out only
+    /// to `state.sync_peers()`.
     pub fn start_at_launch(&mut self, state: &mut AppState, repo: &ConfigRepository) {
-        let peers = state.sync_peers();
-        if peers.is_empty() {
+        let approved = state.approved_devices();
+        let dial = state.sync_peers();
+        if approved.is_empty() {
             state.peer_label = UiText::NoPeerLinked;
             state.status_line = UiText::SelectDeviceToConnect;
-        } else {
-            self.spawn(state, repo, peers);
         }
+        self.spawn(state, repo, approved, dial);
     }
 
     /// The user asked for a sync: a connected worker rescans its folders at once; otherwise
-    /// the worker is (re)started with the current configuration.
+    /// the worker is (re)started with the current configuration, dialing every approved device.
     pub fn start_sync(&mut self, state: &mut AppState, repo: &ConfigRepository) {
         state.auto_reconnect_enabled = true;
         if self.is_running() && state.session_connected && !state.config_dirty {
@@ -69,8 +70,9 @@ impl SyncSupervisor {
         state.reset_sessions();
         state.prepare_manual_sync();
         ShareService::log_event(state, repo, "Starting BEP/1.0 synchronization...");
-        let peers = state.approved_devices();
-        self.spawn(state, repo, peers);
+        let approved = state.approved_devices();
+        let dial = approved.clone();
+        self.spawn(state, repo, approved, dial);
     }
 
     /// Asks the running worker for a LAN discovery cycle now. Returns `false` if no worker
@@ -115,30 +117,29 @@ impl SyncSupervisor {
             self.control = None;
             state.reset_sessions();
             state.sync_in_progress = false;
-            let peers = state.sync_peers();
-            if !peers.is_empty() {
-                self.spawn(state, repo, peers);
-            }
+            let approved = state.approved_devices();
+            let dial = state.sync_peers();
+            self.spawn(state, repo, approved, dial);
         }
 
         let was_running = self.is_running();
         changed |= SyncCoordinator::process_worker_messages(state, repo, &mut self.worker_rx);
+        DeviceOfferService::prompt_next(state);
         FolderOfferService::prompt_next(state);
         if was_running && !self.is_running() {
             self.control = None;
             self.last_finished = Instant::now();
         }
 
-        // A worker that ended (session dropped) is restarted after a short delay.
+        // A worker that ended is restarted after a short delay so inbound reachability stays up.
         if !self.is_running()
             && state.auto_reconnect_enabled
             && self.last_finished.elapsed() >= AUTO_RECONNECT_DELAY
         {
-            let peers = state.sync_peers();
-            if !peers.is_empty() {
-                changed = true;
-                self.spawn(state, repo, peers);
-            }
+            changed = true;
+            let approved = state.approved_devices();
+            let dial = state.sync_peers();
+            self.spawn(state, repo, approved, dial);
         }
         changed
     }
@@ -149,16 +150,26 @@ impl SyncSupervisor {
         }
     }
 
-    /// Starts a worker for `peers` with the current shares, replacing the previous one (which
-    /// must have been asked to stop: `worker_slot` makes the new one wait for it).
-    fn spawn(&mut self, state: &mut AppState, repo: &ConfigRepository, peers: Vec<KnownDevice>) {
-        state.progress_pct = None;
+    /// Starts a worker accepting `approved` devices inbound and dialing `dial` peers outbound,
+    /// replacing the previous one (which must have been asked to stop: `worker_slot` makes the
+    /// new one wait for it).
+    fn spawn(
+        &mut self,
+        state: &mut AppState,
+        repo: &ConfigRepository,
+        approved: Vec<KnownDevice>,
+        dial: Vec<KnownDevice>,
+    ) {
+        if !dial.is_empty() {
+            state.progress_pct = None;
+        }
         let offered = std::mem::take(&mut state.pending_folder_offers);
         let (rx, control) = spawn_sync_worker(
             repo.base_data_dir(),
             self.identity.clone(),
             state.shares.clone(),
-            peers,
+            approved,
+            dial,
             offered,
         );
         self.worker_rx = Some(rx);

@@ -191,17 +191,23 @@ impl FolderOfferService {
     /// The session is restarted so peers resend their `ClusterConfig` right away.
     /// Returns the number of cleared entries.
     pub fn clear_declined(state: &mut AppState, repo: &ConfigRepository) -> usize {
-        let count = state.ignored_folders.len();
+        let count = state.ignored_folders.len() + state.ignored_devices.len();
         if count == 0 {
             state.show_toast(UiText::NoDeclinedFolders);
             return 0;
         }
-        state.ignored_folders.clear();
-        repo.save_ignored_folders(&state.ignored_folders);
+        if !state.ignored_folders.is_empty() {
+            state.ignored_folders.clear();
+            repo.save_ignored_folders(&state.ignored_folders);
+        }
+        if !state.ignored_devices.is_empty() {
+            state.ignored_devices.clear();
+            repo.save_ignored_devices(&state.ignored_devices);
+        }
         state.config_dirty = true;
         state.auto_reconnect_enabled = true;
         let msg = format!(
-            "Cleared {} declined folder(s): they will be offered again",
+            "Cleared {} declined offer(s): they will be prompted again",
             count
         );
         state.show_toast(UiText::DeclinedCleared { count });

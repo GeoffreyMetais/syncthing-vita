@@ -16,19 +16,24 @@ fn setup(name: &str) -> (String, ConfigRepository, AppState, SyncSupervisor) {
 }
 
 #[test]
-fn test_no_worker_starts_without_a_linked_device() {
+fn test_worker_starts_at_launch_even_without_a_linked_device() {
     let (dir, repo, mut state, mut sync) = setup("supervisor-idle");
 
     sync.start_at_launch(&mut state, &repo);
-    assert!(!sync.is_running());
+    assert!(
+        sync.is_running(),
+        "inbound reachability worker starts even with 0 paired devices"
+    );
     assert_eq!(state.peer_label, UiText::NoPeerLinked);
     assert_eq!(state.status_line, UiText::SelectDeviceToConnect);
-    // No worker to ask: the caller starts a sync instead.
-    assert!(!sync.request_discovery());
+    assert_eq!(
+        state.progress_pct,
+        Some(0),
+        "idle listener must not animate indeterminate progress"
+    );
+    assert!(sync.request_discovery());
 
-    // Nothing to reconnect to either.
-    assert!(!sync.tick(&mut state, &repo));
-    assert!(!sync.is_running());
+    sync.shutdown();
     let _ = std::fs::remove_dir_all(&dir);
 }
 
@@ -49,6 +54,11 @@ fn test_configuration_change_applies_once_dialogs_are_closed() {
     assert!(sync.tick(&mut state, &repo));
     assert!(!state.config_dirty);
     assert!(!state.session_connected, "the previous sessions are gone");
-    assert!(!sync.is_running(), "no linked device: nothing to start");
+    assert!(
+        sync.is_running(),
+        "replacement worker starts to keep inbound reachability up"
+    );
+
+    sync.shutdown();
     let _ = std::fs::remove_dir_all(&dir);
 }

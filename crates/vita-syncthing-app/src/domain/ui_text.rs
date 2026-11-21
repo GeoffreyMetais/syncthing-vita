@@ -141,6 +141,12 @@ pub enum UiText {
         label: String,
         id: String,
     },
+    DeviceOfferAccepted {
+        short: String,
+    },
+    DeviceOfferDeclined {
+        short: String,
+    },
     NoDeclinedFolders,
     DeclinedCleared {
         count: usize,

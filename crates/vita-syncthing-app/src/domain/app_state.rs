@@ -9,7 +9,7 @@ use crate::domain::initial_sync::{ConnectedPeers, InitialSyncPeers};
 use crate::domain::interaction::{FocusSlot, HitMap};
 use crate::domain::log_view::{sanitize_log_line, LogView};
 use crate::domain::models::{
-    ActiveTab, CameraPreview, FolderOffer, IgnoredFolder, KnownDevice, Language,
+    ActiveTab, CameraPreview, DeviceOffer, FolderOffer, IgnoredFolder, KnownDevice, Language,
     LanguagePreference, ModalDialog, ShareConfigEntry, SyncActivity, ThemeMode,
 };
 use crate::domain::navigation::{
@@ -89,6 +89,10 @@ pub struct AppState {
     pub folder_offers: Vec<FolderOffer>,
     /// Folder offers the user declined (persisted in `ignored_folders.cfg`).
     pub ignored_folders: Vec<IgnoredFolder>,
+    /// Unknown remote devices that attempted to connect, waiting for the user's consent.
+    pub device_offers: Vec<DeviceOffer>,
+    /// Incoming devices the user declined (persisted in `ignored_devices.cfg`).
+    pub ignored_devices: Vec<DeviceId>,
     pub selected_share_idx: usize,
     /// Rows already scrolled by the touch drag in progress (`ScrollTarget` lists).
     pub drag_scrolled_rows: i32,
@@ -155,6 +159,8 @@ impl AppState {
             pending_share_creation: None,
             folder_offers: Vec::new(),
             ignored_folders: Vec::new(),
+            device_offers: Vec::new(),
+            ignored_devices: Vec::new(),
             selected_share_idx: 0,
             drag_scrolled_rows: 0,
             logs: Vec::with_capacity(32),
@@ -256,6 +262,18 @@ impl AppState {
     /// Index of the first folder offer that should be prompted (not postponed with `Later`).
     pub fn next_folder_offer_to_prompt(&self) -> Option<usize> {
         self.folder_offers.iter().position(|o| !o.snoozed)
+    }
+
+    /// True if the user declined incoming connections from `device_id`.
+    pub fn is_device_ignored(&self, device_id: &DeviceId) -> bool {
+        self.ignored_devices
+            .iter()
+            .any(|id| id.matches_peer(device_id))
+    }
+
+    /// Index of the first device offer that should be prompted (not postponed with `Later`).
+    pub fn next_device_offer_to_prompt(&self) -> Option<usize> {
+        self.device_offers.iter().position(|o| !o.snoozed)
     }
 
     /// True while `shares[share_idx]` is being created and has no linked device yet.

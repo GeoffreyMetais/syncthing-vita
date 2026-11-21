@@ -213,6 +213,10 @@ pub enum ModalDialog {
     FolderOffer {
         offer_idx: usize,
     },
+    /// An unknown remote device tried to connect: the user accepts, declines or postpones it.
+    DeviceOffer {
+        offer_idx: usize,
+    },
 }
 
 /// Known or discovered remote Syncthing device.
@@ -297,6 +301,18 @@ pub struct FolderOffer {
 pub struct IgnoredFolder {
     pub folder_id: String,
     pub device_id: DeviceId,
+}
+
+/// Unknown remote device that attempted to connect to this PS Vita (over TCP or Relay),
+/// waiting for the user's consent before it is added as an approved device.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct DeviceOffer {
+    pub device_id: DeviceId,
+    /// Peer IP address (empty when the connection arrived via a relay).
+    pub address: String,
+    pub via_relay: bool,
+    /// Postponed with `Later`: kept in the list but not prompted again until the app restarts.
+    pub snoozed: bool,
 }
 
 /// Latest greyscale camera frame shown in the `ScanDeviceQr` viewfinder.

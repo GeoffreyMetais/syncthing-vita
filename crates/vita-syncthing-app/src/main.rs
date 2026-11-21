@@ -62,6 +62,7 @@ fn main() {
     state.set_system_language(detect_system_language());
     state.set_language_preference(repo.load_language());
     state.ignored_folders = repo.load_ignored_folders();
+    state.ignored_devices = repo.load_ignored_devices();
     if state.sanitize_legacy_unpaired_peers() {
         repo.save_devices(&state.approved_devices());
         repo.save_shares(&state.shares);

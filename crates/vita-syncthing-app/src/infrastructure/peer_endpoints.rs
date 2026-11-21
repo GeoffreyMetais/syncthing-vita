@@ -13,6 +13,7 @@ use syncthing_core::{
     SyncEvent, SyncSessionStatus,
 };
 
+use super::session_guard::SessionClaims;
 use super::sync_worker::WorkerMsg;
 use crate::domain::defaults::{
     CONNECT_TIMEOUT, GLOBAL_DISCOVERY_TIMEOUT, NO_ADDRESS_POLL, RETRY_AFTER_ERROR,
@@ -25,23 +26,13 @@ const STOP_CHECK_STEP: Duration = Duration::from_millis(200);
 
 pub type SharedDiscoveredAddrs = Arc<Mutex<Vec<(DeviceId, Vec<SocketAddr>)>>>;
 pub type SharedGlobalEndpoints = Arc<Mutex<Vec<(DeviceId, Vec<PeerEndpoint>)>>>;
-/// Configured devices whose session is currently established.
-pub type SharedConnectedPeers = Arc<Mutex<Vec<DeviceId>>>;
 
 /// A device is looked up on Global Discovery only when that can help and is possible: it has a
 /// full `DeviceId` and no session is established with it. Looking up a connected peer would
 /// only tell the discovery server which devices this console talks to.
 pub fn needs_global_lookup(kd: &KnownDevice, connected: &[DeviceId]) -> bool {
-    !kd.device_id.is_short_placeholder() && !connected.contains(&kd.device_id)
-}
-
-pub fn set_connected(connected: &SharedConnectedPeers, device_id: DeviceId, is_connected: bool) {
-    if let Ok(mut guard) = connected.lock() {
-        guard.retain(|id| *id != device_id);
-        if is_connected {
-            guard.push(device_id);
-        }
-    }
+    !kd.device_id.is_short_placeholder()
+        && !connected.iter().any(|id| id.matches_peer(&kd.device_id))
 }
 
 /// Resolves a configured peer address (`ip:port` or `hostname:port`), returning empty for
@@ -136,7 +127,7 @@ pub fn collect_peer_targets(
 pub fn refresh_global_endpoints(
     approved_devices: &[KnownDevice],
     global: &SharedGlobalEndpoints,
-    connected: &SharedConnectedPeers,
+    claims: &Arc<SessionClaims>,
     control: &SyncControl,
     tx: &Sender<WorkerMsg>,
     last_errors: &mut Vec<(DeviceId, String)>,
@@ -145,7 +136,7 @@ pub fn refresh_global_endpoints(
         if control.is_stop_requested() {
             return;
         }
-        let connected_now = connected.lock().map(|g| g.clone()).unwrap_or_default();
+        let connected_now = claims.claimed_ids();
         if !needs_global_lookup(kd, &connected_now) {
             continue;
         }
@@ -223,7 +214,7 @@ pub struct PeerSessionShared {
     pub storage: FsSyncStorage,
     pub discovered: SharedDiscoveredAddrs,
     pub global: SharedGlobalEndpoints,
-    pub connected: SharedConnectedPeers,
+    pub claims: Arc<SessionClaims>,
     pub initial_lan_done: Arc<AtomicBool>,
     pub control: Arc<SyncControl>,
     pub tx: Sender<WorkerMsg>,
@@ -239,7 +230,7 @@ pub fn run_peer_session_loop(kd: KnownDevice, shared: PeerSessionShared) {
         storage,
         discovered,
         global,
-        connected,
+        claims,
         initial_lan_done,
         control,
         tx,
@@ -250,6 +241,13 @@ pub fn run_peer_session_loop(kd: KnownDevice, shared: PeerSessionShared) {
     let mut report_unreachable = true;
     let mut last_error = String::new();
     while !control.is_stop_requested() {
+        if claims.is_claimed(&kd.device_id) {
+            if !sleep_interruptible(&control, RETRY_AFTER_SESSION) {
+                break;
+            }
+            continue;
+        }
+
         let (target_id, targets) = collect_peer_targets(&kd, &discovered, &global);
         if targets.is_empty() {
             if !logged_no_addr {
@@ -284,6 +282,10 @@ pub fn run_peer_session_loop(kd: KnownDevice, shared: PeerSessionShared) {
             if control.is_stop_requested() {
                 return;
             }
+            let Some(_claim) = claims.try_claim(target_id) else {
+                connected_once = true;
+                break;
+            };
             let ep_label = format_endpoint_label(&ep);
             if report_connecting {
                 report_connecting = false;
@@ -297,12 +299,7 @@ pub fn run_peer_session_loop(kd: KnownDevice, shared: PeerSessionShared) {
                 });
             }
             let tx_ev = tx.clone();
-            let connected_ev = Arc::clone(&connected);
-            let configured_id = kd.device_id;
             let emit = move |event: SyncEvent| {
-                if matches!(event, SyncEvent::PeerConnected { .. }) {
-                    set_connected(&connected_ev, configured_id, true);
-                }
                 let _ = tx_ev.send(WorkerMsg::SyncEvent(event));
             };
             let params = SessionParams {
@@ -327,7 +324,6 @@ pub fn run_peer_session_loop(kd: KnownDevice, shared: PeerSessionShared) {
                 )
                 .and_then(|tcp| connect_and_sync_stream(&params, tcp, relay_addr, emit)),
             };
-            set_connected(&connected, kd.device_id, false);
 
             match result {
                 Ok(hs) => match hs.session_status {

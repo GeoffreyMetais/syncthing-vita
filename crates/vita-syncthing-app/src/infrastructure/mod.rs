@@ -4,11 +4,15 @@
 pub mod config_fields;
 pub mod config_repo;
 pub mod framebuffer;
+pub mod global_announcer;
 pub mod identity_store;
+pub mod incoming_listener;
 pub mod input;
 pub mod peer_endpoints;
 pub mod qr_camera;
 pub mod qr_decoder;
+pub mod relay_listener;
+pub mod session_guard;
 pub mod sync_worker;
 #[cfg(feature = "ui-script")]
 pub mod ui_script;
