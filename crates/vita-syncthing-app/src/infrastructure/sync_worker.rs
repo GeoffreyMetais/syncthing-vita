@@ -71,6 +71,39 @@ pub enum WorkerMsg {
     },
 }
 
+/// Builds the TCP addresses advertised in LAN Local Discovery (UDP 21027).
+///
+/// Always advertises an explicit non-loopback local IPv4 address (`tcp://<local_ip>:<port>`)
+/// rather than `tcp://0.0.0.0:<port>`: when a peer runs inside Docker NAT, `0.0.0.0` causes
+/// Syncthing to substitute the Docker bridge gateway IP (e.g. `172.24.0.1`) and dial itself.
+pub fn lan_announce_addresses(
+    listen_port: Option<u16>,
+    local_ip: Option<std::net::Ipv4Addr>,
+) -> Vec<String> {
+    let Some(port) = listen_port.filter(|&p| p != 0) else {
+        return Vec::new();
+    };
+    let Some(ip) = local_ip.filter(|ip| !ip.is_unspecified() && !ip.is_loopback()) else {
+        return Vec::new();
+    };
+    vec![format!("tcp://{ip}:{port}")]
+}
+
+/// Selects the TCP port to advertise on Global Discovery v2 (if any).
+///
+/// Behind home NAT without an explicit UPnP/NAT-PMP external port mapping, advertising
+/// `tcp://0.0.0.0:22000` causes Global Discovery to publish `<public_ip>:22000`, which is
+/// unreachable or hits another port-forwarded device on the same router. Only advertise a TCP
+/// port on Global Discovery when a real external port mapping exists; otherwise stay reachable
+/// over WAN via the relay URI.
+pub fn global_announce_port(
+    listen_port: Option<u16>,
+    mapped_external_port: Option<u16>,
+) -> Option<u16> {
+    listen_port.filter(|&p| p != 0)?;
+    mapped_external_port.filter(|&p| p != 0)
+}
+
 /// Waits up to `duration` before the next discovery cycle. Returns early when the UI asks for a
 /// LAN scan (`SyncControl::request_discovery`); `false` if a stop was requested.
 fn wait_for_next_discovery(control: &SyncControl, duration: Duration) -> bool {
@@ -178,9 +211,7 @@ pub fn spawn_sync_worker(
 
         let announce = Announce {
             id: identity.device_id,
-            addresses: listen_port
-                .map(|port| vec![format!("tcp://0.0.0.0:{port}")])
-                .unwrap_or_default(),
+            addresses: lan_announce_addresses(listen_port, syncthing_core::detect_local_ipv4()),
             instance_id: process_instance_id(),
         };
 
@@ -253,7 +284,7 @@ pub fn spawn_sync_worker(
         {
             let announce_ctx = GlobalAnnouncerContext {
                 identity: identity.clone(),
-                listen_port,
+                listen_port: global_announce_port(listen_port, None),
                 shared_relay_uri: Arc::clone(&shared_relay_uri),
                 control: Arc::clone(&worker_control),
                 tx: tx.clone(),
