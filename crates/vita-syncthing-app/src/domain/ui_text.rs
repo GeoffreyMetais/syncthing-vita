@@ -123,10 +123,17 @@ pub enum UiText {
     ShareReadWrite {
         id: String,
     },
+    ShareSendOnly {
+        id: String,
+    },
     RevertRequested {
         id: String,
     },
     LocalChangesReverted {
+        id: String,
+        count: usize,
+    },
+    RemoteChangesOverridden {
         id: String,
         count: usize,
     },

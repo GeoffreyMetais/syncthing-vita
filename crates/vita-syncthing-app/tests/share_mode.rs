@@ -38,11 +38,16 @@ fn setup(name: &str) -> (String, ConfigRepository, AppState) {
 #[test]
 fn test_share_mode_codes() {
     assert_eq!(ShareMode::default(), ShareMode::ReadWrite);
-    for mode in [ShareMode::ReadWrite, ShareMode::ReadOnly] {
+    for mode in [
+        ShareMode::ReadWrite,
+        ShareMode::ReadOnly,
+        ShareMode::SendOnly,
+    ] {
         assert_eq!(ShareMode::from_code(mode.code()), mode);
         assert_ne!(mode.toggled(), mode);
-        assert_eq!(mode.toggled().toggled(), mode);
+        assert_eq!(mode.toggled().toggled().toggled(), mode);
     }
+    assert_eq!(ShareMode::from_code("so"), ShareMode::SendOnly);
     assert_eq!(ShareMode::from_code("garbage"), ShareMode::ReadWrite);
 }
 
@@ -60,6 +65,14 @@ fn test_new_share_is_read_write_and_mode_is_saved() {
         Some((UiText::ShareReadOnly { id }, _)) if id == "saves"
     ));
     assert_eq!(repo.load_shares()[0].mode, ShareMode::ReadOnly);
+
+    ShareModeService::toggle(&mut state, &repo, 0);
+    assert_eq!(state.shares[0].mode, ShareMode::SendOnly);
+    assert!(matches!(
+        &state.toast_msg,
+        Some((UiText::ShareSendOnly { id }, _)) if id == "saves"
+    ));
+    assert_eq!(repo.load_shares()[0].mode, ShareMode::SendOnly);
 
     ShareModeService::toggle(&mut state, &repo, 0);
     assert_eq!(repo.load_shares()[0].mode, ShareMode::ReadWrite);
@@ -90,7 +103,11 @@ fn test_manage_devices_l_button_switches_mode() {
     assert_eq!(state.shares[0].mode, ShareMode::ReadOnly);
     assert!(matches!(state.modal, ModalDialog::ManageDevices { .. }));
 
-    // Touching the mode button is the same as pressing `L`.
+    // Touching the mode button cycles ReadOnly -> SendOnly -> ReadWrite.
+    let button = rects_of(&mut state, UiAction::Press(PadKey::L))[0];
+    tap_rect(&mut state, &repo, button);
+    assert_eq!(state.shares[0].mode, ShareMode::SendOnly);
+
     let button = rects_of(&mut state, UiAction::Press(PadKey::L))[0];
     tap_rect(&mut state, &repo, button);
     assert_eq!(state.shares[0].mode, ShareMode::ReadWrite);
@@ -106,7 +123,7 @@ fn test_mode_button_fits_in_every_language() {
     let (dir, repo, mut state) = setup("share-mode-geometry");
     for language in Language::ALL {
         state.set_language_preference(LanguagePreference::Fixed(language));
-        for _ in 0..2 {
+        for _ in 0..3 {
             ShareModeService::toggle(&mut state, &repo, 0);
             draw(&mut state);
             let buttons: Vec<Rect> = state
@@ -230,6 +247,20 @@ fn test_toggle_switches_mode_saves_and_reports_each_direction() {
         .logs
         .iter()
         .any(|l| l == "Share saves is now read only"));
+
+    ShareModeService::toggle(&mut state, &repo, 0);
+    assert_eq!(state.shares[0].mode, ShareMode::SendOnly);
+    assert_eq!(repo.load_shares()[0].mode, ShareMode::SendOnly);
+    assert_eq!(
+        state.toast_msg.as_ref().map(|(m, _)| m.clone()),
+        Some(UiText::ShareSendOnly {
+            id: "saves".to_owned()
+        })
+    );
+    assert!(state
+        .logs
+        .iter()
+        .any(|l| l == "Share saves is now send only"));
 
     ShareModeService::toggle(&mut state, &repo, 0);
     assert_eq!(state.shares[0].mode, ShareMode::ReadWrite);

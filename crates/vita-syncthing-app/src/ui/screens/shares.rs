@@ -116,11 +116,19 @@ fn draw_share_card(
         24.0,
         if share.enabled { th.accent_hi } else { th.dim },
     );
-    // A read-only share (peers never modify its files) carries a lock badge on its icon.
-    if share.mode == ShareMode::ReadOnly {
-        let (bx, by) = ((lx + 40) as f32, (ry + SHARE_CARD_H / 2 + 16) as f32);
-        gfx.circle(bx, by, 10.0, th.card);
-        gfx.icon(Icon::Lock, bx, by, 14.0, th.accent_hi);
+    // A read-only share carries a lock badge; a send-only share carries an upload arrow badge.
+    match share.mode {
+        ShareMode::ReadOnly => {
+            let (bx, by) = ((lx + 40) as f32, (ry + SHARE_CARD_H / 2 + 16) as f32);
+            gfx.circle(bx, by, 10.0, th.card);
+            gfx.icon(Icon::Lock, bx, by, 14.0, th.accent_hi);
+        }
+        ShareMode::SendOnly => {
+            let (bx, by) = ((lx + 40) as f32, (ry + SHARE_CARD_H / 2 + 16) as f32);
+            gfx.circle(bx, by, 10.0, th.card);
+            gfx.icon(Icon::ArrowUp, bx, by, 13.0, th.accent_hi);
+        }
+        ShareMode::ReadWrite => {}
     }
 
     // Action buttons on the right: [X Devices] [SQ Delete]. A share's folder is chosen once,
@@ -161,8 +169,8 @@ fn draw_share_card(
         );
     }
 
-    // Line 1: title, and the status chip right-aligned on the text column (left of the
-    // buttons), at the same place on every card.
+    // Line 1: title, and the status chip (plus optional SendOnly / ReadOnly mode chip) right-aligned
+    // on the text column (left of the buttons), at the same place on every card.
     let tx = lx + 58;
     let max_w = bx_devs - 16 - tx;
     let (status_txt, status_col) = if share.enabled {
@@ -170,12 +178,24 @@ fn draw_share_card(
     } else {
         (s.status_paused, C_WARN)
     };
-    let chip_w = draw_chip(gfx, tx + max_w, ry + TITLE_DY, status_txt, status_col);
+    let status_chip_w = draw_chip(gfx, tx + max_w, ry + TITLE_DY, status_txt, status_col);
+    let mode_chip_w = if share.mode == ShareMode::SendOnly {
+        let gap = 6;
+        gap + draw_chip(
+            gfx,
+            tx + max_w - status_chip_w - gap,
+            ry + TITLE_DY,
+            s.share_mode_send_only,
+            th.accent_hi,
+        )
+    } else {
+        0
+    };
     let title = s.fmt_share_title(&share.label, &share.folder_id);
     gfx.text_fit(
         tx,
         ry + TITLE_DY,
-        max_w - chip_w - 10,
+        max_w - status_chip_w - mode_chip_w - 10,
         16,
         FontWeight::Bold,
         th.text,

@@ -236,14 +236,18 @@ pub enum ShareMode {
     /// Peers' changes are applied, but local changes are never sent to them
     /// (Syncthing "Receive Only").
     ReadOnly,
+    /// Local changes are sent to peers, but remote changes are never applied locally
+    /// (Syncthing "Send Only").
+    SendOnly,
 }
 
 impl ShareMode {
-    /// The other mode (the `ManageDevices` toggle).
+    /// Cycles `ReadWrite -> ReadOnly -> SendOnly -> ReadWrite` (the `ManageDevices` toggle).
     pub fn toggled(self) -> Self {
         match self {
             Self::ReadWrite => Self::ReadOnly,
-            Self::ReadOnly => Self::ReadWrite,
+            Self::ReadOnly => Self::SendOnly,
+            Self::SendOnly => Self::ReadWrite,
         }
     }
 
@@ -252,6 +256,7 @@ impl ShareMode {
         match self {
             Self::ReadWrite => "rw",
             Self::ReadOnly => "ro",
+            Self::SendOnly => "so",
         }
     }
 
@@ -259,6 +264,7 @@ impl ShareMode {
     pub fn from_code(code: &str) -> Self {
         match code.trim() {
             "ro" => Self::ReadOnly,
+            "so" => Self::SendOnly,
             _ => Self::ReadWrite,
         }
     }

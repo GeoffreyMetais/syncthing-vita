@@ -55,21 +55,21 @@ pub fn render_manage_devices_modal(
         22.0,
         th.accent_hi,
     );
-    // Header right: the share's access mode; touching it (or `L`) switches to the other one.
+    // Header right: the share's access mode; touching it (or `L`) cycles ReadWrite -> ReadOnly -> SendOnly.
     // A read-only share can also revert its local changes (`START`, confirmed first).
-    let read_only = state
+    let mode = state
         .shares
         .get(share_idx)
-        .is_some_and(|sh| sh.mode == ShareMode::ReadOnly);
-    let mode_lbl = if read_only {
-        s.share_mode_read_only
-    } else {
-        s.share_mode_read_write
+        .map_or(ShareMode::ReadWrite, |sh| sh.mode);
+    let mode_lbl = match mode {
+        ShareMode::ReadWrite => s.share_mode_read_write,
+        ShareMode::ReadOnly => s.share_mode_read_only,
+        ShareMode::SendOnly => s.share_mode_send_only,
     };
     let w_mode = action_width(gfx, PadButton::L, mode_lbl);
     let mut header_right = dx + w - 28 - w_mode;
     draw_press_button(gfx, th, hits, header_right, dy + 40, PadButton::L, mode_lbl);
-    if read_only {
+    if mode == ShareMode::ReadOnly {
         let w_revert = action_width(gfx, PadButton::Start, s.action_revert);
         header_right -= 10 + w_revert;
         draw_press_button(

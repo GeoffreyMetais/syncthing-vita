@@ -124,11 +124,15 @@ fn test_active_tab_discriminants_match_the_sidebar_order() {
 fn test_share_mode_default_toggle_and_codes() {
     assert_eq!(ShareMode::default(), ShareMode::ReadWrite);
     assert_eq!(ShareMode::ReadWrite.toggled(), ShareMode::ReadOnly);
-    assert_eq!(ShareMode::ReadOnly.toggled(), ShareMode::ReadWrite);
+    assert_eq!(ShareMode::ReadOnly.toggled(), ShareMode::SendOnly);
+    assert_eq!(ShareMode::SendOnly.toggled(), ShareMode::ReadWrite);
     assert_eq!(ShareMode::ReadWrite.code(), "rw");
     assert_eq!(ShareMode::ReadOnly.code(), "ro");
+    assert_eq!(ShareMode::SendOnly.code(), "so");
     assert_eq!(ShareMode::from_code("ro"), ShareMode::ReadOnly);
     assert_eq!(ShareMode::from_code(" ro "), ShareMode::ReadOnly);
+    assert_eq!(ShareMode::from_code("so"), ShareMode::SendOnly);
+    assert_eq!(ShareMode::from_code(" so "), ShareMode::SendOnly);
     assert_eq!(ShareMode::from_code("rw"), ShareMode::ReadWrite);
     // Missing or unknown codes are read & write (legacy `shares.cfg` lines).
     assert_eq!(ShareMode::from_code(""), ShareMode::ReadWrite);

@@ -15,6 +15,8 @@ pub struct SyncControl {
     discovery_requested: AtomicBool,
     /// Receive-only folders whose local changes must be reverted, until a session takes them.
     revert_requests: Mutex<Vec<String>>,
+    /// Send-only folders whose remote changes must be overridden, until a session takes them.
+    override_requests: Mutex<Vec<String>>,
     tuning: SyncTuning,
 }
 
@@ -84,6 +86,30 @@ impl SyncControl {
     pub fn take_revert_requests(&self, handles: impl Fn(&str) -> bool) -> Vec<String> {
         let mut requests = self
             .revert_requests
+            .lock()
+            .unwrap_or_else(|p| p.into_inner());
+        let (taken, kept): (Vec<String>, Vec<String>) =
+            requests.drain(..).partition(|f| handles(f));
+        *requests = kept;
+        taken
+    }
+
+    /// Asks the next session that synchronizes `folder_id` (send-only) to override remote changes.
+    pub fn request_override(&self, folder_id: &str) {
+        let mut requests = self
+            .override_requests
+            .lock()
+            .unwrap_or_else(|p| p.into_inner());
+        if !requests.iter().any(|f| f == folder_id) {
+            requests.push(folder_id.to_owned());
+        }
+    }
+
+    /// Removes and returns the pending override requests `handles` accepts; the others stay
+    /// pending for another session. Each request is handled once.
+    pub fn take_override_requests(&self, handles: impl Fn(&str) -> bool) -> Vec<String> {
+        let mut requests = self
+            .override_requests
             .lock()
             .unwrap_or_else(|p| p.into_inner());
         let (taken, kept): (Vec<String>, Vec<String>) =

@@ -126,6 +126,11 @@ impl FsSyncStorage {
         self.folder_type(folder_id) == FolderType::ReceiveOnly
     }
 
+    /// Returns `true` if remote changes for `folder_id` must never be applied locally.
+    pub fn is_folder_send_only(&self, folder_id: &str) -> bool {
+        self.folder_type(folder_id) == FolderType::SendOnly
+    }
+
     /// Declares the devices `folder_id` is shared with (replacing any previous list).
     pub fn set_folder_devices(&mut self, folder_id: &str, devices: Vec<DeviceId>) {
         self.folder_devices.insert(folder_id.to_owned(), devices);

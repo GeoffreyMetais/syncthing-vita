@@ -76,6 +76,36 @@ pub struct DeviceConfig {
     pub addresses: Vec<String>,
 }
 
+/// Synchronization mode of a folder in `config.toml`.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum ConfigFolderType {
+    #[default]
+    SendReceive,
+    SendOnly,
+    ReceiveOnly,
+}
+
+impl ConfigFolderType {
+    /// Converts to the core BEP [`syncthing_core::FolderType`].
+    pub fn to_bep(self) -> syncthing_core::FolderType {
+        match self {
+            Self::SendReceive => syncthing_core::FolderType::SendReceive,
+            Self::SendOnly => syncthing_core::FolderType::SendOnly,
+            Self::ReceiveOnly => syncthing_core::FolderType::ReceiveOnly,
+        }
+    }
+
+    /// Lowercase kebab-case label (`send-receive`, `send-only`, `receive-only`).
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::SendReceive => "send-receive",
+            Self::SendOnly => "send-only",
+            Self::ReceiveOnly => "receive-only",
+        }
+    }
+}
+
 /// A shared folder.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
@@ -85,9 +115,16 @@ pub struct FolderConfig {
     pub path: PathBuf,
     /// Canonical device IDs this folder is shared with.
     pub devices: Vec<String>,
-    /// Receive changes only: local changes are never sent.
+    /// Folder synchronization mode (`send-receive`, `send-only`, `receive-only`).
+    pub folder_type: ConfigFolderType,
+    /// Legacy alias for `folder_type = "receive-only"`.
+    #[serde(skip_serializing_if = "is_false")]
     pub receive_only: bool,
     pub paused: bool,
+}
+
+fn is_false(v: &bool) -> bool {
+    !*v
 }
 
 pub(crate) fn default_addresses() -> Vec<String> {
@@ -102,6 +139,15 @@ impl DeviceConfig {
 }
 
 impl FolderConfig {
+    /// Effective folder type, honoring legacy `receive_only = true` when `folder_type` is default.
+    pub fn effective_folder_type(&self) -> ConfigFolderType {
+        if self.folder_type == ConfigFolderType::SendReceive && self.receive_only {
+            ConfigFolderType::ReceiveOnly
+        } else {
+            self.folder_type
+        }
+    }
+
     /// Parsed IDs of the shared devices; invalid entries are skipped.
     pub fn device_ids(&self) -> Vec<DeviceId> {
         self.devices

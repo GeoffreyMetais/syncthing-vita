@@ -180,14 +180,17 @@ pub fn handle_runtime_index(
     if ctx.storage.is_folder_paused(&idx.folder) {
         return Ok(false);
     }
-    download_folder(stream, ctx, &idx.folder, &idx.files, count_up_to_date)?;
-
-    // The pull just scanned the folder: publish from the database without a second scan.
-    let (new_idx, _) = ctx.storage.local_index_snapshot(
-        &idx.folder,
-        ctx.own_id(),
-        folders.remote_files(&idx.folder),
-    );
+    let (new_idx, _) = if ctx.storage.is_folder_send_only(&idx.folder) {
+        scan_local_index(stream, ctx, folders, &idx.folder)?
+    } else {
+        download_folder(stream, ctx, &idx.folder, &idx.files, count_up_to_date)?;
+        // The pull just scanned the folder: publish from the database without a second scan.
+        ctx.storage.local_index_snapshot(
+            &idx.folder,
+            ctx.own_id(),
+            folders.remote_files(&idx.folder),
+        )
+    };
     publish_index(stream, ctx, folders, &new_idx)?;
     folders.upsert_local_index(new_idx);
     Ok(true)

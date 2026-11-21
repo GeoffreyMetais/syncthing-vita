@@ -24,10 +24,12 @@ impl ShareModeService {
         let log = match mode {
             ShareMode::ReadOnly => format!("Share {} is now read only", id),
             ShareMode::ReadWrite => format!("Share {} is now read & write", id),
+            ShareMode::SendOnly => format!("Share {} is now send only", id),
         };
         state.show_toast(match mode {
             ShareMode::ReadOnly => UiText::ShareReadOnly { id },
             ShareMode::ReadWrite => UiText::ShareReadWrite { id },
+            ShareMode::SendOnly => UiText::ShareSendOnly { id },
         });
         ShareService::log_event(state, repo, &log);
     }

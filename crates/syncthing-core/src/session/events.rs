@@ -73,6 +73,12 @@ pub enum SyncEvent {
         folder: String,
         reverted: usize,
     },
+    /// The remote changes of a send-only folder were overridden by bumping local versions
+    /// above the peer's versions and publishing deletion tombstones for remote-only entries.
+    RemoteChangesOverridden {
+        folder: String,
+        overridden: usize,
+    },
     /// A single file could not be synchronized (e.g. local filesystem error); the session continues.
     FileError {
         folder: String,

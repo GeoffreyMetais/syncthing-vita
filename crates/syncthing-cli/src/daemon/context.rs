@@ -8,8 +8,8 @@ use std::time::Duration;
 
 use syncthing_core::discovery::PeerEndpoint;
 use syncthing_core::{
-    BepFolder, BepHello, DeviceId, DeviceIdentity, FolderType, FsSyncStorage, HttpsClient,
-    SyncControl, SyncTuning,
+    BepFolder, BepHello, DeviceId, DeviceIdentity, FsSyncStorage, HttpsClient, SyncControl,
+    SyncTuning,
 };
 
 use super::activity::SyncActivity;
@@ -226,14 +226,7 @@ fn build_storage(home: &Path, config: &Config) -> FsSyncStorage {
         storage.set_folder_path(&folder.id, &folder.path);
         storage.set_folder_devices(&folder.id, devices.clone());
         storage.set_folder_paused(&folder.id, folder.paused);
-        storage.set_folder_type(
-            &folder.id,
-            if folder.receive_only {
-                FolderType::ReceiveOnly
-            } else {
-                FolderType::SendReceive
-            },
-        );
+        storage.set_folder_type(&folder.id, folder.effective_folder_type().to_bep());
         if !devices.is_empty() {
             storage.add_local_folder(BepFolder {
                 id: folder.id.clone(),

@@ -1,14 +1,19 @@
 //! Folder reconciliation on top of the persistent local database ([`crate::local_db`]).
 //!
 //! - [`scan`] — local disk scans and local `Index` generation
+//! - [`ignore`] — `.stignore` pattern parsing and matching
 //! - [`pull`] — pull planning against a peer's index (deletions, directories, conflicts)
 //!   and bookkeeping of completed downloads
 //! - [`receive_only`] — local changes of receive-only folders are published as invalid
+//! - [`send_only`] — overriding remote changes of send-only folders
 
+pub mod ignore;
 mod pull;
 pub mod receive_only;
 mod scan;
+pub mod send_only;
 
+pub use ignore::IgnoreMatcher;
 pub use receive_only::mask_local_changes;
 
 use std::fs;

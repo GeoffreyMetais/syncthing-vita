@@ -61,6 +61,11 @@ pub fn handle_event(ctx: &DaemonContext, peer: &KnownPeer, event: SyncEvent) {
         SyncEvent::LocalChangesReverted { folder, reverted } => {
             log(&format!("{folder}: {reverted} local change(s) reverted"));
         }
+        SyncEvent::RemoteChangesOverridden { folder, overridden } => {
+            log(&format!(
+                "{folder}: {overridden} remote change(s) overridden"
+            ));
+        }
         SyncEvent::FolderUnavailable { folder, error } => {
             log(&format!("{folder}: folder unavailable: {error}"));
         }
