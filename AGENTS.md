@@ -8,6 +8,7 @@ This document provides essential architectural context, build workflows, and **r
 
 - **English Only**: All source code comments, docstrings, UI labels, log messages, commit messages, and documentation **must be written in English**.
 - **Zero Warnings**: Both host tests (`cargo test --workspace`) and the PS Vita release build (`just vpk`) must compile with **zero compiler warnings**. Use `#[cfg(target_os = "vita")]` and `#[cfg(not(target_os = "vita"))]` cleanly so host and Vita targets both stay warning-free.
+- **Full Quality Pass Before Merging / PRs**: A complete quality pass always includes `cargo fmt --all -- --check`, `cargo clippy --workspace --all-targets`, **`cargo audit`** (0 vulnerabilities), `RUSTFLAGS="-D warnings" cargo test --workspace`, `just vpk` + ELF symbol audit, and the **E2E validation suite** (`./.agents/skills/syncthing-e2e-validation/scripts/validate.sh`).
 - **Visual Changes Are Checked in the Emulator**: any change that alters what is drawn (layout, labels, translations, colours, icons, new screen or modal) must be (1) run in Vita3K, (2) captured with screenshots of every affected screen / state, and (3) shown with those screenshots in the PR description. Host tests passing is not enough. See §6 *Screenshots for Visual Changes*.
 - **No Unapproved C/ASM Crypto Dependencies**: Never add `ring`, `aws-lc-rs`, or `openssl` to the dependency tree. They do not compile for `armv7-sony-vita-newlibeabihf`. Always use pure-Rust cryptography (`rustls` with `default-features = false`, `rustls-rustcrypto`, `p256`, `sha2`, `rcgen`).
 - **Skip `tests/` During Design & Implementation**: The `crates/*/tests/` directories are large. Do **not** read or search (`rg`/`grep`) inside `tests/` while exploring the codebase, designing changes, or implementing features — restrict searches and reads to `crates/*/src/` (e.g., `rg <pattern> crates/*/src`). Only open the specific `tests/<name>.rs` file (or `tests/common/`) when writing new tests, updating existing ones, or diagnosing a test failure.
@@ -21,6 +22,8 @@ syncthing-vita
 ├── Cargo.toml                        # Workspace manifest (Edition 2021, LTO + opt-level = "z")
 ├── Justfile                          # Task runner (test-host, check-vita, build-vita, vpk)
 ├── scripts/build_vpk.sh              # Full VPK build pipeline (vita-elf-create, vita-make-fself, vita-mksfoex, vita-pack-vpk); APP_VER from the Cargo version
+├── scripts/vita3k_cli_sync.sh        # Vita3K <-> syncthing-cli E2E (`lan`, `internet`, `internet-then-lan`)
+├── scripts/vita3k_inbound_e2e.sh     # Vita3K inbound TCP 22000 sync + DeviceOffer accept/decline E2E (`all`, `sync`, `accept`, `decline`)
 ├── docs/screenshots/<branch>/        # Vita3K screenshots of visual changes, embedded in PR descriptions (see §6)
 ├── scripts/gen_livearea.py           # Generates the LiveArea images (assets/sce_sys/: icon, background, gate — PS Vita + Syncthing emblem)
 └── crates/
@@ -31,13 +34,14 @@ syncthing-vita
     │   │   ├── device_id/            # DeviceId: mod.rs (format, hex, short-ID matching), parse.rs (user input), base32.rs (Base32 + Luhn mod 32)
     │   │   ├── cert.rs               # Deterministic ECDSA P-256 X.509 identity (DeviceIdentity) & DER builder
     │   │   ├── version_vector.rs     # Version vector arithmetic (ge / merge / bump, short device ID)
-    │   │   ├── bep/                  # BEP/1.0 pure codecs: header, framing, lz4, hello, cluster_config, index, request, close
-    │   │   ├── discovery/            # announce.rs (codec), addresses.rs, local_ip.rs, udp.rs (broadcast cycle), lan_scan.rs (TCP 22000 + TLS probe)
-    │   │   ├── storage/              # FsSyncStorage: mod.rs (folder registry & paths), blocks.rs, download.rs (temp file assembly), atomic.rs (crash-safe replacement), names.rs (internal names, validation of peer-announced names), vita_fs.rs (sceIo quirks)
+    │   │   ├── bep/                  # BEP/1.0 pure codecs: header, framing, lz4 (compress + decompress), hello, cluster_config, index, request, download_progress, close
+    │   │   ├── discovery/            # announce.rs, addresses.rs, local_ip.rs, udp.rs, lan_scan.rs, global.rs, global_announce.rs, nat.rs (UPnP IGD / NAT-PMP)
+    │   │   ├── relay/                # Relay Protocol v1: wire, pool, client, listen (permanent relay listener)
+    │   │   ├── storage/              # FsSyncStorage: mod.rs, blocks.rs, weak_hash.rs (Adler-32 rolling), download.rs, atomic.rs, versioning.rs (.stversions), encrypted.rs, names.rs, vita_fs.rs
     │   │   ├── local_db/             # Persistent folder DB: mod.rs (LocalEntry, FolderDb), codec.rs (text format), cache.rs (process-wide cache)
-    │   │   ├── folder_sync/          # Reconciliation: scan.rs (disk scan -> local Index), pull.rs (pull planning, conflicts, deletions)
-    │   │   ├── tls/                  # TLS 1.3 transport only: verifier.rs, client.rs (BEP streams, ID probe), polling.rs
-    │   │   └── session/              # BEP sync engine, one file per phase (see §3.3)
+    │   │   ├── folder_sync/          # Reconciliation: scan.rs, pull.rs, ignore.rs (.stignore), receive_only.rs, send_only.rs
+    │   │   ├── tls/                  # TLS 1.3 transport: verifier.rs, client.rs, server.rs, https.rs, proxy.rs, polling.rs
+    │   │   └── session/              # BEP sync engine, one file per phase (+ secondary.rs SecondaryInbox, revert.rs, override_changes.rs)
     │   └── tests/                    # Integration tests, one file per module (+ common/ helpers)
     ├── syncthing-cli/                # Command-line Syncthing client for Linux & macOS (see §3.6)
     │   ├── src/
@@ -73,21 +77,22 @@ syncthing-vita
             │   ├── folder_browser.rs # FolderBrowser (`Files` tab: presets and subfolders, navigation, selection)
             │   ├── dashboard_controller.rs / shares_controller.rs / files_controller.rs / settings_controller.rs / logs.rs # One controller per page: D-pad focus movement, execution of the page's UiActions (`LogsController`: log viewer scrolling)
             │   ├── share_creation.rs # ShareCreation (new share kept only once a device is linked)
-            │   ├── share_mode.rs     # ShareModeService (share read & write <-> read only, revert of local changes)
+            │   ├── share_mode.rs     # ShareModeService (share read & write <-> read only <-> send only, revert of local changes)
             │   ├── folder_offers.rs  # FolderOfferService (folders offered by peers need consent: accept / decline / later)
+            │   ├── device_offers.rs  # DeviceOfferService (unknown incoming / introduced devices need consent: accept / decline / later)
             │   ├── frame_pacing.rs   # FramePacer (dynamic frame rate: render only when the screen changes)
             │   ├── input_gestures.rs # InputGestures (held Up / Down repeat, touch tap on release, touch drag)
             │   ├── devices_scan.rs   # DevicesScan (LAN scan of the ManageDevices dialog: immediate or delayed, cancelled on close)
             │   ├── dpad_navigation.rs # DpadNavigation (sidebar <-> page focus, Cross on focused element)
             │   ├── qr_scan.rs        # QrScanFlow (scanner events -> AddDeviceById confirmation), extract_device_id
-            │   ├── sync_supervisor.rs # SyncSupervisor (sync worker life cycle: start, restart on configuration change, rescan / discovery requests, reconnection)
-            │   ├── sync_coordinator.rs # SyncCoordinator (maps WorkerMsg & SyncEvent into AppState & ShareService)
+            │   ├── sync_supervisor.rs # SyncSupervisor (sync worker life cycle: always-on inbound reachability, config reloads, reconnection)
+            │   ├── sync_coordinator.rs # SyncCoordinator (maps WorkerMsg & SyncEvent into AppState, ShareService & DeviceOfferService)
             │   ├── upload_activity.rs # UploadActivity ("Uploading" state ends UPLOAD_DISPLAY_GRACE after the last block served)
             │   ├── input_controller.rs # InputController (resolves touch / Cross / shortcuts against the frame's HitMap, executes UiActions)
-            │   └── modal_input/      # ModalInput: resolves touches on the open modal, one key / row handler per modal (create_share, manage_devices, add_device, scan_qr, dialogs)
+            │   └── modal_input/      # ModalInput: resolves touches on the open modal, one key / row handler per modal (create_share, manage_devices, add_device, scan_qr, folder_offer, device_offer, dialogs)
             ├── infrastructure/       # Layer 3: Persistence, OS Filesystem, PS Vita Hardware & BEP Worker Thread
             │   ├── mod.rs
-            │   ├── config_repo.rs    # ConfigRepository (devices.cfg, shares.cfg, ignored_folders.cfg, theme.cfg, language.cfg, syncthing.log, ux0: directory listing)
+            │   ├── config_repo.rs    # ConfigRepository (devices.cfg, shares.cfg, ignored_folders.cfg, ignored_devices.cfg, theme.cfg, language.cfg, syncthing.log, ux0: directory listing)
             │   ├── config_fields.rs  # escape_field / unescape_field (peer-supplied text can never forge `.cfg` fields or lines)
             │   ├── worker_slot.rs    # spawn_after_previous / wait_for_worker (a new sync worker starts only once the previous one ended)
             │   ├── identity_store.rs # IdentityStore (sceKernelGetRandomNumber, device_seed.bin, cert.der)
@@ -95,7 +100,12 @@ syncthing-vita
             │   ├── ui_script.rs      # Opt-in `ui-script` feature: scripted input replay + frame dumps for Vita3K
             │   ├── qr_camera.rs      # QrScanner (SceCamera rear camera thread: 640x360 preview + QR decoding)
             │   ├── qr_decoder.rs     # QrDecoder (pure-Rust `quircs` QR decoder on greyscale frames, host-testable)
-            │   ├── sync_worker.rs    # spawn_sync_worker (background thread for fast-path BEP + UDP discovery + TLS 1.3)
+            │   ├── session_guard.rs  # ConnectionSlots, SessionClaims (dedup inbound/outbound), UnknownDeviceLog
+            │   ├── incoming_listener.rs # Non-blocking TCP 22000 listener (approved peers -> accept_and_sync + SecondaryInbox; unknown -> DeviceOffered)
+            │   ├── relay_listener.rs # Permanent Relay Protocol v1 listener (IPv4-only on Vita) & SharedRelayUri
+            │   ├── global_announcer.rs # Periodic Global Discovery v2 announcer (`tcp://0.0.0.0:<port>` + relay URI)
+            │   ├── peer_endpoints.rs # Outbound endpoint resolution (LAN direct -> WAN direct -> Relay) & dial loop
+            │   ├── sync_worker.rs    # spawn_sync_worker (always-on inbound reachability + UDP discovery + outbound BEP loops)
             │   ├── framebuffer.rs    # VitaFramebuffer (SceDisplay + SceSysmem 960x544 RGBA8888 hardware driver)
             │   └── input.rs          # VitaInput & InputFrame (SceCtrl + SceTouch hardware driver)
             └── ui/                   # Layer 4: Pure Presentation & Rendering Layer (reads &AppState, zero business logic)
@@ -130,6 +140,7 @@ syncthing-vita
                 │   ├── scan_qr.rs
                 │   ├── fallback_keyboard.rs
                 │   ├── device_id.rs
+                │   ├── device_offer.rs
                 │   ├── confirm_frame.rs  # Card, header, buttons and hints shared by the three confirmation modals
                 │   ├── confirm_quit.rs
                 │   ├── confirm_delete_share.rs
@@ -275,7 +286,7 @@ A host-only binary built on `syncthing-core` (never cross-compiled for the Vita;
 
 - **Commands** (`commands/`, one file each): `id`, `device add|list|remove`, `folder add|list|remove|share|unshare|pause|resume`, `config show|set`, `discover`, `run`, and the diagnostics `lookup <ID>` (Global Discovery) and `relays` (relay pool). Configuration in `<home>/config.toml` (`config/`, saved atomically), identity in `<home>/device_seed.bin` (0600, `/dev/urandom`, no fallback), folder databases in `<home>/db/`.
 - **Consent**: only configured devices get a session (unknown devices and folders a peer offers are logged with the command that accepts them); a folder is only synchronized with the devices it is shared with (`FsSyncStorage::set_folder_devices`).
-- **Daemon** (`daemon/`, `run`): `listener.rs` accepts connections (the PS Vita app never listens: it always dials the CLI); `dialer.rs` keeps one thread per configured device dialing configured / LAN / Global Discovery addresses, then relays; `lan.rs` listens on UDP 21027 continuously (shared with `SO_REUSEADDR` / `SO_REUSEPORT`, so a Syncthing or another instance on the same computer does not deafen it) and answers announcements directly (the Vita only listens briefly after its broadcast); `global.rs` announces `tcp://0.0.0.0:<port>` and our relay URI; `relay.rs` joins a relay (configured `static_relays` or the public pool) and runs invited sessions. `sessions.rs` allows one session per device whatever the link; a session the peer closed (`SessionEnd::ClosedByPeer`) is redialed after `RETRY_AFTER_SESSION`, only a peer that does not accept us yet (`NotAccepted`) waits `RETRY_AWAITING_PAIRING`. Timings and limits live in `daemon/timing.rs`.
+- **Daemon** (`daemon/`, `run`): `listener.rs` accepts connections (including inbound `1+2` secondary streams via `SecondaryInbox`); `dialer.rs` keeps one thread per configured device dialing configured / LAN / Global Discovery addresses, then relays; `lan.rs` listens on UDP 21027 continuously (shared with `SO_REUSEADDR` / `SO_REUSEPORT`, so a Syncthing or another instance on the same computer does not deafen it) and answers announcements directly (the Vita only listens briefly after its broadcast); `global.rs` announces `tcp://0.0.0.0:<port>` and our relay URI; `relay.rs` joins a relay (configured `static_relays` or the public pool) and runs invited sessions. `sessions.rs` allows one session per device whatever the link; a session the peer closed (`SessionEnd::ClosedByPeer`) is redialed after `RETRY_AFTER_SESSION`, only a peer that does not accept us yet (`NotAccepted`) waits `RETRY_AWAITING_PAIRING`. Timings and limits live in `daemon/timing.rs`.
 - **Bounded state from unauthenticated input**: LAN announcements, connections and relay invitations can carry any device ID or address, so nothing they feed grows without limit: `reports.rs` (`ReportMemory`: unknown devices reported once each up to `MAX_UNKNOWN_DEVICE_REPORTS`, then one line and silence; reports about configured devices / servers kept apart, `MAX_REPORTS_PER_SUBJECT` each), `lan.rs` (`ReplySchedule`: answers of the last reply interval only, configured devices always answered, at most `MAX_LAN_REPLIES_TO_UNKNOWN` others), `connection_slots.rs` (`ConnectionSlots`, RAII slots given back on every exit path): `listener.rs` keeps at most `MAX_UNAUTHENTICATED_CONNECTIONS` connections in their handshake or being turned away, `relay.rs` at most `MAX_PENDING_RELAY_INVITATIONS` invitations being joined (a separate pool, so a relay cannot keep direct connections out); a configured device's session gives its slot back. `relay::triage_invitation` drops invitations from unknown or already connected devices, and those beyond the limit (logged once), before spending a thread. `accept_bep_tls_stream`'s `timeout` bounds the whole handshake.
 - **Proxy** (`https_env.rs`): Global Discovery and the relay pool go through `HTTPS_PROXY` / `https_proxy` / `ALL_PROXY` (HTTP `CONNECT`) and also trust `SSL_CERT_FILE` (a TLS-inspecting proxy's CA); connections to peers and relays are always direct.
 - **Logs**: one timestamped line per event on stdout; peer-supplied text goes through `log::printable` (no control characters).
@@ -403,8 +414,9 @@ Text fields of the `.cfg` files (device names, addresses, folder IDs, labels, pa
 | `device_seed.bin` | 32-byte random seed for deterministic ECDSA P-256 keypair | Raw 32 bytes |
 | `cert.der` | Self-signed X.509 DER certificate whose SHA-256 is the Syncthing `DeviceId` | ASN.1 DER |
 | `devices.cfg` | Known/discovered remote Syncthing peers | `<device_id_hex>\|<name>\|<ip:port>\n` |
-| `shares.cfg` | Configured shared folders, linked devices and access mode (`rw` read & write, `ro` read only; missing means `rw`) | `<folder_id>\|<label>\|<target_path>\|<0\|1>\|<dev_hex1,dev_hex2>\|<rw\|ro>\n` |
+| `shares.cfg` | Configured shared folders, linked devices and access mode (`rw` read & write, `ro` read only, `so` send only; missing means `rw`) | `<folder_id>\|<label>\|<target_path>\|<0\|1>\|<dev_hex1,dev_hex2>\|<rw\|ro\|so>\n` |
 | `ignored_folders.cfg` | Folder offers declined by the user or deleted shares (not prompted again until `Settings` · `Clear Declined`) | `<folder_id>\|<device_id_hex>\n` |
+| `ignored_devices.cfg` | Unknown incoming devices declined by the user (not prompted again until `Settings` · `Clear Declined`) | `<device_id_hex>\n` |
 | `theme.cfg` | Persistent colour theme mode (`dark` or `oled`) | `<dark\|oled>\n` |
 | `language.cfg` | UI language chosen in `Settings` (`system` follows the PS Vita language; a missing file means `system`) | `<system\|en\|fr\|es\|de\|it>\n` |
 | `syncthing.log`, `syncthing.log.1` | Persistent protocol & UI event log, rotated above `LOG_MAX_BYTES` (512 KiB) to `syncthing.log.1` | Plain text lines |
@@ -462,17 +474,18 @@ cargo test --workspace
 
 `syncthing-cli` tests live in `crates/syncthing-cli/tests/` (`cargo test -p syncthing-cli`): `config.rs`, `identity.rs`, `cli_commands.rs` (the real binary), `lan.rs` (UDP 21027 shared, bounded reply schedule), `daemon_limits.rs` (bounded "reported once" memory, configured-device reports never crowded out, connection slots given back, relay invitations triaged and capped), `daemon_sync.rs` (two daemons on `127.0.0.1` with discovery and relays off: sync both ways, live changes and deletions, unknown device refused, offered folder not synchronized, receive-only folder).
 
-### Sync Test Between the Vita App (Vita3K) and `syncthing-cli`
+### Sync & Inbound Reachability Tests Between the Vita App (Vita3K) and `syncthing-cli`
 ```bash
-just vita3k-cli-sync
+just vita3k-cli-sync                           # outbound LAN sync (also supports `internet` and `internet-then-lan` modes)
+./scripts/vita3k_inbound_e2e.sh all            # inbound TCP 22000 sync + DeviceOffer accept & decline E2E
 ```
-`scripts/vita3k_cli_sync.sh` pairs a fresh Vita identity with a fresh CLI home by writing both configurations (the Vita knows the CLI as `dynamic`: it is found by LAN discovery), shares `ux0:data/synctest` with a CLI folder, runs both and checks each side received the other's files. Logs (`vita.log`, `cli.log`) and screenshots land in `target/vita3k-cli-sync/`.
+`scripts/vita3k_cli_sync.sh` pairs a fresh Vita identity with a fresh CLI home (`lan`, `internet`, or `internet-then-lan` verifying WAN -> LAN preference) and checks bidirectional file transfer. `scripts/vita3k_inbound_e2e.sh` runs `syncthing-cli` with `--listen none --no-local-discovery` so only the CLI can dial the Vita on TCP 22000, testing inbound bidirectional sync, `DeviceOffer` acceptance -> `FolderOffer` reception, and `DeviceOffer` decline -> `ignored_devices.cfg`.
 
 ### End-to-End Validation (skill `syncthing-e2e-validation`)
 ```bash
 ./.agents/skills/syncthing-e2e-validation/scripts/validate.sh
 ```
-Runs every stage — host tests, Vita build + ELF audit, CLI <-> CLI LAN sync, Vita3K <-> CLI sync, Internet (relay pool, Global Discovery announce + lookup, relay, CLI <-> CLI sync through Global Discovery + relay) — and prints `PASS` / `FAIL` / `BLOCKED` / `SKIP` per stage (see `.agents/skills/syncthing-e2e-validation/SKILL.md`). Run it before proposing any change to sync behaviour; report `BLOCKED` stages as not validated.
+Runs every stage — `quality` (`cargo fmt`, `cargo clippy`, **`cargo audit`**), `host` tests, `vita` build + ELF audit, `cli-lan` sync, `vita3k` (outbound + inbound + `DeviceOffer` E2E), and `internet` (relay pool, Global Discovery announce + lookup, relay, CLI <-> CLI sync) — and prints `PASS` / `FAIL` / `BLOCKED` / `SKIP` per stage (see `.agents/skills/syncthing-e2e-validation/SKILL.md`). Always run it for a full quality pass before merging PRs; report `BLOCKED` stages as not validated.
 
 ### Mutation Testing (`cargo-mutants`)
 ```bash
