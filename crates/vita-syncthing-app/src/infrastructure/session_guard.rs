@@ -78,7 +78,7 @@ impl Drop for ConnectionSlot {
 #[derive(Debug)]
 pub struct SessionClaims {
     max_sessions: usize,
-    active: Mutex<Vec<DeviceId>>,
+    active: Mutex<Vec<(DeviceId, bool)>>,
 }
 
 /// RAII claim on a peer session in [`SessionClaims`]. Automatically releases the peer on drop.
@@ -97,40 +97,65 @@ impl SessionClaims {
         }
     }
 
-    /// Claims an active session slot for `device_id`.
+    /// Claims an active session slot for `device_id` (initially in the dialing/handshaking state
+    /// until [`Self::mark_established`] is called).
     ///
     /// Returns `None` if `max_sessions` is reached or if any already-claimed peer satisfies
     /// [`DeviceId::matches_peer`] with `device_id`.
     pub fn try_claim(self: &Arc<Self>, device_id: DeviceId) -> Option<SessionClaim> {
         let mut active = self.active.lock().unwrap_or_else(|p| p.into_inner());
-        if active.len() >= self.max_sessions || active.iter().any(|id| id.matches_peer(&device_id))
+        if active.len() >= self.max_sessions
+            || active.iter().any(|(id, _)| id.matches_peer(&device_id))
         {
             return None;
         }
-        active.push(device_id);
+        active.push((device_id, false));
         Some(SessionClaim {
             claims: Arc::clone(self),
             device_id,
         })
     }
 
+    /// Marks any currently claimed session matching `device_id` as established (handshake complete).
+    ///
+    /// Dialing/handshaking claims remain unestablished until this is called so callers such as
+    /// Global Discovery lookup do not mistake a failing dial attempt for a live session.
+    pub fn mark_established(&self, device_id: &DeviceId) {
+        let mut active = self.active.lock().unwrap_or_else(|p| p.into_inner());
+        for (id, established) in active.iter_mut() {
+            if id.matches_peer(device_id) {
+                *established = true;
+            }
+        }
+    }
+
     /// Returns `true` if `device_id` (or a matching full/short placeholder) is currently claimed.
     pub fn is_claimed(&self, device_id: &DeviceId) -> bool {
         let active = self.active.lock().unwrap_or_else(|p| p.into_inner());
-        active.iter().any(|id| id.matches_peer(device_id))
+        active.iter().any(|(id, _)| id.matches_peer(device_id))
     }
 
-    /// Returns a snapshot of all currently claimed [`DeviceId`]s.
+    /// Returns a snapshot of all currently claimed [`DeviceId`]s (both dialing and established).
     pub fn claimed_ids(&self) -> Vec<DeviceId> {
         let active = self.active.lock().unwrap_or_else(|p| p.into_inner());
-        active.clone()
+        active.iter().map(|(id, _)| *id).collect()
+    }
+
+    /// Returns a snapshot of [`DeviceId`]s whose session has completed its handshake and is
+    /// currently established.
+    pub fn established_ids(&self) -> Vec<DeviceId> {
+        let active = self.active.lock().unwrap_or_else(|p| p.into_inner());
+        active
+            .iter()
+            .filter_map(|(id, established)| established.then_some(*id))
+            .collect()
     }
 }
 
 impl Drop for SessionClaim {
     fn drop(&mut self) {
         let mut active = self.claims.active.lock().unwrap_or_else(|p| p.into_inner());
-        if let Some(pos) = active.iter().position(|id| *id == self.device_id) {
+        if let Some(pos) = active.iter().position(|(id, _)| *id == self.device_id) {
             active.swap_remove(pos);
         }
     }

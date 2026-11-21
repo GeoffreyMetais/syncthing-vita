@@ -54,8 +54,19 @@ pub fn resolve_configured_addr(addr: &str) -> Vec<SocketAddr> {
         .unwrap_or_default()
 }
 
+fn is_supported_endpoint(ep: &PeerEndpoint) -> bool {
+    if cfg!(target_os = "vita") {
+        match ep {
+            PeerEndpoint::Direct(sock) => sock.is_ipv4(),
+            PeerEndpoint::Relay { addr, .. } => addr.is_ipv4(),
+        }
+    } else {
+        true
+    }
+}
+
 fn push_unique(out: &mut Vec<PeerEndpoint>, ep: PeerEndpoint) {
-    if !out.contains(&ep) {
+    if is_supported_endpoint(&ep) && !out.contains(&ep) {
         out.push(ep);
     }
 }
@@ -136,7 +147,7 @@ pub fn refresh_global_endpoints(
         if control.is_stop_requested() {
             return;
         }
-        let connected_now = claims.claimed_ids();
+        let connected_now = claims.established_ids();
         if !needs_global_lookup(kd, &connected_now) {
             continue;
         }
@@ -299,7 +310,11 @@ pub fn run_peer_session_loop(kd: KnownDevice, shared: PeerSessionShared) {
                 });
             }
             let tx_ev = tx.clone();
+            let claims_ev = Arc::clone(&claims);
             let emit = move |event: SyncEvent| {
+                if let SyncEvent::PeerConnected { peer_device_id, .. } = &event {
+                    claims_ev.mark_established(peer_device_id);
+                }
                 let _ = tx_ev.send(WorkerMsg::SyncEvent(event));
             };
             let params = SessionParams {
