@@ -265,6 +265,29 @@ impl ConfigRepository {
         write_replacing(&cfg_path, &out);
     }
 
+    /// Loads declined incoming devices from `<base_data_dir>/ignored_devices.cfg`.
+    pub fn load_ignored_devices(&self) -> Vec<DeviceId> {
+        let cfg_path = format!("{}/ignored_devices.cfg", self.base_data_dir);
+        let Ok(content) = read_recovering(&cfg_path) else {
+            return Vec::new();
+        };
+        content
+            .lines()
+            .filter_map(|line| DeviceId::from_hex(line.trim()))
+            .collect()
+    }
+
+    /// Saves declined incoming devices to `<base_data_dir>/ignored_devices.cfg`.
+    pub fn save_ignored_devices(&self, ignored: &[DeviceId]) {
+        let _ = fs::create_dir_all(&self.base_data_dir);
+        let cfg_path = format!("{}/ignored_devices.cfg", self.base_data_dir);
+        let out: String = ignored
+            .iter()
+            .map(|id| format!("{}\n", id.to_hex()))
+            .collect();
+        write_replacing(&cfg_path, &out);
+    }
+
     /// Loads the chosen colour theme mode from `<base_data_dir>/theme.cfg`.
     /// Defaults to `ThemeMode::Oled` if the file does not exist or contains invalid data.
     pub fn load_theme(&self) -> ThemeMode {

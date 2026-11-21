@@ -112,6 +112,7 @@ pub struct Strings {
     pub hint_add_remote_device_id: &'static str,
     pub hint_close_qr_device_id: &'static str,
     pub hint_accept_share: &'static str,
+    pub hint_accept_device: &'static str,
     pub hint_confirm_add: &'static str,
     pub hint_type_key: &'static str,
 
@@ -230,6 +231,11 @@ pub struct Strings {
     pub modal_folder_offer_title: &'static str,
     pub modal_folder_offer_hint: &'static str,
 
+    // Modals: Device Offer
+    pub modal_device_offer_title: &'static str,
+    pub modal_device_offer_hint: &'static str,
+    pub modal_device_offer_via_relay: &'static str,
+
     // Modals: Scan QR
     pub modal_scan_qr_title: &'static str,
     pub modal_scan_qr_subtitle: &'static str,
@@ -340,6 +346,17 @@ impl Strings {
                 format!("{device} vuole condividere una cartella con questa PS Vita")
             }
             Language::English => format!("{device} wants to share a folder with this PS Vita"),
+        }
+    }
+
+    /// Formats the incoming device offer source line.
+    pub fn fmt_device_offer_sub(&self, source: &str) -> String {
+        match self.language {
+            Language::French => format!("Connexion entrante depuis {source}"),
+            Language::Spanish => format!("Conexión entrante desde {source}"),
+            Language::German => format!("Eingehende Verbindung von {source}"),
+            Language::Italian => format!("Connessione in entrata da {source}"),
+            Language::English => format!("Incoming connection from {source}"),
         }
     }
 

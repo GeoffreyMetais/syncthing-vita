@@ -12,20 +12,27 @@ use syncthing_core::{
     BEP_DEFAULT_PORT, DISCOVERY_BROADCAST_ADDR,
 };
 
+use super::global_announcer::{run_global_announcer, GlobalAnnouncerContext};
+use super::incoming_listener::{bind_bep_listener, run_tcp_listener, IncomingListenerContext};
 use super::peer_endpoints::{
     refresh_global_endpoints, run_peer_session_loop, sleep_unless_stopped, PeerSessionShared,
-    SharedConnectedPeers, SharedDiscoveredAddrs, SharedGlobalEndpoints,
+    SharedDiscoveredAddrs, SharedGlobalEndpoints,
 };
+use super::relay_listener::{run_relay_listener, RelayListenerContext, SharedRelayUri};
+use super::session_guard::{ConnectionSlots, SessionClaims, UnknownDeviceLog};
 use super::worker_slot::spawn_after_previous;
 use super::ConfigRepository;
 use crate::domain::defaults::{
-    CLIENT_NAME, DEVICE_NAME, DISCOVERY_INTERVAL, DISCOVERY_LISTEN, DISCOVERY_SCAN_LISTEN,
-    GLOBAL_DISCOVERY_INTERVAL, KEEPALIVE_INTERVAL, MAX_PEER_SESSIONS, RESCAN_INTERVAL,
+    BEP_LISTEN_PORT, CLIENT_NAME, DEVICE_NAME, DISCOVERY_INTERVAL, DISCOVERY_LISTEN,
+    GLOBAL_DISCOVERY_INTERVAL, KEEPALIVE_INTERVAL, MAX_INCOMING_HANDSHAKES, MAX_PEER_SESSIONS,
+    MAX_UNKNOWN_DEVICE_REPORTS, RESCAN_INTERVAL,
 };
 use crate::domain::{KnownDevice, ShareConfigEntry, ShareMode, UiText};
 
-/// Stack size of the worker and peer session threads.
-const WORKER_STACK_SIZE: usize = 1536 * 1024;
+/// Stack size of threads performing TLS 1.3 / BEP I/O.
+pub(crate) const WORKER_STACK_SIZE: usize = 1536 * 1024;
+/// Stack size of the lightweight non-blocking TCP accept loop (no TLS on this thread).
+const LISTENER_STACK_SIZE: usize = 256 * 1024;
 
 static PROCESS_INSTANCE_ID: OnceLock<i64> = OnceLock::new();
 
@@ -51,7 +58,13 @@ pub enum WorkerMsg {
         name: String,
         address: String,
     },
+    DeviceOffered {
+        device_id: DeviceId,
+        address: String,
+        via_relay: bool,
+    },
     SyncEvent(SyncEvent),
+    InboundSyncEvent(SyncEvent),
     Finished {
         summary: UiText,
         allow_auto_reconnect: bool,
@@ -64,14 +77,20 @@ fn wait_for_next_discovery(control: &SyncControl, duration: Duration) -> bool {
     sleep_unless_stopped(control, duration, || control.take_discovery_request())
 }
 
-/// Spawns UDP 21027 discovery + concurrent persistent `1+2` TLS 1.3 / BEP sessions for all
-/// `approved_devices` so every paired instance (e.g. Linux server and MacOS desktop) stays
-/// connected simultaneously while the UI thread keeps running.
+/// Spawns the full BEP/1.0 worker:
+/// - Incoming TCP listener (`0.0.0.0:22000` with ephemeral fallback) accepting `approved_devices`
+///   and emitting [`WorkerMsg::DeviceOffered`] for unknown peers;
+/// - Permanent Relay Protocol v1 listener & Global Discovery v2 announcer (active even with 0
+///   paired devices so remote peers can reach this PS Vita immediately);
+/// - Continuous UDP 21027 Local Discovery broadcasting our listen address;
+/// - Outgoing persistent `1+2` session loops for `dial_peers`, deduplicated against inbound
+///   sessions via [`SessionClaims`].
 pub fn spawn_sync_worker(
     base_data_dir: &str,
     identity: DeviceIdentity,
     shares_snapshot: Vec<ShareConfigEntry>,
     approved_devices: Vec<KnownDevice>,
+    dial_peers: Vec<KnownDevice>,
     offered_folder_ids: Vec<String>,
 ) -> (Receiver<WorkerMsg>, Arc<SyncControl>) {
     let (tx, rx): (Sender<WorkerMsg>, Receiver<WorkerMsg>) = mpsc::channel();
@@ -132,137 +151,174 @@ pub fn spawn_sync_worker(
             }
         }
 
-        // The Vita never listens on TCP 22000 (it always dials out), so it advertises no address.
-        // Advertising `tcp://0.0.0.0:22000` made peers dial back the UDP source IP, which behind
-        // Docker NAT is the bridge gateway (e.g. `172.24.0.1`) and ends as "connected to self".
-        // Syncthing ignores announcements without addresses, so peers never try to dial the Vita.
+        let our_hello = BepHello::new(DEVICE_NAME, CLIENT_NAME, env!("CARGO_PKG_VERSION"));
+
+        // Bind incoming BEP/1.0 TCP listener so peers on the LAN (or via port-forwarding) can
+        // initiate connections to the Vita.
+        let (tcp_listener, listen_port) = match bind_bep_listener(BEP_LISTEN_PORT) {
+            Ok((listener, port)) => {
+                let _ = tx.send(WorkerMsg::Log(format!(
+                    "Listening for incoming BEP/1.0 connections on 0.0.0.0:{port}"
+                )));
+                (Some(listener), Some(port))
+            }
+            Err(e) => {
+                let _ = tx.send(WorkerMsg::Log(format!(
+                    "Cannot bind BEP listener ({e}): outgoing/relay reachability only"
+                )));
+                (None, None)
+            }
+        };
+
         let announce = Announce {
             id: identity.device_id,
-            addresses: Vec::new(),
+            addresses: listen_port
+                .map(|port| vec![format!("tcp://0.0.0.0:{port}")])
+                .unwrap_or_default(),
             instance_id: process_instance_id(),
         };
 
-        let our_hello = BepHello::new(DEVICE_NAME, CLIENT_NAME, env!("CARGO_PKG_VERSION"));
-
-        // If no peer has been manually linked/added yet, run passive LAN discovery only (never dial TCP 22000).
-        if approved_devices.is_empty() {
-            let _ = tx.send(WorkerMsg::Progress {
-                pct: None,
-                status: UiText::ScanningLan,
-                file: UiText::raw("-"),
-            });
-            match run_discovery_cycle(&announce, DISCOVERY_BROADCAST_ADDR, DISCOVERY_SCAN_LISTEN) {
-                Ok(res) => {
-                    let mut count = 0usize;
-                    let mut seen_ids = Vec::new();
-                    for (udp_src, peer) in &res.discovered_peers {
-                        if seen_ids.contains(&peer.id) {
-                            continue;
-                        }
-                        seen_ids.push(peer.id);
-                        count += 1;
-                        let best_tcp = resolve_peer_tcp_addrs(*udp_src, &peer.addresses)
-                            .into_iter()
-                            .next()
-                            .unwrap_or_else(|| SocketAddr::new(udp_src.ip(), BEP_DEFAULT_PORT));
-                        let _ = tx.send(WorkerMsg::DeviceDiscovered {
-                            device_id: peer.id,
-                            name: "LAN Peer".to_owned(),
-                            address: best_tcp.to_string(),
-                        });
-                    }
-                    let (summary, log) = if count > 0 {
-                        (
-                            UiText::FoundLanPeers { count },
-                            format!("Found {} LAN peer(s).", count),
-                        )
-                    } else {
-                        (
-                            UiText::NoPeerAddDevice,
-                            "No LAN peer found and no device linked.".to_owned(),
-                        )
-                    };
-                    let _ = tx.send(WorkerMsg::Log(log));
-                    let _ = tx.send(WorkerMsg::Finished {
-                        summary,
-                        allow_auto_reconnect: false,
-                    });
-                }
-                Err(e) => {
-                    let _ = tx.send(WorkerMsg::Log(format!("UDP discovery error: {}", e)));
-                    let _ = tx.send(WorkerMsg::Finished {
-                        summary: UiText::DiscoveryError {
-                            error: e.to_string(),
-                        },
-                        allow_auto_reconnect: false,
-                    });
-                }
-            }
-            return;
-        }
-
         let discovered_addrs: SharedDiscoveredAddrs = Arc::new(Mutex::new(Vec::new()));
         let global_endpoints: SharedGlobalEndpoints = Arc::new(Mutex::new(Vec::new()));
-        let connected_peers: SharedConnectedPeers = Arc::new(Mutex::new(Vec::new()));
+        let claims = Arc::new(SessionClaims::new(MAX_PEER_SESSIONS));
+        let tcp_slots = Arc::new(ConnectionSlots::new(MAX_INCOMING_HANDSHAKES));
+        let unknown_log = Arc::new(UnknownDeviceLog::new(MAX_UNKNOWN_DEVICE_REPORTS));
+        let shared_relay_uri: SharedRelayUri = Arc::new(Mutex::new(None));
         let initial_lan_done = Arc::new(AtomicBool::new(false));
-        let mut peer_handles = Vec::new();
+        let mut child_handles = Vec::new();
 
-        let peer_list: Vec<String> = approved_devices
-            .iter()
-            .take(MAX_PEER_SESSIONS)
-            .map(|kd| format!("{} [{}] @ {}", kd.name, kd.device_id.short(), kd.address))
-            .collect();
-        let _ = tx.send(WorkerMsg::Log(format!(
-            "Linked peers: {}",
-            peer_list.join(", ")
-        )));
-
-        if approved_devices.len() > MAX_PEER_SESSIONS {
-            let _ = tx.send(WorkerMsg::Log(format!(
-                "{} devices are linked: only the first {} are synchronized.",
-                approved_devices.len(),
-                MAX_PEER_SESSIONS
-            )));
-        }
-
-        // Spawn a concurrent persistent `1+2` session worker for each user-approved device (up to `MAX_PEER_SESSIONS`)
-        for (idx, kd) in approved_devices
-            .iter()
-            .take(MAX_PEER_SESSIONS)
-            .cloned()
-            .enumerate()
-        {
-            let peer_name = kd.name.clone();
-            let shared = PeerSessionShared {
+        // 1. Incoming TCP listener thread (active even with 0 paired devices).
+        if let Some(listener) = tcp_listener {
+            let listener_ctx = IncomingListenerContext {
                 identity: identity.clone(),
                 hello: our_hello.clone(),
                 storage: storage.clone(),
-                discovered: Arc::clone(&discovered_addrs),
-                global: Arc::clone(&global_endpoints),
-                connected: Arc::clone(&connected_peers),
-                initial_lan_done: Arc::clone(&initial_lan_done),
+                approved_devices: approved_devices.clone(),
+                claims: Arc::clone(&claims),
+                slots: Arc::clone(&tcp_slots),
+                unknown_log: Arc::clone(&unknown_log),
                 control: Arc::clone(&worker_control),
                 tx: tx.clone(),
             };
-            let peer_builder = std::thread::Builder::new()
-                .name(format!("bep_peer_{}", idx))
-                .stack_size(WORKER_STACK_SIZE);
-
-            match peer_builder.spawn(move || run_peer_session_loop(kd, shared)) {
-                Ok(handle) => peer_handles.push(handle),
+            match std::thread::Builder::new()
+                .name("bep_listener".to_owned())
+                .stack_size(LISTENER_STACK_SIZE)
+                .spawn(move || run_tcp_listener(listener, listener_ctx))
+            {
+                Ok(handle) => child_handles.push(handle),
                 Err(e) => {
                     let _ = tx.send(WorkerMsg::Log(format!(
-                        "Cannot start session thread for {}: {}",
-                        peer_name, e
+                        "Cannot start incoming TCP listener thread: {e}"
                     )));
                 }
             }
         }
 
-        // Continuously run UDP 21027 local discovery + periodic Global Discovery v2 in the coordinator thread so:
-        // 1. All LAN peers receive the Vita's Announce packet.
-        // 2. Approved peers have their LAN IP:port resolved before falling back to WAN/relay.
-        // 3. Peers outside the LAN have their WAN direct & relay endpoints resolved via Global Discovery v2.
+        // 2. Permanent Relay Protocol v1 listener thread (active even with 0 paired devices).
+        {
+            let relay_ctx = RelayListenerContext {
+                identity: identity.clone(),
+                hello: our_hello.clone(),
+                storage: storage.clone(),
+                approved_devices: approved_devices.clone(),
+                claims: Arc::clone(&claims),
+                unknown_log: Arc::clone(&unknown_log),
+                shared_relay_uri: Arc::clone(&shared_relay_uri),
+                control: Arc::clone(&worker_control),
+                tx: tx.clone(),
+            };
+            match std::thread::Builder::new()
+                .name("bep_relay".to_owned())
+                .stack_size(WORKER_STACK_SIZE)
+                .spawn(move || run_relay_listener(relay_ctx))
+            {
+                Ok(handle) => child_handles.push(handle),
+                Err(e) => {
+                    let _ = tx.send(WorkerMsg::Log(format!(
+                        "Cannot start relay listener thread: {e}"
+                    )));
+                }
+            }
+        }
+
+        // 3. Global Discovery v2 announcer thread (active even with 0 paired devices).
+        {
+            let announce_ctx = GlobalAnnouncerContext {
+                identity: identity.clone(),
+                listen_port,
+                shared_relay_uri: Arc::clone(&shared_relay_uri),
+                control: Arc::clone(&worker_control),
+                tx: tx.clone(),
+            };
+            match std::thread::Builder::new()
+                .name("bep_announce".to_owned())
+                .stack_size(WORKER_STACK_SIZE)
+                .spawn(move || run_global_announcer(announce_ctx))
+            {
+                Ok(handle) => child_handles.push(handle),
+                Err(e) => {
+                    let _ = tx.send(WorkerMsg::Log(format!(
+                        "Cannot start Global Discovery announcer thread: {e}"
+                    )));
+                }
+            }
+        }
+
+        // 4. Outgoing persistent `1+2` session workers for `dial_peers` (up to `MAX_PEER_SESSIONS`).
+        if !dial_peers.is_empty() {
+            let peer_list: Vec<String> = dial_peers
+                .iter()
+                .take(MAX_PEER_SESSIONS)
+                .map(|kd| format!("{} [{}] @ {}", kd.name, kd.device_id.short(), kd.address))
+                .collect();
+            let _ = tx.send(WorkerMsg::Log(format!(
+                "Linked peers: {}",
+                peer_list.join(", ")
+            )));
+
+            if dial_peers.len() > MAX_PEER_SESSIONS {
+                let _ = tx.send(WorkerMsg::Log(format!(
+                    "{} devices are linked: only the first {} are synchronized.",
+                    dial_peers.len(),
+                    MAX_PEER_SESSIONS
+                )));
+            }
+
+            for (idx, kd) in dial_peers
+                .iter()
+                .take(MAX_PEER_SESSIONS)
+                .cloned()
+                .enumerate()
+            {
+                let peer_name = kd.name.clone();
+                let shared = PeerSessionShared {
+                    identity: identity.clone(),
+                    hello: our_hello.clone(),
+                    storage: storage.clone(),
+                    discovered: Arc::clone(&discovered_addrs),
+                    global: Arc::clone(&global_endpoints),
+                    claims: Arc::clone(&claims),
+                    initial_lan_done: Arc::clone(&initial_lan_done),
+                    control: Arc::clone(&worker_control),
+                    tx: tx.clone(),
+                };
+                let peer_builder = std::thread::Builder::new()
+                    .name(format!("bep_peer_{}", idx))
+                    .stack_size(WORKER_STACK_SIZE);
+
+                match peer_builder.spawn(move || run_peer_session_loop(kd, shared)) {
+                    Ok(handle) => child_handles.push(handle),
+                    Err(e) => {
+                        let _ = tx.send(WorkerMsg::Log(format!(
+                            "Cannot start session thread for {}: {}",
+                            peer_name, e
+                        )));
+                    }
+                }
+            }
+        }
+
+        // 5. Continuous UDP 21027 Local Discovery + periodic Global Discovery v2 lookups.
         let mut first_pass = true;
         let mut last_global_lookup: Option<Instant> = None;
         let mut global_errors = Vec::new();
@@ -273,13 +329,13 @@ pub fn spawn_sync_worker(
                     Err(_) => Vec::new(),
                 };
 
-            if first_pass && !worker_control.is_stop_requested() {
-                let missing_approved = approved_devices.iter().any(|kd| {
+            if first_pass && !dial_peers.is_empty() && !worker_control.is_stop_requested() {
+                let missing_dial = dial_peers.iter().any(|kd| {
                     !discovered_peers
                         .iter()
                         .any(|(_, p)| kd.device_id.matches_peer(&p.id))
                 });
-                if missing_approved {
+                if missing_dial {
                     for (addr, peer) in scan_lan_bep_peers(identity.device_id) {
                         if !discovered_peers.iter().any(|(_, p)| p.id == peer.id) {
                             discovered_peers.push((addr, peer));
@@ -321,13 +377,14 @@ pub fn spawn_sync_worker(
                 first_pass = false;
             }
 
-            if last_global_lookup.is_none_or(|t| t.elapsed() >= GLOBAL_DISCOVERY_INTERVAL)
+            if !dial_peers.is_empty()
+                && last_global_lookup.is_none_or(|t| t.elapsed() >= GLOBAL_DISCOVERY_INTERVAL)
                 && !worker_control.is_stop_requested()
             {
                 refresh_global_endpoints(
-                    &approved_devices,
+                    &dial_peers,
                     &global_endpoints,
-                    &connected_peers,
+                    &claims,
                     &worker_control,
                     &tx,
                     &mut global_errors,
@@ -340,7 +397,7 @@ pub fn spawn_sync_worker(
             }
         }
 
-        for handle in peer_handles {
+        for handle in child_handles {
             let _ = handle.join();
         }
     });

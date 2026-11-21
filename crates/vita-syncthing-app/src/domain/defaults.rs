@@ -56,6 +56,30 @@ pub const GLOBAL_DISCOVERY_INTERVAL: Duration = Duration::from_secs(60);
 /// Timeout for HTTPS Global Discovery v2 lookups and Relay Protocol v1 handshakes.
 pub const GLOBAL_DISCOVERY_TIMEOUT: Duration = Duration::from_secs(6);
 
+// --- Incoming reachability & device offers -------------------------------------------------
+
+/// Preferred TCP port on which the PS Vita accepts incoming BEP/1.0 connections
+/// (falls back to an OS-assigned ephemeral port if unavailable).
+pub const BEP_LISTEN_PORT: u16 = 22000;
+/// Maximum number of unauthenticated incoming TCP connections performing a TLS handshake at once.
+pub const MAX_INCOMING_HANDSHAKES: usize = 2;
+/// Maximum number of incoming relay invitations being joined concurrently.
+pub const MAX_PENDING_RELAY_INVITATIONS: usize = 2;
+/// Maximum number of distinct unknown incoming devices reported/offered per worker lifetime.
+pub const MAX_UNKNOWN_DEVICE_REPORTS: usize = 16;
+/// Maximum number of pending unknown-device offers kept in memory.
+pub const MAX_DEVICE_OFFERS: usize = 16;
+/// Poll interval between non-blocking `accept()` attempts on the incoming TCP listener.
+pub const INCOMING_ACCEPT_POLL: Duration = Duration::from_millis(200);
+/// Poll interval while waiting for invitations on an established relay listener connection.
+pub const RELAY_POLL: Duration = Duration::from_millis(250);
+/// Delay before retrying the next relay server after a relay connection fails or drops.
+pub const RELAY_RETRY: Duration = Duration::from_secs(10);
+/// Delay before re-fetching the public relay pool when no usable relay could be reached.
+pub const RELAY_POOL_RETRY: Duration = Duration::from_secs(60);
+/// Poll interval at which the Global Discovery v2 announcer checks for address changes or stop requests.
+pub const GLOBAL_ANNOUNCE_POLL: Duration = Duration::from_secs(5);
+
 // --- Power ---------------------------------------------------------------------------------
 
 /// How long standby stays blocked after the last transfer activity.

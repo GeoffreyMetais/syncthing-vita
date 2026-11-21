@@ -1,42 +1,31 @@
-//! Direct checks of two helpers of `peer_endpoints` that decide which configured devices are
-//! connected (`set_connected`) and how a worker sleeps while honouring stop requests and wake-ups
-//! (`sleep_unless_stopped`). Both are reached through the public module only.
+//! Direct checks of session claim tracking (`SessionClaims`) and how a worker sleeps while
+//! honouring stop requests and wake-ups (`sleep_unless_stopped`).
 
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use syncthing_core::{DeviceId, SyncControl};
-use vita_syncthing_app::infrastructure::peer_endpoints::{set_connected, sleep_unless_stopped};
-
-fn connected_list(ids: &[DeviceId]) -> Arc<Mutex<Vec<DeviceId>>> {
-    Arc::new(Mutex::new(ids.to_vec()))
-}
+use vita_syncthing_app::infrastructure::peer_endpoints::sleep_unless_stopped;
+use vita_syncthing_app::infrastructure::session_guard::SessionClaims;
 
 #[test]
-fn test_set_connected_adds_once_and_removes_only_that_device() {
+fn test_session_claims_adds_once_and_releases_only_that_device() {
     let a = DeviceId([0x01; 32]);
     let b = DeviceId([0x02; 32]);
-    let list = connected_list(&[]);
+    let claims = Arc::new(SessionClaims::new(4));
 
-    set_connected(&list, a, true);
-    set_connected(&list, a, true);
-    assert_eq!(*list.lock().unwrap(), vec![a], "a device is listed once");
+    let claim_a = claims.try_claim(a).expect("first claim succeeds");
+    assert!(claims.try_claim(a).is_none(), "a device is claimed once");
+    assert_eq!(claims.claimed_ids(), vec![a]);
 
-    set_connected(&list, b, true);
-    assert_eq!(*list.lock().unwrap(), vec![a, b]);
+    let _claim_b = claims.try_claim(b).expect("second device claim succeeds");
+    assert_eq!(claims.claimed_ids(), vec![a, b]);
 
-    set_connected(&list, a, false);
+    drop(claim_a);
     assert_eq!(
-        *list.lock().unwrap(),
+        claims.claimed_ids(),
         vec![b],
-        "only the named device leaves"
-    );
-
-    set_connected(&list, a, false);
-    assert_eq!(
-        *list.lock().unwrap(),
-        vec![b],
-        "removing an absent device changes nothing"
+        "only the dropped device leaves"
     );
 }
 

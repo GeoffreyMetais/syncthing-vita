@@ -98,6 +98,10 @@ pub struct Messages {
     pub choose_where_to_store: &'static str,
     /// `{label}`, `{id}`.
     pub offer_declined: &'static str,
+    /// `{short}`.
+    pub device_offer_accepted: &'static str,
+    /// `{short}`.
+    pub device_offer_declined: &'static str,
     pub no_declined_folders: &'static str,
     /// `{count}`.
     pub declined_cleared: &'static str,
@@ -264,6 +268,12 @@ impl Strings {
             }
             UiText::OfferDeclined { label, id } => {
                 fill(m.offer_declined, &[("label", label), ("id", id)])
+            }
+            UiText::DeviceOfferAccepted { short } => {
+                fill(m.device_offer_accepted, &[("short", short)])
+            }
+            UiText::DeviceOfferDeclined { short } => {
+                fill(m.device_offer_declined, &[("short", short)])
             }
             UiText::DeclinedCleared { count } => fill(m.declined_cleared, &[("count", count)]),
             UiText::SharedWith { devices } => fill(m.shared_with, &[("devices", devices)]),

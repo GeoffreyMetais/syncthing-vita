@@ -2,6 +2,7 @@
 //! (`SyncCoordinator`), and user input presenter/controller (`InputController`).
 
 pub mod controllers;
+pub mod device_offers;
 pub mod device_registry;
 pub mod devices_scan;
 pub mod dpad_navigation;
@@ -23,6 +24,7 @@ pub use controllers::{
     DashboardController, FilesController, InputController, LogsController, SettingsController,
     SharesController, UserCommand,
 };
+pub use device_offers::DeviceOfferService;
 pub use device_registry::DeviceRegistry;
 pub use devices_scan::DevicesScan;
 pub use dpad_navigation::DpadNavigation;

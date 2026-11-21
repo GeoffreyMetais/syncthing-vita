@@ -4,7 +4,9 @@ use std::sync::mpsc::Receiver;
 
 use syncthing_core::{is_local_ip, SyncEvent};
 
-use crate::application::{DeviceRegistry, FolderBrowser, FolderOfferService, ShareService};
+use crate::application::{
+    DeviceOfferService, DeviceRegistry, FolderBrowser, FolderOfferService, ShareService,
+};
 use crate::domain::{AppState, UiText};
 use crate::infrastructure::{ConfigRepository, WorkerMsg};
 
@@ -49,7 +51,19 @@ impl SyncCoordinator {
                     } => {
                         DeviceRegistry::register_discovered_peer(state, device_id, &name, &address);
                     }
-                    WorkerMsg::SyncEvent(event) => Self::handle_sync_event(state, repo, event),
+                    WorkerMsg::DeviceOffered {
+                        device_id,
+                        address,
+                        via_relay,
+                    } => {
+                        DeviceOfferService::receive(state, repo, device_id, &address, via_relay);
+                    }
+                    WorkerMsg::SyncEvent(event) => {
+                        Self::handle_sync_event(state, repo, event, false)
+                    }
+                    WorkerMsg::InboundSyncEvent(event) => {
+                        Self::handle_sync_event(state, repo, event, true)
+                    }
                     WorkerMsg::Finished {
                         summary,
                         allow_auto_reconnect,
@@ -72,7 +86,12 @@ impl SyncCoordinator {
         received
     }
 
-    fn handle_sync_event(state: &mut AppState, repo: &ConfigRepository, event: SyncEvent) {
+    fn handle_sync_event(
+        state: &mut AppState,
+        repo: &ConfigRepository,
+        event: SyncEvent,
+        inbound: bool,
+    ) {
         match event {
             SyncEvent::PeerConnected {
                 peer_addr,
@@ -85,7 +104,9 @@ impl SyncCoordinator {
                 } else {
                     peer_name
                 };
-                let persisted_addr = if is_local_ip(peer_addr.ip()) {
+                // An inbound connection's `peer_addr` carries an ephemeral client port (not the
+                // peer's listening port), so never persist it into `devices.cfg`.
+                let persisted_addr = if !inbound && is_local_ip(peer_addr.ip()) {
                     peer_addr.to_string()
                 } else {
                     String::new()

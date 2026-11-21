@@ -91,6 +91,7 @@ pub static STRINGS_ES: Strings = Strings {
     hint_add_remote_device_id: "Añadir ID remoto",
     hint_close_qr_device_id: "Cerrar QR / ID",
     hint_accept_share: "Aceptar carpeta",
+    hint_accept_device: "Aceptar dispositivo",
     hint_confirm_add: "Confirmar y añadir",
     hint_type_key: "Pulsar tecla",
 
@@ -209,6 +210,12 @@ pub static STRINGS_ES: Strings = Strings {
     modal_folder_offer_hint:
         "Acepta para elegir una carpeta en ux0:. Nada se sincroniza hasta activarla.",
 
+    // Modals: Device Offer
+    modal_device_offer_title: "Nuevo dispositivo",
+    modal_device_offer_hint:
+        "Aceptar permite a este dispositivo conectarse y ofrecer carpetas compartidas.",
+    modal_device_offer_via_relay: "un relé Syncthing",
+
     // Modals: Scan QR
     modal_scan_qr_title: "Escanear código QR del dispositivo",
     modal_scan_qr_subtitle: "Syncthing: Acciones > Mostrar ID, luego apunta la cámara trasera",
@@ -263,6 +270,8 @@ pub static MESSAGES_ES: Messages = Messages {
     offer_accepted: "Carpeta '{label}' aceptada ({id})",
     choose_where_to_store: "Elige dónde guardar '{label}'",
     offer_declined: "Carpeta '{label}' rechazada ({id})",
+    device_offer_accepted: "Dispositivo {short} aceptado",
+    device_offer_declined: "Dispositivo {short} rechazado",
     no_declined_folders: "Ninguna carpeta rechazada",
     declined_cleared: "{count} carpeta(s) rechazada(s) borrada(s): se volverán a ofrecer",
     id_empty: "El ID de dispositivo no puede estar vacío",

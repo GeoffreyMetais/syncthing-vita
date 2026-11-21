@@ -91,6 +91,7 @@ pub static STRINGS_DE: Strings = Strings {
     hint_add_remote_device_id: "Remote-Geräte-ID hinzufügen",
     hint_close_qr_device_id: "QR / ID schließen",
     hint_accept_share: "Freigabe annehmen",
+    hint_accept_device: "Gerät annehmen",
     hint_confirm_add: "Bestätigen & Hinzufügen",
     hint_type_key: "Taste drücken",
 
@@ -208,6 +209,12 @@ pub static STRINGS_DE: Strings = Strings {
     modal_folder_offer_hint:
         "Annehmen, um einen Pfad auf ux0: zu wählen. Vor Aktivierung erfolgt kein Sync.",
 
+    // Modals: Device Offer
+    modal_device_offer_title: "Neues Gerät",
+    modal_device_offer_hint:
+        "Nach Annahme darf dieses Gerät verbinden und freigegebene Ordner anbieten.",
+    modal_device_offer_via_relay: "ein Syncthing-Relay",
+
     // Modals: Scan QR
     modal_scan_qr_title: "Geräte-ID QR-Code scannen",
     modal_scan_qr_subtitle: "Syncthing: Aktionen > ID anzeigen, dann Rückkamera darauf richten",
@@ -262,6 +269,8 @@ pub static MESSAGES_DE: Messages = Messages {
     offer_accepted: "Freigabe „{label}“ angenommen ({id})",
     choose_where_to_store: "Speicherort für „{label}“ wählen",
     offer_declined: "Freigabe „{label}“ abgelehnt ({id})",
+    device_offer_accepted: "Gerät {short} angenommen",
+    device_offer_declined: "Gerät {short} abgelehnt",
     no_declined_folders: "Keine abgelehnten Ordner",
     declined_cleared: "{count} abgelehnte(r) Ordner gelöscht: wird/werden erneut angeboten",
     id_empty: "Die Geräte-ID darf nicht leer sein",

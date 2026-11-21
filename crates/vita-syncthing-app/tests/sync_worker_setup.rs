@@ -6,7 +6,7 @@ use std::sync::mpsc::Receiver;
 use std::time::{Duration, Instant};
 
 use syncthing_core::DeviceIdentity;
-use vita_syncthing_app::domain::{KnownDevice, ShareConfigEntry, ShareMode, UiText};
+use vita_syncthing_app::domain::{KnownDevice, ShareConfigEntry, ShareMode};
 use vita_syncthing_app::infrastructure::{spawn_sync_worker, WorkerMsg};
 
 mod common;
@@ -59,22 +59,25 @@ fn test_share_of_the_app_data_is_refused_and_others_are_not() {
         // A folder inside the data directory's sync area: accepted.
         share("ok", format!("{base}/sync/ok")),
     ];
-    let (rx, control) = spawn_sync_worker(&base, identity(), shares, Vec::new(), Vec::new());
+    let (rx, control) = spawn_sync_worker(
+        &base,
+        identity(),
+        shares,
+        Vec::new(),
+        Vec::new(),
+        Vec::new(),
+    );
 
-    let mut progress_scanning = false;
-    let mut finished = false;
+    let mut listening = false;
     let logs = drain_until(&rx, |msg| match msg {
-        WorkerMsg::Progress { status, .. } if matches!(status, UiText::ScanningLan) => {
-            progress_scanning = true;
-            false
-        }
-        WorkerMsg::Finished { .. } => {
-            finished = true;
+        WorkerMsg::Log(line) if line.starts_with("Listening for incoming BEP/1.0") => {
+            listening = true;
             true
         }
         _ => false,
     });
     control.request_stop();
+    let _ = drain_until(&rx, |_| false);
 
     let refused = format!("Share own not synchronized: {base} holds the app's own data.");
     assert!(logs.contains(&refused), "logs: {logs:?}");
@@ -82,9 +85,8 @@ fn test_share_of_the_app_data_is_refused_and_others_are_not() {
         !logs.iter().any(|l| l.contains("Share ok not synchronized")),
         "a folder inside the sync area is not refused"
     );
-    // No linked device: the worker only runs a passive LAN discovery, then finishes.
-    assert!(progress_scanning, "LAN discovery was announced");
-    assert!(finished, "discovery-only worker finishes");
+    // Even with 0 paired devices, the worker binds the incoming BEP listener and stays reachable.
+    assert!(listening, "incoming BEP listener started: {logs:?}");
 }
 
 #[test]
@@ -97,8 +99,14 @@ fn test_linked_peers_are_listed_then_capped_at_the_session_limit() {
             address: "127.0.0.1:1".to_owned(),
         })
         .collect();
-    let (rx, control) =
-        spawn_sync_worker(&base, identity(), Vec::new(), devices.clone(), Vec::new());
+    let (rx, control) = spawn_sync_worker(
+        &base,
+        identity(),
+        Vec::new(),
+        devices.clone(),
+        devices.clone(),
+        Vec::new(),
+    );
 
     let logs = drain_until(
         &rx,

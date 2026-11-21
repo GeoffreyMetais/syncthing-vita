@@ -91,6 +91,7 @@ pub static STRINGS_FR: Strings = Strings {
     hint_add_remote_device_id: "Ajouter ID distant",
     hint_close_qr_device_id: "Fermer QR / ID",
     hint_accept_share: "Accepter partage",
+    hint_accept_device: "Accepter appareil",
     hint_confirm_add: "Confirmer & Ajouter",
     hint_type_key: "Saisir touche",
 
@@ -212,6 +213,12 @@ pub static STRINGS_FR: Strings = Strings {
     modal_folder_offer_hint:
         "Acceptez pour choisir un dossier sur ux0:. Rien ne se synchronise avant activation.",
 
+    // Modals: Device Offer
+    modal_device_offer_title: "Nouvel appareil",
+    modal_device_offer_hint:
+        "Accepter autorise cet appareil à se connecter et proposer des dossiers partagés.",
+    modal_device_offer_via_relay: "un relais Syncthing",
+
     // Modals: Scan QR
     modal_scan_qr_title: "Scanner le QR code de l'appareil",
     modal_scan_qr_subtitle:
@@ -267,6 +274,8 @@ pub static MESSAGES_FR: Messages = Messages {
     offer_accepted: "Partage « {label} » accepté ({id})",
     choose_where_to_store: "Choisissez où enregistrer « {label} »",
     offer_declined: "Partage « {label} » refusé ({id})",
+    device_offer_accepted: "Appareil {short} accepté",
+    device_offer_declined: "Appareil {short} refusé",
     no_declined_folders: "Aucun dossier refusé",
     declined_cleared: "{count} dossier(s) refusé(s) effacé(s) : ils seront proposés à nouveau",
     id_empty: "L'ID d'appareil ne peut pas être vide",

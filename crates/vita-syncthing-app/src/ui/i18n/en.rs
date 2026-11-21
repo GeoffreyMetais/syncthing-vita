@@ -91,6 +91,7 @@ pub static STRINGS_EN: Strings = Strings {
     hint_add_remote_device_id: "Add Remote Device ID",
     hint_close_qr_device_id: "Close QR / Device ID",
     hint_accept_share: "Accept share",
+    hint_accept_device: "Accept device",
     hint_confirm_add: "Confirm & Add",
     hint_type_key: "Type Key",
 
@@ -211,6 +212,12 @@ pub static STRINGS_EN: Strings = Strings {
     modal_folder_offer_hint:
         "Accept to pick a folder on ux0:. Nothing syncs until you enable the share.",
 
+    // Modals: Device Offer
+    modal_device_offer_title: "New device request",
+    modal_device_offer_hint:
+        "Accepting lets this device connect and offer shared folders to this PS Vita.",
+    modal_device_offer_via_relay: "a Syncthing relay",
+
     // Modals: Scan QR
     modal_scan_qr_title: "Scan Device ID QR Code",
     modal_scan_qr_subtitle: "Syncthing GUI: Actions > Show ID, then aim the rear camera at it",
@@ -265,6 +272,8 @@ pub static MESSAGES_EN: Messages = Messages {
     offer_accepted: "Accepted share '{label}' ({id})",
     choose_where_to_store: "Choose where to store '{label}'",
     offer_declined: "Declined share '{label}' ({id})",
+    device_offer_accepted: "Accepted device {short}",
+    device_offer_declined: "Declined device {short}",
     no_declined_folders: "No declined folders",
     declined_cleared: "Cleared {count} declined folder(s): they will be offered again",
     id_empty: "Device ID cannot be empty",
