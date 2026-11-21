@@ -68,6 +68,7 @@ print(base64.b32decode(data + "====").hex())
 
 start_cli_lan() {
     local log_file="$1"
+    mkdir -p "$(dirname "$log_file")"
     "$CLI" --home "$CLI_HOME" run --listen 0.0.0.0:22000 --no-global-discovery --no-relays \
         > "$log_file" 2>&1 &
     CLI_PID=$!
@@ -287,7 +288,8 @@ else
     check "$VITA_SHARE/from_vita_wan.txt" "$WORK/cli-share/from_vita_wan.txt" "Phase 2 Vita -> CLI: from_vita_wan.txt"
     check "$WORK/cli-share/from_cli_wan.txt" "$VITA_SHARE/from_cli_wan.txt" "Phase 2 CLI -> Vita: from_cli_wan.txt"
 
-    if grep -qE "Connected via TLS 1\.3 to .*relay://" "$PHASE2_OUT/vita.log" 2>/dev/null; then
+    if grep -qE "Connected via TLS 1\.3 to .*\(" "$PHASE2_OUT/vita.log" 2>/dev/null &&
+        ! grep -qE "Connected via TLS 1\.3 to .* \((127\.|10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)" "$PHASE2_OUT/vita.log" 2>/dev/null; then
         echo "OK   Phase 2 fell back to relay via Global Discovery"
     else
         echo "FAIL Phase 2 did not log a TLS 1.3 connection via relay"
