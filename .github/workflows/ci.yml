@@ -121,10 +121,10 @@ jobs:
           path: target/e2e-cli
           if-no-files-found: ignore
 
-  e2e-vita3k:
-    name: Vita3K <-> CLI E2E (LAN, Internet, Roaming & Inbound)
+  e2e-vita3k-core:
+    name: Vita3K <-> CLI E2E (LAN, Internet & Inbound)
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 15
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -165,29 +165,80 @@ jobs:
         run: CARGO_FEATURES=ui-script just vpk
 
       - name: E2E Sync Vita3K <-> CLI (LAN)
-        run: ./scripts/vita3k_cli_sync.sh 75 target/e2e-vita3k-lan lan
+        run: ./scripts/vita3k_cli_sync.sh 45 target/e2e-vita3k-lan lan
 
       - name: E2E Sync Vita3K <-> CLI (Internet / Global Discovery + Relay)
-        run: ./scripts/vita3k_cli_sync.sh 90 target/e2e-vita3k-internet internet
-
-      - name: E2E Sync Vita3K <-> CLI (Internet -> LAN roaming)
-        run: ./scripts/vita3k_cli_sync.sh 90 target/e2e-vita3k-internet-then-lan internet-then-lan
-
-      - name: E2E Sync Vita3K <-> CLI (LAN -> Internet fallback)
-        run: ./scripts/vita3k_cli_sync.sh 90 target/e2e-vita3k-lan-then-internet lan-then-internet
+        run: ./scripts/vita3k_cli_sync.sh 60 target/e2e-vita3k-internet internet
 
       - name: E2E Inbound TCP 22000 & DeviceOffer (Vita3K <-> CLI)
         run: ./scripts/vita3k_inbound_e2e.sh all target/e2e-vita3k-inbound
 
-      - name: Upload Vita3K E2E logs and screenshots
+      - name: Upload Vita3K Core E2E logs and screenshots
         if: always()
         uses: actions/upload-artifact@v7
         with:
-          name: vita3k-e2e-logs
+          name: vita3k-e2e-core-logs
           path: |
             target/e2e-vita3k-lan
             target/e2e-vita3k-internet
+            target/e2e-vita3k-inbound
+          if-no-files-found: ignore
+
+  e2e-vita3k-roaming:
+    name: Vita3K <-> CLI E2E (Roaming & Fallback)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Install Rust stable and nightly toolchains
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Install Rust nightly toolchain with rust-src
+        uses: dtolnay/rust-toolchain@nightly
+        with:
+          components: rust-src
+
+      - name: Cache Cargo dependencies and build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: vita3k-e2e
+
+      - name: Install Vita3K runtime dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends \
+            xvfb unzip python3-pil libgl1 libegl1 libxkbcommon-x11-0 \
+            libxcb-cursor0 libxcb-icccm4 libxcb-keysyms1 libxcb-render-util0 \
+            libxcb-shape0 libxcb-xinerama0
+
+      - name: Install VitaSDK, just, and Vita3K
+        env:
+          VITASDK: ${{ runner.temp }}/vitasdk
+        run: |
+          ./scripts/setup_env.sh --install-vitasdk
+          ./scripts/setup_env.sh --install-just
+          ./scripts/setup_env.sh --install-vita3k
+          echo "VITASDK=${VITASDK}" >> "$GITHUB_ENV"
+          echo "${VITASDK}/bin" >> "$GITHUB_PATH"
+          echo "${HOME}/.local/bin" >> "$GITHUB_PATH"
+
+      - name: Build PS Vita VPK with ui-script
+        run: CARGO_FEATURES=ui-script just vpk
+
+      - name: E2E Sync Vita3K <-> CLI (Internet -> LAN roaming)
+        run: ./scripts/vita3k_cli_sync.sh 60 target/e2e-vita3k-internet-then-lan internet-then-lan
+
+      - name: E2E Sync Vita3K <-> CLI (LAN -> Internet fallback)
+        run: ./scripts/vita3k_cli_sync.sh 60 target/e2e-vita3k-lan-then-internet lan-then-internet
+
+      - name: Upload Vita3K Roaming E2E logs and screenshots
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: vita3k-e2e-roaming-logs
+          path: |
             target/e2e-vita3k-internet-then-lan
             target/e2e-vita3k-lan-then-internet
-            target/e2e-vita3k-inbound
           if-no-files-found: ignore

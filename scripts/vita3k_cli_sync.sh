@@ -128,9 +128,11 @@ stop_cli() {
 run_vita3k_phase() {
     local phase_out="$1"
     local run_secs="$2"
+    local ready_fn="$3"
     mkdir -p "$phase_out" "$DATA" "$UX0/app"
     local script="$WORK/ui_script.txt"
-    local frames=$(( (run_secs > 15 ? run_secs - 15 : 5) * 60 ))
+    local shot_secs=$(( run_secs > 20 ? 15 : (run_secs > 5 ? run_secs - 5 : 2) ))
+    local frames=$(( shot_secs * 60 ))
     printf 'wait %d\nshot 1_overview\npress R\nwait 20\npress R\nwait 30\nshot 2_settings\n' \
         "$frames" > "$script"
 
@@ -144,7 +146,15 @@ run_vita3k_phase() {
     unzip -qo "$vpk" -d "$UX0/app/SYNCTHING"
 
     ./scripts/vita3k_launch.sh -z --frontend sdl -l 2 -r SYNCTHING > "$phase_out/vita3k.log" 2>&1 &
-    sleep "$run_secs"
+    local waited=0
+    while (( waited < run_secs )); do
+        sleep 1
+        waited=$((waited + 1))
+        if [[ -f "$DATA/shots/2_settings.rgba" ]] && "$ready_fn"; then
+            sleep 1
+            break
+        fi
+    done
     pkill -x Vita3K || true
     sleep 1
 
@@ -197,10 +207,29 @@ check() {
     if cmp -s "$1" "$2"; then echo "OK   $3"; else echo "FAIL $3"; status=1; fi
 }
 
+phase1_ready() {
+    cmp -s "$VITA_SHARE/from_vita.txt" "$WORK/cli-share/from_vita.txt" &&
+        cmp -s "$WORK/cli-share/from_cli.txt" "$VITA_SHARE/from_cli.txt" &&
+        cmp -s "$WORK/cli-share/nested/blob.bin" "$VITA_SHARE/nested/blob.bin"
+}
+
+phase2_lan_ready() {
+    cmp -s "$VITA_SHARE/from_vita_lan.txt" "$WORK/cli-share/from_vita_lan.txt" &&
+        cmp -s "$WORK/cli-share/from_cli_lan.txt" "$VITA_SHARE/from_cli_lan.txt" &&
+        grep -qE "Connected via TLS 1\.3 to .* \((127\.|10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)" "$DATA/syncthing.log" 2>/dev/null
+}
+
+phase2_wan_ready() {
+    cmp -s "$VITA_SHARE/from_vita_wan.txt" "$WORK/cli-share/from_vita_wan.txt" &&
+        cmp -s "$WORK/cli-share/from_cli_wan.txt" "$VITA_SHARE/from_cli_wan.txt" &&
+        grep -qE "Connected via TLS 1\.3 to .*\(" "$DATA/syncthing.log" 2>/dev/null &&
+        ! grep -qE "Connected via TLS 1\.3 to .* \((127\.|10\.|192\.168\.|172\.(1[6-9]|2[0-9]|3[0-1])\.)" "$DATA/syncthing.log" 2>/dev/null
+}
+
 # --- Run ----------------------------------------------------------------------------------
 if [[ "$MODE" == "lan" ]]; then
     start_cli_lan "$OUT_DIR/cli.log"
-    run_vita3k_phase "$OUT_DIR" "$RUN_SECS"
+    run_vita3k_phase "$OUT_DIR" "$RUN_SECS" phase1_ready
     stop_cli
 
     check "$VITA_SHARE/from_vita.txt" "$WORK/cli-share/from_vita.txt" "Vita -> CLI: from_vita.txt"
@@ -208,7 +237,7 @@ if [[ "$MODE" == "lan" ]]; then
     check "$WORK/cli-share/nested/blob.bin" "$VITA_SHARE/nested/blob.bin" "CLI -> Vita: nested/blob.bin"
 elif [[ "$MODE" == "internet" ]]; then
     start_cli_internet "$OUT_DIR/cli.log"
-    run_vita3k_phase "$OUT_DIR" "$RUN_SECS"
+    run_vita3k_phase "$OUT_DIR" "$RUN_SECS" phase1_ready
     stop_cli
 
     check "$VITA_SHARE/from_vita.txt" "$WORK/cli-share/from_vita.txt" "Vita -> CLI: from_vita.txt"
@@ -219,7 +248,7 @@ elif [[ "$MODE" == "internet-then-lan" ]]; then
     echo "=== Phase 1: Internet / relay sync ==="
     PHASE1_OUT="$OUT_DIR/phase1-internet"
     start_cli_internet "$PHASE1_OUT/cli.log"
-    run_vita3k_phase "$PHASE1_OUT" "$RUN_SECS"
+    run_vita3k_phase "$PHASE1_OUT" "$RUN_SECS" phase1_ready
     stop_cli
 
     check "$VITA_SHARE/from_vita.txt" "$WORK/cli-share/from_vita.txt" "Phase 1 Vita -> CLI: from_vita.txt"
@@ -244,7 +273,7 @@ elif [[ "$MODE" == "internet-then-lan" ]]; then
     echo "written on the Vita (LAN phase)" > "$VITA_SHARE/from_vita_lan.txt"
 
     start_cli_lan_and_global "$PHASE2_OUT/cli.log"
-    run_vita3k_phase "$PHASE2_OUT" "$RUN_SECS"
+    run_vita3k_phase "$PHASE2_OUT" "$RUN_SECS" phase2_lan_ready
     stop_cli
 
     check "$VITA_SHARE/from_vita_lan.txt" "$WORK/cli-share/from_vita_lan.txt" "Phase 2 Vita -> CLI: from_vita_lan.txt"
@@ -266,7 +295,7 @@ else
     echo "=== Phase 1: LAN sync ==="
     PHASE1_OUT="$OUT_DIR/phase1-lan"
     start_cli_lan "$PHASE1_OUT/cli.log"
-    run_vita3k_phase "$PHASE1_OUT" "$RUN_SECS"
+    run_vita3k_phase "$PHASE1_OUT" "$RUN_SECS" phase1_ready
     stop_cli
 
     check "$VITA_SHARE/from_vita.txt" "$WORK/cli-share/from_vita.txt" "Phase 1 Vita -> CLI: from_vita.txt"
@@ -282,7 +311,7 @@ else
     echo "written on the Vita (off-LAN phase)" > "$VITA_SHARE/from_vita_wan.txt"
 
     start_cli_internet "$PHASE2_OUT/cli.log"
-    run_vita3k_phase "$PHASE2_OUT" "$RUN_SECS"
+    run_vita3k_phase "$PHASE2_OUT" "$RUN_SECS" phase2_wan_ready
     stop_cli
 
     check "$VITA_SHARE/from_vita_wan.txt" "$WORK/cli-share/from_vita_wan.txt" "Phase 2 Vita -> CLI: from_vita_wan.txt"
