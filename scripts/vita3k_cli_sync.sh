@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # End-to-end sync test between the PS Vita app (in Vita3K) and syncthing-cli on this computer.
 #
-# Usage: scripts/vita3k_cli_sync.sh [run_seconds] [out_dir] [lan|internet|internet-then-lan]
+# Usage: scripts/vita3k_cli_sync.sh [run_seconds] [out_dir] [lan|internet|internet-then-lan|lan-then-internet]
 # Requires a VPK built with `CARGO_FEATURES=ui-script just vpk`.
 #
 # Modes:
@@ -11,6 +11,9 @@
 #   internet-then-lan Phase 1 syncs over Internet/relay, verifies devices.cfg stays `dynamic`,
 #                     then Phase 2 keeps the same Vita DATA dir and restarts CLI on LAN, verifying
 #                     new files sync over a local LAN IP (and not a relay address).
+#   lan-then-internet Phase 1 syncs over LAN (saving a LAN IP in devices.cfg), then Phase 2 stops
+#                     the LAN listener and switches CLI to Internet/relay-only, verifying Vita falls
+#                     back to Global Discovery + relay instead of getting stuck on the stale LAN IP.
 #
 # 1. Generates the Vita's identity seed, so its device ID is known in advance (the CLI derives
 #    the same ID from the same seed), and pairs both sides by writing their configuration:
@@ -24,8 +27,8 @@ set -euo pipefail
 RUN_SECS="${1:-75}"
 OUT_DIR="$(realpath -m "${2:-target/vita3k-cli-sync}")"
 MODE="${3:-lan}"
-if [[ "$MODE" != "lan" && "$MODE" != "internet" && "$MODE" != "internet-then-lan" ]]; then
-    echo "Usage: $0 [run_seconds] [out_dir] [lan|internet|internet-then-lan]" >&2
+if [[ "$MODE" != "lan" && "$MODE" != "internet" && "$MODE" != "internet-then-lan" && "$MODE" != "lan-then-internet" ]]; then
+    echo "Usage: $0 [run_seconds] [out_dir] [lan|internet|internet-then-lan|lan-then-internet]" >&2
     exit 2
 fi
 UX0="${VITA3K_UX0:-$HOME/.local/share/Vita3K/Vita3K/ux0}"
@@ -210,7 +213,7 @@ elif [[ "$MODE" == "internet" ]]; then
     check "$VITA_SHARE/from_vita.txt" "$WORK/cli-share/from_vita.txt" "Vita -> CLI: from_vita.txt"
     check "$WORK/cli-share/from_cli.txt" "$VITA_SHARE/from_cli.txt" "CLI -> Vita: from_cli.txt"
     check "$WORK/cli-share/nested/blob.bin" "$VITA_SHARE/nested/blob.bin" "CLI -> Vita: nested/blob.bin"
-else
+elif [[ "$MODE" == "internet-then-lan" ]]; then
     # Phase 1: Internet / relay sync
     echo "=== Phase 1: Internet / relay sync ==="
     PHASE1_OUT="$OUT_DIR/phase1-internet"
@@ -255,6 +258,40 @@ else
     fi
     if grep -qE "Connected via TLS 1\.3 to .*relay://" "$PHASE2_OUT/vita.log" 2>/dev/null; then
         echo "FAIL Phase 2 unexpectedly connected via a relay address"
+        status=1
+    fi
+else
+    # Phase 1: LAN sync (records a LAN IP in devices.cfg)
+    echo "=== Phase 1: LAN sync ==="
+    PHASE1_OUT="$OUT_DIR/phase1-lan"
+    start_cli_lan "$PHASE1_OUT/cli.log"
+    run_vita3k_phase "$PHASE1_OUT" "$RUN_SECS"
+    stop_cli
+
+    check "$VITA_SHARE/from_vita.txt" "$WORK/cli-share/from_vita.txt" "Phase 1 Vita -> CLI: from_vita.txt"
+    check "$WORK/cli-share/from_cli.txt" "$VITA_SHARE/from_cli.txt" "Phase 1 CLI -> Vita: from_cli.txt"
+    check "$WORK/cli-share/nested/blob.bin" "$VITA_SHARE/nested/blob.bin" "Phase 1 CLI -> Vita: nested/blob.bin"
+
+    # Phase 2: Leave the LAN — CLI switches to Internet/relay-only while Vita still has a stale
+    # LAN IP in devices.cfg. Vita must not get stuck on `Peer unreachable (waiting for LAN)`.
+    echo "=== Phase 2: Off-LAN Global Discovery + relay fallback ==="
+    PHASE2_OUT="$OUT_DIR/phase2-internet"
+    rm -f "$DATA/syncthing.log" "$DATA/syncthing.log.1"
+    echo "written on the CLI (off-LAN phase)" > "$WORK/cli-share/from_cli_wan.txt"
+    echo "written on the Vita (off-LAN phase)" > "$VITA_SHARE/from_vita_wan.txt"
+
+    start_cli_internet "$PHASE2_OUT/cli.log"
+    run_vita3k_phase "$PHASE2_OUT" "$RUN_SECS"
+    stop_cli
+
+    check "$VITA_SHARE/from_vita_wan.txt" "$WORK/cli-share/from_vita_wan.txt" "Phase 2 Vita -> CLI: from_vita_wan.txt"
+    check "$WORK/cli-share/from_cli_wan.txt" "$VITA_SHARE/from_cli_wan.txt" "Phase 2 CLI -> Vita: from_cli_wan.txt"
+
+    if grep -qE "Connected via TLS 1\.3 to .*relay://" "$PHASE2_OUT/vita.log" 2>/dev/null; then
+        echo "OK   Phase 2 fell back to relay via Global Discovery"
+    else
+        echo "FAIL Phase 2 did not log a TLS 1.3 connection via relay"
+        grep -E "Connected via TLS 1\.3" "$PHASE2_OUT/vita.log" 2>/dev/null || true
         status=1
     fi
 fi
