@@ -38,6 +38,7 @@ fn test_serialized_text_has_the_exact_format() {
             offset: 0,
             size: 3,
             hash: vec![0x01, 0xff],
+            weak_hash: 0,
         }],
         ..entry("a|b", false, false)
     });
@@ -128,11 +129,13 @@ fn test_damaged_versions_and_blocks_are_dropped_individually() {
                 offset: 0,
                 size: 4,
                 hash: vec![0x01, 0xff],
+                weak_hash: 0,
             },
             BepBlockInfo {
                 offset: 8,
                 size: 0,
                 hash: Vec::new(),
+                weak_hash: 0,
             },
         ]
     );
@@ -176,6 +179,7 @@ fn test_hex_fields_reject_odd_length_and_non_hex_text() {
             offset: 0,
             size: 1,
             hash: vec![0x0a],
+            weak_hash: 0,
         }]
     );
 }

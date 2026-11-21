@@ -39,6 +39,7 @@ fn blocks_of(data: &[u8]) -> Vec<BepBlockInfo> {
             offset: 0,
             size: 0,
             hash: sha(&[]),
+            weak_hash: 0,
         }];
     }
     data.chunks(BEP_BLOCK_SIZE)
@@ -47,6 +48,7 @@ fn blocks_of(data: &[u8]) -> Vec<BepBlockInfo> {
                 offset: *offset,
                 size: chunk.len() as i32,
                 hash: sha(chunk),
+                weak_hash: syncthing_core::storage::weak_hash::weak_hash(chunk),
             };
             *offset += chunk.len() as i64;
             Some(b)
@@ -327,11 +329,13 @@ fn test_same_bytes_with_another_block_layout_are_up_to_date() {
             offset: 0,
             size: 2,
             hash: sha(b"ab"),
+            weak_hash: 0,
         },
         BepBlockInfo {
             offset: 2,
             size: 1,
             hash: sha(b"c"),
+            weak_hash: 0,
         },
     ];
     let plan = storage.plan_pull("f", OWN, &[remote]).unwrap();

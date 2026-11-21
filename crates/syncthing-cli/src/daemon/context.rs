@@ -8,8 +8,8 @@ use std::time::Duration;
 
 use syncthing_core::discovery::PeerEndpoint;
 use syncthing_core::{
-    BepFolder, BepHello, DeviceId, DeviceIdentity, FsSyncStorage, HttpsClient, SyncControl,
-    SyncTuning,
+    BepFolder, BepHello, DeviceId, DeviceIdentity, FsSyncStorage, HttpsClient, SecondaryInbox,
+    SyncControl, SyncTuning,
 };
 
 use super::activity::SyncActivity;
@@ -68,6 +68,7 @@ pub struct DaemonContext {
     pub hello: BepHello,
     pub storage: FsSyncStorage,
     pub control: Arc<SyncControl>,
+    pub secondary_inbox: Arc<SecondaryInbox>,
     pub peers: Vec<KnownPeer>,
     pub options: DaemonOptions,
     /// Port we accept connections on, once listening.
@@ -102,6 +103,7 @@ impl DaemonContext {
             storage: build_storage(home, config),
             identity,
             control,
+            secondary_inbox: Arc::new(SecondaryInbox::new()),
             peers,
             options,
             listen_port: Mutex::new(None),

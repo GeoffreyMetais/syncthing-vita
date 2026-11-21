@@ -45,6 +45,7 @@ fn request_block(storage: &FsSyncStorage, peer: DeviceId, folder: &str) -> BepRe
         offset: 0,
         size: CONTENT.len() as i32,
         hash: Vec::new(),
+        weak_hash: 0,
     };
     let mut wire = Vec::new();
     serve_block_request(&mut wire, &mut ctx, &req.encode()).unwrap();
@@ -117,6 +118,7 @@ fn session_params<'a>(
         expected_device_id: Some(peer),
         timeout: Duration::from_secs(4),
         control,
+        secondary_inbox: None,
     }
 }
 

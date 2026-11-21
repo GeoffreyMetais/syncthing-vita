@@ -153,16 +153,19 @@ pub(crate) fn hash_file_blocks(
                     offset: 0,
                     size: 0,
                     hash: empty_hash,
+                    weak_hash: 0,
                 });
             }
             break;
         }
 
         let hash = Sha256::digest(&buf[..read_total]).to_vec();
+        let weak = super::weak_hash::weak_hash(&buf[..read_total]);
         blocks.push(BepBlockInfo {
             offset,
             size: read_total as i32,
             hash,
+            weak_hash: weak,
         });
         offset += read_total as i64;
         on_progress();

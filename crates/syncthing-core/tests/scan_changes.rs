@@ -222,6 +222,7 @@ fn test_identical_remote_versions_are_adopted() {
                 offset: 0,
                 size: data.len() as i32,
                 hash: Sha256::digest(data).to_vec(),
+                weak_hash: syncthing_core::storage::weak_hash::weak_hash(data),
             }],
         };
     let peer = |v| BepVersionCounter {

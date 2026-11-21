@@ -86,6 +86,7 @@ fn test_announced_block_size_follows_the_blocks() {
                     offset,
                     size,
                     hash: vec![0; 32],
+                    weak_hash: 0,
                 };
                 offset += i64::from(size);
                 block

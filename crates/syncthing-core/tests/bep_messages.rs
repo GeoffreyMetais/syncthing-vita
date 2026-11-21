@@ -98,6 +98,7 @@ fn sample_request() -> BepRequest {
         offset: 131_072,
         size: 131_072,
         hash: vec![0xAB],
+        weak_hash: 0,
     }
 }
 
@@ -134,6 +135,7 @@ fn request_omits_zero_offset_size_and_empty_hash() {
         offset: 0,
         size: 0,
         hash: Vec::new(),
+        weak_hash: 0,
     };
     // Only id (field 1), folder and name (always written, even when empty) are encoded.
     assert_eq!(req.encode(), vec![0x08, 0x02, 0x12, 0x00, 0x1A, 0x00]);

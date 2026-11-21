@@ -28,6 +28,11 @@ impl IncomingBepStream {
     pub fn peer_device_id(&self) -> DeviceId {
         self.peer_device_id
     }
+
+    /// Consumes this wrapper and returns the underlying authenticated TLS stream.
+    pub fn into_stream(self) -> BepTlsStream {
+        self.stream
+    }
 }
 
 /// Server configuration: our certificate, a mandatory client certificate (recorded in the

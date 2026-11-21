@@ -86,6 +86,7 @@ fn test_listener_and_dialer_sync_a_folder_both_ways() {
             expected_device_id: Some(expected_peer),
             timeout: TIMEOUT,
             control: Some(control),
+            secondary_inbox: None,
         };
         let mut events = Vec::new();
         let result = accept_and_sync(&params, incoming, peer_addr, |e| events.push(e)).unwrap();
@@ -103,6 +104,7 @@ fn test_listener_and_dialer_sync_a_folder_both_ways() {
             expected_device_id: Some(expected_listener),
             timeout: TIMEOUT,
             control: Some(control),
+            secondary_inbox: None,
         };
         connect_and_sync(&params, addr, |_| {}).unwrap()
     });
@@ -182,6 +184,7 @@ fn test_incoming_session_is_refused_when_the_peer_is_not_the_expected_one() {
             expected_device_id: Some(listener_device),
             timeout: TIMEOUT,
             control: None,
+            secondary_inbox: None,
         };
         let _ = connect_and_sync(&params, addr, |_| {});
     });
@@ -196,6 +199,7 @@ fn test_incoming_session_is_refused_when_the_peer_is_not_the_expected_one() {
         expected_device_id: Some(someone_else),
         timeout: TIMEOUT,
         control: None,
+        secondary_inbox: None,
     };
     let err = accept_and_sync(&params, incoming, peer_addr, |_| {}).unwrap_err();
     assert_eq!(err.kind(), std::io::ErrorKind::PermissionDenied);
@@ -280,6 +284,7 @@ fn test_incoming_session_announces_a_single_connection() {
             expected_device_id: Some(expected_dialer),
             timeout: TIMEOUT,
             control: None,
+            secondary_inbox: None,
         };
         let _ = accept_and_sync(&params, incoming, peer_addr, |_| {});
     });

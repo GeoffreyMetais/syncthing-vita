@@ -21,6 +21,7 @@ fn file(name: &str) -> BepFileInfo {
             offset: 0,
             size: 5,
             hash: vec![0xEE; 32],
+            weak_hash: 0,
         }],
     }
 }
@@ -64,16 +65,19 @@ fn index_roundtrip_keeps_sequence_deleted_invalid_and_block_offsets() {
             offset: 0,
             size: 65_536,
             hash: vec![1; 32],
+            weak_hash: 0,
         },
         BepBlockInfo {
             offset: 65_536,
             size: 65_536,
             hash: vec![2; 32],
+            weak_hash: 0,
         },
         BepBlockInfo {
             offset: 131_072,
             size: 9,
             hash: vec![3; 32],
+            weak_hash: 0,
         },
     ];
 

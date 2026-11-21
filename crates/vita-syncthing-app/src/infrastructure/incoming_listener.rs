@@ -18,8 +18,8 @@ use std::thread::{self, JoinHandle};
 
 use syncthing_core::tls::polling::is_socket_timeout_or_would_block;
 use syncthing_core::{
-    accept_and_sync, accept_bep_tls_stream, BepHello, DeviceIdentity, FsSyncStorage, SessionParams,
-    SyncControl, SyncSessionStatus,
+    accept_and_sync, accept_bep_tls_stream, accept_secondary_cluster_config, BepHello,
+    DeviceIdentity, FsSyncStorage, SecondaryInbox, SessionParams, SyncControl, SyncSessionStatus,
 };
 
 use super::peer_endpoints::sleep_interruptible;
@@ -38,6 +38,7 @@ pub struct IncomingListenerContext {
     pub storage: FsSyncStorage,
     pub approved_devices: Vec<KnownDevice>,
     pub claims: Arc<SessionClaims>,
+    pub secondary_inbox: Arc<SecondaryInbox>,
     pub slots: Arc<ConnectionSlots>,
     pub unknown_log: Arc<UnknownDeviceLog>,
     pub control: Arc<SyncControl>,
@@ -193,10 +194,29 @@ fn handle_incoming_tcp(
         return;
     };
 
-    // Release the handshake slot before claiming a long-lived session.
+    // Release the handshake slot before claiming a long-lived session or probing secondary status.
     drop(slot);
 
     let Some(_claim) = ctx.claims.try_claim(peer_id) else {
+        if ctx.secondary_inbox.has_active_session(&peer_id) {
+            let mut tls_stream = stream.into_stream();
+            match accept_secondary_cluster_config(&mut tls_stream, &ctx.hello) {
+                Ok(true) => {
+                    if ctx.secondary_inbox.deliver(&peer_id, tls_stream).is_ok() {
+                        return;
+                    }
+                }
+                Ok(false) => {}
+                Err(e) => {
+                    let _ = ctx.tx.send(WorkerMsg::Log(format!(
+                        "Incoming secondary check from {} ({}) failed: {e}",
+                        kd.name,
+                        peer_addr.ip()
+                    )));
+                    return;
+                }
+            }
+        }
         let _ = ctx.tx.send(WorkerMsg::Log(format!(
             "Ignored duplicate incoming connection from {} ({}).",
             kd.name,
@@ -212,6 +232,7 @@ fn handle_incoming_tcp(
         expected_device_id: Some(peer_id),
         timeout: CONNECT_TIMEOUT,
         control: Some(Arc::clone(&ctx.control)),
+        secondary_inbox: Some(Arc::clone(&ctx.secondary_inbox)),
     };
 
     let result = accept_and_sync(&params, stream, peer_addr, |ev| {

@@ -309,6 +309,7 @@ pub fn run_peer_session_loop(kd: KnownDevice, shared: PeerSessionShared) {
                 expected_device_id: Some(target_id),
                 timeout: CONNECT_TIMEOUT,
                 control: Some(Arc::clone(&control)),
+                secondary_inbox: None,
             };
             let result = match ep {
                 PeerEndpoint::Direct(tcp_addr) => connect_and_sync(&params, tcp_addr, emit),

@@ -2,6 +2,7 @@
 //! `Request` on all streams, applies remote `IndexUpdate`s and rescans local folders.
 
 use std::net::SocketAddr;
+use std::sync::mpsc::Receiver;
 use std::time::{Duration, Instant};
 
 use super::context::SessionContext;
@@ -13,7 +14,8 @@ use super::index_exchange::{rescan_and_publish, retry_incomplete_pulls};
 use super::override_changes::handle_override_requests;
 use super::revert::handle_revert_requests;
 use super::secondary::{
-    open_secondary_bep_stream, ping_all_secondaries, poll_all_secondaries, SecondaryBepConn,
+    attach_inbound_secondaries, open_secondary_bep_stream, ping_all_secondaries,
+    poll_all_secondaries, SecondaryBepConn,
 };
 use crate::bep::{write_bep_message, BepClose, BepMessageType};
 use crate::tls::BepTlsStream;
@@ -27,6 +29,7 @@ pub struct PersistentLinks {
     pub peer_addr: SocketAddr,
     pub secondaries: Vec<SecondaryBepConn>,
     pub desired_secondary: usize,
+    pub inbound_sec_rx: Option<Receiver<BepTlsStream>>,
 }
 
 impl PersistentLinks {
@@ -82,10 +85,15 @@ fn session_loop(
             return Ok(());
         }
 
-        // B. Secondary data connections (`+2`)
+        // B. Attach any newly arrived inbound secondary connections (`ClusterConfig { secondary: true }`)
+        if attach_inbound_secondaries(links.inbound_sec_rx.as_ref(), &mut links.secondaries) {
+            ctx.emit_cycle_completed(links.active_connections());
+        }
+
+        // C. Secondary data connections (`+2`)
         poll_all_secondaries(&mut links.secondaries, ctx);
 
-        // C. Re-open a secondary connection that dropped transiently
+        // D. Re-open a secondary connection that dropped transiently (outbound side)
         if links.secondaries.len() < links.desired_secondary
             && last_secondary_retry.elapsed() >= SECONDARY_RETRY_INTERVAL
         {

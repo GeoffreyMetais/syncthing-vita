@@ -16,6 +16,7 @@ pub mod blocks;
 pub mod download;
 pub mod names;
 pub mod vita_fs;
+pub mod weak_hash;
 
 use std::collections::{HashMap, HashSet};
 use std::path::{Path, PathBuf};

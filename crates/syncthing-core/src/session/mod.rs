@@ -47,6 +47,10 @@ pub use control::SyncControl;
 pub use events::SyncEvent;
 pub use outcome::{PeerHandshakeResult, SyncSessionStatus};
 pub use params::SessionParams;
+pub use secondary::{
+    accept_secondary_cluster_config, SecondaryInbox, SecondaryInboxRegistration,
+    MAX_SECONDARIES_PER_PEER,
+};
 pub use tuning::SyncTuning;
 
 use cluster_exchange::{exchange_cluster_config, ClusterExchange};
@@ -55,7 +59,10 @@ use dispatch::with_context;
 use folders::FolderSyncState;
 use initial_sync::{run_initial_sync, InitialSync};
 use persistent::{run_persistent_session, PersistentLinks};
-use secondary::{desired_secondary_count, open_secondary_bep_stream, SecondaryBepConn};
+use secondary::{
+    attach_inbound_secondaries, desired_secondary_count, open_secondary_bep_stream,
+    SecondaryBepConn,
+};
 
 use std::net::TcpStream;
 
@@ -132,8 +139,10 @@ where
 /// [`crate::tls::accept_bep_tls_stream`] (a TCP listener, or a relay invitation with
 /// `ServerSocket` set). [`SessionParams::expected_device_id`], when set, must match the peer.
 ///
-/// The peer dialed, so it would also open the secondary connections: our `Hello` announces a
-/// single connection so that it opens none, and the whole session runs on `incoming`.
+/// When [`SessionParams::secondary_inbox`] is `Some`, our `Hello` advertises `1+2` connections
+/// (`num_connections >= 3`) and registers the active session in the inbox so secondary
+/// connections dialed by the peer can attach seamlessly. When `None` (e.g. single-stream relays),
+/// our `Hello` announces a single connection so the peer opens none.
 pub fn accept_and_sync<F>(
     params: &SessionParams<'_>,
     incoming: IncomingBepStream,
@@ -153,14 +162,20 @@ where
         }
     }
     let mut hello = params.hello.clone();
-    hello.num_connections = 1;
-    let single_connection = SessionParams {
+    if params.secondary_inbox.is_some() {
+        if hello.num_connections < 3 {
+            hello.num_connections = 3;
+        }
+    } else {
+        hello.num_connections = 1;
+    }
+    let adjusted = SessionParams {
         hello: &hello,
         ..params.clone()
     };
     let observed: ObservedDeviceId = Arc::new(Mutex::new(Some(peer_device_id)));
     run_bep_session(
-        &single_connection,
+        &adjusted,
         incoming.stream,
         observed,
         peer_addr,
@@ -200,12 +215,22 @@ where
         }
     };
 
+    let peer_device_id =
+        observed().ok_or_else(|| io::Error::other("Peer certificate was not observed"))?;
     let mut result = PeerHandshakeResult {
         peer_addr,
-        peer_device_id: observed()
-            .ok_or_else(|| io::Error::other("Peer certificate was not observed"))?,
+        peer_device_id,
         peer_hello: Some(peer_hello.clone()),
         session_status: SyncSessionStatus::AwaitingPairing,
+    };
+
+    // Register in SecondaryInbox (unregistered automatically when `_sec_reg` drops).
+    let (inbound_sec_rx, _sec_reg) = match params.secondary_inbox.as_ref() {
+        Some(inbox) => {
+            let (rx, reg) = inbox.register(peer_device_id);
+            (Some(rx), Some(reg))
+        }
+        None => (None, None),
     };
 
     let mut ctx = SessionContext::new(
@@ -240,6 +265,7 @@ where
     let mut secondaries: Vec<SecondaryBepConn> = (0..desired_secondary)
         .filter_map(|_| open_secondary_bep_stream(&ctx, peer_addr, SECONDARY_OPEN_TIMEOUT).ok())
         .collect();
+    attach_inbound_secondaries(inbound_sec_rx.as_ref(), &mut secondaries);
 
     // 4. Initial download, local index publication and request draining
     let initial = run_initial_sync(
@@ -248,6 +274,7 @@ where
         &mut folders,
         &mut secondaries,
         secondaries_opened_at,
+        inbound_sec_rx.as_ref(),
         control.is_some(),
     )?;
     if let InitialSync::ClosedByPeer(reason) = initial {
@@ -261,6 +288,7 @@ where
             peer_addr,
             secondaries,
             desired_secondary,
+            inbound_sec_rx,
         };
         run_persistent_session(&mut stream, &mut ctx, &mut folders, links, ctrl);
     }

@@ -4,6 +4,7 @@ use std::sync::Arc;
 use std::time::Duration;
 
 use super::control::SyncControl;
+use super::secondary::SecondaryInbox;
 use crate::bep::BepHello;
 use crate::cert::DeviceIdentity;
 use crate::device_id::DeviceId;
@@ -28,4 +29,8 @@ pub struct SessionParams<'a> {
     /// `Some`: the session stays connected until [`SyncControl::request_stop`]. `None`: it
     /// ends after one sync cycle.
     pub control: Option<Arc<SyncControl>>,
+    /// `Some`: registers this session in the shared [`SecondaryInbox`] so inbound secondary
+    /// connections (`ClusterConfig { secondary: true }`) opened by the peer can attach to this
+    /// active primary session (`1+2` mode).
+    pub secondary_inbox: Option<Arc<SecondaryInbox>>,
 }

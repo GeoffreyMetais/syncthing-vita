@@ -13,6 +13,7 @@ pub struct BepRequest {
     pub offset: i64,
     pub size: i32,
     pub hash: Vec<u8>,
+    pub weak_hash: u32,
 }
 
 impl BepRequest {
@@ -30,6 +31,9 @@ impl BepRequest {
         if !self.hash.is_empty() {
             encode_bytes_field(&mut buf, 6, &self.hash);
         }
+        if self.weak_hash != 0 {
+            encode_varint_field(&mut buf, 8, u64::from(self.weak_hash));
+        }
         buf
     }
 
@@ -40,6 +44,7 @@ impl BepRequest {
         let mut offset = 0i64;
         let mut size = 0i32;
         let mut hash = Vec::new();
+        let mut weak_hash = 0u32;
 
         for item in WireIter::new(payload) {
             let (field_num, wire_type, slice) = item?;
@@ -59,6 +64,10 @@ impl BepRequest {
                     size = v as i32;
                 }
                 (6, 2) => hash = slice.to_vec(),
+                (8, 0) => {
+                    let (v, _) = decode_varint(slice)?;
+                    weak_hash = v as u32;
+                }
                 _ => {}
             }
         }
@@ -70,6 +79,7 @@ impl BepRequest {
             offset,
             size,
             hash,
+            weak_hash,
         })
     }
 }
