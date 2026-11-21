@@ -6,6 +6,7 @@ use std::io;
 use std::path::{Path, PathBuf};
 use std::time::{SystemTime, UNIX_EPOCH};
 
+use super::ignore::IgnoreMatcher;
 use super::{mtime_secs, PullPlan};
 use crate::bep::{BepFileInfo, BepVersionCounter};
 use crate::device_id::DeviceId;
@@ -40,11 +41,20 @@ impl FsSyncStorage {
         on_progress: &mut dyn FnMut(),
     ) -> io::Result<PullPlan> {
         let short_id = short_device_id(own_id);
-        // Names that do not designate a plain entry inside the folder are ignored.
-        // Parents before children for creations; children before parents for deletions.
+        let root = self.folder_root(folder_id);
+        let ignore = IgnoreMatcher::load(&root);
+        let send_only = self.is_folder_send_only(folder_id);
+        // Names that do not designate a plain entry inside the folder (or are ignored by
+        // `.stignore`) are skipped. Parents before children for creations; children before parents
+        // for deletions.
         let mut ordered: Vec<&BepFileInfo> = remote
             .iter()
-            .filter(|rf| !rf.invalid && !rf.versions.is_empty() && is_syncable_name(&rf.name))
+            .filter(|rf| {
+                !rf.invalid
+                    && !rf.versions.is_empty()
+                    && is_syncable_name(&rf.name)
+                    && !ignore.is_ignored(&rf.name)
+            })
             .collect();
         ordered.sort_by(|a, b| match (a.deleted, b.deleted) {
             (false, false) => a.name.cmp(&b.name),
@@ -56,6 +66,9 @@ impl FsSyncStorage {
         with_folder_db(&self.db_path(folder_id), folder_id, own_id, |db| {
             self.scan_into_db(folder_id, short_id, db, on_progress)?;
             let mut plan = PullPlan::default();
+            if send_only {
+                return Ok(plan);
+            }
             for rf in ordered {
                 on_progress();
                 self.plan_entry(folder_id, short_id, db, rf, &mut plan);

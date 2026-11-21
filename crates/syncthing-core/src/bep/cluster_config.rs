@@ -46,13 +46,15 @@ pub struct BepFolder {
 
 /// Folder type announced in `ClusterConfig` (BEP `Folder.type`, field 3).
 ///
-/// Only the types the Vita supports locally are modelled. The wire values are Syncthing's
-/// (`SEND_RECEIVE = 0`, `RECEIVE_ONLY = 2`).
+/// Matches Syncthing's `FolderType` enum:
+/// (`SEND_RECEIVE = 0`, `SEND_ONLY = 1`, `RECEIVE_ONLY = 2`).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum FolderType {
     /// Local changes are sent and remote changes are applied (read-write share).
     #[default]
     SendReceive,
+    /// Local changes are sent, remote changes are never applied locally (send-only share).
+    SendOnly,
     /// Remote changes are applied, local changes are never sent (read-only share).
     ReceiveOnly,
 }
@@ -62,6 +64,7 @@ impl FolderType {
     pub fn wire_value(self) -> u64 {
         match self {
             Self::SendReceive => 0,
+            Self::SendOnly => 1,
             Self::ReceiveOnly => 2,
         }
     }

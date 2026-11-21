@@ -52,6 +52,7 @@ pub static STRINGS_FR: Strings = Strings {
     status_paused: "En pause",
     share_mode_read_write: "Lecture & écriture",
     share_mode_read_only: "Lecture seule",
+    share_mode_send_only: "Envoi seul",
 
     // Navigation & Sidebar
     tab_overview: "Aperçu",
@@ -269,8 +270,10 @@ pub static MESSAGES_FR: Messages = Messages {
     share_paused: "Le partage {id} est en pause",
     share_read_only: "Le partage {id} est en lecture seule",
     share_read_write: "Le partage {id} est en lecture & écriture",
+    share_send_only: "Le partage {id} est en envoi seul",
     revert_requested: "Annulation des modifications locales de {id}...",
     local_changes_reverted: "Modifications locales de {id} annulées ({count})",
+    remote_changes_overridden: "Modifications distantes de {id} écrasées ({count})",
     offer_accepted: "Partage « {label} » accepté ({id})",
     choose_where_to_store: "Choisissez où enregistrer « {label} »",
     offer_declined: "Partage « {label} » refusé ({id})",

@@ -38,6 +38,7 @@ pub fn download_folder(
     count_up_to_date: bool,
 ) -> io::Result<bool> {
     if ctx.storage.is_folder_paused(folder_id)
+        || ctx.storage.is_folder_send_only(folder_id)
         || !ctx
             .storage
             .is_folder_shared_with(folder_id, &ctx.peer_device_id)

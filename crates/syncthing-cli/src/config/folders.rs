@@ -3,7 +3,7 @@
 use std::path::PathBuf;
 
 use super::error::ConfigError;
-use super::model::{is_device, parse_device_id, Config, FolderConfig};
+use super::model::{is_device, parse_device_id, Config, ConfigFolderType, FolderConfig};
 
 impl Config {
     /// Adds a folder. Every device must already be configured; the label defaults to the ID.
@@ -14,6 +14,23 @@ impl Config {
         label: Option<String>,
         devices: Vec<String>,
         receive_only: bool,
+    ) -> Result<(), ConfigError> {
+        let folder_type = if receive_only {
+            ConfigFolderType::ReceiveOnly
+        } else {
+            ConfigFolderType::SendReceive
+        };
+        self.add_folder_with_type(id, path, label, devices, folder_type)
+    }
+
+    /// Adds a folder with an explicit [`ConfigFolderType`].
+    pub fn add_folder_with_type(
+        &mut self,
+        id: &str,
+        path: PathBuf,
+        label: Option<String>,
+        devices: Vec<String>,
+        folder_type: ConfigFolderType,
     ) -> Result<(), ConfigError> {
         let id = id.trim();
         if id.is_empty() {
@@ -42,7 +59,8 @@ impl Config {
             label,
             path,
             devices: shared,
-            receive_only,
+            folder_type,
+            receive_only: folder_type == ConfigFolderType::ReceiveOnly,
             paused: false,
         });
         Ok(())

@@ -44,7 +44,7 @@ pub use discovery::{
     DEFAULT_ANNOUNCE_SERVERS, DEFAULT_LOOKUP_SERVER, DISCOVERY_BROADCAST_ADDR, DISCOVERY_MAGIC,
     DISCOVERY_PORT,
 };
-pub use folder_sync::PullPlan;
+pub use folder_sync::{IgnoreMatcher, PullPlan};
 pub use relay::{
     connect_via_relay, fetch_relay_pool, join_relay_session, RelayListener, RelayMessage,
     RelayResponse, SessionInvitation, DEFAULT_RELAY_POOL,

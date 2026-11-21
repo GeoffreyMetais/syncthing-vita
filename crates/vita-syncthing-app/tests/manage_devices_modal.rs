@@ -178,11 +178,13 @@ fn test_select_pauses_and_resumes_the_share() {
 }
 
 #[test]
-fn test_l_switches_between_read_write_and_read_only() {
+fn test_l_switches_between_read_write_read_only_and_send_only() {
     let (dir, repo, mut state) = setup("manage-l");
     assert_eq!(state.shares[0].mode, ShareMode::ReadWrite);
     press(&mut state, &repo, BTN_L);
     assert_eq!(state.shares[0].mode, ShareMode::ReadOnly);
+    press(&mut state, &repo, BTN_L);
+    assert_eq!(state.shares[0].mode, ShareMode::SendOnly);
     press(&mut state, &repo, BTN_L);
     assert_eq!(state.shares[0].mode, ShareMode::ReadWrite);
     let _ = std::fs::remove_dir_all(&dir);

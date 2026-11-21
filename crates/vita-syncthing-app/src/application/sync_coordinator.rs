@@ -280,6 +280,21 @@ impl SyncCoordinator {
                     count: reverted,
                 });
             }
+            SyncEvent::RemoteChangesOverridden { folder, overridden } => {
+                state.transfer_activity += 1;
+                ShareService::log_event(
+                    state,
+                    repo,
+                    &format!(
+                        "[{}] Remote changes overridden ({} entries)",
+                        folder, overridden
+                    ),
+                );
+                state.show_toast(UiText::RemoteChangesOverridden {
+                    id: folder,
+                    count: overridden,
+                });
+            }
             SyncEvent::FileError {
                 folder,
                 name,

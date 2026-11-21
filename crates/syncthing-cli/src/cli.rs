@@ -2,7 +2,7 @@
 
 use std::path::PathBuf;
 
-use clap::{Args, Parser, Subcommand};
+use clap::{Args, Parser, Subcommand, ValueEnum};
 
 /// Command-line Syncthing client (BEP/1.0, LAN discovery, Global Discovery, relays).
 #[derive(Debug, Parser)]
@@ -65,6 +65,14 @@ pub enum DeviceCommand {
     },
 }
 
+/// Folder synchronization mode for `folder add --type`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, ValueEnum)]
+pub enum FolderTypeArg {
+    SendReceive,
+    SendOnly,
+    ReceiveOnly,
+}
+
 #[derive(Debug, Subcommand)]
 pub enum FolderCommand {
     /// Add a shared folder.
@@ -79,7 +87,10 @@ pub enum FolderCommand {
         /// Device to share the folder with; repeatable.
         #[arg(long = "device", value_name = "DEVICE_ID")]
         devices: Vec<String>,
-        /// Receive changes only: local changes are never sent.
+        /// Folder type (`send-receive`, `receive-only`, `send-only`).
+        #[arg(long = "type", value_enum, value_name = "TYPE")]
+        folder_type: Option<FolderTypeArg>,
+        /// Receive changes only: local changes are never sent (alias for `--type receive-only`).
         #[arg(long)]
         receive_only: bool,
     },

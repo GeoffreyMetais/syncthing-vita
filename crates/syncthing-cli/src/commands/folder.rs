@@ -4,8 +4,10 @@ use std::fs;
 use std::io;
 use std::path::Path;
 
-use crate::cli::FolderCommand;
-use crate::config::{load_config, parse_device_id, save_config, Config, FolderConfig};
+use crate::cli::{FolderCommand, FolderTypeArg};
+use crate::config::{
+    load_config, parse_device_id, save_config, Config, ConfigFolderType, FolderConfig,
+};
 
 pub fn run(home: &Path, cmd: FolderCommand) -> io::Result<()> {
     let mut cfg = load_config(home)?;
@@ -15,11 +17,19 @@ pub fn run(home: &Path, cmd: FolderCommand) -> io::Result<()> {
             path,
             label,
             devices,
+            folder_type,
             receive_only,
         } => {
             fs::create_dir_all(&path)?;
             let path = fs::canonicalize(&path)?;
-            cfg.add_folder(&id, path.clone(), label, devices, receive_only)?;
+            let resolved_type = match folder_type {
+                Some(FolderTypeArg::SendReceive) => ConfigFolderType::SendReceive,
+                Some(FolderTypeArg::SendOnly) => ConfigFolderType::SendOnly,
+                Some(FolderTypeArg::ReceiveOnly) => ConfigFolderType::ReceiveOnly,
+                None if receive_only => ConfigFolderType::ReceiveOnly,
+                None => ConfigFolderType::SendReceive,
+            };
+            cfg.add_folder_with_type(&id, path.clone(), label, devices, resolved_type)?;
             save_config(home, &cfg)?;
             println!("Added folder {} at {}", id.trim(), path.display());
         }
@@ -64,8 +74,10 @@ fn print_folders(cfg: &Config) {
 
 fn folder_line(folder: &FolderConfig) -> String {
     let mut line = format!("{}  {}  {}", folder.id, folder.label, folder.path.display());
-    if folder.receive_only {
-        line.push_str("  [receive-only]");
+    match folder.effective_folder_type() {
+        ConfigFolderType::ReceiveOnly => line.push_str("  [receive-only]"),
+        ConfigFolderType::SendOnly => line.push_str("  [send-only]"),
+        ConfigFolderType::SendReceive => {}
     }
     if folder.paused {
         line.push_str("  [paused]");

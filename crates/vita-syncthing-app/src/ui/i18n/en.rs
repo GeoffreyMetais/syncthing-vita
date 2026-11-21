@@ -52,6 +52,7 @@ pub static STRINGS_EN: Strings = Strings {
     status_paused: "Paused",
     share_mode_read_write: "Read & write",
     share_mode_read_only: "Read only",
+    share_mode_send_only: "Send Only",
 
     // Navigation & Sidebar
     tab_overview: "Overview",
@@ -267,8 +268,10 @@ pub static MESSAGES_EN: Messages = Messages {
     share_paused: "Share {id} is now paused",
     share_read_only: "Share {id} is now read only",
     share_read_write: "Share {id} is now read & write",
+    share_send_only: "Share {id} is now send only",
     revert_requested: "Reverting local changes of {id}...",
     local_changes_reverted: "Local changes of {id} reverted ({count})",
+    remote_changes_overridden: "Remote changes of {id} overridden ({count})",
     offer_accepted: "Accepted share '{label}' ({id})",
     choose_where_to_store: "Choose where to store '{label}'",
     offer_declined: "Declined share '{label}' ({id})",

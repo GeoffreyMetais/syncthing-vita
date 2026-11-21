@@ -4,6 +4,7 @@ use std::collections::HashSet;
 use std::fs;
 use std::io;
 
+use super::ignore::IgnoreMatcher;
 use super::mtime_secs;
 use crate::bep::{BepFileInfo, BepIndex, FolderIndexState, FolderType};
 use crate::device_id::DeviceId;
@@ -28,6 +29,7 @@ impl FsSyncStorage {
     ) -> io::Result<()> {
         let root = self.folder_root(folder_id);
         ensure_dir_exists(&root)?;
+        let ignore = IgnoreMatcher::load(&root);
         let mut listing = DiskListing::default();
         collect_files_recursive(&root, "", &mut listing)?;
         if recover_interrupted_commits(&listing.download_backups) {
@@ -44,6 +46,9 @@ impl FsSyncStorage {
         for entry in listing.entries {
             on_progress();
             let name = entry.rel;
+            if ignore.is_ignored(&name) {
+                continue;
+            }
             if entry.kind == DiskEntryKind::Unreadable {
                 unreadable.push(name);
                 continue;

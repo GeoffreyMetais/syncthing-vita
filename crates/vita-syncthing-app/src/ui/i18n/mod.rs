@@ -73,6 +73,8 @@ pub struct Strings {
     pub share_mode_read_write: &'static str,
     /// Mode of a share whose files peers never modify.
     pub share_mode_read_only: &'static str,
+    /// Mode of a share that only sends local changes and never pulls remote ones.
+    pub share_mode_send_only: &'static str,
 
     // Navigation & Sidebar
     pub tab_overview: &'static str,

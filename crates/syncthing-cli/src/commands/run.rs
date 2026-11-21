@@ -58,16 +58,17 @@ pub fn run(home: &Path, args: RunArgs) -> io::Result<()> {
         log("No device configured: add one with `syncthing-cli device add <ID>`");
     }
     for folder in &config.folders {
+        let mode_note = match folder.effective_folder_type() {
+            crate::config::ConfigFolderType::ReceiveOnly => ", receive only",
+            crate::config::ConfigFolderType::SendOnly => ", send only",
+            crate::config::ConfigFolderType::SendReceive => "",
+        };
         log(&format!(
             "Folder {} at {} shared with {} device(s){}{}",
             folder.id,
             folder.path.display(),
             folder.devices.len(),
-            if folder.receive_only {
-                ", receive only"
-            } else {
-                ""
-            },
+            mode_note,
             if folder.paused { ", paused" } else { "" }
         ));
     }

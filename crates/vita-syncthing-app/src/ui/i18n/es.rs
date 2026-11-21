@@ -52,6 +52,7 @@ pub static STRINGS_ES: Strings = Strings {
     status_paused: "En pausa",
     share_mode_read_write: "Lectura y escritura",
     share_mode_read_only: "Solo lectura",
+    share_mode_send_only: "Solo envío",
 
     // Navigation & Sidebar
     tab_overview: "Resumen",
@@ -265,8 +266,10 @@ pub static MESSAGES_ES: Messages = Messages {
     share_paused: "La carpeta {id} está en pausa",
     share_read_only: "La carpeta {id} es ahora de solo lectura",
     share_read_write: "La carpeta {id} es ahora de lectura y escritura",
+    share_send_only: "La carpeta {id} es ahora de solo envío",
     revert_requested: "Revirtiendo los cambios locales de {id}...",
     local_changes_reverted: "Cambios locales de {id} revertidos ({count})",
+    remote_changes_overridden: "Cambios remotos de {id} anulados ({count})",
     offer_accepted: "Carpeta '{label}' aceptada ({id})",
     choose_where_to_store: "Elige dónde guardar '{label}'",
     offer_declined: "Carpeta '{label}' rechazada ({id})",
