@@ -26,6 +26,12 @@ jobs:
       - name: Cache Cargo dependencies and build artifacts
         uses: Swatinem/rust-cache@v2
 
+      - name: Check formatting (cargo fmt)
+        run: cargo fmt --all -- --check
+
+      - name: Run Clippy lints
+        run: cargo clippy --workspace --all-targets
+
       - name: Run all workspace unit and integration tests
         env:
           RUSTFLAGS: "-D warnings"
@@ -90,10 +96,35 @@ jobs:
           path: target/armv7-sony-vita-newlibeabihf/release/SYNCTHING.vpk
           if-no-files-found: error
 
-  e2e-vita3k:
-    name: Vita3K <-> CLI E2E (LAN & Internet)
+  e2e-cli:
+    name: CLI <-> CLI E2E (LAN & Internet)
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 10
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+
+      - name: Install Rust stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+
+      - name: Cache Cargo dependencies and build artifacts
+        uses: Swatinem/rust-cache@v2
+
+      - name: Run CLI <-> CLI E2E (LAN discovery + Global Discovery & Relay)
+        run: ./.agents/skills/syncthing-e2e-validation/scripts/validate.sh --only cli-lan,internet --out target/e2e-cli
+
+      - name: Upload CLI E2E logs
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: cli-e2e-logs
+          path: target/e2e-cli
+          if-no-files-found: ignore
+
+  e2e-vita3k:
+    name: Vita3K <-> CLI E2E (LAN, Internet, Roaming & Inbound)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
     steps:
       - name: Checkout repository
         uses: actions/checkout@v7
@@ -139,6 +170,15 @@ jobs:
       - name: E2E Sync Vita3K <-> CLI (Internet / Global Discovery + Relay)
         run: ./scripts/vita3k_cli_sync.sh 90 target/e2e-vita3k-internet internet
 
+      - name: E2E Sync Vita3K <-> CLI (Internet -> LAN roaming)
+        run: ./scripts/vita3k_cli_sync.sh 90 target/e2e-vita3k-internet-then-lan internet-then-lan
+
+      - name: E2E Sync Vita3K <-> CLI (LAN -> Internet fallback)
+        run: ./scripts/vita3k_cli_sync.sh 90 target/e2e-vita3k-lan-then-internet lan-then-internet
+
+      - name: E2E Inbound TCP 22000 & DeviceOffer (Vita3K <-> CLI)
+        run: ./scripts/vita3k_inbound_e2e.sh all target/e2e-vita3k-inbound
+
       - name: Upload Vita3K E2E logs and screenshots
         if: always()
         uses: actions/upload-artifact@v7
@@ -147,4 +187,7 @@ jobs:
           path: |
             target/e2e-vita3k-lan
             target/e2e-vita3k-internet
+            target/e2e-vita3k-internet-then-lan
+            target/e2e-vita3k-lan-then-internet
+            target/e2e-vita3k-inbound
           if-no-files-found: ignore
