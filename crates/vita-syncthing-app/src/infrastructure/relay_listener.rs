@@ -21,7 +21,7 @@ use syncthing_core::{
     accept_and_sync, accept_bep_tls_stream, connect_and_sync_stream, fetch_relay_pool,
     join_relay_session, resolve_endpoint_uri, BepHello, DeviceId, DeviceIdentity, FsSyncStorage,
     HttpsClient, HttpsServer, PeerEndpoint, RelayListener, SessionInvitation, SessionParams,
-    SyncControl, SyncSessionStatus, DEFAULT_RELAY_POOL,
+    SyncControl, SyncEvent, SyncSessionStatus, DEFAULT_RELAY_POOL,
 };
 
 use super::peer_endpoints::sleep_interruptible;
@@ -400,6 +400,9 @@ fn handle_invitation(
             return;
         };
         accept_and_sync(&params, incoming, relay_addr, |ev| {
+            if let SyncEvent::PeerConnected { peer_device_id, .. } = &ev {
+                ctx.claims.mark_established(peer_device_id);
+            }
             let _ = ctx.tx.send(WorkerMsg::InboundSyncEvent(ev));
         })
     } else {
@@ -408,6 +411,9 @@ fn handle_invitation(
             return;
         };
         connect_and_sync_stream(&params, tcp, relay_addr, |ev| {
+            if let SyncEvent::PeerConnected { peer_device_id, .. } = &ev {
+                ctx.claims.mark_established(peer_device_id);
+            }
             let _ = ctx.tx.send(WorkerMsg::InboundSyncEvent(ev));
         })
     };

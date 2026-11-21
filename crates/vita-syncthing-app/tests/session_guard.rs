@@ -173,3 +173,53 @@ fn unknown_device_log_zero_limit_reports_limit_once() {
     assert_eq!(log.record(id1), UnknownReport::Quiet);
     assert_eq!(log.record(id2), UnknownReport::Quiet);
 }
+
+#[test]
+fn session_claims_distinguish_dialing_from_established_for_global_lookup() {
+    use vita_syncthing_app::domain::KnownDevice;
+    use vita_syncthing_app::infrastructure::peer_endpoints::needs_global_lookup;
+
+    let claims = Arc::new(SessionClaims::new(4));
+    let peer_id = id_from_seed(50);
+    let kd = KnownDevice {
+        device_id: peer_id,
+        name: "Home Server".to_owned(),
+        address: "192.168.1.20:22000".to_owned(),
+    };
+
+    // While a peer session thread is dialing an unreachable LAN address, the claim is held for
+    // deduplication, but the session is not yet established: Global Discovery must still run.
+    let claim = claims.try_claim(peer_id).expect("claim peer_id");
+    assert!(claims.is_claimed(&peer_id));
+    assert_eq!(claims.claimed_ids(), vec![peer_id]);
+    assert!(claims.established_ids().is_empty());
+    assert!(
+        needs_global_lookup(&kd, &claims.established_ids()),
+        "dialing an unreachable LAN IP must not suppress Global Discovery lookup"
+    );
+
+    // Once the TLS + BEP handshake completes (PeerConnected), the session is established and
+    // Global Discovery lookup is no longer needed.
+    claims.mark_established(&peer_id);
+    assert_eq!(claims.established_ids(), vec![peer_id]);
+    assert!(!needs_global_lookup(&kd, &claims.established_ids()));
+
+    // Dropping the claim clears both claimed and established state.
+    drop(claim);
+    assert!(!claims.is_claimed(&peer_id));
+    assert!(claims.established_ids().is_empty());
+    assert!(needs_global_lookup(&kd, &claims.established_ids()));
+}
+
+#[test]
+fn session_claims_mark_established_matches_short_placeholder_and_full_id() {
+    let claims = Arc::new(SessionClaims::new(4));
+    let full_id = id_from_seed(51);
+    let short_id = DeviceId::parse_user_id(&full_id.short()).unwrap();
+
+    let _claim = claims.try_claim(short_id).expect("claim short placeholder");
+    assert!(claims.established_ids().is_empty());
+
+    claims.mark_established(&full_id);
+    assert_eq!(claims.established_ids(), vec![short_id]);
+}

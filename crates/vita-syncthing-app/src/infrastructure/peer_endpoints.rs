@@ -54,8 +54,19 @@ pub fn resolve_configured_addr(addr: &str) -> Vec<SocketAddr> {
         .unwrap_or_default()
 }
 
+fn is_supported_endpoint(ep: &PeerEndpoint) -> bool {
+    if cfg!(target_os = "vita") {
+        match ep {
+            PeerEndpoint::Direct(sock) => sock.is_ipv4(),
+            PeerEndpoint::Relay { addr, .. } => addr.is_ipv4(),
+        }
+    } else {
+        true
+    }
+}
+
 fn push_unique(out: &mut Vec<PeerEndpoint>, ep: PeerEndpoint) {
-    if !out.contains(&ep) {
+    if is_supported_endpoint(&ep) && !out.contains(&ep) {
         out.push(ep);
     }
 }
@@ -132,15 +143,39 @@ pub fn refresh_global_endpoints(
     tx: &Sender<WorkerMsg>,
     last_errors: &mut Vec<(DeviceId, String)>,
 ) {
+    refresh_global_endpoints_with(
+        approved_devices,
+        global,
+        claims,
+        control,
+        tx,
+        last_errors,
+        |id| lookup_global_peer(id, GLOBAL_DISCOVERY_TIMEOUT),
+    );
+}
+
+/// Core implementation of [`refresh_global_endpoints`] with an injectable Global Discovery
+/// resolver for deterministic E2E testing.
+pub fn refresh_global_endpoints_with<F>(
+    approved_devices: &[KnownDevice],
+    global: &SharedGlobalEndpoints,
+    claims: &Arc<SessionClaims>,
+    control: &SyncControl,
+    tx: &Sender<WorkerMsg>,
+    last_errors: &mut Vec<(DeviceId, String)>,
+    mut lookup: F,
+) where
+    F: FnMut(DeviceId) -> std::io::Result<Vec<PeerEndpoint>>,
+{
     for kd in approved_devices {
         if control.is_stop_requested() {
             return;
         }
-        let connected_now = claims.claimed_ids();
+        let connected_now = claims.established_ids();
         if !needs_global_lookup(kd, &connected_now) {
             continue;
         }
-        match lookup_global_peer(kd.device_id, GLOBAL_DISCOVERY_TIMEOUT) {
+        match lookup(kd.device_id) {
             Ok(eps) => {
                 if let Some(slot) = last_errors.iter_mut().find(|(id, _)| *id == kd.device_id) {
                     slot.1.clear();
@@ -299,7 +334,11 @@ pub fn run_peer_session_loop(kd: KnownDevice, shared: PeerSessionShared) {
                 });
             }
             let tx_ev = tx.clone();
+            let claims_ev = Arc::clone(&claims);
             let emit = move |event: SyncEvent| {
+                if let SyncEvent::PeerConnected { peer_device_id, .. } = &event {
+                    claims_ev.mark_established(peer_device_id);
+                }
                 let _ = tx_ev.send(WorkerMsg::SyncEvent(event));
             };
             let params = SessionParams {

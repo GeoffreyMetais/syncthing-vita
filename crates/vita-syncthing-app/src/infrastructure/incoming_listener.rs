@@ -19,7 +19,8 @@ use std::thread::{self, JoinHandle};
 use syncthing_core::tls::polling::is_socket_timeout_or_would_block;
 use syncthing_core::{
     accept_and_sync, accept_bep_tls_stream, accept_secondary_cluster_config, BepHello,
-    DeviceIdentity, FsSyncStorage, SecondaryInbox, SessionParams, SyncControl, SyncSessionStatus,
+    DeviceIdentity, FsSyncStorage, SecondaryInbox, SessionParams, SyncControl, SyncEvent,
+    SyncSessionStatus,
 };
 
 use super::peer_endpoints::sleep_interruptible;
@@ -236,6 +237,9 @@ fn handle_incoming_tcp(
     };
 
     let result = accept_and_sync(&params, stream, peer_addr, |ev| {
+        if let SyncEvent::PeerConnected { peer_device_id, .. } = &ev {
+            ctx.claims.mark_established(peer_device_id);
+        }
         let _ = ctx.tx.send(WorkerMsg::InboundSyncEvent(ev));
     });
 
