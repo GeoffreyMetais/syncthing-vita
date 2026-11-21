@@ -112,10 +112,10 @@ pub(crate) fn collect_files_recursive_with_symlinks(
         if sync_symlinks {
             if let Ok(sym_meta) = fs::symlink_metadata(&path) {
                 if sym_meta.file_type().is_symlink() {
-                    if let Ok(target) = fs::read_link(&path) {
+                    if let Ok(target) = read_link_target(&path) {
                         out.entries.push(DiskEntry {
                             rel,
-                            kind: DiskEntryKind::Symlink(target.to_string_lossy().into_owned()),
+                            kind: DiskEntryKind::Symlink(target),
                         });
                     } else {
                         out.entries.push(DiskEntry {
@@ -153,4 +153,17 @@ pub(crate) fn collect_files_recursive_with_symlinks(
         }
     }
     Ok(())
+}
+
+#[cfg(not(target_env = "newlib"))]
+fn read_link_target(path: &Path) -> io::Result<String> {
+    fs::read_link(path).map(|t| t.to_string_lossy().into_owned())
+}
+
+#[cfg(target_env = "newlib")]
+fn read_link_target(_path: &Path) -> io::Result<String> {
+    Err(io::Error::new(
+        io::ErrorKind::Unsupported,
+        "symbolic links are not supported on this platform",
+    ))
 }

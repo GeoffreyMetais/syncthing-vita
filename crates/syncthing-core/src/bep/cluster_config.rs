@@ -63,6 +63,7 @@ impl Default for BepClusterDevice {
 pub struct BepFolder {
     pub id: String,
     pub label: String,
+    pub folder_type: FolderType,
     pub ignore_permissions: bool,
     pub ignore_delete: bool,
     pub device_ids: Vec<DeviceId>,
@@ -72,7 +73,7 @@ pub struct BepFolder {
 /// Folder type announced in `ClusterConfig` (BEP `Folder.type`, field 3).
 ///
 /// Matches Syncthing's `FolderType` enum:
-/// (`SEND_RECEIVE = 0`, `SEND_ONLY = 1`, `RECEIVE_ONLY = 2`).
+/// (`SEND_RECEIVE = 0`, `SEND_ONLY = 1`, `RECEIVE_ONLY = 2`, `RECEIVE_ENCRYPTED = 3`).
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub enum FolderType {
     /// Local changes are sent and remote changes are applied (read-write share).
@@ -82,6 +83,8 @@ pub enum FolderType {
     SendOnly,
     /// Remote changes are applied, local changes are never sent (read-only share).
     ReceiveOnly,
+    /// Untrusted encrypted folder: stores encrypted blocks and never sends local changes back.
+    ReceiveEncrypted,
 }
 
 impl FolderType {
@@ -91,6 +94,17 @@ impl FolderType {
             Self::SendReceive => 0,
             Self::SendOnly => 1,
             Self::ReceiveOnly => 2,
+            Self::ReceiveEncrypted => 3,
+        }
+    }
+
+    /// Decodes a BEP `Folder.type` wire varint (defaults to `SendReceive` for unknown values).
+    pub fn from_wire(v: u64) -> Self {
+        match v {
+            1 => Self::SendOnly,
+            2 => Self::ReceiveOnly,
+            3 => Self::ReceiveEncrypted,
+            _ => Self::SendReceive,
         }
     }
 }
@@ -184,6 +198,7 @@ impl BepClusterConfig {
     fn decode_folder(bytes: &[u8]) -> io::Result<BepFolder> {
         let mut id = String::new();
         let mut label = String::new();
+        let mut folder_type = FolderType::SendReceive;
         let mut ignore_permissions = false;
         let mut ignore_delete = false;
         let mut device_ids = Vec::new();
@@ -194,6 +209,10 @@ impl BepClusterConfig {
             match (field_num, wire_type) {
                 (1, 2) => id = String::from_utf8_lossy(data).into_owned(),
                 (2, 2) => label = String::from_utf8_lossy(data).into_owned(),
+                (3, 0) => {
+                    let (v, _) = decode_varint(data)?;
+                    folder_type = FolderType::from_wire(v);
+                }
                 (4, 0) => {
                     let (v, _) = decode_varint(data)?;
                     ignore_permissions = v != 0;
@@ -215,6 +234,7 @@ impl BepClusterConfig {
         Ok(BepFolder {
             id,
             label,
+            folder_type,
             ignore_permissions,
             ignore_delete,
             device_ids,
@@ -406,6 +426,9 @@ impl BepClusterConfig {
             encode_bytes_field(&mut folder_buf, 1, folder.id.as_bytes());
             if !folder.label.is_empty() {
                 encode_bytes_field(&mut folder_buf, 2, folder.label.as_bytes());
+            }
+            if folder.folder_type != FolderType::SendReceive {
+                encode_varint_field(&mut folder_buf, 3, folder.folder_type.wire_value());
             }
             if folder.ignore_permissions {
                 encode_varint_field(&mut folder_buf, 4, 1);

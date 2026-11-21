@@ -120,6 +120,17 @@ impl FsSyncStorage {
         let _ = file.sync_all();
         drop(file);
         let backup = self.download_backup_path(folder_id, rel_path);
+        let versioning = self.folder_versioning(folder_id);
+        if versioning != super::versioning::FileVersioning::None && full.is_file() {
+            // Copy to backup first so crash-safe replacement still works if archiving fails,
+            // or archive the previous file directly after staging the temp file.
+            let _ = super::versioning::archive_file(
+                &self.folder_root(folder_id),
+                rel_path,
+                &full,
+                versioning,
+            );
+        }
         replace_file(&tmp, &full, &backup)
             .map_err(|e| io::Error::new(e.kind(), format!("replace {}: {e}", full.display())))
     }

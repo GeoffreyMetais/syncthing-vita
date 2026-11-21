@@ -8,5 +8,7 @@ mod options;
 mod store;
 
 pub use error::ConfigError;
-pub use model::{parse_device_id, Config, ConfigFolderType, DeviceConfig, FolderConfig};
+pub use model::{
+    parse_device_id, Config, ConfigFolderType, DeviceConfig, FolderConfig, FolderVersioningConfig,
+};
 pub use store::{load_config, save_config};
