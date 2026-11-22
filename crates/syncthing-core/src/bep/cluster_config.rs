@@ -43,7 +43,6 @@ pub struct BepClusterDevice {
     pub name: String,
     pub compression: BepDeviceCompression,
     pub introducer: bool,
-    pub max_request_kib: i32,
 }
 
 impl Default for BepClusterDevice {
@@ -53,7 +52,6 @@ impl Default for BepClusterDevice {
             name: String::new(),
             compression: BepDeviceCompression::default(),
             introducer: false,
-            max_request_kib: 0,
         }
     }
 }
@@ -247,7 +245,6 @@ impl BepClusterConfig {
         let mut name = String::new();
         let mut compression = BepDeviceCompression::Metadata;
         let mut introducer = false;
-        let mut max_request_kib = 0i32;
 
         for dev_item in WireIter::new(bytes) {
             let (df, dw, ddata) = dev_item?;
@@ -262,22 +259,11 @@ impl BepClusterConfig {
                     let (v, _) = decode_varint(ddata)?;
                     compression = BepDeviceCompression::from_wire(v);
                 }
-                (6, 0) => {
-                    let (v, _) = decode_varint(ddata)?;
-                    // Field 6 is `introducer` (bool: 0/1) in the extended Device schema when sent
-                    // as bool, or `max_sequence` (int64) in legacy BEP v1.
-                    introducer = v != 0;
-                }
+                // Syncthing BEP v1 `Device` schema: field 6 is `int64 max_sequence`, field 7 is
+                // `bool introducer`, and field 10 is `bytes encryption_password_token`.
                 (7, 0) => {
                     let (v, _) = decode_varint(ddata)?;
-                    // Syncthing BEP v1 spec defines `bool introducer = 7`.
-                    if v != 0 {
-                        introducer = true;
-                    }
-                }
-                (10, 0) => {
-                    let (v, _) = decode_varint(ddata)?;
-                    max_request_kib = v as i32;
+                    introducer = v != 0;
                 }
                 _ => {}
             }
@@ -288,7 +274,6 @@ impl BepClusterConfig {
             name,
             compression,
             introducer,
-            max_request_kib,
         }))
     }
 
@@ -381,8 +366,7 @@ impl BepClusterConfig {
                     dev.id,
                     &dev.name,
                     dev_comp,
-                    dev.introducer,
-                    dev.max_request_kib,
+                    if is_peer { false } else { dev.introducer },
                 );
             }
             for &id in &folder.device_ids {
@@ -404,11 +388,10 @@ impl BepClusterConfig {
                         BepDeviceCompression::Metadata
                     },
                     false,
-                    0,
                 );
             }
             if !peer_encoded {
-                encode_device_entry(&mut folder_buf, peer_id, "", compression, false, 0);
+                encode_device_entry(&mut folder_buf, peer_id, "", compression, false);
             }
 
             encode_bytes_field(&mut out, 1, &folder_buf);
@@ -417,8 +400,8 @@ impl BepClusterConfig {
         out
     }
 
-    /// Encodes a [`BepClusterConfig`] struct directly (preserving folder flags and full
-    /// [`BepClusterDevice`] metadata such as `introducer` and `max_request_kib`).
+    /// Encodes a [`BepClusterConfig`] struct directly (preserving folder flags and
+    /// [`BepClusterDevice`] metadata such as `introducer`).
     pub fn encode(&self) -> Vec<u8> {
         let mut out = Vec::new();
         for folder in &self.folders {
@@ -443,7 +426,6 @@ impl BepClusterConfig {
                     &dev.name,
                     dev.compression,
                     dev.introducer,
-                    dev.max_request_kib,
                 );
             }
             for &id in &folder.device_ids {
@@ -454,7 +436,6 @@ impl BepClusterConfig {
                         "",
                         BepDeviceCompression::Metadata,
                         false,
-                        0,
                     );
                 }
             }
@@ -473,7 +454,6 @@ fn encode_device_entry(
     name: &str,
     compression: BepDeviceCompression,
     introducer: bool,
-    max_request_kib: i32,
 ) {
     let mut dev_buf = Vec::new();
     encode_bytes_field(&mut dev_buf, 1, &id.0);
@@ -485,10 +465,7 @@ fn encode_device_entry(
         encode_varint_field(&mut dev_buf, 4, compression.wire_value());
     }
     if introducer {
-        encode_varint_field(&mut dev_buf, 6, 1);
-    }
-    if max_request_kib != 0 {
-        encode_varint_field(&mut dev_buf, 10, max_request_kib as i64 as u64);
+        encode_varint_field(&mut dev_buf, 7, 1);
     }
     encode_bytes_field(folder_buf, 16, &dev_buf);
 }

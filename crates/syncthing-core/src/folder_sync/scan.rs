@@ -251,6 +251,28 @@ impl FsSyncStorage {
         )
     }
 
+    /// Returns the persisted `(index_id, max_sequence)` state of `folder_id` directly from
+    /// its folder database without scanning or hashing files on disk.
+    pub fn folder_index_state(&self, folder_id: &str, own_id: DeviceId) -> FolderIndexState {
+        let folder_type = self.folder_type(folder_id);
+        if self.is_folder_paused(folder_id) {
+            return FolderIndexState {
+                index_id: 0,
+                max_sequence: 0,
+                paused: true,
+                folder_type,
+            };
+        }
+        with_folder_db(&self.db_path(folder_id), folder_id, own_id, |db| {
+            FolderIndexState {
+                index_id: db.index_id,
+                max_sequence: db.max_sequence,
+                paused: false,
+                folder_type,
+            }
+        })
+    }
+
     /// Scans the local folder and returns the Vita's `Index` for it (files, directories and
     /// deletions with persistent version vectors and sequence numbers).
     pub fn build_local_index(

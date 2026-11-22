@@ -189,8 +189,10 @@ stage_vita3k() {
         result vita3k FAIL "($(grep -c '^FAIL' "$OUT/vita3k.log") outbound check(s) failed, see vita3k.log)"
     elif ! ./scripts/vita3k_inbound_e2e.sh all "$OUT/vita3k-inbound" > "$OUT/vita3k-inbound.log" 2>&1; then
         result vita3k FAIL "($(grep -c '^FAIL' "$OUT/vita3k-inbound.log") inbound check(s) failed, see vita3k-inbound.log)"
+    elif ! ./scripts/vita3k_connection_lifecycle.sh "$OUT/vita3k-lifecycle" > "$OUT/vita3k-lifecycle.log" 2>&1; then
+        result vita3k FAIL "($(grep -c '^FAIL' "$OUT/vita3k-lifecycle.log") lifecycle check(s) failed, see vita3k-lifecycle.log)"
     else
-        result vita3k PASS "(Vita <-> CLI outbound + inbound + DeviceOffer E2E passed; screenshots in vita3k/ and vita3k-inbound/)"
+        result vita3k PASS "(Vita <-> CLI outbound + inbound + DeviceOffer + lifecycle E2E passed; screenshots in vita3k/, vita3k-inbound/ and vita3k-lifecycle/)"
     fi
     echo "    note: target/.../SYNCTHING.vpk now contains the ui-script feature: rebuild with \`just vpk\` before any release"
 }

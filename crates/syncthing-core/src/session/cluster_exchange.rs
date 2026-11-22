@@ -8,7 +8,6 @@ use std::time::{Duration, Instant};
 use super::context::SessionContext;
 use super::events::SyncEvent;
 use super::folders::FolderSyncState;
-use super::index_exchange::scan_local_index;
 use super::upload::serve_block_request;
 use crate::bep::{
     write_bep_message, BepClose, BepClusterConfig, BepFolder, BepHello, BepIndex, BepMessageType,
@@ -19,6 +18,11 @@ use crate::tls::BepTlsStream;
 
 /// Total time allowed for the initial exchange.
 const EXCHANGE_WINDOW: Duration = Duration::from_secs(4);
+/// On an inbound session, wait this long for the dialing peer's `ClusterConfig` before
+/// announcing our configured folders first (handles `syncthing-core` dialers that wait for
+/// the server's `ClusterConfig`, without delaying real Syncthing servers that send theirs
+/// immediately after `Hello`).
+const SERVER_AWAIT_PEER_CONFIG: Duration = Duration::from_millis(400);
 /// Poll timeout while waiting for the peer's `ClusterConfig`.
 const AWAIT_CONFIG_POLL: Duration = Duration::from_millis(1600);
 /// Poll timeout while collecting initial `Index` messages.
@@ -43,23 +47,33 @@ pub fn exchange_cluster_config(
     peer_hello: &BepHello,
 ) -> io::Result<ClusterExchange> {
     let mut got_cluster_config = false;
-    // The dialer waits for our `ClusterConfig` when it is a peer like us (it answers the one it
-    // receives): when the peer connected to us, we announce our folders first.
-    let mut announced: Option<Vec<String>> = None;
-    if stream.is_server() {
-        add_local_folders_shared_with_peer(ctx, folders);
-        announced = Some(send_cluster_config(stream, ctx, folders)?);
-    }
+    let mut sent_cluster_config = false;
     let start = Instant::now();
 
     while start.elapsed() < EXCHANGE_WINDOW {
         let poll_timeout = if got_cluster_config {
             AWAIT_INDEX_POLL
+        } else if stream.is_server() && !sent_cluster_config {
+            SERVER_AWAIT_PEER_CONFIG
+                .saturating_sub(start.elapsed())
+                .max(Duration::from_millis(1))
         } else {
             AWAIT_CONFIG_POLL
         };
         match try_read_bep_message(stream, poll_timeout) {
-            Ok(None) => break,
+            Ok(None) => {
+                if stream.is_server() && !got_cluster_config && !sent_cluster_config {
+                    for f in ctx.storage.configured_folders_for_peer(&ctx.peer_device_id) {
+                        if !folders.is_shared_folder(&f.id) {
+                            folders.shared_folders.push(f);
+                        }
+                    }
+                    send_cluster_config(stream, ctx, folders)?;
+                    sent_cluster_config = true;
+                } else {
+                    break;
+                }
+            }
             Ok(Some((BepMessageType::ClusterConfig, payload))) => {
                 let cfg = BepClusterConfig::decode(&payload)?;
                 if cfg.secondary {
@@ -78,8 +92,9 @@ pub fn exchange_cluster_config(
                     });
                 }
                 accept_peer_cluster_config(ctx, folders, cfg);
-                if announced.as_deref() != Some(&shared_folder_ids(folders)) {
-                    announced = Some(send_cluster_config(stream, ctx, folders)?);
+                if !sent_cluster_config {
+                    send_cluster_config(stream, ctx, folders)?;
+                    sent_cluster_config = true;
                 }
             }
             Ok(Some((BepMessageType::Index | BepMessageType::IndexUpdate, payload))) => {
@@ -99,7 +114,12 @@ pub fn exchange_cluster_config(
                 return Ok(ClusterExchange::ClosedByPeer(close.reason));
             }
             Ok(Some(_)) => {}
-            Err(_) => break,
+            Err(e) => {
+                if got_cluster_config {
+                    return Err(e);
+                }
+                break;
+            }
         }
     }
 
@@ -125,8 +145,14 @@ fn accept_peer_cluster_config(
         .filter(|f| ctx.storage.is_folder_shared_with(&f.id, &peer_device_id))
         .cloned()
         .collect();
-    folders.peer_folder_ids = accepted.iter().map(|f| f.id.clone()).collect();
-    folders.shared_folders = accepted;
+    for folder in accepted {
+        if !folders.peer_folder_ids.iter().any(|id| id == &folder.id) {
+            folders.peer_folder_ids.push(folder.id.clone());
+        }
+        if !folders.is_shared_folder(&folder.id) {
+            folders.shared_folders.push(folder);
+        }
+    }
     emit_introduced_devices(ctx, &cfg.folders);
     ctx.emit(SyncEvent::ClusterConfigReceived {
         peer_device_id,
@@ -195,65 +221,33 @@ fn add_local_folders_shared_with_peer(ctx: &SessionContext<'_>, folders: &mut Fo
     }
 }
 
-/// The session's shared folder IDs, sorted (the announced set, whatever its order).
-fn shared_folder_ids(folders: &FolderSyncState) -> Vec<String> {
-    let mut ids: Vec<String> = folders
-        .shared_folders
-        .iter()
-        .map(|f| f.id.clone())
-        .collect();
-    ids.sort();
-    ids
-}
-
-/// Sends our `ClusterConfig` for the session's shared folders; returns the folder IDs announced.
+/// Sends our `ClusterConfig` for the session's shared folders.
 fn send_cluster_config(
     stream: &mut BepTlsStream,
     ctx: &mut SessionContext<'_>,
     folders: &FolderSyncState,
-) -> io::Result<Vec<String>> {
-    let states = initial_folder_states(stream, ctx, folders);
+) -> io::Result<()> {
+    let states = initial_folder_states(ctx, folders);
     let config = BepClusterConfig::encode_for_peers(
         &states,
         ctx.own_id(),
         &ctx.hello.device_name,
         ctx.peer_device_id,
     );
-    write_bep_message(stream, BepMessageType::ClusterConfig, &config)?;
-    Ok(shared_folder_ids(folders))
+    write_bep_message(stream, BepMessageType::ClusterConfig, &config)
 }
 
-/// Local index state of each shared folder, so our single `ClusterConfig` advertises accurate
-/// `index_id` and `max_sequence` values.
+/// Local index state of each shared folder from the persisted database, so our single
+/// `ClusterConfig` advertises accurate `index_id` and `max_sequence` values immediately without
+/// running a full disk scan or sending keepalive `Ping`s while the peer is still in `stateInitial`.
 fn initial_folder_states(
-    stream: &mut BepTlsStream,
-    ctx: &mut SessionContext<'_>,
+    ctx: &SessionContext<'_>,
     folders: &FolderSyncState,
 ) -> Vec<(BepFolder, FolderIndexState)> {
+    let own_id = ctx.own_id();
     folders
         .shared_folders
         .iter()
-        .map(|f| {
-            let folder_type = ctx.storage.folder_type(&f.id);
-            let state = if ctx.storage.is_folder_paused(&f.id) {
-                FolderIndexState {
-                    index_id: 0,
-                    max_sequence: 0,
-                    paused: true,
-                    folder_type,
-                }
-            } else {
-                scan_local_index(stream, ctx, folders, &f.id)
-                    .map(|(_, st)| st)
-                    .unwrap_or_default()
-            };
-            (
-                f.clone(),
-                FolderIndexState {
-                    folder_type,
-                    ..state
-                },
-            )
-        })
+        .map(|f| (f.clone(), ctx.storage.folder_index_state(&f.id, own_id)))
         .collect()
 }

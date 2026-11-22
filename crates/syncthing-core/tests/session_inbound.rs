@@ -11,9 +11,10 @@ use std::time::{Duration, Instant};
 
 use syncthing_core::tls::client::open_bep_tls_stream;
 use syncthing_core::{
-    accept_and_sync, accept_bep_tls_stream, connect_and_sync, BepFolder, BepHello, DeviceId,
-    DeviceIdentity, FsSyncStorage, SessionParams, SyncControl, SyncEvent, SyncSessionStatus,
-    SyncTuning,
+    accept_and_sync, accept_bep_tls_stream, connect_and_sync, connect_and_sync_stream,
+    read_bep_message, write_bep_message, BepClusterConfig, BepFolder, BepHello, BepIndex,
+    BepMessageType, DeviceId, DeviceIdentity, FolderIndexState, FsSyncStorage, SessionParams,
+    SyncControl, SyncEvent, SyncSessionStatus, SyncTuning,
 };
 
 const TIMEOUT: Duration = Duration::from_secs(4);
@@ -298,4 +299,245 @@ fn test_incoming_session_announces_a_single_connection() {
     assert_eq!(peer_hello.num_connections, 1);
     drop(stream);
     listener.join().unwrap();
+}
+
+#[test]
+fn test_inbound_accepts_immediate_peer_cluster_config_with_single_reply() {
+    let listener_dir = common::fresh_temp_dir("inbound_immediate_cfg_srv");
+    let listener_id = DeviceIdentity::from_seed(&[28u8; 32]).unwrap();
+    let dialer_id = DeviceIdentity::from_seed(&[29u8; 32]).unwrap();
+
+    // Server storage ONLY has `set_folder_devices` (no `add_local_folder`, matching `vita-syncthing-app`).
+    let data = listener_dir.join("data");
+    std::fs::create_dir_all(&data).unwrap();
+    std::fs::write(data.join("vita.txt"), b"from vita").unwrap();
+    let mut listener_storage = FsSyncStorage::new(listener_dir.join("db"));
+    listener_storage.set_folder_path(FOLDER, &data);
+    listener_storage.set_folder_devices(FOLDER, vec![dialer_id.device_id]);
+
+    let tcp_listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let addr = tcp_listener.local_addr().unwrap();
+    let expected_dialer = dialer_id.device_id;
+    let accept_thread = thread::spawn(move || {
+        let (tcp, peer_addr) = tcp_listener.accept().unwrap();
+        let incoming = accept_bep_tls_stream(&listener_id, tcp, TIMEOUT).unwrap();
+        let hello = BepHello::new("vita-listener", "test", "1");
+        let params = SessionParams {
+            identity: &listener_id,
+            hello: &hello,
+            storage: &listener_storage,
+            expected_device_id: Some(expected_dialer),
+            timeout: TIMEOUT,
+            control: None,
+            secondary_inbox: None,
+        };
+        accept_and_sync(&params, incoming, peer_addr, |_| {}).unwrap()
+    });
+
+    let listener_dev = DeviceIdentity::from_seed(&[28u8; 32]).unwrap().device_id;
+    let (mut stream, _) =
+        open_bep_tls_stream(&dialer_id, addr, Some(listener_dev), TIMEOUT).unwrap();
+    let _ = BepHello::new("syncthing-dialer", "syncthing", "v2.0.0")
+        .exchange(&mut stream)
+        .unwrap();
+
+    // Immediately send ClusterConfig (like a real Syncthing server dialing the PS Vita).
+    let cfg_payload = BepClusterConfig::encode_for_peers(
+        &[(
+            BepFolder {
+                id: FOLDER.to_owned(),
+                label: FOLDER.to_owned(),
+                device_ids: vec![dialer_id.device_id, listener_dev],
+                ..Default::default()
+            },
+            FolderIndexState::default(),
+        )],
+        dialer_id.device_id,
+        "syncthing-dialer",
+        listener_dev,
+    );
+    write_bep_message(&mut stream, BepMessageType::ClusterConfig, &cfg_payload).unwrap();
+
+    // Server must reply with exactly one ClusterConfig containing `FOLDER` (not empty).
+    let (msg_type, payload) = read_bep_message(&mut stream).unwrap();
+    assert_eq!(msg_type, BepMessageType::ClusterConfig);
+    let reply = BepClusterConfig::decode(&payload).unwrap();
+    let reply_ids: Vec<&str> = reply.folders.iter().map(|f| f.id.as_str()).collect();
+    assert_eq!(reply_ids, vec![FOLDER]);
+
+    // Send an empty Index and drain messages until the server's Index arrives; ensure no second
+    // ClusterConfig is ever sent.
+    let empty_index = BepIndex {
+        folder: FOLDER.to_owned(),
+        files: Vec::new(),
+    };
+    write_bep_message(&mut stream, BepMessageType::Index, &empty_index.encode()).unwrap();
+
+    let mut cluster_configs_seen = 1usize;
+    let mut index_seen = false;
+    stream.get_mut().set_read_timeout(Some(TIMEOUT)).unwrap();
+    while !index_seen {
+        match read_bep_message(&mut stream) {
+            Ok((BepMessageType::ClusterConfig, _)) => cluster_configs_seen += 1,
+            Ok((BepMessageType::Index, idx_payload)) => {
+                let idx = BepIndex::decode(&idx_payload).unwrap();
+                assert_eq!(idx.folder, FOLDER);
+                index_seen = true;
+            }
+            Ok(_) => {}
+            Err(e) => panic!("unexpected read error before Index: {e}"),
+        }
+    }
+    assert_eq!(
+        cluster_configs_seen, 1,
+        "must never send a second ClusterConfig"
+    );
+    drop(stream);
+
+    let result = accept_thread.join().unwrap();
+    assert!(
+        matches!(result.session_status, SyncSessionStatus::Active { .. }),
+        "expected Active session, got {:?}",
+        result.session_status
+    );
+}
+
+#[test]
+fn test_inbound_server_fallback_announces_configured_folder_and_label() {
+    let listener_dir = common::fresh_temp_dir("inbound_fallback_srv");
+    let dialer_dir = common::fresh_temp_dir("inbound_fallback_cli");
+    let listener_id = DeviceIdentity::from_seed(&[30u8; 32]).unwrap();
+    let dialer_id = DeviceIdentity::from_seed(&[31u8; 32]).unwrap();
+
+    // Server storage ONLY has `set_folder_devices` + `set_folder_label` (no `add_local_folder`).
+    let srv_data = listener_dir.join("data");
+    std::fs::create_dir_all(&srv_data).unwrap();
+    std::fs::write(srv_data.join("from_srv.txt"), b"hello from server").unwrap();
+    let mut listener_storage = FsSyncStorage::new(listener_dir.join("db"));
+    listener_storage.set_folder_path(FOLDER, &srv_data);
+    listener_storage.set_folder_devices(FOLDER, vec![dialer_id.device_id]);
+    listener_storage.set_folder_label(FOLDER, "Vita Saves");
+
+    let cli_data = dialer_dir.join("data");
+    std::fs::create_dir_all(&cli_data).unwrap();
+    std::fs::write(cli_data.join("from_cli.txt"), b"hello from dialer").unwrap();
+    let mut dialer_storage = FsSyncStorage::new(dialer_dir.join("db"));
+    dialer_storage.set_folder_path(FOLDER, &cli_data);
+    dialer_storage.set_folder_devices(FOLDER, vec![listener_id.device_id]);
+
+    let tcp_listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let addr = tcp_listener.local_addr().unwrap();
+    let expected_dialer = dialer_id.device_id;
+    let listener_control = fast_control();
+    let srv_ctrl = Arc::clone(&listener_control);
+    let accept_thread = thread::spawn(move || {
+        let (tcp, peer_addr) = tcp_listener.accept().unwrap();
+        let incoming = accept_bep_tls_stream(&listener_id, tcp, TIMEOUT).unwrap();
+        let hello = BepHello::new("vita-listener", "test", "1");
+        let params = SessionParams {
+            identity: &listener_id,
+            hello: &hello,
+            storage: &listener_storage,
+            expected_device_id: Some(expected_dialer),
+            timeout: TIMEOUT,
+            control: Some(srv_ctrl),
+            secondary_inbox: None,
+        };
+        accept_and_sync(&params, incoming, peer_addr, |_| {}).unwrap()
+    });
+
+    let expected_listener = DeviceIdentity::from_seed(&[30u8; 32]).unwrap().device_id;
+    let dialer_control = fast_control();
+    let cli_ctrl = Arc::clone(&dialer_control);
+    let dialer_thread = thread::spawn(move || {
+        let hello = BepHello::new("syncthing-core-dialer", "test", "1");
+        let params = SessionParams {
+            identity: &dialer_id,
+            hello: &hello,
+            storage: &dialer_storage,
+            expected_device_id: Some(expected_listener),
+            timeout: TIMEOUT,
+            control: Some(cli_ctrl),
+            secondary_inbox: None,
+        };
+        let mut events = Vec::new();
+        let res = connect_and_sync(&params, addr, |e| events.push(e)).unwrap();
+        (res, events)
+    });
+
+    assert!(
+        wait_for_file(
+            &srv_data.join("from_cli.txt"),
+            b"hello from dialer",
+            Duration::from_secs(10)
+        ),
+        "server did not receive dialer's file"
+    );
+    assert!(
+        wait_for_file(
+            &cli_data.join("from_srv.txt"),
+            b"hello from server",
+            Duration::from_secs(10)
+        ),
+        "dialer did not receive server's file"
+    );
+
+    listener_control.request_stop();
+    let srv_res = accept_thread.join().unwrap();
+    assert!(matches!(
+        srv_res.session_status,
+        SyncSessionStatus::Active { .. }
+    ));
+    let (_, dialer_events) = dialer_thread.join().unwrap();
+
+    let cfgs: Vec<&Vec<BepFolder>> = dialer_events
+        .iter()
+        .filter_map(|e| match e {
+            SyncEvent::ClusterConfigReceived { folders, .. } => Some(folders),
+            _ => None,
+        })
+        .collect();
+    assert_eq!(cfgs.len(), 1, "server must send exactly 1 ClusterConfig");
+    assert_eq!(cfgs[0].len(), 1);
+    assert_eq!(cfgs[0][0].id, FOLDER);
+    assert_eq!(cfgs[0][0].label, "Vita Saves");
+}
+
+#[test]
+fn test_connect_and_sync_stream_announces_single_connection_in_hello() {
+    let listener_id = DeviceIdentity::from_seed(&[32u8; 32]).unwrap();
+    let dialer_id = DeviceIdentity::from_seed(&[33u8; 32]).unwrap();
+    let tcp_listener = TcpListener::bind("127.0.0.1:0").unwrap();
+    let addr = tcp_listener.local_addr().unwrap();
+
+    let listener = thread::spawn(move || {
+        let (tcp, _) = tcp_listener.accept().unwrap();
+        let incoming = accept_bep_tls_stream(&listener_id, tcp, TIMEOUT).unwrap();
+        let mut stream = incoming.into_stream();
+        let peer_hello = BepHello::new("relay-peer", "test", "1")
+            .exchange(&mut stream)
+            .unwrap();
+        drop(stream);
+        peer_hello.num_connections
+    });
+
+    let tcp = std::net::TcpStream::connect(addr).unwrap();
+    let storage = FsSyncStorage::new(common::fresh_temp_dir("stream_hello_single"));
+    let mut hello = BepHello::new("vita", "test", "1");
+    hello.num_connections = 3;
+    let params = SessionParams {
+        identity: &dialer_id,
+        hello: &hello,
+        storage: &storage,
+        expected_device_id: Some(DeviceIdentity::from_seed(&[32u8; 32]).unwrap().device_id),
+        timeout: TIMEOUT,
+        control: None,
+        secondary_inbox: None,
+    };
+    let res = connect_and_sync_stream(&params, tcp, addr, |_| {}).unwrap();
+    assert!(matches!(
+        res.session_status,
+        SyncSessionStatus::AwaitingPairing
+    ));
+    assert_eq!(listener.join().unwrap(), 1);
 }

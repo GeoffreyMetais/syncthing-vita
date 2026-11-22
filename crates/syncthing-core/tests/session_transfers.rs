@@ -36,7 +36,7 @@ fn test_up_to_date_files_and_downloaded_bytes_are_counted() {
         conn.wait_for(BepMessageType::ClusterConfig, Duration::from_secs(5))
             .expect("ClusterConfig reply");
         conn.send_index("saves", vec![same, new], false);
-        conn.serve_until_idle(Duration::from_millis(800));
+        conn.serve_until_idle(Duration::from_millis(1500));
     });
 
     let mut storage = FsSyncStorage::new(common::fresh_temp_dir("transfers_counters"));
@@ -263,7 +263,7 @@ fn test_blocks_already_held_locally_are_kept_and_only_the_others_are_fetched() {
         conn.wait_for(BepMessageType::ClusterConfig, Duration::from_secs(5))
             .expect("ClusterConfig reply");
         conn.send_index("saves", vec![file], false);
-        conn.serve_until_idle(Duration::from_millis(800));
+        conn.serve_until_idle(Duration::from_millis(1500));
     });
 
     let mut storage = FsSyncStorage::new(common::fresh_temp_dir("transfers_partial_blocks"));
