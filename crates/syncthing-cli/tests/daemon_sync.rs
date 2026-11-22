@@ -252,3 +252,63 @@ fn receive_only_folder_receives_but_never_sends_local_files() {
     );
     wait_for_file(&b.dir("b-docs/b-only.txt"), "bob's local file", WAIT);
 }
+
+#[test]
+fn peer_appears_connected_during_first_sync_on_cli_side() {
+    let a = Node::new("sync-conn-first-a");
+    let b = Node::new("sync-conn-first-b");
+    // Multi-block payloads on both sides so the initial sync performs real block transfers
+    // in both directions before completing.
+    let server_payload = vec![0x5Au8; 4 * 1024 * 1024];
+    let peer_payload = vec![0xA5u8; 1024 * 1024];
+    std::fs::create_dir_all(a.dir("a-docs")).expect("create a-docs");
+    std::fs::create_dir_all(b.dir("b-docs")).expect("create b-docs");
+    std::fs::write(a.dir("a-docs/server_blob.bin"), &server_payload).expect("write server blob");
+    std::fs::write(b.dir("b-docs/peer_blob.bin"), &peer_payload).expect("write peer blob");
+    pair(&a, &b, false);
+
+    let alice_daemon = start_listening(&a, &["--exit-after", "90"]);
+    let mut bob_daemon = spawn_dialer(&b, &["--exit-when-synced", "--exit-after", "90"]);
+
+    // On the CLI/server side, the peer must be reported connected as soon as ClusterConfig
+    // completes, before the first sync finishes transferring files.
+    alice_daemon.wait_for_log_line("Connected to bob", WAIT);
+    alice_daemon.wait_for_log_line("In sync with bob", WAIT);
+
+    let during_sync_log = alice_daemon.stdout();
+    let conn_pos = during_sync_log
+        .find("Connected to bob")
+        .expect("CLI log must contain Connected to bob");
+    let recv_pos = during_sync_log
+        .find("docs: received peer_blob.bin")
+        .expect("CLI log must record receiving peer_blob.bin");
+    let insync_pos = during_sync_log
+        .find("In sync with bob")
+        .expect("CLI log must contain In sync with bob");
+    assert!(
+        conn_pos < recv_pos && conn_pos < insync_pos,
+        "peer must appear connected before file transfers and sync completion:\n{during_sync_log}"
+    );
+    assert!(
+        !during_sync_log[..insync_pos].contains("Disconnected from bob"),
+        "peer must not appear disconnected during the first sync:\n{during_sync_log}"
+    );
+
+    let status = bob_daemon.wait_for_exit(WAIT);
+    assert!(
+        status.success(),
+        "bob exited with {status}\n{}",
+        bob_daemon.stdout()
+    );
+    assert_eq!(
+        std::fs::read(b.dir("b-docs/server_blob.bin")).expect("read downloaded server blob"),
+        server_payload
+    );
+    assert_eq!(
+        std::fs::read(a.dir("a-docs/peer_blob.bin")).expect("read uploaded peer blob"),
+        peer_payload
+    );
+
+    // Once the peer disconnects cleanly after finishing, the CLI must reflect the disconnect.
+    alice_daemon.wait_for_log_line("Disconnected from bob: closed by peer: closing", WAIT);
+}

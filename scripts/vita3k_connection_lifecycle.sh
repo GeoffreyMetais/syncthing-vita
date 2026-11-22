@@ -174,6 +174,26 @@ else
     fail "[phase2] CLI did not reach 'In sync with vita'"
 fi
 
+# Verify Vita appeared connected on the CLI side *before* the first sync completed, with zero
+# disconnects during the initial transfer.
+if python3 - "$CLI_LOG_1" <<'PY'
+import sys
+text = open(sys.argv[1], encoding="utf-8", errors="replace").read()
+conn = text.find("Connected to vita")
+recv = text.find("received from_vita.txt")
+insync = text.find("In sync with vita")
+assert conn != -1, "missing 'Connected to vita'"
+assert recv != -1, "missing 'received from_vita.txt'"
+assert insync != -1, "missing 'In sync with vita'"
+assert conn < recv and conn < insync, f"bad ordering: conn={conn} recv={recv} insync={insync}"
+assert "Disconnected from vita" not in text[:insync], "spurious disconnect before first sync completed"
+PY
+then
+    ok "[phase2] CLI showed Vita connected throughout the first sync (before file transfer & In sync)"
+else
+    fail "[phase2] CLI did not show Vita connected before first sync completed"
+fi
+
 # Trigger Phase 3 live update while session stays active.
 echo "live delta while connected" > "$WORK/cli-share/live_update.txt"
 
