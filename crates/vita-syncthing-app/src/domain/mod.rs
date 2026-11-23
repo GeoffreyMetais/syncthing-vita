@@ -23,7 +23,7 @@ pub use models::{
     fmt_size, ActiveTab, CameraPreview, DeviceOffer, FolderOffer, IgnoredFolder, KnownDevice,
     Language, LanguagePreference, ModalDialog, PickerItem, PickerMode, ShareConfigEntry, ShareMode,
     SyncActivity, ThemeMode, ADD_DEVICE_KEYPAD, BROWSER_ROWS, BROWSE_TEMPLATE_ID,
-    NEW_SHARE_TEMPLATES, VISIBLE_DEVICES,
+    NEW_SHARE_TEMPLATES, VISIBLE_DEVICES, VISIBLE_SHARES,
 };
 pub use navigation::{
     action_count, default_col, settings_row_action_count, starts_on_header, NavFocus, NavState,

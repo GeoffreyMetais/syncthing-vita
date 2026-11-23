@@ -2,7 +2,10 @@
 //! or, after `Show All`, the whole `syncthing.log` history. It covers the sidebar so log lines
 //! get the full screen width.
 
-use crate::domain::{AppState, HitMap, Hotspot, LogScope, LogView, Rect, UiAction, LOG_VIEW_ROWS};
+use crate::domain::{
+    AppState, HitMap, Hotspot, LogScope, LogView, Rect, ScrollArea, ScrollTarget, UiAction,
+    LOG_VIEW_ROWS,
+};
 use crate::ui::gfx::{Align, Color, FontWeight, Gfx, PadButton, GFX_W};
 use crate::ui::strings;
 use crate::ui::theme::{UiTheme, CONTENT_B, C_BAD, C_GOOD};
@@ -81,6 +84,12 @@ pub fn render_log_screen(
     let card_w = right - MARGIN;
     let card_h = CONTENT_B - CARD_Y;
     draw_card(gfx, th, MARGIN, CARD_Y, card_w, card_h, false);
+    // Dragging a finger over the list scrolls it line by line (the lines follow the finger).
+    hits.add_scroll_area(ScrollArea {
+        rect: Rect::new(MARGIN, CARD_Y, card_w, card_h),
+        target: ScrollTarget::LogLines,
+        step: LINE_STEP,
+    });
     // Touching the upper half of the list pages towards older lines, the lower half newer.
     hits.add(Hotspot {
         rect: Rect::new(MARGIN, CARD_Y, card_w, card_h / 2),

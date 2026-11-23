@@ -36,6 +36,20 @@ impl LogsController {
         }
     }
 
+    /// Scrolls the open viewer by `lines` (touch drag; positive: towards newer lines).
+    pub fn drag_scroll(state: &mut AppState, lines: i32) {
+        let total = Self::line_count(state);
+        let Some(view) = state.log_view.as_mut() else {
+            return;
+        };
+        let n = lines.unsigned_abs() as usize;
+        if lines > 0 {
+            view.scroll_newer(n, total);
+        } else {
+            view.scroll_older(n, total);
+        }
+    }
+
     /// Executes a log viewer action (`OpenLogs` comes from the `Settings` log card).
     pub fn apply(state: &mut AppState, repo: &ConfigRepository, action: UiAction) {
         if action == UiAction::OpenLogs {

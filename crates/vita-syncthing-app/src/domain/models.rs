@@ -10,6 +10,9 @@ pub const VISIBLE_DEVICES: usize = 5;
 /// Number of visible rows in the `ux0:` directory browser.
 pub const BROWSER_ROWS: usize = 8;
 
+/// Share cards visible at once in the `Overview` share list; the list scrolls beyond that.
+pub const VISIBLE_SHARES: usize = 4;
+
 /// User interface languages supported by VitaSyncthing.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum Language {

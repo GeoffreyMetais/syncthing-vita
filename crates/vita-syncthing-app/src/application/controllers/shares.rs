@@ -7,6 +7,11 @@ use crate::domain::{AppState, ModalDialog, UiAction};
 pub struct SharesController;
 
 impl SharesController {
+    /// Scrolls the share list by `rows` (touch drag); the selection stays visible.
+    pub fn scroll(state: &mut AppState, rows: i32) {
+        state.scroll_shares(rows);
+    }
+
     /// Executes a share action. A share index that is no longer valid (the list changed
     /// since the frame was drawn) is ignored.
     pub fn apply(state: &mut AppState, action: UiAction) {

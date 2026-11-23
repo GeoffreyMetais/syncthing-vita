@@ -147,6 +147,10 @@ pub struct Hotspot {
 pub enum ScrollTarget {
     /// The `Files` folder list.
     FilesList,
+    /// The `Overview` share list.
+    ShareList,
+    /// The lines of the full-screen log viewer.
+    LogLines,
 }
 
 /// Area of the frame that scrolls `target` when a finger drags across it: one row per
