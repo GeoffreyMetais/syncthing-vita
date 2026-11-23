@@ -212,6 +212,7 @@ pub fn spawn_sync_worker(
             // Authorization: a folder is only synchronized with the devices linked to its share.
             let device_ids = s.shared_devices.clone();
             storage.set_folder_devices(&s.folder_id, device_ids.clone());
+            storage.set_folder_label(&s.folder_id, &s.label);
             if s.enabled
                 && !device_ids.is_empty()
                 && offered_folder_ids.iter().any(|fid| fid == &s.folder_id)

@@ -331,16 +331,20 @@ impl SyncCoordinator {
                 peer_device_id,
                 reason,
             } => {
+                let was_initial = state.initial_sync.is_active();
                 state.initial_sync.end(peer_device_id);
                 if !state.initial_sync.is_active() {
                     state.sync_in_progress = false;
                 }
-                // The last connected peer left: the app is offline until a peer loop
-                // reconnects (its `Progress` messages are shown again from 0%).
+                // The last active peer (connected or in initial sync) left: the app is offline
+                // until a peer loop reconnects (its `Progress` messages are shown again from 0%).
                 let was_connected = state.session_connected;
                 state.connected_peers.end(peer_device_id);
                 state.session_connected = state.connected_peers.is_active();
-                if was_connected && !state.session_connected {
+                if (was_connected || was_initial)
+                    && !state.session_connected
+                    && !state.initial_sync.is_active()
+                {
                     state.uploading = false;
                     state.progress_pct = Some(0);
                     state.current_file = UiText::raw("-");

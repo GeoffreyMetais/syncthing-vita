@@ -86,22 +86,22 @@ fn test_cluster_config_lists_linked_folders_and_locally_shared_ones() {
 }
 
 #[test]
-fn test_cluster_config_is_sent_again_when_the_shared_folders_change() {
+fn test_cluster_config_is_sent_at_most_once_per_connection() {
     let vita = device_under_test().device_id;
     let peer = FakePeer::spawn(0x72, move |conn| {
         conn.send_cluster_config(&["alpha"], vita);
         conn.wait_for(BepMessageType::ClusterConfig, Duration::from_secs(5))
             .expect("first ClusterConfig reply");
-        // A second configuration with one more folder: our answer must follow it.
+        // A second ClusterConfig with an additional folder must NOT trigger a second
+        // ClusterConfig from us (fatal protocol error in Syncthing state 1), yet we still
+        // accept `beta` and publish its initial `Index`.
         conn.send_cluster_config(&["alpha", "beta"], vita);
-        conn.wait_for(BepMessageType::ClusterConfig, Duration::from_secs(3));
-        // Stay connected past the exchange window: our initial `Index` follows it.
         conn.serve_until_idle(Duration::from_millis(1500));
     });
 
     // `alpha` is a local share of the peer from the start; `beta` only becomes one when the
     // peer's second configuration announces it.
-    let mut storage = FsSyncStorage::new(common::fresh_temp_dir("index_config_resend"));
+    let mut storage = FsSyncStorage::new(common::fresh_temp_dir("index_config_once"));
     storage.set_folder_devices("alpha", vec![peer.device_id]);
     storage.set_folder_devices("beta", vec![peer.device_id]);
     storage.add_local_folder(BepFolder {
@@ -131,12 +131,72 @@ fn test_cluster_config_is_sent_again_when_the_shared_folders_change() {
     let configs = payloads(&received, BepMessageType::ClusterConfig);
     assert_eq!(
         configs.len(),
-        2,
-        "one answer per configuration that changed the set"
+        1,
+        "BEP/1.0 forbids sending a second ClusterConfig on a connection"
     );
-    let mut second = announced_folders(configs[1]);
-    second.sort();
-    assert_eq!(second, vec!["alpha".to_owned(), "beta".to_owned()]);
+    assert_eq!(announced_folders(configs[0]), vec!["alpha".to_owned()]);
+
+    let published: Vec<String> = index_messages(&received)
+        .into_iter()
+        .map(|i| i.folder)
+        .collect();
+    assert!(published.contains(&"alpha".to_owned()));
+    assert!(published.contains(&"beta".to_owned()));
+}
+
+#[test]
+fn test_initial_cluster_config_uses_db_state_without_pre_config_ping() {
+    let vita_identity = device_under_test();
+    let vita = vita_identity.device_id;
+    let peer = FakePeer::spawn(0x74, move |conn| {
+        conn.send_cluster_config(&["shared"], vita);
+        conn.wait_for(BepMessageType::ClusterConfig, Duration::from_secs(5))
+            .expect("ClusterConfig reply");
+        conn.send_index("shared", Vec::new(), false);
+        conn.wait_for(BepMessageType::Index, Duration::from_secs(5))
+            .expect("Index of shared folder");
+        conn.serve_until_idle(Duration::from_millis(600));
+    });
+
+    let storage = storage_with(
+        "index_no_pre_ping",
+        peer.device_id,
+        &["shared"],
+        &["shared"],
+    );
+    // Pre-populate the DB so `folder_index_state` has a known non-zero `index_id` & `max_sequence`.
+    let (_, expected_state) = storage
+        .build_local_index("shared", vita, &[])
+        .expect("initial local scan");
+    assert_ne!(expected_state.index_id, 0);
+    assert!(expected_state.max_sequence > 0);
+    let db_state = storage.folder_index_state("shared", vita);
+    assert_eq!(db_state.index_id, expected_state.index_id);
+    assert_eq!(db_state.max_sequence, expected_state.max_sequence);
+    assert!(!db_state.paused);
+
+    // Zero keepalive interval: if `exchange_cluster_config` ran `scan_local_index`, it would send
+    // `Ping` before `ClusterConfig` (fatal `ping message in state 0` in Syncthing).
+    run_session(
+        &peer,
+        &storage,
+        &hello_under_test(1),
+        Some(control_with(Duration::from_secs(3600), Duration::ZERO)),
+        |_| {},
+    )
+    .expect("session failed");
+    let received = peer.join();
+
+    assert_eq!(
+        received.first().map(|(t, _)| *t),
+        Some(BepMessageType::ClusterConfig),
+        "first message after Hello must be ClusterConfig, never Ping"
+    );
+    let cfg = syncthing_core::BepClusterConfig::decode(
+        payloads(&received, BepMessageType::ClusterConfig)[0],
+    )
+    .unwrap();
+    assert_eq!(cfg.folders[0].id, "shared");
 }
 
 #[test]

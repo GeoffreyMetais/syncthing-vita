@@ -125,8 +125,14 @@ where
         params.timeout,
     )
     .map_err(|e| with_context("TLS wrap", e))?;
+    let mut hello = params.hello.clone();
+    hello.num_connections = 1;
+    let adjusted = SessionParams {
+        hello: &hello,
+        ..params.clone()
+    };
     run_bep_session(
-        params,
+        &adjusted,
         stream,
         observed_device_id,
         peer_addr,
@@ -246,12 +252,27 @@ where
     let mut folders = FolderSyncState::default();
 
     // 2. `ClusterConfig` exchange and initial remote `Index`
-    match exchange_cluster_config(&mut stream, &mut ctx, &mut folders, peer_addr, &peer_hello)? {
-        ClusterExchange::Established => {}
-        ClusterExchange::AwaitingPairing => return Ok(result),
-        ClusterExchange::ClosedByPeer(reason) => {
+    match exchange_cluster_config(&mut stream, &mut ctx, &mut folders, peer_addr, &peer_hello) {
+        Ok(ClusterExchange::Established) => {}
+        Ok(ClusterExchange::AwaitingPairing) => return Ok(result),
+        Ok(ClusterExchange::ClosedByPeer(reason)) => {
+            if control.is_some() && ctx.peer_connected() {
+                ctx.emit(SyncEvent::SessionEnded {
+                    peer_device_id: ctx.peer_device_id,
+                    reason: format!("closed by peer: {reason}"),
+                });
+            }
             result.session_status = SyncSessionStatus::ClosedByPeer(reason);
             return Ok(result);
+        }
+        Err(e) => {
+            if control.is_some() && ctx.peer_connected() {
+                ctx.emit(SyncEvent::SessionEnded {
+                    peer_device_id: ctx.peer_device_id,
+                    reason: format!("cluster exchange failed: {e}"),
+                });
+            }
+            return Err(e);
         }
     }
 
@@ -268,7 +289,7 @@ where
     attach_inbound_secondaries(inbound_sec_rx.as_ref(), &mut secondaries);
 
     // 4. Initial download, local index publication and request draining
-    let initial = run_initial_sync(
+    let initial = match run_initial_sync(
         &mut stream,
         &mut ctx,
         &mut folders,
@@ -276,8 +297,25 @@ where
         secondaries_opened_at,
         inbound_sec_rx.as_ref(),
         control.is_some(),
-    )?;
+    ) {
+        Ok(initial) => initial,
+        Err(e) => {
+            if control.is_some() && ctx.peer_connected() {
+                ctx.emit(SyncEvent::SessionEnded {
+                    peer_device_id: ctx.peer_device_id,
+                    reason: format!("initial sync failed: {e}"),
+                });
+            }
+            return Err(e);
+        }
+    };
     if let InitialSync::ClosedByPeer(reason) = initial {
+        if control.is_some() && ctx.peer_connected() {
+            ctx.emit(SyncEvent::SessionEnded {
+                peer_device_id: ctx.peer_device_id,
+                reason: format!("closed by peer: {reason}"),
+            });
+        }
         result.session_status = SyncSessionStatus::ClosedByPeer(reason);
         return Ok(result);
     }

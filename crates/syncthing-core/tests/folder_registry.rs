@@ -71,3 +71,42 @@ fn test_folder_is_shared_only_with_its_linked_devices() {
     s.set_folder_devices("saves", Vec::new());
     assert!(!s.is_folder_shared_with("saves", &other));
 }
+
+#[test]
+fn test_configured_folders_for_peer_uses_labels_and_filters_by_peer() {
+    let mut s = storage();
+    let peer_a = DeviceId([0xA1; 32]);
+    let peer_b = DeviceId([0xB2; 32]);
+
+    s.add_local_folder(folder("offered", "Offered Label", vec![peer_a]));
+    s.set_folder_devices("labeled", vec![peer_a, peer_b]);
+    s.set_folder_label("labeled", "My Labeled Share");
+    s.set_folder_devices("unlabeled", vec![peer_a]);
+    s.set_folder_devices("other_only", vec![peer_b]);
+
+    let for_a = s.configured_folders_for_peer(&peer_a);
+    let summary: Vec<(&str, &str)> = for_a
+        .iter()
+        .map(|f| (f.id.as_str(), f.label.as_str()))
+        .collect();
+    assert_eq!(
+        summary,
+        vec![
+            ("offered", "Offered Label"),
+            ("labeled", "My Labeled Share"),
+            ("unlabeled", "unlabeled"),
+        ]
+    );
+
+    // Clearing the label falls back to the folder ID.
+    s.set_folder_label("labeled", "");
+    let for_b = s.configured_folders_for_peer(&peer_b);
+    let summary_b: Vec<(&str, &str)> = for_b
+        .iter()
+        .map(|f| (f.id.as_str(), f.label.as_str()))
+        .collect();
+    assert_eq!(
+        summary_b,
+        vec![("labeled", "labeled"), ("other_only", "other_only")]
+    );
+}

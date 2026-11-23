@@ -1,10 +1,10 @@
 //! BEP/1.0 message codecs with hand-built byte vectors: `Header`, `Close`, `Request`,
 //! `Response` and `ClusterConfig` (folders, devices, index state).
 
-use syncthing_core::proto::{encode_bytes_field, WireIter};
+use syncthing_core::proto::{encode_bytes_field, encode_varint_field, WireIter};
 use syncthing_core::{
-    BepClose, BepClusterConfig, BepCompression, BepFolder, BepHeader, BepMessageType, BepRequest,
-    BepResponse, DeviceId, FolderIndexState, FolderType,
+    BepClose, BepClusterConfig, BepClusterDevice, BepCompression, BepDeviceCompression, BepFolder,
+    BepHeader, BepMessageType, BepRequest, BepResponse, DeviceId, FolderIndexState, FolderType,
 };
 
 // ---------------------------------------------------------------- Header
@@ -339,4 +339,58 @@ fn encode_for_peers_writes_folder_type_and_pause() {
         decoded.folders[0].device_ids,
         vec![own_device(), peer_device()]
     );
+}
+
+#[test]
+fn cluster_config_device_field_6_is_max_sequence_and_field_7_is_introducer() {
+    // Hand-build a peer Device entry with field 6 (`max_sequence = 42`), field 8
+    // (`index_id = 0x99`), and no field 7 (`introducer = false`).
+    let mut dev_buf = Vec::new();
+    encode_bytes_field(&mut dev_buf, 1, &peer_device().0);
+    encode_bytes_field(&mut dev_buf, 2, b"SyncthingServer");
+    encode_varint_field(&mut dev_buf, 6, 42);
+    encode_varint_field(&mut dev_buf, 8, 0x99);
+    let msg = folder_message(&[dev_buf]);
+
+    let decoded = BepClusterConfig::decode(&msg).unwrap();
+    assert_eq!(decoded.folders.len(), 1);
+    assert!(
+        !decoded.folders[0].devices[0].introducer,
+        "field 6 (max_sequence) must never set introducer = true"
+    );
+
+    // Re-encoding for the peer must NOT echo field 6, field 7, or varint field 10 on the peer.
+    let reply = BepClusterConfig::encode_for_peers(
+        &[(decoded.folders[0].clone(), FolderIndexState::default())],
+        own_device(),
+        "vita",
+        peer_device(),
+    );
+    let entries = device_entries_of(&reply);
+    assert_eq!(entries.len(), 2);
+    assert_eq!(device_varint(&entries[1], 6), None);
+    assert_eq!(device_varint(&entries[1], 7), None);
+    assert_eq!(device_varint(&entries[1], 10), None);
+
+    // `introducer = true` encodes on field 7 (never field 6) and decodes back cleanly.
+    let cfg = BepClusterConfig {
+        folders: vec![BepFolder {
+            id: "f".to_owned(),
+            devices: vec![BepClusterDevice {
+                id: peer_device(),
+                name: "Intro".to_owned(),
+                compression: BepDeviceCompression::Metadata,
+                introducer: true,
+            }],
+            ..Default::default()
+        }],
+        secondary: false,
+    };
+    let encoded = cfg.encode();
+    let intro_entries = device_entries_of(&encoded);
+    assert_eq!(device_varint(&intro_entries[0], 6), None);
+    assert_eq!(device_varint(&intro_entries[0], 7), Some(1));
+    assert_eq!(device_varint(&intro_entries[0], 10), None);
+    let roundtrip = BepClusterConfig::decode(&encoded).unwrap();
+    assert!(roundtrip.folders[0].devices[0].introducer);
 }

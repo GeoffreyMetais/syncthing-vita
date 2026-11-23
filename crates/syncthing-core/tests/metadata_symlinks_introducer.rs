@@ -1,8 +1,8 @@
 //! Integration tests for Milestone P2.4:
 //! - Extended `BepFileInfo` metadata (`permissions`, `no_permissions`, `modified_ns`,
 //!   `modified_by`, `symlink_target` with `SYMLINK = 4`).
-//! - Extended `BepClusterConfig` options (`introducer`, `max_request_kib`, `ignore_permissions`,
-//!   `ignore_delete`, and `BepClusterDevice`).
+//! - Extended `BepClusterConfig` options (`introducer`, `ignore_permissions`, `ignore_delete`,
+//!   and `BepClusterDevice`).
 //! - Live localhost sync with `sync_symlinks = true` (Unix) and `sync_symlinks = false`.
 //! - `SyncEvent::DevicesIntroduced` emitted when an introducer peer announces unknown devices.
 
@@ -142,14 +142,12 @@ fn bep_cluster_config_extended_fields_roundtrip() {
                     name: "Alice".to_owned(),
                     compression: BepDeviceCompression::Always,
                     introducer: true,
-                    max_request_kib: 4096,
                 },
                 BepClusterDevice {
                     id: dev_b,
                     name: "Bob".to_owned(),
                     compression: BepDeviceCompression::Never,
                     introducer: false,
-                    max_request_kib: 512,
                 },
             ],
         }],

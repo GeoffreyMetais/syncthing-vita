@@ -63,6 +63,7 @@ pub struct SessionContext<'a> {
     incomplete_folders: Vec<String>,
     last_keepalive: Instant,
     next_request_id: i32,
+    peer_connected: bool,
     on_event: &'a mut dyn FnMut(SyncEvent),
 }
 
@@ -87,6 +88,7 @@ impl<'a> SessionContext<'a> {
             incomplete_folders: Vec::new(),
             last_keepalive: Instant::now(),
             next_request_id: 1,
+            peer_connected: false,
             on_event,
         }
     }
@@ -143,7 +145,15 @@ impl<'a> SessionContext<'a> {
 
     /// Forwards `event` to the session's event sink.
     pub fn emit(&mut self, event: SyncEvent) {
+        if matches!(event, SyncEvent::PeerConnected { .. }) {
+            self.peer_connected = true;
+        }
         (self.on_event)(event);
+    }
+
+    /// Returns `true` once [`SyncEvent::PeerConnected`] has been emitted in this session.
+    pub fn peer_connected(&self) -> bool {
+        self.peer_connected
     }
 
     /// Emits a `SyncCycleCompleted` event with the current statistics.

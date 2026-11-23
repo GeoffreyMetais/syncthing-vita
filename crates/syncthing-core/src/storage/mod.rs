@@ -45,6 +45,8 @@ pub struct FsSyncStorage {
     /// Devices each configured folder is shared with. A folder missing here is not shared with
     /// anyone: it is never announced, indexed, downloaded or served.
     folder_devices: HashMap<String, Vec<DeviceId>>,
+    /// Human-readable labels per configured `folder_id`.
+    folder_labels: HashMap<String, String>,
     /// Locally configured folders to advertise in `ClusterConfig`
     local_folders: Vec<BepFolder>,
     /// Known local/paired devices (for introducer deduplication).
@@ -66,6 +68,7 @@ impl FsSyncStorage {
             folder_types: HashMap::new(),
             folder_versionings: HashMap::new(),
             folder_devices: HashMap::new(),
+            folder_labels: HashMap::new(),
             local_folders: Vec::new(),
             known_devices: Vec::new(),
             introducer_peers: Vec::new(),
@@ -236,6 +239,53 @@ impl FsSyncStorage {
     /// Declares the devices `folder_id` is shared with (replacing any previous list).
     pub fn set_folder_devices(&mut self, folder_id: &str, devices: Vec<DeviceId>) {
         self.folder_devices.insert(folder_id.to_owned(), devices);
+    }
+
+    /// Sets the human-readable label for a configured `folder_id`.
+    pub fn set_folder_label(&mut self, folder_id: &str, label: &str) {
+        if label.is_empty() {
+            self.folder_labels.remove(folder_id);
+        } else {
+            self.folder_labels
+                .insert(folder_id.to_owned(), label.to_owned());
+        }
+    }
+
+    /// Returns all folders shared with `peer`: explicitly added `local_folders` plus any folder
+    /// registered via [`Self::set_folder_devices`] that includes `peer`, using its configured
+    /// label or defaulting to the folder ID.
+    pub fn configured_folders_for_peer(&self, peer: &DeviceId) -> Vec<BepFolder> {
+        let mut folders: Vec<BepFolder> = self
+            .local_folders
+            .iter()
+            .filter(|lf| lf.device_ids.iter().any(|id| id.matches_peer(peer)))
+            .cloned()
+            .collect();
+        let mut extra: Vec<(&String, &Vec<DeviceId>)> = self
+            .folder_devices
+            .iter()
+            .filter(|(folder_id, devices)| {
+                devices.iter().any(|id| id.matches_peer(peer))
+                    && !folders.iter().any(|f| &f.id == *folder_id)
+            })
+            .collect();
+        extra.sort_by(|(a, _), (b, _)| a.cmp(b));
+        for (folder_id, devices) in extra {
+            let label = self
+                .folder_labels
+                .get(folder_id)
+                .filter(|l| !l.is_empty())
+                .cloned()
+                .unwrap_or_else(|| folder_id.clone());
+            folders.push(BepFolder {
+                id: folder_id.clone(),
+                label,
+                folder_type: self.folder_type(folder_id),
+                device_ids: devices.clone(),
+                ..Default::default()
+            });
+        }
+        folders
     }
 
     /// Returns `true` if `folder_id` is a configured folder shared with `peer`. This is the
