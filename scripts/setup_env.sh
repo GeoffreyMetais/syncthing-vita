@@ -190,6 +190,42 @@ install_audit() {
     echo "✅ cargo-audit installed successfully: $(cargo audit --version)"
 }
 
+resolve_vitasdk_release() {
+    local channels_base="https://vitasdk.org/channels"
+    local index_json
+    index_json="$(curl -fsSL --max-time 15 "${channels_base}/index.json" 2>/dev/null || true)"
+    [[ -n "${index_json}" ]] || return 1
+
+    local channel
+    channel="$(printf '%s' "${index_json}" | python3 -c '
+import json, sys
+data = json.load(sys.stdin)
+supported = [
+    name for name, meta in data.get("channels", {}).items()
+    if meta.get("status") == "supported" and meta.get("world", "vita") == "vita"
+]
+def key(name):
+    return [int(p) if p.isdigit() else 0 for p in name.split(".")]
+if supported:
+    print(sorted(supported, key=key, reverse=True)[0])
+' 2>/dev/null || true)"
+    [[ -n "${channel}" && "${channel}" =~ ^[A-Za-z0-9._-]+$ ]] || return 1
+
+    local channel_json
+    channel_json="$(curl -fsSL --max-time 15 "${channels_base}/${channel}.json" 2>/dev/null || true)"
+    [[ -n "${channel_json}" ]] || return 1
+
+    printf '%s' "${channel_json}" | python3 -c '
+import json, sys
+data = json.load(sys.stdin)
+core = data.get("core", {})
+repo = core.get("repository", "")
+rel = core.get("release", "")
+if repo and rel:
+    print(f"{repo}|{rel}")
+' 2>/dev/null
+}
+
 install_vitasdk() {
     setup_user_env
     echo "=== Installing VitaSDK to ${VITASDK_DIR} ==="
@@ -213,22 +249,48 @@ install_vitasdk() {
         fi
     fi
 
-    echo "Fetching latest VitaSDK Linux release URL..."
-    local download_url
-    download_url=$(curl -sL "https://api.github.com/repos/vitasdk/autobuilds/releases?per_page=30" 2>/dev/null | \
-        grep -o '"browser_download_url": "[^"]*vitasdk-x86_64-linux-gnu-[^"]*\.tar\.bz2"' | \
-        head -n 1 | cut -d '"' -f 4 || true)
-
-    if [[ -z "${download_url}" ]]; then
-        # Reliable fallback snapshot if GitHub API is rate-limited or offline
-        download_url="https://github.com/vitasdk/autobuilds/releases/download/sdk-snapshot-20261015.850.1/vitasdk-x86_64-linux-gnu-2026-10-15_05-01-16.tar.bz2"
+    echo "Resolving supported VitaSDK release channel..."
+    local resolved repo="" release="" expected_sha256=""
+    resolved="$(resolve_vitasdk_release || true)"
+    if [[ "${resolved}" == *"|"* ]]; then
+        repo="${resolved%%|*}"
+        release="${resolved#*|}"
+    fi
+    if [[ ! "${repo}" =~ ^[A-Za-z0-9._-]+/[A-Za-z0-9._-]+$ || ! "${release}" =~ ^[A-Za-z0-9._-]+$ ]]; then
+        # Reliable fallback to the pinned supported 2026.08 release
+        repo="vitasdk/autobuilds"
+        release="sdk-snapshot-20260825.611.1"
+        expected_sha256="3d5be8ad0fae5de872c13328f3508a59b9e1eec504269eec64e47d06de78b098"
     fi
 
-    echo "Downloading VitaSDK from: ${download_url}"
+    local download_url="https://github.com/${repo}/releases/download/${release}/vitasdk-bootstrap-x86_64-linux-gnu.tar.bz2"
+    if [[ -z "${expected_sha256}" ]]; then
+        expected_sha256="$(curl -fsSL --max-time 15 "${download_url}.sha256" 2>/dev/null | awk '{print tolower($1); exit}' || true)"
+    fi
+
+    echo "Downloading VitaSDK (${release}) from: ${download_url}"
     local tmp_archive
     tmp_archive="$(mktemp /tmp/vitasdk_XXXXXX.tar.bz2)"
-    curl -fL "${download_url}" -o "${tmp_archive}"
-    tar -xj -C "${VITASDK_DIR}" --strip-components=1 -f "${tmp_archive}"
+    if ! curl -fL "${download_url}" -o "${tmp_archive}"; then
+        rm -f "${tmp_archive}"
+        return 1
+    fi
+
+    if command -v sha256sum >/dev/null 2>&1 && [[ "${expected_sha256}" =~ ^[0-9a-f]{64}$ ]]; then
+        local actual_sha256
+        actual_sha256="$(sha256sum "${tmp_archive}" | awk '{print tolower($1)}')"
+        if [[ "${actual_sha256}" != "${expected_sha256}" ]]; then
+            echo "❌ VitaSDK SHA-256 mismatch (expected ${expected_sha256}, got ${actual_sha256})." >&2
+            rm -f "${tmp_archive}"
+            return 1
+        fi
+        echo "✅ Verified VitaSDK SHA-256: ${actual_sha256}"
+    fi
+
+    if ! tar -xj -C "${VITASDK_DIR}" --strip-components=1 -f "${tmp_archive}"; then
+        rm -f "${tmp_archive}"
+        return 1
+    fi
     rm -f "${tmp_archive}"
 
     echo "✅ VitaSDK installed to ${VITASDK_DIR}."

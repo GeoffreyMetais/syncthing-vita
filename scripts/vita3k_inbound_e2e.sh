@@ -33,9 +33,20 @@ rm -rf "$OUT_DIR" && mkdir -p "$OUT_DIR"
 BACKUP="$(mktemp -d)"
 [[ -d "$DATA" ]] && cp -a "$DATA" "$BACKUP/syncthing"
 CLI_PID=""
+stop_vita3k() {
+    pkill -x Vita3K 2>/dev/null || true
+    local i
+    for ((i = 0; i < 12; i++)); do
+        pgrep -x Vita3K >/dev/null 2>&1 || return 0
+        sleep 0.25
+    done
+    pkill -9 -x Vita3K 2>/dev/null || true
+    sleep 0.25
+}
+
 cleanup() {
     [[ -n "$CLI_PID" ]] && kill "$CLI_PID" 2>/dev/null || true
-    pkill -x Vita3K 2>/dev/null || true
+    stop_vita3k
     rm -rf "$DATA" "$VITA_SHARE"
     [[ -d "$BACKUP/syncthing" ]] && cp -a "$BACKUP/syncthing" "$DATA"
     rm -rf "$BACKUP"
@@ -70,6 +81,7 @@ run_vita3k_with_cli() {
     rm -rf "$DATA/shots"
     unzip -qo "$VPK" -d "$UX0/app/SYNCTHING"
 
+    stop_vita3k
     ./scripts/vita3k_launch.sh -z --frontend sdl -l 2 -r SYNCTHING > "$sub_out/vita3k.log" 2>&1 &
     sleep 3
 
@@ -79,7 +91,7 @@ run_vita3k_with_cli() {
     CLI_PID=$!
 
     sleep "$run_secs"
-    pkill -x Vita3K || true
+    stop_vita3k
     kill "$CLI_PID" 2>/dev/null || true
     wait "$CLI_PID" 2>/dev/null || true
     CLI_PID=""

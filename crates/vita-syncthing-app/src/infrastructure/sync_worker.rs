@@ -7,7 +7,7 @@ use std::sync::{Arc, Mutex, OnceLock};
 use std::time::Duration;
 
 use syncthing_core::{
-    resolve_peer_tcp_addrs, run_discovery_cycle, scan_lan_bep_peers_interruptible, Announce,
+    resolve_peer_tcp_addrs, run_discovery_cycle, scan_lan_bep_peers_with_options, Announce,
     BepFolder, BepHello, DeviceId, DeviceIdentity, FolderType, FsSyncStorage, SyncControl,
     SyncEvent, SyncTuning, BEP_DEFAULT_PORT, DISCOVERY_BROADCAST_ADDR,
 };
@@ -445,12 +445,13 @@ pub fn spawn_sync_worker(
                             && !established.iter().any(|id| id.matches_peer(&kd.device_id))
                     });
                     if missing_dial {
+                        let include_loopback = listen_port != Some(BEP_DEFAULT_PORT);
                         let mut scanned = Vec::new();
-                        for (addr, peer) in
-                            scan_lan_bep_peers_interruptible(identity.device_id, || {
-                                worker_control.is_stop_requested()
-                            })
-                        {
+                        for (addr, peer) in scan_lan_bep_peers_with_options(
+                            identity.device_id,
+                            include_loopback,
+                            || worker_control.is_stop_requested(),
+                        ) {
                             if !discovered_peers.iter().any(|(_, p)| p.id == peer.id)
                                 && !scanned
                                     .iter()

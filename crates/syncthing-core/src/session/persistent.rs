@@ -12,7 +12,7 @@ use super::events::SyncEvent;
 use super::folders::FolderSyncState;
 use super::index_exchange::{rescan_and_publish, retry_incomplete_pulls};
 use super::override_changes::handle_override_requests;
-use super::revert::handle_revert_requests;
+use super::revert::{handle_revert_requests, RevertOutcome};
 use super::secondary::{
     attach_inbound_secondaries, open_secondary_bep_stream, ping_all_secondaries,
     poll_all_secondaries, SecondaryBepConn,
@@ -58,8 +58,10 @@ pub fn run_persistent_session(
     .encode();
     for mut sec in links.secondaries {
         let _ = write_bep_message(&mut sec.stream, BepMessageType::Close, &close_payload);
+        sec.stream.send_close_notify();
     }
     let _ = write_bep_message(stream, BepMessageType::Close, &close_payload);
+    stream.send_close_notify();
     let peer_device_id = ctx.peer_device_id;
     ctx.emit(SyncEvent::SessionEnded {
         peer_device_id,
@@ -119,8 +121,11 @@ fn session_loop(
         seen_rescan_epoch = cur_epoch;
         if manual_rescan || last_local_scan.elapsed() >= ctx.tuning.rescan_interval {
             last_local_scan = Instant::now();
-            retry_incomplete_pulls(stream, ctx, folders)
-                .map_err(|e| format!("download retry failed: {e}"))?;
+            if let Some(reason) = retry_incomplete_pulls(stream, ctx, folders)
+                .map_err(|e| format!("download retry failed: {e}"))?
+            {
+                return Err(format!("closed by peer: {reason}"));
+            }
             let published = rescan_and_publish(stream, ctx, folders, manual_rescan)
                 .map_err(|e| format!("index update send failed: {e}"))?;
             if published {
@@ -129,10 +134,12 @@ fn session_loop(
         }
 
         // F. Revert of a receive-only folder's local changes (UI-requested)
-        if handle_revert_requests(stream, ctx, folders, control)
+        match handle_revert_requests(stream, ctx, folders, control)
             .map_err(|e| format!("revert of local changes failed: {e}"))?
         {
-            ctx.emit_cycle_completed(links.active_connections());
+            RevertOutcome::Idle => {}
+            RevertOutcome::Reverted => ctx.emit_cycle_completed(links.active_connections()),
+            RevertOutcome::ClosedByPeer(reason) => return Err(format!("closed by peer: {reason}")),
         }
 
         // G. Override of a send-only folder's remote changes (UI-requested)

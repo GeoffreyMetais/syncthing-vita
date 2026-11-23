@@ -54,19 +54,23 @@ just setup
    export PATH="$VITASDK/bin:$PATH"
    ```
 
-2. **Download and Extract Prebuilt VitaSDK**:
-   VitaSDK autobuild releases are tagged as `sdk-snapshot-<date>.<build>.<rev>`. Fetch the latest snapshot dynamically or use the `vdpm` bootstrap:
+2. **Download and Extract Prebuilt Supported VitaSDK**:
+   VitaSDK publishes supported (stable) release channels (`world: "vita"`, e.g. `2026.08`) via `https://vitasdk.org/channels/index.json`:
    ```bash
    mkdir -p "$VITASDK"
-   # Dynamically resolve latest Linux snapshot tarball
-   DOWNLOAD_URL=$(curl -sL "https://api.github.com/repos/vitasdk/autobuilds/releases?per_page=30" | \
-       grep -o '"browser_download_url": "[^"]*vitasdk-x86_64-linux-gnu-[^"]*\.tar\.bz2"' | \
-       head -n 1 | cut -d '"' -f 4)
+   # Resolve the newest supported hard-float release channel
+   CHANNEL=$(curl -fsSL "https://vitasdk.org/channels/index.json" | python3 -c '
+   import json, sys
+   data = json.load(sys.stdin)
+   supported = [k for k, v in data.get("channels", {}).items() if v.get("status") == "supported" and v.get("world", "vita") == "vita"]
+   print(sorted(supported, key=lambda s: [int(p) if p.isdigit() else 0 for p in s.split(".")], reverse=True)[0])
+   ')
+   RELEASE=$(curl -fsSL "https://vitasdk.org/channels/${CHANNEL}.json" | python3 -c 'import json, sys; print(json.load(sys.stdin)["core"]["release"])')
+   # Fallback to pinned supported 2026.08 release if offline:
+   RELEASE="${RELEASE:-sdk-snapshot-20260825.611.1}"
 
-   # Fallback snapshot if GitHub API is offline or rate-limited:
-   DOWNLOAD_URL="${DOWNLOAD_URL:-https://github.com/vitasdk/autobuilds/releases/download/sdk-snapshot-20261015.850.1/vitasdk-x86_64-linux-gnu-2026-10-15_05-01-16.tar.bz2}"
-
-   curl -fL "$DOWNLOAD_URL" | tar -xj -C "$VITASDK" --strip-components=1
+   curl -fL "https://github.com/vitasdk/autobuilds/releases/download/${RELEASE}/vitasdk-bootstrap-x86_64-linux-gnu.tar.bz2" | \
+       tar -xj -C "$VITASDK" --strip-components=1
    ```
    *(Alternatively, run `git clone --depth 1 https://github.com/vitasdk/vdpm /tmp/vdpm && (cd /tmp/vdpm && ./bootstrap-vitasdk.sh)`)*
 

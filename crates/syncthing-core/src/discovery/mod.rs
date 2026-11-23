@@ -26,7 +26,9 @@ pub use global::{
     PeerEndpoint, DEFAULT_LOOKUP_SERVER,
 };
 pub use global_announce::{announce_on, AnnounceOutcome, DEFAULT_ANNOUNCE_SERVERS};
-pub use lan_scan::{scan_lan_bep_peers, scan_lan_bep_peers_interruptible};
+pub use lan_scan::{
+    scan_lan_bep_peers, scan_lan_bep_peers_interruptible, scan_lan_bep_peers_with_options,
+};
 pub use local_ip::detect_local_ipv4;
 pub use nat::{
     build_add_port_mapping_soap, build_get_external_ip_soap, build_ssdp_msearch,

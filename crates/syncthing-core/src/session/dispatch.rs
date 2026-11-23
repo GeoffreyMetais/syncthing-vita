@@ -5,7 +5,7 @@ use std::time::Duration;
 
 use super::context::SessionContext;
 use super::folders::FolderSyncState;
-use super::index_exchange::{handle_runtime_cluster_config, handle_runtime_index};
+use super::index_exchange::{handle_runtime_cluster_config, handle_runtime_index, RuntimeIndex};
 use super::upload::serve_block_request;
 use crate::bep::{write_bep_message, BepClose, BepDownloadProgress, BepMessageType};
 use crate::tls::polling::try_read_bep_message;
@@ -51,8 +51,9 @@ pub fn dispatch_primary_message(
         }
         BepMessageType::Index | BepMessageType::IndexUpdate => {
             match handle_runtime_index(stream, ctx, folders, payload, count_up_to_date) {
-                Ok(true) => Ok(Dispatched::IndexApplied),
-                Ok(false) => Ok(Dispatched::Handled),
+                Ok(RuntimeIndex::Applied) => Ok(Dispatched::IndexApplied),
+                Ok(RuntimeIndex::Ignored) => Ok(Dispatched::Handled),
+                Ok(RuntimeIndex::ClosedByPeer(reason)) => Ok(Dispatched::Closed(reason)),
                 Err(e) => Err(with_context("index/download error", e)),
             }
         }

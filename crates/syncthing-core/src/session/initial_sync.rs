@@ -7,7 +7,7 @@ use std::time::{Duration, Instant};
 
 use super::context::SessionContext;
 use super::dispatch::{dispatch_primary_message, next_primary_message, with_context, Dispatched};
-use super::download::download_folder;
+use super::download::{download_folder, DownloadOutcome};
 use super::folders::FolderSyncState;
 use super::index_exchange::{build_initial_local_indexes, publish_initial_indexes};
 use super::secondary::{
@@ -40,7 +40,9 @@ pub fn run_initial_sync(
     inbound_sec_rx: Option<&Receiver<BepTlsStream>>,
     persistent: bool,
 ) -> io::Result<InitialSync> {
-    initial_download(stream, ctx, folders)?;
+    if let Some(reason) = initial_download(stream, ctx, folders)? {
+        return Ok(InitialSync::ClosedByPeer(reason));
+    }
 
     build_initial_local_indexes(stream, ctx, folders);
     wait_for_promotion(secondaries, secondaries_opened_at, ctx);
@@ -78,13 +80,17 @@ fn initial_download(
     stream: &mut BepTlsStream,
     ctx: &mut SessionContext<'_>,
     folders: &FolderSyncState,
-) -> io::Result<()> {
+) -> io::Result<Option<String>> {
     for (folder_id, files) in folders.remote_folders() {
         if ctx.storage.is_folder_paused(folder_id) {
             continue;
         }
-        download_folder(stream, ctx, folder_id, files, true)
-            .map_err(|e| with_context(&format!("Initial download ({folder_id})"), e))?;
+        if let DownloadOutcome::ClosedByPeer(reason) =
+            download_folder(stream, ctx, folder_id, files, true)
+                .map_err(|e| with_context(&format!("Initial download ({folder_id})"), e))?
+        {
+            return Ok(Some(reason));
+        }
     }
-    Ok(())
+    Ok(None)
 }
