@@ -62,7 +62,7 @@ pub fn draw_confirm_frame(
         frame.icon_disc,
         frame.title,
     )
-    .subtitle(frame.subtitle, 54, 14, th.dim);
+    .subtitle(frame.subtitle, th.dim);
     draw_modal_header(gfx, th, dx, dy, header_max_w, &header);
     draw_modal_separator(gfx, th, dx, dy, w, 76);
 

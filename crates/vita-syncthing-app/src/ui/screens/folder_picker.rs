@@ -84,7 +84,7 @@ pub fn render_folder_picker_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState, h
         &state.picker.current_dir,
     );
 
-    let top = state.picker.scroll.top;
+    let top = state.picker.top_idx;
     let total = state.picker.items.len();
 
     // Dragging a finger over the rows scrolls the list.

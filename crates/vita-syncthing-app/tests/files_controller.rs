@@ -115,9 +115,9 @@ fn test_selection_keeps_the_scroll_window_on_the_selected_row() {
     }
     assert_eq!(state.picker.selected_idx, rows - 1);
     let visible = vita_syncthing_app::domain::BROWSER_ROWS;
-    assert_eq!(state.picker.scroll.top, rows - visible);
+    assert_eq!(state.picker.top_idx, rows - visible);
     press(&mut state, &repo, BTN_UP);
-    assert!(state.picker.selected_idx >= state.picker.scroll.top);
+    assert!(state.picker.selected_idx >= state.picker.top_idx);
     let _ = std::fs::remove_dir_all(&dir);
 }
 
@@ -142,12 +142,12 @@ fn test_dragging_over_the_list_scrolls_it_without_selecting() {
         ..Default::default()
     };
     feed(&mut state, &repo, drag(-2 * area.step, true));
-    assert_eq!(state.picker.scroll.top, 2);
+    assert_eq!(state.picker.top_idx, 2);
     assert_eq!(state.picker.selected_idx, 2);
     assert_eq!(state.picker.current_dir, dir);
     // Finger back down by one row.
     feed(&mut state, &repo, drag(-area.step, false));
-    assert_eq!(state.picker.scroll.top, 1);
+    assert_eq!(state.picker.top_idx, 1);
     let _ = std::fs::remove_dir_all(&dir);
 }
 

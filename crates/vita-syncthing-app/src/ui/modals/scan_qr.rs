@@ -33,7 +33,7 @@ pub fn render_scan_qr_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits:
             s.modal_scan_qr_title,
         )
         .compact()
-        .subtitle(s.modal_scan_qr_subtitle, 51, 13, th.dim),
+        .subtitle(s.modal_scan_qr_subtitle, th.dim),
     );
 
     let vx = lx;

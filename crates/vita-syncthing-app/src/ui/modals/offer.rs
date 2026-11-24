@@ -14,21 +14,8 @@ use crate::ui::widgets::{
     ModalHeader,
 };
 
-/// Everything that distinguishes a folder offer from a device offer on screen.
-struct OfferView<'a> {
-    icon: Icon,
-    title: &'a str,
-    /// Requester (folder) or connection source (device) line under the title.
-    sub: String,
-    /// Offered share title (folder) or full Device ID (device).
-    body: String,
-    body_size: i32,
-    hint: &'a str,
-    accept_hint: &'a str,
-    pending: usize,
-}
-
-/// Renders the open offer modal (`FolderOffer` or `DeviceOffer`).
+/// Renders the open offer modal (`FolderOffer` or `DeviceOffer`). Returns the texts that
+/// distinguish the two kinds: `(icon, title, sub, body, body_size, hint, accept_hint, pending)`.
 pub fn render_offer_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut HitMap) {
     let (folder, offer_idx) = match state.modal {
         ModalDialog::FolderOffer { offer_idx } => (true, offer_idx),
@@ -36,7 +23,8 @@ pub fn render_offer_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &
         _ => return,
     };
     let s = i18n::strings(state.language);
-    let view = if folder {
+    // icon, title, requester/source line, body line, body size, hint, accept hint, pending count
+    let (icon, title, sub, body, body_size, hint, accept_hint, pending) = if folder {
         let Some(offer) = state.folder_offers.get(offer_idx) else {
             return;
         };
@@ -51,16 +39,16 @@ pub fn render_offer_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &
                     &[("short", &offer.device_id.short())],
                 )
             });
-        OfferView {
-            icon: Icon::Folder,
-            title: s.modal_folder_offer_title,
-            sub: s.fmt_folder_offer_sub(&device),
-            body: s.fmt_share_title(&offer.label, &offer.folder_id),
-            body_size: 17,
-            hint: s.modal_folder_offer_hint,
-            accept_hint: s.hint_accept_share,
-            pending: state.folder_offers.len(),
-        }
+        (
+            Icon::Folder,
+            s.modal_folder_offer_title,
+            s.fmt_folder_offer_sub(&device),
+            s.fmt_share_title(&offer.label, &offer.folder_id),
+            17,
+            s.modal_folder_offer_hint,
+            s.hint_accept_share,
+            state.folder_offers.len(),
+        )
     } else {
         let Some(offer) = state.device_offers.get(offer_idx) else {
             return;
@@ -72,16 +60,16 @@ pub fn render_offer_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &
         } else {
             s.modal_device_offer_via_relay
         };
-        OfferView {
-            icon: Icon::Wifi,
-            title: s.modal_device_offer_title,
-            sub: s.fmt_device_offer_sub(source),
-            body: offer.device_id.to_syncthing_string(),
-            body_size: 13,
-            hint: s.modal_device_offer_hint,
-            accept_hint: s.hint_accept_device,
-            pending: state.device_offers.len(),
-        }
+        (
+            Icon::Wifi,
+            s.modal_device_offer_title,
+            s.fmt_device_offer_sub(source),
+            offer.device_id.to_syncthing_string(),
+            13,
+            s.modal_device_offer_hint,
+            s.hint_accept_device,
+            state.device_offers.len(),
+        )
     };
 
     let (_, _, w, h) = folder_offer_modal_rect();
@@ -93,8 +81,7 @@ pub fn render_offer_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &
         dx,
         dy,
         w - 108,
-        &ModalHeader::new(view.icon, 22.0, th.accent, th.accent_bg, view.title)
-            .subtitle(&view.sub, 54, 14, th.dim),
+        &ModalHeader::new(icon, 22.0, th.accent, th.accent_bg, title).subtitle(&sub, th.dim),
     );
     draw_modal_separator(gfx, th, dx, dy, w, 76);
 
@@ -102,11 +89,11 @@ pub fn render_offer_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &
         lx,
         dy + 110,
         w - 56,
-        view.body_size,
+        body_size,
         FontWeight::Medium,
         th.text,
         Align::Left,
-        &view.body,
+        &body,
     );
     gfx.text_fit(
         lx,
@@ -116,10 +103,10 @@ pub fn render_offer_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &
         FontWeight::Regular,
         th.dim,
         Align::Left,
-        view.hint,
+        hint,
     );
-    if view.pending > 1 {
-        let waiting_str = s.fmt_offers_waiting(view.pending - 1);
+    if pending > 1 {
+        let waiting_str = s.fmt_offers_waiting(pending - 1);
         gfx.text(
             lx,
             dy + 164,
@@ -165,7 +152,7 @@ pub fn render_offer_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &
         th,
         hits,
         &[
-            (PadButton::Cross, None, view.accept_hint),
+            (PadButton::Cross, None, accept_hint),
             (PadButton::Square, None, s.action_decline),
             (PadButton::Circle, None, s.action_later),
         ],

@@ -111,8 +111,8 @@ fn test_holding_down_scrolls_the_files_list() {
     }
     // One press, then a repeat after the delay and every interval.
     assert_eq!(state.picker.selected_idx, 1 + 9);
-    assert!(state.picker.scroll.top > 0);
-    assert!(state.picker.selected_idx < state.picker.scroll.top + BROWSER_ROWS);
+    assert!(state.picker.top_idx > 0);
+    assert!(state.picker.selected_idx < state.picker.top_idx + BROWSER_ROWS);
     assert!(state.shares.is_empty());
 
     let _ = std::fs::remove_dir_all(&dir);
@@ -128,21 +128,21 @@ fn test_dragging_the_files_list_scrolls_it_without_selecting() {
 
     // Finger moves up by 3 rows: the content follows it.
     drag_list(&mut state, &repo, bottom, bottom - 3 * area.step - 5);
-    assert_eq!(state.picker.scroll.top, 3);
+    assert_eq!(state.picker.top_idx, 3);
     assert!(state.picker.selected_idx >= 3);
     assert!(state.shares.is_empty(), "a drag is not a tap");
     assert_eq!(state.picker.current_dir, dir);
 
     // Dragging down further than the top stops at the first row.
     drag_list(&mut state, &repo, area.rect.y + 2, bottom);
-    assert_eq!(state.picker.scroll.top, 0);
+    assert_eq!(state.picker.top_idx, 0);
     assert!(state.picker.selected_idx < BROWSER_ROWS);
 
     // Dragging up past the end stops on the last page.
     for _ in 0..4 {
         drag_list(&mut state, &repo, bottom, area.rect.y);
     }
-    assert_eq!(state.picker.scroll.top, 30 - BROWSER_ROWS);
+    assert_eq!(state.picker.top_idx, 30 - BROWSER_ROWS);
     assert!(state.picker.selected_idx >= 30 - BROWSER_ROWS);
 
     let _ = std::fs::remove_dir_all(&dir);

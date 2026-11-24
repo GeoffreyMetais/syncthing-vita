@@ -38,8 +38,7 @@ pub fn render_create_share_modal(
             th.accent_bg,
             s.modal_create_share_title,
         )
-        .title_pos(32, 21)
-        .subtitle(s.modal_create_share_subtitle, 54, 14, th.dim),
+        .subtitle(s.modal_create_share_subtitle, th.dim),
     );
     draw_modal_separator(gfx, th, dx, dy, w, 76);
 

@@ -2,7 +2,7 @@
 //! directory, its rows, the selection and the scroll window.
 
 use crate::domain::models::{PickerItem, PickerMode, BROWSER_ROWS};
-use crate::domain::scroll_window::ScrollWindow;
+use crate::domain::scroll_window;
 
 /// The folder browser of the `Files` tab.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -13,8 +13,8 @@ pub struct FolderPicker {
     /// Presets and subfolders of `current_dir`.
     pub items: Vec<PickerItem>,
     pub selected_idx: usize,
-    /// Scroll window over `items` (`top` = first visible row).
-    pub scroll: ScrollWindow,
+    /// First visible row.
+    pub top_idx: usize,
 }
 
 impl FolderPicker {
@@ -24,7 +24,7 @@ impl FolderPicker {
             current_dir: browse_root.to_owned(),
             items: Vec::new(),
             selected_idx: 0,
-            scroll: ScrollWindow::new(BROWSER_ROWS),
+            top_idx: 0,
         }
     }
 
@@ -32,13 +32,19 @@ impl FolderPicker {
     /// the selection moves along so that it stays visible.
     pub fn scroll_rows(&mut self, rows: i32) {
         let len = self.items.len();
-        self.scroll.scroll_by(len, &mut self.selected_idx, rows);
+        scroll_window::scroll_by(
+            &mut self.top_idx,
+            BROWSER_ROWS,
+            len,
+            &mut self.selected_idx,
+            rows,
+        );
         self.clamp_scroll();
     }
 
-    /// Keeps the selection within the list and the scroll window on the selection.
+    /// Keeps the selection within the list and the scroll window (`top_idx`) on the selection.
     pub fn clamp_scroll(&mut self) {
         let len = self.items.len();
-        self.scroll.clamp(len, &mut self.selected_idx);
+        scroll_window::clamp_window(&mut self.top_idx, BROWSER_ROWS, len, &mut self.selected_idx);
     }
 }

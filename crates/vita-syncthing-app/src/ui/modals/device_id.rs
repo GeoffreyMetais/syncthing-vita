@@ -41,7 +41,7 @@ pub fn render_device_id_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hit
             th.accent_bg,
             s.modal_device_id_title,
         )
-        .subtitle(s.modal_device_id_subtitle, 54, 14, th.dim),
+        .subtitle(s.modal_device_id_subtitle, th.dim),
     );
     draw_modal_separator(gfx, th, dx, dy, w, 76);
 

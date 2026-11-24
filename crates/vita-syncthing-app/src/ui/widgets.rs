@@ -459,22 +459,21 @@ pub fn draw_modal_card(
     (dx, dy)
 }
 
-/// Header of a modal card: icon disc, bold title, optional subtitle line. Vertical offsets
-/// are from the card top: `disc_dy` (disc centre), `title_dy` / `subtitle` (text baselines).
+/// Header of a modal card: icon disc, bold title, optional subtitle line.
 pub struct ModalHeader<'a> {
     pub icon: Icon,
     pub icon_size: f32,
     pub icon_colour: Color,
     pub icon_disc: Color,
-    pub disc_dy: i32,
     pub title: &'a str,
-    pub title_dy: i32,
-    pub title_size: i32,
-    pub subtitle: Option<(&'a str, i32, i32, Color)>,
+    pub subtitle: Option<(&'a str, Color)>,
+    /// Compact variant (scan QR, add device): smaller disc, title and subtitle offsets.
+    pub compact: bool,
 }
 
 impl<'a> ModalHeader<'a> {
-    /// Standard header: disc at `dy + 40`, 21 px bold title at `dy + 31`.
+    /// Standard header: disc at `dy + 40`, 21 px bold title at `dy + 31`, 14 px subtitle at
+    /// `dy + 54`.
     pub fn new(
         icon: Icon,
         icon_size: f32,
@@ -487,32 +486,21 @@ impl<'a> ModalHeader<'a> {
             icon_size,
             icon_colour,
             icon_disc,
-            disc_dy: 40,
             title,
-            title_dy: 31,
-            title_size: 21,
             subtitle: None,
+            compact: false,
         }
     }
 
-    /// Adds a subtitle line: `text` at `dy + sub_dy`, `size` px, in `colour`.
-    pub fn subtitle(mut self, text: &'a str, sub_dy: i32, size: i32, colour: Color) -> Self {
-        self.subtitle = Some((text, sub_dy, size, colour));
+    /// Adds a subtitle line in `colour`.
+    pub fn subtitle(mut self, text: &'a str, colour: Color) -> Self {
+        self.subtitle = Some((text, colour));
         self
     }
 
-    /// Moves the title baseline to `dy + title_dy` at `size` px.
-    pub fn title_pos(mut self, title_dy: i32, size: i32) -> Self {
-        self.title_dy = title_dy;
-        self.title_size = size;
-        self
-    }
-
-    /// Compact variant (scan QR, add device): disc at `dy + 38`, 20 px title at `dy + 29`.
+    /// Compact variant: disc at `dy + 38`, 20 px title at `dy + 29`, 13 px subtitle at `dy + 51`.
     pub fn compact(mut self) -> Self {
-        self.disc_dy = 38;
-        self.title_dy = 29;
-        self.title_size = 20;
+        self.compact = true;
         self
     }
 }
@@ -527,36 +515,41 @@ pub fn draw_modal_header(
     text_max_w: i32,
     header: &ModalHeader<'_>,
 ) -> i32 {
+    let (disc_dy, title_dy, title_size, sub_dy, sub_size) = if header.compact {
+        (38, 29, 20, 51, 13)
+    } else {
+        (40, 31, 21, 54, 14)
+    };
     let lx = dx + MODAL_PAD_X;
     gfx.circle(
         (lx + 20) as f32,
-        (dy + header.disc_dy) as f32,
+        (dy + disc_dy) as f32,
         20.0,
         header.icon_disc,
     );
     gfx.icon(
         header.icon,
         (lx + 20) as f32,
-        (dy + header.disc_dy) as f32,
+        (dy + disc_dy) as f32,
         header.icon_size,
         header.icon_colour,
     );
     gfx.text_fit(
         lx + MODAL_HEADER_TEXT_DX,
-        dy + header.title_dy,
+        dy + title_dy,
         text_max_w,
-        header.title_size,
+        title_size,
         FontWeight::Bold,
         th.text,
         Align::Left,
         header.title,
     );
-    if let Some((text, sub_dy, size, colour)) = header.subtitle {
+    if let Some((text, colour)) = header.subtitle {
         gfx.text_fit(
             lx + MODAL_HEADER_TEXT_DX,
             dy + sub_dy,
             text_max_w,
-            size,
+            sub_size,
             FontWeight::Regular,
             colour,
             Align::Left,

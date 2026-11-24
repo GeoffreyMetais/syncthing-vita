@@ -44,7 +44,7 @@ pub fn render_add_device_modal(
             s.modal_add_device_title,
         )
         .compact()
-        .subtitle(s.modal_add_device_subtitle, 51, 13, th.dim),
+        .subtitle(s.modal_add_device_subtitle, th.dim),
     );
     draw_modal_separator(gfx, th, dx, dy, w, 70);
 

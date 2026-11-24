@@ -90,8 +90,7 @@ pub fn render_manage_devices_modal(
             th.accent_bg,
             &header_title,
         )
-        .title_pos(32, 20)
-        .subtitle(subtitle, 54, 14, subtitle_col),
+        .subtitle(subtitle, subtitle_col),
     );
     draw_modal_separator(gfx, th, dx, dy, w, 76);
 

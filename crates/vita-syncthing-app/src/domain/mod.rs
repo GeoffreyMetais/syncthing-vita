@@ -32,5 +32,5 @@ pub use navigation::{
     SETTINGS_ROW_DISPLAY, SETTINGS_ROW_LANGUAGE, SETTINGS_ROW_LOG, TAB_ORDER,
 };
 pub use screensaver::ScreensaverMotion;
-pub use scroll_window::ScrollWindow;
+pub use scroll_window::{clamp_window, first_visible, scroll_by, settle};
 pub use ui_text::UiText;
