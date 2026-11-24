@@ -130,84 +130,104 @@ impl ConfigRepository {
         let _ = fs::create_dir_all(path);
     }
 
+    /// Path of a `.cfg` file in the data directory.
+    fn cfg_path(&self, name: &str) -> String {
+        format!("{}/{}", self.base_data_dir, name)
+    }
+
+    /// Loads a `.cfg` file as rows of unescaped `|`-separated fields (a missing or unreadable
+    /// file yields no rows).
+    fn load_rows(&self, name: &str) -> Vec<Vec<String>> {
+        let Ok(content) = read_recovering(&self.cfg_path(name)) else {
+            return Vec::new();
+        };
+        content
+            .lines()
+            .map(|line| line.split('|').map(unescape_field).collect())
+            .collect()
+    }
+
+    /// Saves rows of fields to a `.cfg` file, one `|`-separated escaped row per line, through
+    /// the atomic temp-file replacement.
+    fn save_rows(&self, name: &str, rows: &[Vec<String>]) {
+        let _ = fs::create_dir_all(&self.base_data_dir);
+        let mut out = String::new();
+        for row in rows {
+            for (i, field) in row.iter().enumerate() {
+                if i > 0 {
+                    out.push('|');
+                }
+                out.push_str(&escape_field(field));
+            }
+            out.push('\n');
+        }
+        write_replacing(&self.cfg_path(name), &out);
+    }
+
     /// Loads known remote devices from `<base_data_dir>/devices.cfg`.
     pub fn load_devices(&self) -> Vec<KnownDevice> {
-        let cfg_path = format!("{}/devices.cfg", self.base_data_dir);
-        let mut out = Vec::new();
-        if let Ok(content) = read_recovering(&cfg_path) {
-            for line in content.lines() {
-                let parts: Vec<&str> = line.split('|').collect();
-                if parts.len() >= 3 {
-                    if let Some(device_id) = DeviceId::from_hex(parts[0]) {
-                        out.push(KnownDevice {
-                            device_id,
-                            name: unescape_field(parts[1]),
-                            address: unescape_field(parts[2]),
-                        });
-                    }
+        self.load_rows("devices.cfg")
+            .into_iter()
+            .filter_map(|row| {
+                if row.len() < 3 {
+                    return None;
                 }
-            }
-        }
-        out
+                Some(KnownDevice {
+                    device_id: DeviceId::from_hex(&row[0])?,
+                    name: row[1].clone(),
+                    address: row[2].clone(),
+                })
+            })
+            .collect()
     }
 
     /// Saves known remote devices to `<base_data_dir>/devices.cfg`.
     pub fn save_devices(&self, devices: &[KnownDevice]) {
-        let _ = fs::create_dir_all(&self.base_data_dir);
-        let cfg_path = format!("{}/devices.cfg", self.base_data_dir);
-        let mut out = String::new();
-        for d in devices {
-            out.push_str(&format!(
-                "{}|{}|{}\n",
-                d.device_id.to_hex(),
-                escape_field(&d.name),
-                escape_field(&d.address)
-            ));
-        }
-        write_replacing(&cfg_path, &out);
+        let rows: Vec<Vec<String>> = devices
+            .iter()
+            .map(|d| vec![d.device_id.to_hex(), d.name.clone(), d.address.clone()])
+            .collect();
+        self.save_rows("devices.cfg", &rows);
     }
 
     /// Loads shared folder configuration from `<base_data_dir>/shares.cfg`.
     pub fn load_shares(&self) -> Vec<ShareConfigEntry> {
-        let cfg_path = format!("{}/shares.cfg", self.base_data_dir);
         let mut entries = Vec::new();
         let mut needs_save = false;
-        if let Ok(content) = read_recovering(&cfg_path) {
-            for line in content.lines() {
-                let parts: Vec<&str> = line.split('|').collect();
-                if parts.len() >= 4 {
-                    let shared_devices = if parts.len() >= 5 && !parts[4].trim().is_empty() {
-                        parts[4]
-                            .split(',')
-                            .filter_map(|hex| DeviceId::from_hex(hex.trim()))
-                            .collect()
-                    } else {
-                        Vec::new()
-                    };
-                    let folder_id = unescape_field(parts[0]);
-                    let mut target_path = unescape_field(parts[2]);
-                    let default_sync_path = self.default_share_dir(&folder_id);
-                    if target_path == default_sync_path {
-                        if let Some(&(_, _, tpl_path)) = NEW_SHARE_TEMPLATES
-                            .iter()
-                            .find(|&&(id, _, _)| id == folder_id && id != "__browse__")
-                        {
-                            target_path = tpl_path.to_owned();
-                            needs_save = true;
-                        }
-                    }
-                    entries.push(ShareConfigEntry {
-                        folder_id,
-                        label: unescape_field(parts[1]),
-                        target_path,
-                        enabled: parts[3] != "0",
-                        mode: parts
-                            .get(5)
-                            .map_or(ShareMode::ReadWrite, |c| ShareMode::from_code(c)),
-                        shared_devices,
-                    });
+        for row in self.load_rows("shares.cfg") {
+            if row.len() < 4 {
+                continue;
+            }
+            let shared_devices = if row.len() >= 5 && !row[4].trim().is_empty() {
+                row[4]
+                    .split(',')
+                    .filter_map(|hex| DeviceId::from_hex(hex.trim()))
+                    .collect()
+            } else {
+                Vec::new()
+            };
+            let folder_id = row[0].clone();
+            let mut target_path = row[2].clone();
+            let default_sync_path = self.default_share_dir(&folder_id);
+            if target_path == default_sync_path {
+                if let Some(&(_, _, tpl_path)) = NEW_SHARE_TEMPLATES
+                    .iter()
+                    .find(|&&(id, _, _)| id == folder_id && id != "__browse__")
+                {
+                    target_path = tpl_path.to_owned();
+                    needs_save = true;
                 }
             }
+            entries.push(ShareConfigEntry {
+                folder_id,
+                label: row[1].clone(),
+                target_path,
+                enabled: row[3] != "0",
+                mode: row
+                    .get(5)
+                    .map_or(ShareMode::ReadWrite, |c| ShareMode::from_code(c)),
+                shared_devices,
+            });
         }
         if needs_save {
             self.save_shares(&entries);
@@ -217,38 +237,34 @@ impl ConfigRepository {
 
     /// Saves shared folder configuration to `<base_data_dir>/shares.cfg`.
     pub fn save_shares(&self, shares: &[ShareConfigEntry]) {
-        let _ = fs::create_dir_all(&self.base_data_dir);
-        let cfg_path = format!("{}/shares.cfg", self.base_data_dir);
-        let mut out = String::new();
-        for s in shares {
-            let devs: Vec<String> = s.shared_devices.iter().map(DeviceId::to_hex).collect();
-            let devs = devs.join(",");
-            out.push_str(&format!(
-                "{}|{}|{}|{}|{}|{}\n",
-                escape_field(&s.folder_id),
-                escape_field(&s.label),
-                escape_field(&s.target_path),
-                if s.enabled { "1" } else { "0" },
-                devs,
-                s.mode.code()
-            ));
-        }
-        write_replacing(&cfg_path, &out);
+        let rows: Vec<Vec<String>> = shares
+            .iter()
+            .map(|s| {
+                let devs: Vec<String> = s.shared_devices.iter().map(DeviceId::to_hex).collect();
+                vec![
+                    s.folder_id.clone(),
+                    s.label.clone(),
+                    s.target_path.clone(),
+                    if s.enabled { "1" } else { "0" }.to_owned(),
+                    devs.join(","),
+                    s.mode.code().to_owned(),
+                ]
+            })
+            .collect();
+        self.save_rows("shares.cfg", &rows);
     }
 
     /// Loads declined folder offers from `<base_data_dir>/ignored_folders.cfg`.
     pub fn load_ignored_folders(&self) -> Vec<IgnoredFolder> {
-        let cfg_path = format!("{}/ignored_folders.cfg", self.base_data_dir);
-        let Ok(content) = read_recovering(&cfg_path) else {
-            return Vec::new();
-        };
-        content
-            .lines()
-            .filter_map(|line| {
-                let (folder_id, dev_hex) = line.split_once('|')?;
+        self.load_rows("ignored_folders.cfg")
+            .into_iter()
+            .filter_map(|row| {
+                if row.len() < 2 {
+                    return None;
+                }
                 Some(IgnoredFolder {
-                    folder_id: unescape_field(folder_id),
-                    device_id: DeviceId::from_hex(dev_hex.trim())?,
+                    folder_id: row[0].clone(),
+                    device_id: DeviceId::from_hex(row[1].trim())?,
                 })
             })
             .collect()
@@ -256,72 +272,61 @@ impl ConfigRepository {
 
     /// Saves declined folder offers to `<base_data_dir>/ignored_folders.cfg`.
     pub fn save_ignored_folders(&self, ignored: &[IgnoredFolder]) {
-        let _ = fs::create_dir_all(&self.base_data_dir);
-        let cfg_path = format!("{}/ignored_folders.cfg", self.base_data_dir);
-        let out: String = ignored
+        let rows: Vec<Vec<String>> = ignored
             .iter()
-            .map(|f| format!("{}|{}\n", escape_field(&f.folder_id), f.device_id.to_hex()))
+            .map(|f| vec![f.folder_id.clone(), f.device_id.to_hex()])
             .collect();
-        write_replacing(&cfg_path, &out);
+        self.save_rows("ignored_folders.cfg", &rows);
     }
 
     /// Loads declined incoming devices from `<base_data_dir>/ignored_devices.cfg`.
     pub fn load_ignored_devices(&self) -> Vec<DeviceId> {
-        let cfg_path = format!("{}/ignored_devices.cfg", self.base_data_dir);
-        let Ok(content) = read_recovering(&cfg_path) else {
-            return Vec::new();
-        };
-        content
-            .lines()
-            .filter_map(|line| DeviceId::from_hex(line.trim()))
+        self.load_rows("ignored_devices.cfg")
+            .into_iter()
+            .filter_map(|row| {
+                if row.len() == 1 {
+                    DeviceId::from_hex(row[0].trim())
+                } else {
+                    None
+                }
+            })
             .collect()
     }
 
     /// Saves declined incoming devices to `<base_data_dir>/ignored_devices.cfg`.
     pub fn save_ignored_devices(&self, ignored: &[DeviceId]) {
-        let _ = fs::create_dir_all(&self.base_data_dir);
-        let cfg_path = format!("{}/ignored_devices.cfg", self.base_data_dir);
-        let out: String = ignored
-            .iter()
-            .map(|id| format!("{}\n", id.to_hex()))
-            .collect();
-        write_replacing(&cfg_path, &out);
+        let rows: Vec<Vec<String>> = ignored.iter().map(|id| vec![id.to_hex()]).collect();
+        self.save_rows("ignored_devices.cfg", &rows);
     }
 
     /// Loads the chosen colour theme mode from `<base_data_dir>/theme.cfg`.
     /// Defaults to `ThemeMode::Oled` if the file does not exist or contains invalid data.
     pub fn load_theme(&self) -> ThemeMode {
-        let cfg_path = format!("{}/theme.cfg", self.base_data_dir);
-        let Ok(content) = read_recovering(&cfg_path) else {
-            return ThemeMode::Oled;
-        };
-        ThemeMode::parse(&content).unwrap_or(ThemeMode::Oled)
+        self.load_rows("theme.cfg")
+            .first()
+            .and_then(|row| row.first())
+            .and_then(|value| ThemeMode::parse(value))
+            .unwrap_or(ThemeMode::Oled)
     }
 
     /// Saves the chosen colour theme mode to `<base_data_dir>/theme.cfg`.
     pub fn save_theme(&self, theme: ThemeMode) {
-        let _ = fs::create_dir_all(&self.base_data_dir);
-        let cfg_path = format!("{}/theme.cfg", self.base_data_dir);
-        let out = format!("{}\n", theme.as_str());
-        write_replacing(&cfg_path, &out);
+        self.save_rows("theme.cfg", &[vec![theme.as_str().to_owned()]]);
     }
 
     /// Loads the UI language preference from `<base_data_dir>/language.cfg`.
     /// Defaults to `LanguagePreference::System` if the file is missing or invalid.
     pub fn load_language(&self) -> LanguagePreference {
-        let cfg_path = format!("{}/language.cfg", self.base_data_dir);
-        let Ok(content) = read_recovering(&cfg_path) else {
-            return LanguagePreference::System;
-        };
-        LanguagePreference::parse(&content).unwrap_or_default()
+        self.load_rows("language.cfg")
+            .first()
+            .and_then(|row| row.first())
+            .and_then(|value| LanguagePreference::parse(value))
+            .unwrap_or_default()
     }
 
     /// Saves the UI language preference to `<base_data_dir>/language.cfg`.
     pub fn save_language(&self, pref: LanguagePreference) {
-        let _ = fs::create_dir_all(&self.base_data_dir);
-        let cfg_path = format!("{}/language.cfg", self.base_data_dir);
-        let out = format!("{}\n", pref.as_str());
-        write_replacing(&cfg_path, &out);
+        self.save_rows("language.cfg", &[vec![pref.as_str().to_owned()]]);
     }
 
     /// Lists sorted non-hidden subdirectory names inside `dir_path`.
