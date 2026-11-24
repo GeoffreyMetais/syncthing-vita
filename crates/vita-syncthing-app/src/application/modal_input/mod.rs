@@ -7,10 +7,9 @@
 
 mod add_device;
 mod create_share;
-mod device_offer;
 mod dialogs;
-mod folder_offer;
 mod manage_devices;
+mod offers;
 mod scan_qr;
 
 pub(crate) use add_device::{confirm_add_device, open_add_device_modal};
@@ -95,12 +94,20 @@ impl ModalInput {
                 dialogs::confirm_revert_share(state, repo, input, share_idx)
             }
             ModalDialog::ConfirmQuit => dialogs::confirm_quit(state, input),
-            ModalDialog::FolderOffer { offer_idx } => {
-                folder_offer::handle(state, repo, input, offer_idx)
-            }
-            ModalDialog::DeviceOffer { offer_idx } => {
-                device_offer::handle(state, repo, input, offer_idx)
-            }
+            ModalDialog::FolderOffer { offer_idx } => offers::handle(
+                state,
+                repo,
+                input,
+                offer_idx,
+                offers::OfferKind::Folder,
+            ),
+            ModalDialog::DeviceOffer { offer_idx } => offers::handle(
+                state,
+                repo,
+                input,
+                offer_idx,
+                offers::OfferKind::Device,
+            ),
         }
     }
 }
