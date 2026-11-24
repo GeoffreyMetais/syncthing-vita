@@ -54,6 +54,9 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
+      - name: Install Rust stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+
       - name: Install Rust nightly toolchain with rust-src
         uses: dtolnay/rust-toolchain@nightly
         with:
@@ -129,7 +132,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Install Rust stable and nightly toolchains
+      - name: Install Rust stable toolchain
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install Rust nightly toolchain with rust-src
@@ -196,7 +199,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v7
 
-      - name: Install Rust stable and nightly toolchains
+      - name: Install Rust stable toolchain
         uses: dtolnay/rust-toolchain@stable
 
       - name: Install Rust nightly toolchain with rust-src
