@@ -12,16 +12,16 @@ official Syncthing apps you already run: there is nothing to install on the othe
   <img src="docs/readme/1_overview.png" width="640" alt="Overview: the PS Vita device card and three shared folders">
 </p>
 
-> **Status:** early but usable (v0.1.0). It syncs real folders with desktop Syncthing every
+> **Status:** early but usable (v0.2.0). It syncs real folders with desktop Syncthing every
 > day, and it is written to never lose a file, but keep a backup of anything you would hate to
 > lose, as with any young sync tool.
 
 ---
 
-## What's new since v0.1.0
+## What's new in v0.2.0
 
-Landed on `main` after [v0.1.0](https://github.com/GeoffreyMetais/syncthing-vita/releases/tag/v0.1.0),
-not tagged yet:
+Highlights of [v0.2.0](https://github.com/GeoffreyMetais/syncthing-vita/releases/tag/v0.2.0)
+(full list in [CHANGELOG.md](CHANGELOG.md)):
 
 - **The Vita is now reachable inbound**: it listens on TCP port 22000, joins a public relay and
   announces itself on Global Discovery, even with no paired device. Unknown devices that connect
@@ -38,8 +38,6 @@ not tagged yet:
   Receive Encrypted folders.
 - **Security and quality**: all `cargo audit` vulnerabilities fixed, TLS 1.2 ChaCha20 hardened,
   and CI now covers E2E sync over LAN and the Internet, including inbound scenarios.
-
-See [CHANGELOG.md](CHANGELOG.md) for the full list.
 
 ---
 

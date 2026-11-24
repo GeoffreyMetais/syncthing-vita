@@ -9,6 +9,8 @@ GitHub Release carrying the `SYNCTHING.vpk` asset.
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-11-24
+
 ### Added
 
 - The PS Vita app is now **reachable inbound**: TCP listener on port 22000, permanent relay
@@ -128,3 +130,7 @@ the official Syncthing apps.
 - READMEs: the PS Vita app README ([#30](https://github.com/GeoffreyMetais/syncthing-vita/pull/30))
   and developer READMEs for `syncthing-core` and `syncthing-cli`
   ([#29](https://github.com/GeoffreyMetais/syncthing-vita/pull/29)).
+
+[Unreleased]: https://github.com/GeoffreyMetais/syncthing-vita/compare/v0.2.0...HEAD
+[0.2.0]: https://github.com/GeoffreyMetais/syncthing-vita/compare/v0.1.0...v0.2.0
+[0.1.0]: https://github.com/GeoffreyMetais/syncthing-vita/releases/tag/v0.1.0
