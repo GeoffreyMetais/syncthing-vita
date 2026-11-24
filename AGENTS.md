@@ -4,6 +4,15 @@ This document provides essential architectural context, build workflows, and **r
 
 ---
 
+## Working Principles
+
+- **Think before coding**: state your assumptions before writing any code; if the task is unclear, stop and ask instead of guessing.
+- **Simplicity first**: write the minimum code that solves the problem — no speculative generality, no extra abstractions.
+- **Surgical changes**: every changed line must trace back to the request; never refactor, reformat, or "fix" unrelated code along the way.
+- **Goal-driven**: turn the task into a check you can run (test, build, lint, E2E) and loop until it passes; the task is not done until that check is green.
+
+---
+
 ## 1. Language & Code Quality Rules
 
 - **English Only**: All source code comments, docstrings, UI labels, log messages, commit messages, and documentation **must be written in English**.
