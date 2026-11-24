@@ -128,24 +128,3 @@ the official Syncthing apps.
 - READMEs: the PS Vita app README ([#30](https://github.com/GeoffreyMetais/syncthing-vita/pull/30))
   and developer READMEs for `syncthing-core` and `syncthing-cli`
   ([#29](https://github.com/GeoffreyMetais/syncthing-vita/pull/29)).
-
-### Fixed
-
-- Settings / Quit dialog text overflow
-  ([#1](https://github.com/GeoffreyMetais/syncthing-vita/pull/1)).
-- Development environment setup, headless Vita3K support and read-only rustup handling
-  ([#2](https://github.com/GeoffreyMetais/syncthing-vita/pull/2),
-  [#23](https://github.com/GeoffreyMetais/syncthing-vita/pull/23)).
-- `VITASDK` env scope in the CI workflow
-  ([#7](https://github.com/GeoffreyMetais/syncthing-vita/pull/7)).
-- Global hardening: peer data loss on `.st*` names, crashes on hostile input, folder ID path
-  traversal, per-peer connection tracking, off-LAN sync status
-  ([#21](https://github.com/GeoffreyMetais/syncthing-vita/pull/21),
-  [#24](https://github.com/GeoffreyMetais/syncthing-vita/pull/24)).
-
-### Changed
-
-- Default folder presets changed
-  ([#14](https://github.com/GeoffreyMetais/syncthing-vita/pull/14)); the share-folder change
-  action was removed from the Overview
-  ([#31](https://github.com/GeoffreyMetais/syncthing-vita/pull/31)).
