@@ -8,8 +8,8 @@ use crate::domain::{
     SETTINGS_ROW_LANGUAGE, SETTINGS_ROW_LOG,
 };
 use crate::ui::gfx::{Align, FontWeight, Gfx, PadButton};
-use crate::ui::screens::logs::log_line_colour;
 use crate::ui::i18n;
+use crate::ui::screens::logs::log_line_colour;
 use crate::ui::theme::{
     UiTheme, CONTENT_B, CONTENT_R, CONTENT_W, CONTENT_X, CONTENT_Y, SETTINGS_DECLINED_B,
     SETTINGS_DECLINED_Y, SETTINGS_DEVICES_B, SETTINGS_DEVICES_Y, SETTINGS_LANGUAGE_B,

@@ -6,8 +6,8 @@ use super::fallback_keyboard::draw_fallback_keypad;
 use crate::domain::interaction::{HitMap, PadKey, UiAction};
 use crate::domain::AppState;
 use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton};
-use crate::ui::i18n::messages::fill;
 use crate::ui::i18n;
+use crate::ui::i18n::messages::fill;
 use crate::ui::theme::{add_device_modal_height, UiTheme, C_GOOD, C_WARN};
 use crate::ui::widgets::{
     action_width, declare_touch, draw_modal_card, draw_modal_header, draw_modal_separator,

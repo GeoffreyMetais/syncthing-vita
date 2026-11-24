@@ -6,8 +6,8 @@
 use crate::domain::interaction::HitMap;
 use crate::domain::{AppState, ModalDialog};
 use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton};
-use crate::ui::i18n::messages::fill;
 use crate::ui::i18n;
+use crate::ui::i18n::messages::fill;
 use crate::ui::theme::{folder_offer_modal_rect, folder_offer_slot_x, UiTheme};
 use crate::ui::widgets::{
     draw_modal_card, draw_modal_header, draw_modal_separator, draw_press_button, draw_press_hints,

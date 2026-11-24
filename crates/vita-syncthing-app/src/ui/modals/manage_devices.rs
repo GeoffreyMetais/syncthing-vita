@@ -3,8 +3,8 @@
 use crate::domain::interaction::{HitMap, PadKey, UiAction};
 use crate::domain::{AppState, ShareMode, VISIBLE_DEVICES};
 use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton};
-use crate::ui::i18n::messages::fill;
 use crate::ui::i18n;
+use crate::ui::i18n::messages::fill;
 use crate::ui::theme::{UiTheme, C_GOOD, C_WARN, MANAGE_DEVICES_H, MANAGE_DEVICES_W};
 use crate::ui::widgets::{
     action_width, declare_touch, draw_chip, draw_modal_card, draw_modal_header,

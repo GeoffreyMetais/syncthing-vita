@@ -5,6 +5,7 @@ use crate::domain::defaults::ANIMATION_INTERVAL;
 use crate::domain::{ActiveTab, AppState, ModalDialog};
 use crate::infrastructure::VitaFramebuffer;
 use crate::ui::gfx::{Gfx, GFX_H, GFX_W};
+use crate::ui::i18n;
 use crate::ui::modals::{
     render_add_device_modal, render_confirm_delete_share_modal, render_confirm_quit_modal,
     render_confirm_revert_share_modal, render_create_share_modal, render_device_id_modal,
@@ -14,7 +15,6 @@ use crate::ui::screens::{
     render_dashboard_tab, render_folder_picker_tab, render_log_screen, render_oled_screensaver,
     render_settings_tab, SAVER_H, SAVER_W,
 };
-use crate::ui::i18n;
 use crate::ui::theme::UiTheme;
 use crate::ui::widgets::{draw_chrome, draw_toast};
 

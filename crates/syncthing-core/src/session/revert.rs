@@ -45,18 +45,19 @@ pub fn handle_revert_requests(
         &requested,
         |stream, ctx, folder_id, remote| {
             let own_id = ctx.own_id();
-            let reverted = match storage.revert_local_changes(folder_id, own_id, remote, &mut || {
-                send_keepalive_if_due(stream, ctx)
-            }) {
-                Ok(reverted) => reverted,
-                Err(e) => {
-                    ctx.emit(SyncEvent::FolderUnavailable {
-                        folder: folder_id.to_owned(),
-                        error: e.to_string(),
-                    });
-                    return Ok(RequestStep::Skipped);
-                }
-            };
+            let reverted =
+                match storage.revert_local_changes(folder_id, own_id, remote, &mut || {
+                    send_keepalive_if_due(stream, ctx)
+                }) {
+                    Ok(reverted) => reverted,
+                    Err(e) => {
+                        ctx.emit(SyncEvent::FolderUnavailable {
+                            folder: folder_id.to_owned(),
+                            error: e.to_string(),
+                        });
+                        return Ok(RequestStep::Skipped);
+                    }
+                };
             if let DownloadOutcome::ClosedByPeer(reason) =
                 download_folder(stream, ctx, folder_id, remote, false)?
             {

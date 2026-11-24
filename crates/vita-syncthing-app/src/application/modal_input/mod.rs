@@ -94,20 +94,12 @@ impl ModalInput {
                 dialogs::confirm_revert_share(state, repo, input, share_idx)
             }
             ModalDialog::ConfirmQuit => dialogs::confirm_quit(state, input),
-            ModalDialog::FolderOffer { offer_idx } => offers::handle(
-                state,
-                repo,
-                input,
-                offer_idx,
-                offers::OfferKind::Folder,
-            ),
-            ModalDialog::DeviceOffer { offer_idx } => offers::handle(
-                state,
-                repo,
-                input,
-                offer_idx,
-                offers::OfferKind::Device,
-            ),
+            ModalDialog::FolderOffer { offer_idx } => {
+                offers::handle(state, repo, input, offer_idx, offers::OfferKind::Folder)
+            }
+            ModalDialog::DeviceOffer { offer_idx } => {
+                offers::handle(state, repo, input, offer_idx, offers::OfferKind::Device)
+            }
         }
     }
 }

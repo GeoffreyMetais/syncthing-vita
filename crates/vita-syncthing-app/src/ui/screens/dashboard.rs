@@ -3,8 +3,8 @@
 
 use crate::domain::{AppState, FocusSlot, HitMap, Hotspot, Rect, UiAction, UiText};
 use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton};
-use crate::ui::screens::shares::draw_share_list;
 use crate::ui::i18n;
+use crate::ui::screens::shares::draw_share_list;
 use crate::ui::theme::{UiTheme, CONTENT_R, CONTENT_W, CONTENT_X, CONTENT_Y, C_GOOD, C_WARN};
 use crate::ui::widgets::{
     action_width, draw_action_hotspot, draw_card, draw_chip, draw_hint_bar, draw_page_title, Hint,

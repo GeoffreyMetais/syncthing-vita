@@ -3,9 +3,9 @@
 use crate::domain::interaction::{HitMap, PadKey};
 use crate::domain::AppState;
 use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton};
+use crate::ui::i18n;
 use crate::ui::i18n::messages::fill;
 use crate::ui::image::draw_gray_image;
-use crate::ui::i18n;
 use crate::ui::theme::{scan_qr_modal_rect, UiTheme, C_WARN, SCAN_QR_VIEW_H, SCAN_QR_VIEW_W};
 use crate::ui::widgets::{
     action_width, draw_modal_card, draw_modal_header, draw_press_button, draw_press_hints,
