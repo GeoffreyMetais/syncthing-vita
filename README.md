@@ -18,19 +18,49 @@ official Syncthing apps you already run: there is nothing to install on the othe
 
 ---
 
+## What's new since v0.1.0
+
+Landed on `main` after [v0.1.0](https://github.com/GeoffreyMetais/syncthing-vita/releases/tag/v0.1.0),
+not tagged yet:
+
+- **The Vita is now reachable inbound**: it listens on TCP port 22000, joins a public relay and
+  announces itself on Global Discovery, even with no paired device. Unknown devices that connect
+  get a consent dialog (accept / decline / decide later).
+- **Send Only shares** alongside Receive Only, with *Override Changes*; the **Vita game saves
+  preset** (`ux0:user/00/savedata`) is back.
+- **Touch-drag scrolling** of the share list and of the log viewer.
+- **Faster, more reliable off-LAN sync**: Global Discovery starts at launch, LAN addresses win
+  over public IPs, and behind a NAT the app advertises its relay (or the UPnP/NAT-PMP mapped
+  port) instead of an unreachable address.
+- **Protocol fixes and features** in `syncthing-core`: no more disconnects from real Syncthing
+  servers, LZ4 compression, `.stignore`, rolling weak-hash block reuse, secondary 1+2
+  connections, extended metadata / Unix symlinks / introducer devices, `.stversions` versioning,
+  Receive Encrypted folders.
+- **Security and quality**: all `cargo audit` vulnerabilities fixed, TLS 1.2 ChaCha20 hardened,
+  and CI now covers E2E sync over LAN and the Internet, including inbound scenarios.
+
+See [CHANGELOG.md](CHANGELOG.md) for the full list.
+
+---
+
 ## What you can do with it
 
 ### Sync the folders that matter on a Vita
 
-- **One-tap presets** for the usual suspects: Vita screenshots (`ux0:picture/SCREENSHOT`),
-  RetroArch save files and save states, your music folder.
+- **One-tap presets** for the usual suspects: Vita game saves (`ux0:user/00/savedata`), Vita
+  screenshots (`ux0:picture/SCREENSHOT`), RetroArch save files and save states, your music
+  folder.
 - **Any other folder**: the `Files` tab browses `ux0:` so you can share whatever you like.
   Folders that are already shared are greyed out, and the app's own data directory is protected.
+- **`.stignore` files are honored** when scanning and pulling, with the same pattern syntax as
+  desktop Syncthing.
 - **Several devices per folder**: link a folder to your PC *and* your Steam Deck, and edits made
   anywhere end up everywhere. Up to four devices sync at the same time.
-- **Receive-only shares**: switch a folder to *Receive Only* and the Vita
-  will receive changes without ever pushing its own. If something changed locally anyway,
-  *Revert Local Changes* puts the folder back to what your other devices have.
+- **Receive-only and send-only shares**: switch a folder to *Receive Only* and the Vita will
+  receive changes without ever pushing its own — *Revert Local Changes* puts the folder back to
+  what your other devices have if something changed locally anyway. *Send Only* does the
+  opposite: it pushes your changes and never pulls remote ones, and *Override Changes* forces
+  your version onto the other devices.
 - **Pause** any share without losing its configuration.
 
 <p align="center">
@@ -46,6 +76,9 @@ official Syncthing apps you already run: there is nothing to install on the othe
 - Devices on the same Wi-Fi are **discovered automatically** and appear in the device list,
   ready to be ticked.
 - You can also type a **short ID** (the first group) and let LAN discovery fill in the rest.
+- The Vita also **listens for incoming connections** (TCP, relay, Global Discovery): a device
+  you have not paired that tries to connect triggers a dialog where you accept it, decline it,
+  or decide later.
 
 <p align="center">
   <img src="docs/readme/5_device_id.png" width="420" alt="The Device ID screen with its QR code">
@@ -54,15 +87,23 @@ official Syncthing apps you already run: there is nothing to install on the othe
 
 ### Works at home and away
 
-- **Local Discovery** finds your devices on the LAN in a couple of seconds.
+- **Local Discovery** finds your devices on the LAN in a couple of seconds; when a peer is on
+  the same network, its LAN address is preferred over its public one.
 - **Global Discovery** and **public relays** let the Vita reach your devices when you are not on
   the same network, the same way any Syncthing device does.
+- The Vita is also **reachable inbound**: it listens on TCP port 22000, joins a public relay and
+  announces itself on Global Discovery, so your other devices can connect straight to it. Behind
+  a NAT it advertises its relay address — or the external port mapped automatically with
+  UPnP/NAT-PMP when the router supports it — instead of an unreachable public IP.
 
 ### You stay in control
 
 - A folder offered by another device is **never synced without your consent**: the Vita asks
   you to accept it, decline it, or decide later. Accepted folders start paused until you pick
   where they go.
+- A **device you have not paired** that connects to the Vita is never added without your consent
+  either: accept, decline, or decide later from the dialog. Declined devices can be reviewed and
+  cleared in *Settings*.
 - Every device has its own **unique identity**, generated on first launch from the Vita's
   hardware random number generator.
 - A **protocol log** (in `Settings`) tells you what happened and when, for this session or the
@@ -72,7 +113,8 @@ official Syncthing apps you already run: there is nothing to install on the othe
 
 - Designed for the 960x544 screen, with crisp anti-aliased text (Poppins).
 - **D-pad and touch everywhere**: every button can be pressed, tapped or reached with the D-pad,
-  and the hint bar always tells you which face button does what.
+  long lists (shares, log viewer) scroll with a touch drag, and the hint bar always tells you
+  which face button does what.
 - **Five languages**: English, French, Spanish, German and Italian, following the system
   language by default.
 - **Two themes**: Dark, and Pure Black for the OLED screen of the PS Vita 1000.
@@ -124,7 +166,9 @@ to sleep as usual, and reconnects to your devices when it wakes up.
 
 - Files are **streamed block by block** into a hidden temporary file, never loaded whole, so a
   2 GB file needs no more RAM than a 2 KB one.
-- **Delta sync**: when a file changes, only the blocks that differ are downloaded.
+- **Delta sync**: when a file changes, only the blocks that differ are downloaded. Block
+  matching uses a rolling weak hash, so even a file shifted by an insertion only re-downloads
+  what actually changed, and BEP messages are LZ4-compressed when that makes them smaller.
 - Everything that grows from outside input is **bounded**: discovered LAN devices, concurrent
   sessions, the in-memory log (200 lines), the log history viewer (2,000 lines), the glyph cache.
 - UI strings in all five languages are **static catalogs**: drawing a frame does not allocate
@@ -167,8 +211,9 @@ and write your save data, pictures and music.
    add it by ID or with **Scan QR**.
 4. Accept the folder on your computer, pick where it goes, and let it sync.
 
-The Vita always connects *to* your other devices, it never waits for incoming connections.
-Desktop Syncthing accepts connections by default, so this needs no setup on your side.
+The Vita connects *to* your other devices, and also accepts incoming connections on TCP port
+22000, so desktop Syncthing can reach it directly too — no setup needed on your side. A device
+you have not paired is always asked for your consent before it can sync.
 
 All the app's state lives in `ux0:data/syncthing/`.
 
@@ -179,9 +224,11 @@ All the app's state lives in `ux0:data/syncthing/`.
 The Vita app is built on two other crates, which also live here:
 
 - **[`syncthing-core`](crates/syncthing-core)**: a platform-independent Syncthing library in
-  pure Rust: BEP/1.0 codecs, TLS 1.3 transport (pure-Rust crypto, no OpenSSL or `ring`, so it
-  cross-compiles for the Vita), Local and Global Discovery, relays, folder scanning and pulls,
-  crash-safe storage. Nothing Vita-specific in it.
+  pure Rust: BEP/1.0 codecs (LZ4 compression, `DownloadProgress`, secondary 1+2 connections),
+  TLS 1.3 transport (pure-Rust crypto, no OpenSSL or `ring`, so it cross-compiles for the Vita),
+  Local and Global Discovery, relays, UPnP/NAT-PMP port mapping, folder scanning and pulls with
+  `.stignore` filtering and `.stversions` versioning, crash-safe storage. Nothing Vita-specific
+  in it.
 - **[`syncthing-cli`](crates/syncthing-cli)**: a small command-line Syncthing client for Linux
   and macOS built on the same library. Handy as a lightweight peer for the Vita, and it is
   what the end-to-end tests sync against.
