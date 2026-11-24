@@ -7,8 +7,8 @@ use std::io;
 use super::context::SessionContext;
 use super::control::SyncControl;
 use super::events::SyncEvent;
+use super::folder_requests::{handle_requests, RequestStep, RequestsOutcome};
 use super::folders::FolderSyncState;
-use super::index_exchange::publish_index;
 use super::keepalive::send_keepalive_if_due;
 use crate::tls::BepTlsStream;
 
@@ -28,29 +28,32 @@ pub fn handle_override_requests(
             && storage.is_folder_send_only(folder_id)
             && !storage.is_folder_paused(folder_id)
     });
-    for folder_id in &requested {
-        let remote = folders.remote_files(folder_id).to_vec();
-        let own_id = ctx.own_id();
-        let overridden =
-            match storage.override_remote_changes(folder_id, own_id, &remote, &mut || {
+    let outcome = handle_requests(
+        stream,
+        ctx,
+        folders,
+        &requested,
+        |stream, ctx, folder_id, remote| {
+            let own_id = ctx.own_id();
+            match storage.override_remote_changes(folder_id, own_id, remote, &mut || {
                 send_keepalive_if_due(stream, ctx)
             }) {
-                Ok(overridden) => overridden,
+                Ok(overridden) => Ok(RequestStep::Done(overridden)),
                 Err(e) => {
                     ctx.emit(SyncEvent::FolderUnavailable {
-                        folder: folder_id.clone(),
+                        folder: folder_id.to_owned(),
                         error: e.to_string(),
                     });
-                    continue;
+                    Ok(RequestStep::Skipped)
                 }
-            };
-        let (index, _) = storage.local_index_snapshot(folder_id, own_id, &remote);
-        publish_index(stream, ctx, folders, &index)?;
-        folders.upsert_local_index(index);
-        ctx.emit(SyncEvent::RemoteChangesOverridden {
-            folder: folder_id.clone(),
-            overridden,
-        });
-    }
-    Ok(!requested.is_empty())
+            }
+        },
+        |ctx, folder_id, overridden| {
+            ctx.emit(SyncEvent::RemoteChangesOverridden {
+                folder: folder_id.to_owned(),
+                overridden,
+            });
+        },
+    )?;
+    Ok(!matches!(outcome, RequestsOutcome::Idle))
 }

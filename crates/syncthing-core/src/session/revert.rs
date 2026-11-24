@@ -8,8 +8,8 @@ use super::context::SessionContext;
 use super::control::SyncControl;
 use super::download::{download_folder, DownloadOutcome};
 use super::events::SyncEvent;
+use super::folder_requests::{handle_requests, RequestStep, RequestsOutcome};
 use super::folders::FolderSyncState;
-use super::index_exchange::publish_index;
 use super::keepalive::send_keepalive_if_due;
 use crate::tls::BepTlsStream;
 
@@ -38,37 +38,42 @@ pub fn handle_revert_requests(
             && storage.is_folder_receive_only(folder_id)
             && !storage.is_folder_paused(folder_id)
     });
-    for folder_id in &requested {
-        let remote = folders.remote_files(folder_id).to_vec();
-        let own_id = ctx.own_id();
-        let reverted = match storage.revert_local_changes(folder_id, own_id, &remote, &mut || {
-            send_keepalive_if_due(stream, ctx)
-        }) {
-            Ok(reverted) => reverted,
-            Err(e) => {
-                ctx.emit(SyncEvent::FolderUnavailable {
-                    folder: folder_id.clone(),
-                    error: e.to_string(),
-                });
-                continue;
+    let outcome = handle_requests(
+        stream,
+        ctx,
+        folders,
+        &requested,
+        |stream, ctx, folder_id, remote| {
+            let own_id = ctx.own_id();
+            let reverted = match storage.revert_local_changes(folder_id, own_id, remote, &mut || {
+                send_keepalive_if_due(stream, ctx)
+            }) {
+                Ok(reverted) => reverted,
+                Err(e) => {
+                    ctx.emit(SyncEvent::FolderUnavailable {
+                        folder: folder_id.to_owned(),
+                        error: e.to_string(),
+                    });
+                    return Ok(RequestStep::Skipped);
+                }
+            };
+            if let DownloadOutcome::ClosedByPeer(reason) =
+                download_folder(stream, ctx, folder_id, remote, false)?
+            {
+                return Ok(RequestStep::Closed(reason));
             }
-        };
-        if let DownloadOutcome::ClosedByPeer(reason) =
-            download_folder(stream, ctx, folder_id, &remote, false)?
-        {
-            return Ok(RevertOutcome::ClosedByPeer(reason));
-        }
-        let (index, _) = storage.local_index_snapshot(folder_id, own_id, &remote);
-        publish_index(stream, ctx, folders, &index)?;
-        folders.upsert_local_index(index);
-        ctx.emit(SyncEvent::LocalChangesReverted {
-            folder: folder_id.clone(),
-            reverted,
-        });
-    }
-    Ok(if requested.is_empty() {
-        RevertOutcome::Idle
-    } else {
-        RevertOutcome::Reverted
+            Ok(RequestStep::Done(reverted))
+        },
+        |ctx, folder_id, reverted| {
+            ctx.emit(SyncEvent::LocalChangesReverted {
+                folder: folder_id.to_owned(),
+                reverted,
+            });
+        },
+    )?;
+    Ok(match outcome {
+        RequestsOutcome::Idle => RevertOutcome::Idle,
+        RequestsOutcome::Done => RevertOutcome::Reverted,
+        RequestsOutcome::ClosedByPeer(reason) => RevertOutcome::ClosedByPeer(reason),
     })
 }

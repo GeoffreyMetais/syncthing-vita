@@ -25,6 +25,7 @@ pub mod control;
 mod dispatch;
 mod download;
 pub mod events;
+mod folder_requests;
 pub mod folders;
 mod index_exchange;
 mod initial_sync;
