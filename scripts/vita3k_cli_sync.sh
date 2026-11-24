@@ -46,10 +46,21 @@ BACKUP="$(mktemp -d)"
 [[ -d "$DATA" ]] && cp -a "$DATA" "$BACKUP/syncthing"
 CLI_PID=""
 COPIER=""
+stop_vita3k() {
+    pkill -x Vita3K 2>/dev/null || true
+    local i
+    for ((i = 0; i < 12; i++)); do
+        pgrep -x Vita3K >/dev/null 2>&1 || return 0
+        sleep 0.25
+    done
+    pkill -9 -x Vita3K 2>/dev/null || true
+    sleep 0.25
+}
+
 cleanup() {
     [[ -n "$COPIER" ]] && kill "$COPIER" 2>/dev/null || true
     [[ -n "$CLI_PID" ]] && kill "$CLI_PID" 2>/dev/null || true
-    pkill -x Vita3K 2>/dev/null || true
+    stop_vita3k
     rm -rf "$DATA"
     [[ -d "$BACKUP/syncthing" ]] && cp -a "$BACKUP/syncthing" "$DATA"
     rm -rf "$BACKUP" "$WORK"
@@ -145,6 +156,7 @@ run_vita3k_phase() {
     cp "$script" "$DATA/ui_script.txt"
     unzip -qo "$vpk" -d "$UX0/app/SYNCTHING"
 
+    stop_vita3k
     ./scripts/vita3k_launch.sh -z --frontend sdl -l 2 -r SYNCTHING > "$phase_out/vita3k.log" 2>&1 &
     local waited=0
     while (( waited < run_secs )); do
@@ -155,8 +167,7 @@ run_vita3k_phase() {
             break
         fi
     done
-    pkill -x Vita3K || true
-    sleep 1
+    stop_vita3k
 
     kill "$COPIER" 2>/dev/null || true
     wait "$COPIER" 2>/dev/null || true

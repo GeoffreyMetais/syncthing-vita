@@ -6,22 +6,32 @@ use std::io;
 
 use super::context::SessionContext;
 use super::control::SyncControl;
-use super::download::download_folder;
+use super::download::{download_folder, DownloadOutcome};
 use super::events::SyncEvent;
 use super::folders::FolderSyncState;
 use super::index_exchange::publish_index;
 use super::keepalive::send_keepalive_if_due;
 use crate::tls::BepTlsStream;
 
+/// Outcome of handling UI-requested reverts for receive-only folders.
+pub enum RevertOutcome {
+    /// No revert was requested for any synchronized receive-only folder.
+    Idle,
+    /// At least one folder was reverted and its updated index was published.
+    Reverted,
+    /// The peer sent a BEP `Close` frame with this reason while reverting.
+    ClosedByPeer(String),
+}
+
 /// Reverts every pending folder this session synchronizes (shared with the peer, receive-only,
 /// not paused): local changes are dropped, the peer's version is pulled again and the result
-/// is published. Returns `true` if a folder was reverted.
+/// is published.
 pub fn handle_revert_requests(
     stream: &mut BepTlsStream,
     ctx: &mut SessionContext<'_>,
     folders: &mut FolderSyncState,
     control: &SyncControl,
-) -> io::Result<bool> {
+) -> io::Result<RevertOutcome> {
     let storage = ctx.storage;
     let requested = control.take_revert_requests(|folder_id| {
         folders.is_shared_folder(folder_id)
@@ -43,7 +53,11 @@ pub fn handle_revert_requests(
                 continue;
             }
         };
-        download_folder(stream, ctx, folder_id, &remote, false)?;
+        if let DownloadOutcome::ClosedByPeer(reason) =
+            download_folder(stream, ctx, folder_id, &remote, false)?
+        {
+            return Ok(RevertOutcome::ClosedByPeer(reason));
+        }
         let (index, _) = storage.local_index_snapshot(folder_id, own_id, &remote);
         publish_index(stream, ctx, folders, &index)?;
         folders.upsert_local_index(index);
@@ -52,5 +66,9 @@ pub fn handle_revert_requests(
             reverted,
         });
     }
-    Ok(!requested.is_empty())
+    Ok(if requested.is_empty() {
+        RevertOutcome::Idle
+    } else {
+        RevertOutcome::Reverted
+    })
 }

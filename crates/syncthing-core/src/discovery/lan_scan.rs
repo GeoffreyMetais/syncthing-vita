@@ -10,7 +10,7 @@ use crate::bep::BEP_DEFAULT_PORT;
 use crate::device_id::DeviceId;
 use crate::tls::probe_bep_peer_device_id;
 
-const SCAN_WORKERS: usize = if cfg!(target_os = "vita") { 8 } else { 16 };
+const SCAN_WORKERS: usize = if cfg!(target_os = "vita") { 4 } else { 16 };
 
 /// Scans the local `/24` subnet on TCP port `22000` (plus `127.0.0.1:22000`) and verifies any open
 /// port using a TLS 1.3 (`bep/1.0`) handshake to extract its Syncthing `DeviceId`.
@@ -28,6 +28,20 @@ pub fn scan_lan_bep_peers_interruptible<F>(
 where
     F: Fn() -> bool + Send + Sync,
 {
+    scan_lan_bep_peers_with_options(own_device_id, true, should_stop)
+}
+
+/// Scans the local `/24` subnet on TCP port `22000`, probing `127.0.0.1:22000` only when
+/// `include_loopback` is `true` (callers already bound on TCP `22000` pass `false` to avoid
+/// self-probing their own listener), and aborts early when `should_stop()` returns `true`.
+pub fn scan_lan_bep_peers_with_options<F>(
+    own_device_id: DeviceId,
+    include_loopback: bool,
+    should_stop: F,
+) -> Vec<(SocketAddr, Announce)>
+where
+    F: Fn() -> bool + Send + Sync,
+{
     if should_stop() {
         return Vec::new();
     }
@@ -37,10 +51,12 @@ where
     let self_host = octets[3];
 
     let mut candidates = Vec::with_capacity(255);
-    candidates.push(SocketAddr::new(
-        IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
-        BEP_DEFAULT_PORT,
-    ));
+    if include_loopback {
+        candidates.push(SocketAddr::new(
+            IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)),
+            BEP_DEFAULT_PORT,
+        ));
+    }
     for host in 1u8..=254u8 {
         if host == self_host {
             continue;

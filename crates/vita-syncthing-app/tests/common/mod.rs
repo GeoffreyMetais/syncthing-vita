@@ -15,7 +15,7 @@ pub fn temp_test_dir(suffix: &str) -> String {
 
 use vita_syncthing_app::application::{InputController, UserCommand};
 use vita_syncthing_app::domain::{AppState, Rect, UiAction};
-use vita_syncthing_app::infrastructure::{ConfigRepository, InputFrame};
+use vita_syncthing_app::infrastructure::{ConfigRepository, InputFrame, TouchDrag};
 use vita_syncthing_app::ui::gfx::Gfx;
 use vita_syncthing_app::ui::renderer::draw_frame;
 
@@ -99,4 +99,44 @@ pub fn tap_action(state: &mut AppState, repo: &ConfigRepository, action: UiActio
         .last()
         .unwrap_or_else(|| panic!("{action:?} is not on screen"));
     tap_rect(state, repo, rect)
+}
+
+/// Drags a finger vertically by `dy` pixels from the centre of the first scroll area of the
+/// current frame declared for `target`, over `steps` frames, then lifts it.
+pub fn drag_over(
+    state: &mut AppState,
+    repo: &ConfigRepository,
+    target: vita_syncthing_app::domain::ScrollTarget,
+    dy: i32,
+    steps: i32,
+) {
+    draw(state);
+    let area = *state
+        .hit_map
+        .scroll_areas()
+        .iter()
+        .find(|a| a.target == target)
+        .unwrap_or_else(|| panic!("no {target:?} scroll area on screen"));
+    let start = (
+        (area.rect.x + area.rect.w / 2) as usize,
+        (area.rect.y + area.rect.h / 2) as usize,
+    );
+    for i in 1..=steps.max(1) {
+        let total_dy = dy * i / steps.max(1);
+        let pos = (start.0, (start.1 as i32 + total_dy).clamp(0, 543) as usize);
+        feed(
+            state,
+            repo,
+            InputFrame {
+                touch_drag: Some(TouchDrag {
+                    start,
+                    total_dy,
+                    started: i == 1,
+                }),
+                touch_pos: Some(pos),
+                any_activity: true,
+                ..Default::default()
+            },
+        );
+    }
 }

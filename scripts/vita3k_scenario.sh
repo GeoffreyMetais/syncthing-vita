@@ -19,8 +19,19 @@ VPK="target/armv7-sony-vita-newlibeabihf/release/SYNCTHING.vpk"
 cd "$(dirname "$0")/.."
 BACKUP="$(mktemp -d)"
 [[ -d "$DATA" ]] && cp -a "$DATA" "$BACKUP/syncthing"
-restore() {
+stop_vita3k() {
     pkill -x Vita3K 2>/dev/null || true
+    local i
+    for ((i = 0; i < 12; i++)); do
+        pgrep -x Vita3K >/dev/null 2>&1 || return 0
+        sleep 0.25
+    done
+    pkill -9 -x Vita3K 2>/dev/null || true
+    sleep 0.25
+}
+
+restore() {
+    stop_vita3k
     rm -rf "$DATA"
     [[ -d "$BACKUP/syncthing" ]] && cp -a "$BACKUP/syncthing" "$DATA"
     rm -rf "$BACKUP"
@@ -32,10 +43,10 @@ rm -rf "$DATA/shots"
 cp "$SCRIPT" "$DATA/ui_script.txt"
 unzip -qo "$VPK" -d "$UX0/app/SYNCTHING"
 
+stop_vita3k
 ./scripts/vita3k_launch.sh -z --frontend sdl -l 2 -r SYNCTHING > "$OUT_DIR/vita3k.log" 2>&1 &
 sleep "$RUN_SECS"
-pkill -x Vita3K || true
-sleep 1
+stop_vita3k
 
 for f in "$DATA"/shots/*.rgba; do
     [[ -f "$f" ]] || continue

@@ -4,12 +4,12 @@
 
 mod common;
 
-use common::{draw, press, rects_of, tap_action, tap_rect, temp_test_dir};
+use common::{drag_over, draw, press, rects_of, tap_action, tap_rect, temp_test_dir};
 use vita_syncthing_app::application::ShareService;
 use vita_syncthing_app::domain::defaults::LOG_BUFFER_LINES;
 use vita_syncthing_app::domain::{
-    ActiveTab, AppState, Language, LanguagePreference, LogScope, LogView, NavFocus, UiAction,
-    LOG_VIEW_PAGE, LOG_VIEW_ROWS, SETTINGS_ROW_LOG,
+    ActiveTab, AppState, Language, LanguagePreference, LogScope, LogView, NavFocus, ScrollTarget,
+    UiAction, LOG_VIEW_PAGE, LOG_VIEW_ROWS, SETTINGS_ROW_LOG,
 };
 use vita_syncthing_app::infrastructure::{
     ConfigRepository, BTN_CIRCLE, BTN_CROSS, BTN_DOWN, BTN_L, BTN_R, BTN_TRIANGLE, BTN_UP,
@@ -274,5 +274,36 @@ fn test_log_file_is_rotated_and_history_spans_both_files() {
     assert_eq!(history.len(), lines);
     assert!(history[0].starts_with("0 "));
     assert!(history[lines - 1].starts_with(&format!("{} ", lines - 1)));
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_dragging_over_the_log_lines_scrolls_them_with_the_finger() {
+    let total = 60;
+    let (dir, repo, mut state) = setup("logs-drag", total);
+    tap_action(&mut state, &repo, UiAction::OpenLogs);
+    draw(&mut state);
+    let step = state
+        .hit_map
+        .scroll_areas()
+        .iter()
+        .find(|a| a.target == ScrollTarget::LogLines)
+        .expect("log lines scroll area")
+        .step;
+    assert_eq!(window(&state), (total - LOG_VIEW_ROWS, total));
+
+    // Finger moved down by five lines: older lines come into view, no page jump.
+    drag_over(&mut state, &repo, ScrollTarget::LogLines, 5 * step, 5);
+    assert_eq!(window(&state), (total - LOG_VIEW_ROWS - 5, total - 5));
+    // Finger moved up by two lines: back towards the newest ones.
+    drag_over(&mut state, &repo, ScrollTarget::LogLines, -2 * step, 2);
+    assert_eq!(window(&state), (total - LOG_VIEW_ROWS - 3, total - 3));
+    // Far past either end, the window stops on the oldest / newest lines.
+    drag_over(&mut state, &repo, ScrollTarget::LogLines, 200 * step, 10);
+    assert_eq!(window(&state), (0, LOG_VIEW_ROWS));
+    drag_over(&mut state, &repo, ScrollTarget::LogLines, -200 * step, 10);
+    assert_eq!(window(&state), (total - LOG_VIEW_ROWS, total));
+    // The viewer stays open.
+    assert!(state.log_view.is_some());
     let _ = std::fs::remove_dir_all(&dir);
 }

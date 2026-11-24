@@ -48,6 +48,8 @@ impl InputController {
     ) -> UserCommand {
         let prev_tab = state.active_tab;
         let prev_modal = state.modal;
+        // Selection moves scroll the share list from the window on screen.
+        state.settle_share_window();
         let mut cmd = Self::handle_frame(state, repo, input);
         if state.active_tab != prev_tab {
             state.reset_nav_for_tab();
@@ -192,6 +194,8 @@ impl InputController {
         if rows != 0 {
             match area.target {
                 ScrollTarget::FilesList => FilesController::scroll(state, rows),
+                ScrollTarget::ShareList => SharesController::scroll(state, rows),
+                ScrollTarget::LogLines => LogsController::drag_scroll(state, rows),
             }
         }
     }

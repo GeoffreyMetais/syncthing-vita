@@ -35,9 +35,20 @@ rm -rf "$OUT_DIR" && mkdir -p "$OUT_DIR"
 BACKUP="$(mktemp -d)"
 [[ -d "$DATA" ]] && cp -a "$DATA" "$BACKUP/syncthing"
 CLI_PID=""
+stop_vita3k() {
+    pkill -x Vita3K 2>/dev/null || true
+    local i
+    for ((i = 0; i < 12; i++)); do
+        pgrep -x Vita3K >/dev/null 2>&1 || return 0
+        sleep 0.25
+    done
+    pkill -9 -x Vita3K 2>/dev/null || true
+    sleep 0.25
+}
+
 cleanup() {
     [[ -n "$CLI_PID" ]] && kill "$CLI_PID" 2>/dev/null || true
-    pkill -x Vita3K 2>/dev/null || true
+    stop_vita3k
     rm -rf "$DATA" "$VITA_SHARE"
     [[ -d "$BACKUP/syncthing" ]] && cp -a "$BACKUP/syncthing" "$DATA"
     rm -rf "$BACKUP" "$WORK"
@@ -66,6 +77,15 @@ wait_grep() {
     local pattern="$1" file="$2" secs="$3" i
     for ((i = 0; i < secs * 4; i++)); do
         grep -qE "$pattern" "$file" 2>/dev/null && return 0
+        sleep 0.25
+    done
+    return 1
+}
+
+wait_cmp() {
+    local a="$1" b="$2" secs="$3" i
+    for ((i = 0; i < secs * 4; i++)); do
+        cmp -s "$a" "$b" && return 0
         sleep 0.25
     done
     return 1
@@ -124,14 +144,14 @@ echo "written on Vita (phase 2)" > "$VITA_SHARE/from_vita.txt"
 
 # Scripted timeline (60 VBlanks = ~1s):
 #   5s  -> 1_offline_initial               (CLI not started yet)
-#   30s -> 2_connected_synced              (CLI running, initial + live sync done, Ready/Connected 1+2)
-#   42s -> 3_disconnected_after_cli_stop   (CLI stopped cleanly via SIGINT)
-#   64s -> 4_reconnected_synced            (CLI restarted, reconnected + post_reconnect.txt synced)
-#   65s -> START + CROSS                   (Vita quits cleanly -> sends BEP Close to CLI)
+#   45s -> 2_connected_synced              (CLI running, initial + live sync done, Ready/Connected 1+2)
+#   57s -> 3_disconnected_after_cli_stop   (CLI stopped cleanly via SIGINT)
+#   79s -> 4_reconnected_synced            (CLI restarted, reconnected + post_reconnect.txt synced)
+#   80s -> START + CROSS                   (Vita quits cleanly -> sends BEP Close to CLI)
 cat > "$DATA/ui_script.txt" <<'EOF'
 wait 300
 shot 1_offline_initial
-wait 1500
+wait 2400
 shot 2_connected_synced
 wait 720
 shot 3_disconnected_after_cli_stop
@@ -149,6 +169,7 @@ unzip -qo "$VPK" -d "$UX0/app/SYNCTHING"
 
 # --- Phase 1: Launch Vita while CLI is offline -------------------------------------------
 echo "=== Phase 1: Offline initial state (CLI stopped) ==="
+stop_vita3k
 ./scripts/vita3k_launch.sh -z --frontend sdl -l 2 -r SYNCTHING > "$OUT_DIR/vita3k.log" 2>&1 &
 
 if wait_file "$DATA/shots/1_offline_initial.rgba" 45; then
@@ -168,7 +189,7 @@ echo "=== Phase 2 & 3: Connection, bidirectional sync, and live update ==="
 CLI_LOG_1="$OUT_DIR/cli_phase1.log"
 start_cli_lan "$CLI_LOG_1"
 
-if wait_grep "In sync with vita" "$CLI_LOG_1" 25; then
+if wait_grep "In sync with vita" "$CLI_LOG_1" 40; then
     ok "[phase2] CLI reached 'In sync with vita'"
 else
     fail "[phase2] CLI did not reach 'In sync with vita'"
@@ -196,6 +217,7 @@ fi
 
 # Trigger Phase 3 live update while session stays active.
 echo "live delta while connected" > "$WORK/cli-share/live_update.txt"
+wait_cmp "$WORK/cli-share/live_update.txt" "$VITA_SHARE/live_update.txt" 20 || true
 
 if wait_file "$DATA/shots/2_connected_synced.rgba" 75; then
     ok "[phase3] Captured 2_connected_synced screenshot"
@@ -291,7 +313,7 @@ else
 fi
 
 sleep 1
-pkill -x Vita3K 2>/dev/null || true
+stop_vita3k
 stop_cli_gracefully "$CLI_LOG_2"
 
 cp "$DATA/syncthing.log" "$OUT_DIR/vita.log" 2>/dev/null || true

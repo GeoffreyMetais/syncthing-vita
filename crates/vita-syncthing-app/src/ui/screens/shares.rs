@@ -1,17 +1,19 @@
 //! Share list of the `Overview` page: one compact card per configured Syncthing share with its
-//! `Devices` and `Delete` actions. The list scrolls to keep the selected share visible.
+//! `Devices` and `Delete` actions. The list scrolls to keep the selected share visible, and a
+//! finger dragged over the cards scrolls it.
 //!
 //! Every interactive element is declared in the frame's `HitMap` where it is drawn; input is
 //! handled from these declarations by `application::SharesController`.
 
-use crate::domain::{ActiveTab, AppState, FocusSlot, HitMap, Hotspot, Rect, ShareMode, UiAction};
+use crate::domain::{
+    ActiveTab, AppState, FocusSlot, HitMap, Hotspot, Rect, ScrollArea, ScrollTarget, ShareMode,
+    UiAction, VISIBLE_SHARES,
+};
 use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton};
 use crate::ui::strings;
 use crate::ui::theme::{UiTheme, CONTENT_R, CONTENT_W, CONTENT_X, C_GOOD, C_WARN};
 use crate::ui::widgets::{action_width, draw_action_hotspot, draw_card, draw_chip, draw_scrollbar};
 
-/// Shares visible at once; the list scrolls with the selection beyond that.
-const VISIBLE_SHARES: usize = 4;
 /// Height of a share card and vertical distance between two cards.
 /// Three text lines (title, target path, linked devices); four cards fit in the content area.
 const SHARE_CARD_H: i32 = 68;
@@ -36,13 +38,19 @@ pub fn draw_share_list(
         return;
     }
     let count = state.shares.len();
-    let first = first_visible_share(state.selected_share_idx, count);
+    let first = state.first_visible_share();
     let last = (first + VISIBLE_SHARES).min(count);
+    let list_h = (VISIBLE_SHARES as i32 - 1) * SHARE_CARD_STEP + SHARE_CARD_H;
+    // Dragging a finger over the cards scrolls the list (taps still reach the cards).
+    hits.add_scroll_area(ScrollArea {
+        rect: Rect::new(CONTENT_X, top_y, CONTENT_W, list_h),
+        target: ScrollTarget::ShareList,
+        step: SHARE_CARD_STEP,
+    });
     for i in first..last {
         let ry = top_y + ((i - first) as i32) * SHARE_CARD_STEP;
         draw_share_card(gfx, th, state, hits, i, ry);
     }
-    let list_h = (VISIBLE_SHARES as i32 - 1) * SHARE_CARD_STEP + SHARE_CARD_H;
     draw_scrollbar(
         gfx,
         th,
@@ -53,15 +61,6 @@ pub fn draw_share_list(
         VISIBLE_SHARES,
         count,
     );
-}
-
-/// First share drawn so that `selected` is visible.
-fn first_visible_share(selected: usize, count: usize) -> usize {
-    let max_first = count.saturating_sub(VISIBLE_SHARES);
-    selected
-        .min(count.saturating_sub(1))
-        .saturating_sub(VISIBLE_SHARES - 1)
-        .min(max_first)
 }
 
 fn draw_empty_list(gfx: &mut Gfx, th: &UiTheme, state: &AppState, top_y: i32) {

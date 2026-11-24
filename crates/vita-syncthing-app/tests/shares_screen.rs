@@ -3,15 +3,16 @@
 
 mod common;
 
-use common::{draw, press, rect_of, tap, tap_rect, temp_test_dir};
+use common::{drag_over, draw, press, rect_of, tap, tap_rect, temp_test_dir};
 use syncthing_core::DeviceId;
 use vita_syncthing_app::application::{DeviceRegistry, InputController, ShareService};
 use vita_syncthing_app::domain::{
-    ActiveTab, AppState, FocusSlot, Language, LanguagePreference, ModalDialog, UiAction,
+    ActiveTab, AppState, FocusSlot, Language, LanguagePreference, ModalDialog, NavFocus,
+    ScrollTarget, UiAction, VISIBLE_SHARES,
 };
 use vita_syncthing_app::infrastructure::{
     ConfigRepository, InputFrame, BTN_CIRCLE, BTN_CROSS, BTN_DOWN, BTN_RIGHT, BTN_SQUARE,
-    BTN_TRIANGLE,
+    BTN_TRIANGLE, BTN_UP,
 };
 
 const PEER: DeviceId = DeviceId([0x42; 32]);
@@ -190,5 +191,93 @@ fn test_no_page_element_is_declared_behind_the_screensaver() {
     state.oled_saver_active = true;
     draw(&mut state);
     assert!(state.hit_map.hotspots().is_empty());
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+/// Indexes of the share cards drawn in the current frame.
+fn drawn_shares(state: &mut AppState) -> Vec<usize> {
+    draw(state);
+    state
+        .hit_map
+        .hotspots()
+        .iter()
+        .filter_map(|h| match h.action {
+            UiAction::SelectShare(i) => Some(i),
+            _ => None,
+        })
+        .collect()
+}
+
+#[test]
+fn test_dragging_over_the_share_list_scrolls_it_and_keeps_the_selection_visible() {
+    let (dir, repo, mut state) = setup("shares-drag", 9);
+    state.selected_share_idx = 0;
+    draw(&mut state);
+    let step = state
+        .hit_map
+        .scroll_areas()
+        .iter()
+        .find(|a| a.target == ScrollTarget::ShareList)
+        .expect("share list scroll area")
+        .step;
+    assert_eq!(drawn_shares(&mut state), vec![0, 1, 2, 3]);
+
+    // Finger moved up by two cards: the list follows it, the selection stays on screen.
+    drag_over(&mut state, &repo, ScrollTarget::ShareList, -2 * step, 6);
+    assert_eq!(drawn_shares(&mut state), vec![2, 3, 4, 5]);
+    assert_eq!(state.selected_share_idx, 2);
+    // A drag opens nothing.
+    assert_eq!(state.modal, ModalDialog::None);
+
+    // Dragging far past the end stops on the last full window.
+    drag_over(&mut state, &repo, ScrollTarget::ShareList, -20 * step, 10);
+    assert_eq!(drawn_shares(&mut state), vec![5, 6, 7, 8]);
+    assert_eq!(state.selected_share_idx, 5);
+
+    // Finger moved down by one card: back one share.
+    drag_over(&mut state, &repo, ScrollTarget::ShareList, step, 4);
+    assert_eq!(drawn_shares(&mut state), vec![4, 5, 6, 7]);
+    // And far past the start: the first window.
+    drag_over(&mut state, &repo, ScrollTarget::ShareList, 20 * step, 10);
+    assert_eq!(drawn_shares(&mut state), vec![0, 1, 2, 3]);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_dpad_moves_scroll_from_the_window_on_screen() {
+    let (dir, repo, mut state) = setup("shares-drag-dpad", 9);
+    state.selected_share_idx = 0;
+    state.nav.focus = NavFocus::Content;
+    state.nav.header = false;
+    draw(&mut state);
+    let step = state.hit_map.scroll_areas()[0].step;
+    drag_over(&mut state, &repo, ScrollTarget::ShareList, -3 * step, 3);
+    assert_eq!(drawn_shares(&mut state), vec![3, 4, 5, 6]);
+    assert_eq!(state.selected_share_idx, 3);
+
+    // Down within the window keeps it; past its last card it scrolls by one.
+    for _ in 0..3 {
+        press(&mut state, &repo, BTN_DOWN);
+    }
+    assert_eq!(state.selected_share_idx, 6);
+    assert_eq!(drawn_shares(&mut state), vec![3, 4, 5, 6]);
+    press(&mut state, &repo, BTN_DOWN);
+    assert_eq!(drawn_shares(&mut state), vec![4, 5, 6, 7]);
+
+    // Up within the window keeps it too (no jump back to the selection at the bottom).
+    press(&mut state, &repo, BTN_UP);
+    press(&mut state, &repo, BTN_UP);
+    assert_eq!(state.selected_share_idx, 5);
+    assert_eq!(drawn_shares(&mut state), vec![4, 5, 6, 7]);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_short_share_list_does_not_scroll() {
+    let (dir, repo, mut state) = setup("shares-drag-short", VISIBLE_SHARES - 1);
+    state.selected_share_idx = 0;
+    drag_over(&mut state, &repo, ScrollTarget::ShareList, -300, 5);
+    assert_eq!(drawn_shares(&mut state), vec![0, 1, 2]);
+    assert_eq!(state.selected_share_idx, 0);
     let _ = std::fs::remove_dir_all(&dir);
 }

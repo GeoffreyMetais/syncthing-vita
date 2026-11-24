@@ -12,7 +12,7 @@ use super::events::SyncEvent;
 use super::keepalive::send_keepalive_if_due;
 use super::upload::serve_block_request;
 use crate::bep::{
-    read_bep_message, write_bep_message, write_bep_message_compressed, BepBlockInfo,
+    read_bep_message, write_bep_message, write_bep_message_compressed, BepBlockInfo, BepClose,
     BepDeviceCompression, BepDownloadProgress, BepFileDownloadProgressUpdate, BepFileInfo,
     BepMessageType, BepRequest, BepResponse, DownloadProgressUpdateType, BEP_BLOCK_HASH_LEN,
     BEP_BLOCK_SIZE,
@@ -26,24 +26,50 @@ const BLOCK_RESPONSE_TIMEOUT: Duration = Duration::from_secs(20);
 /// Number of downloaded blocks between periodic `DownloadProgress` updates.
 const DOWNLOAD_PROGRESS_BLOCK_INTERVAL: usize = 8;
 
+/// Outcome of bringing a folder up to date from the peer's index.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum DownloadOutcome {
+    /// Download pass finished (local file errors, if any, were skipped and marked incomplete).
+    Completed,
+    /// The peer sent a BEP `Close` frame with this reason while a block response was awaited.
+    ClosedByPeer(String),
+}
+
+enum BlockFetch {
+    Data(usize),
+    Skipped,
+    ClosedByPeer(String),
+}
+
+enum FetchAll {
+    Counts(usize, usize),
+    Skipped,
+    ClosedByPeer(String),
+}
+
+enum FileDownload {
+    Downloaded,
+    Skipped,
+    ClosedByPeer(String),
+}
+
 /// Brings `folder_id` up to date with the peer's `files`.
 /// Directories, deletions and identical content are handled locally (version-vector plan);
 /// only files with a newer remote version are downloaded.
-/// Returns `true` if anything changed locally.
 pub fn download_folder(
     stream: &mut BepTlsStream,
     ctx: &mut SessionContext<'_>,
     folder_id: &str,
     files: &[BepFileInfo],
     count_up_to_date: bool,
-) -> io::Result<bool> {
+) -> io::Result<DownloadOutcome> {
     if ctx.storage.is_folder_paused(folder_id)
         || ctx.storage.is_folder_send_only(folder_id)
         || !ctx
             .storage
             .is_folder_shared_with(folder_id, &ctx.peer_device_id)
     {
-        return Ok(false);
+        return Ok(DownloadOutcome::Completed);
     }
 
     let prev_timeout = stream.get_ref().read_timeout().ok().flatten();
@@ -61,7 +87,7 @@ fn apply_pull_plan(
     folder_id: &str,
     files: &[BepFileInfo],
     count_up_to_date: bool,
-) -> io::Result<bool> {
+) -> io::Result<DownloadOutcome> {
     let storage = ctx.storage;
     let own_id = ctx.own_id();
     let planned = storage.plan_pull_with_progress(folder_id, own_id, files, &mut || {
@@ -76,17 +102,15 @@ fn apply_pull_plan(
                 folder: folder_id.to_owned(),
                 error: e.to_string(),
             });
-            return Ok(false);
+            return Ok(DownloadOutcome::Completed);
         }
     };
 
-    let mut any_changed = false;
     for line in &plan.applied {
         ctx.emit(SyncEvent::LocalChangeApplied {
             folder: folder_id.to_owned(),
             description: line.clone(),
         });
-        any_changed = true;
     }
     if count_up_to_date {
         for file in &plan.up_to_date {
@@ -101,29 +125,36 @@ fn apply_pull_plan(
     // Completed files are recorded in the database as they come, saved at intervals; whatever
     // ends the downloads (success, protocol error, stop request), the rest is saved here.
     let mut skipped = false;
-    let downloads = plan.downloads.iter().try_for_each(|file| {
-        if download_file(stream, ctx, folder_id, file)? {
-            any_changed = true;
-        } else {
-            skipped = true;
+    let mut outcome: io::Result<DownloadOutcome> = Ok(DownloadOutcome::Completed);
+    for file in &plan.downloads {
+        match download_file(stream, ctx, folder_id, file) {
+            Ok(FileDownload::Downloaded) => {}
+            Ok(FileDownload::Skipped) => skipped = true,
+            Ok(FileDownload::ClosedByPeer(reason)) => {
+                outcome = Ok(DownloadOutcome::ClosedByPeer(reason));
+                break;
+            }
+            Err(e) => {
+                outcome = Err(e);
+                break;
+            }
         }
-        Ok(())
-    });
+    }
     storage.flush_folder_db(folder_id);
     if skipped {
         ctx.mark_folder_incomplete(folder_id);
     }
-    downloads.map(|()| any_changed)
+    outcome
 }
 
 /// Downloads the outdated blocks of one file into a temp file and commits it.
-/// Local filesystem errors only skip this file (`Ok(false)`); protocol errors are returned.
+/// Local filesystem errors only skip this file (`FileDownload::Skipped`); protocol errors are returned.
 fn download_file(
     stream: &mut BepTlsStream,
     ctx: &mut SessionContext<'_>,
     folder_id: &str,
     file: &BepFileInfo,
-) -> io::Result<bool> {
+) -> io::Result<FileDownload> {
     let storage = ctx.storage;
     let block_size = file
         .blocks
@@ -168,7 +199,7 @@ fn download_file(
         Err(e) => {
             storage.abort_download(folder_id, &file.name);
             emit_file_error(ctx, folder_id, file, &e);
-            return Ok(false);
+            return Ok(FileDownload::Skipped);
         }
     };
 
@@ -176,8 +207,9 @@ fn download_file(
     let mut progress_sent = false;
     let mut pending_indexes: Vec<i32> = Vec::with_capacity(DOWNLOAD_PROGRESS_BLOCK_INTERVAL);
 
-    // Fetches every outdated block: `Ok(None)` if the file must be skipped.
-    let mut fetch_all = || -> io::Result<Option<(usize, usize)>> {
+    // Fetches every outdated block: `FetchAll::Skipped` if the file must be skipped, or
+    // `FetchAll::ClosedByPeer` if the peer sent `Close`.
+    let mut fetch_all = || -> io::Result<FetchAll> {
         let (mut blocks, mut bytes) = (0usize, 0usize);
         for block in &outdated_blocks {
             if ctx.is_stop_requested() {
@@ -187,7 +219,7 @@ fn download_file(
                 ));
             }
             match fetch_block(stream, ctx, folder_id, file, block, &mut tmp)? {
-                Some(len) => {
+                BlockFetch::Data(len) => {
                     blocks += 1;
                     bytes += len;
                     if track_progress {
@@ -214,17 +246,18 @@ fn download_file(
                         }
                     }
                 }
-                None => return Ok(None),
+                BlockFetch::Skipped => return Ok(FetchAll::Skipped),
+                BlockFetch::ClosedByPeer(reason) => return Ok(FetchAll::ClosedByPeer(reason)),
             }
         }
-        Ok(Some((blocks, bytes)))
+        Ok(FetchAll::Counts(blocks, bytes))
     };
     let fetched = fetch_all();
     // The temp file must be closed before it is removed or renamed into place.
     drop(tmp);
     let (file_blocks, file_bytes) = match fetched {
-        Ok(Some(counts)) => counts,
-        Ok(None) => {
+        Ok(FetchAll::Counts(b, bytes)) => (b, bytes),
+        Ok(FetchAll::Skipped) => {
             if progress_sent {
                 send_download_progress(
                     stream,
@@ -237,7 +270,11 @@ fn download_file(
                 );
             }
             storage.abort_download(folder_id, &file.name);
-            return Ok(false);
+            return Ok(FileDownload::Skipped);
+        }
+        Ok(FetchAll::ClosedByPeer(reason)) => {
+            storage.abort_download(folder_id, &file.name);
+            return Ok(FileDownload::ClosedByPeer(reason));
         }
         Err(e) => {
             if progress_sent {
@@ -271,7 +308,7 @@ fn download_file(
         }
         storage.abort_download(folder_id, &file.name);
         emit_file_error(ctx, folder_id, file, &e);
-        return Ok(false);
+        return Ok(FileDownload::Skipped);
     }
     if track_progress {
         send_download_progress(
@@ -293,7 +330,7 @@ fn download_file(
         bytes_downloaded: file_bytes as u64,
         total_size,
     });
-    Ok(true)
+    Ok(FileDownload::Downloaded)
 }
 
 fn send_download_progress(
@@ -324,7 +361,8 @@ fn send_download_progress(
 }
 
 /// Requests one block and waits for its `Response`, serving peer `Request`s and answering
-/// `Ping`s meanwhile. Returns the stored length, or `None` if the file must be skipped.
+/// `Ping`s meanwhile. Returns the stored length, `BlockFetch::Skipped` if the file must be
+/// skipped, or `BlockFetch::ClosedByPeer` if the peer sent `Close`.
 fn fetch_block(
     stream: &mut BepTlsStream,
     ctx: &mut SessionContext<'_>,
@@ -332,7 +370,7 @@ fn fetch_block(
     file: &BepFileInfo,
     block: &BepBlockInfo,
     tmp: &mut File,
-) -> io::Result<Option<usize>> {
+) -> io::Result<BlockFetch> {
     let req_id = ctx.next_request_id();
     let req = BepRequest {
         id: req_id,
@@ -356,18 +394,23 @@ fn fetch_block(
             }
             BepMessageType::Request => serve_block_request(stream, ctx, &payload)?,
             BepMessageType::Ping => write_bep_message(stream, BepMessageType::Ping, &[])?,
-            // Index changes, a new `ClusterConfig` or `Close` cannot be applied in the middle
-            // of a file: keep them for the session loop instead of losing them.
-            BepMessageType::Index
-            | BepMessageType::IndexUpdate
-            | BepMessageType::ClusterConfig
-            | BepMessageType::Close => ctx.defer_message(mtype, payload),
+            BepMessageType::Close => {
+                let reason = BepClose::decode(&payload)
+                    .map(|c| c.reason)
+                    .unwrap_or_default();
+                return Ok(BlockFetch::ClosedByPeer(reason));
+            }
+            // Index changes or a new `ClusterConfig` cannot be applied in the middle of a file:
+            // keep them for the session loop instead of losing them.
+            BepMessageType::Index | BepMessageType::IndexUpdate | BepMessageType::ClusterConfig => {
+                ctx.defer_message(mtype, payload)
+            }
             _ => {}
         }
     };
 
     if resp.code != 0 {
-        return Ok(None);
+        return Ok(BlockFetch::Skipped);
     }
     if resp.data.len() != block.size.max(0) as usize {
         return Err(io::Error::new(
@@ -395,7 +438,7 @@ fn fetch_block(
         // Local filesystem error (invalid name on exFAT, path clash, ...):
         // skip this file but keep the BEP session alive.
         emit_file_error(ctx, folder_id, file, &e);
-        return Ok(None);
+        return Ok(BlockFetch::Skipped);
     }
 
     let len = resp.data.len();
@@ -407,7 +450,7 @@ fn fetch_block(
         size: len,
         total_size,
     });
-    Ok(Some(len))
+    Ok(BlockFetch::Data(len))
 }
 
 /// Scans the existing local file in one streaming pass for any full-size outdated blocks that

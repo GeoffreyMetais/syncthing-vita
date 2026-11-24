@@ -4,7 +4,7 @@
 use std::io;
 
 use super::context::SessionContext;
-use super::download::download_folder;
+use super::download::{download_folder, DownloadOutcome};
 use super::events::SyncEvent;
 use super::folders::{published_file_count, FolderSyncState};
 use super::keepalive::send_keepalive_if_due;
@@ -163,30 +163,40 @@ pub fn handle_runtime_cluster_config(
     });
 }
 
+/// Outcome of applying a runtime `Index` or `IndexUpdate` message.
+pub enum RuntimeIndex {
+    Ignored,
+    Applied,
+    ClosedByPeer(String),
+}
+
 /// Applies a runtime `Index` / `IndexUpdate`: downloads newer files, then publishes the
-/// resulting changes of our local index. Returns `true` if the folder was synchronized
-/// (shared and not paused).
+/// resulting changes of our local index.
 pub fn handle_runtime_index(
     stream: &mut BepTlsStream,
     ctx: &mut SessionContext<'_>,
     folders: &mut FolderSyncState,
     payload: &[u8],
     count_up_to_date: bool,
-) -> io::Result<bool> {
+) -> io::Result<RuntimeIndex> {
     let Ok(idx) = BepIndex::decode(payload) else {
-        return Ok(false);
+        return Ok(RuntimeIndex::Ignored);
     };
     if !folders.is_shared_folder(&idx.folder) {
-        return Ok(false);
+        return Ok(RuntimeIndex::Ignored);
     }
     folders.merge_remote_index(&idx.folder, &idx.files);
     if ctx.storage.is_folder_paused(&idx.folder) {
-        return Ok(false);
+        return Ok(RuntimeIndex::Ignored);
     }
     let (new_idx, _) = if ctx.storage.is_folder_send_only(&idx.folder) {
         scan_local_index(stream, ctx, folders, &idx.folder)?
     } else {
-        download_folder(stream, ctx, &idx.folder, &idx.files, count_up_to_date)?;
+        if let DownloadOutcome::ClosedByPeer(reason) =
+            download_folder(stream, ctx, &idx.folder, &idx.files, count_up_to_date)?
+        {
+            return Ok(RuntimeIndex::ClosedByPeer(reason));
+        }
         // The pull just scanned the folder: publish from the database without a second scan.
         ctx.storage.local_index_snapshot(
             &idx.folder,
@@ -196,24 +206,29 @@ pub fn handle_runtime_index(
     };
     publish_index(stream, ctx, folders, &new_idx)?;
     folders.upsert_local_index(new_idx);
-    Ok(true)
+    Ok(RuntimeIndex::Applied)
 }
 
 /// Pulls again the folders in which a file could not be downloaded (see
 /// [`SessionContext::mark_folder_incomplete`]), against everything the peer announced so far.
+/// Returns `Some(reason)` if the peer closed the connection mid-download.
 /// The caller publishes the result with [`rescan_and_publish`].
 pub fn retry_incomplete_pulls(
     stream: &mut BepTlsStream,
     ctx: &mut SessionContext<'_>,
     folders: &FolderSyncState,
-) -> io::Result<()> {
+) -> io::Result<Option<String>> {
     for folder_id in ctx.take_incomplete_folders() {
         if folders.is_shared_folder(&folder_id) {
             let remote = folders.remote_files(&folder_id);
-            download_folder(stream, ctx, &folder_id, remote, false)?;
+            if let DownloadOutcome::ClosedByPeer(reason) =
+                download_folder(stream, ctx, &folder_id, remote, false)?
+            {
+                return Ok(Some(reason));
+            }
         }
     }
-    Ok(())
+    Ok(None)
 }
 
 /// Rescans every non-paused shared folder and publishes the entries that changed since the

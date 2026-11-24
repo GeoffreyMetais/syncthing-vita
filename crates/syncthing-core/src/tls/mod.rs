@@ -60,6 +60,21 @@ impl BepTlsStream {
     pub fn is_server(&self) -> bool {
         matches!(self, Self::Server(_))
     }
+
+    /// Sends a TLS `close_notify` alert and flushes it to the underlying socket so the peer sees a
+    /// clean TLS shutdown if it reads past the final BEP `Close` frame.
+    pub fn send_close_notify(&mut self) {
+        match self {
+            Self::Client(s) => {
+                s.conn.send_close_notify();
+                let _ = s.flush();
+            }
+            Self::Server(s) => {
+                s.conn.send_close_notify();
+                let _ = s.flush();
+            }
+        }
+    }
 }
 
 impl Read for BepTlsStream {

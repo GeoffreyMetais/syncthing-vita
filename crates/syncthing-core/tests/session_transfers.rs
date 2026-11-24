@@ -296,3 +296,97 @@ fn test_blocks_already_held_locally_are_kept_and_only_the_others_are_fetched() {
         .collect();
     assert_eq!(offsets, vec![BEP_BLOCK_SIZE as i64]);
 }
+
+#[test]
+fn test_peer_close_during_runtime_block_download_ends_cleanly() {
+    let vita = vita_id();
+    let peer = FakePeer::spawn(0x66, move |conn| {
+        conn.send_cluster_config(&["saves"], vita);
+        conn.wait_for(BepMessageType::ClusterConfig, Duration::from_secs(5))
+            .expect("ClusterConfig reply");
+        conn.send_index("saves", Vec::new(), false);
+        conn.wait_for(BepMessageType::Index, Duration::from_secs(5))
+            .expect("initial Index");
+        // Wait past DRAIN_BEFORE_PERSISTENT (1 s) so the session enters `run_persistent_session`.
+        std::thread::sleep(Duration::from_millis(1200));
+
+        let file = conn.file("saves", "interrupted.bin", b"partial payload", 2);
+        conn.send_index("saves", vec![file], true);
+        conn.wait_for(BepMessageType::Request, Duration::from_secs(5))
+            .expect("block request");
+        let close = syncthing_core::BepClose {
+            reason: "closing".to_owned(),
+        };
+        conn.send(BepMessageType::Close, &close.encode());
+    });
+
+    let mut storage = FsSyncStorage::new(common::fresh_temp_dir("transfers_runtime_close"));
+    storage.set_folder_devices("saves", vec![peer.device_id]);
+
+    let mut events = Vec::new();
+    let result = run_session(
+        &peer,
+        &storage,
+        &hello_under_test(1),
+        Some(quiet_control()),
+        |e| events.push(e),
+    )
+    .expect("session should end cleanly on BEP Close");
+    peer.join();
+
+    assert!(matches!(
+        result.session_status,
+        SyncSessionStatus::Active { .. }
+    ));
+    let ended = events.iter().find_map(|e| match e {
+        SyncEvent::SessionEnded { reason, .. } => Some(reason.as_str()),
+        _ => None,
+    });
+    assert_eq!(ended, Some("closed by peer: closing"));
+    assert!(!storage
+        .resolve_safe_path("saves", "interrupted.bin")
+        .exists());
+}
+
+#[test]
+fn test_peer_close_during_initial_block_download_returns_closed_by_peer() {
+    let vita = vita_id();
+    let peer = FakePeer::spawn(0x67, move |conn| {
+        let file = conn.file("saves", "initial.bin", b"initial payload", 1);
+        conn.send_cluster_config(&["saves"], vita);
+        conn.wait_for(BepMessageType::ClusterConfig, Duration::from_secs(5))
+            .expect("ClusterConfig reply");
+        conn.send_index("saves", vec![file], false);
+        conn.wait_for(BepMessageType::Request, Duration::from_secs(5))
+            .expect("block request");
+        let close = syncthing_core::BepClose {
+            reason: "closing".to_owned(),
+        };
+        conn.send(BepMessageType::Close, &close.encode());
+    });
+
+    let mut storage = FsSyncStorage::new(common::fresh_temp_dir("transfers_initial_close"));
+    storage.set_folder_devices("saves", vec![peer.device_id]);
+
+    let mut events = Vec::new();
+    let result = run_session(
+        &peer,
+        &storage,
+        &hello_under_test(1),
+        Some(quiet_control()),
+        |e| events.push(e),
+    )
+    .expect("session should return ClosedByPeer");
+    peer.join();
+
+    assert!(matches!(
+        result.session_status,
+        SyncSessionStatus::ClosedByPeer(ref reason) if reason == "closing"
+    ));
+    let ended = events.iter().find_map(|e| match e {
+        SyncEvent::SessionEnded { reason, .. } => Some(reason.as_str()),
+        _ => None,
+    });
+    assert_eq!(ended, Some("closed by peer: closing"));
+    assert!(!storage.resolve_safe_path("saves", "initial.bin").exists());
+}
