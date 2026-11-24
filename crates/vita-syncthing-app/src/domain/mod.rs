@@ -10,6 +10,7 @@ pub mod log_view;
 pub mod models;
 pub mod navigation;
 pub mod screensaver;
+pub mod scroll_window;
 pub mod ui_text;
 
 pub use app_state::AppState;
@@ -31,4 +32,5 @@ pub use navigation::{
     SETTINGS_ROW_DISPLAY, SETTINGS_ROW_LANGUAGE, SETTINGS_ROW_LOG, TAB_ORDER,
 };
 pub use screensaver::ScreensaverMotion;
+pub use scroll_window::ScrollWindow;
 pub use ui_text::UiText;

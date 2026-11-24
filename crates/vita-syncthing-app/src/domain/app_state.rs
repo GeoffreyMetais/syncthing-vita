@@ -16,6 +16,7 @@ use crate::domain::navigation::{
     default_col, starts_on_header, NavFocus, NavState, DASHBOARD_HEADER_ACTIONS,
 };
 use crate::domain::screensaver::ScreensaverMotion;
+use crate::domain::scroll_window::ScrollWindow;
 use crate::domain::ui_text::UiText;
 
 /// Pure application state for PS Vita Syncthing.
@@ -94,9 +95,9 @@ pub struct AppState {
     /// Incoming devices the user declined (persisted in `ignored_devices.cfg`).
     pub ignored_devices: Vec<DeviceId>,
     pub selected_share_idx: usize,
-    /// First share of the `Overview` list window, as last scrolled; read it through
-    /// `first_visible_share`, which keeps the selected share visible.
-    pub share_top_idx: usize,
+    /// Scroll window of the `Overview` share list; read `top` through `first_visible_share`,
+    /// which keeps the selected share visible.
+    pub shares_scroll: ScrollWindow,
     /// Rows already scrolled by the touch drag in progress (`ScrollTarget` lists).
     pub drag_scrolled_rows: i32,
     /// Protocol log lines of this session, oldest first (last `LOG_BUFFER_LINES`).
@@ -165,7 +166,7 @@ impl AppState {
             device_offers: Vec::new(),
             ignored_devices: Vec::new(),
             selected_share_idx: 0,
-            share_top_idx: 0,
+            shares_scroll: ScrollWindow::new(VISIBLE_SHARES),
             drag_scrolled_rows: 0,
             logs: Vec::with_capacity(32),
             log_view: None,
@@ -341,41 +342,27 @@ impl AppState {
             && self.selected_share_idx < self.shares.len()
     }
 
-    /// First share of the `Overview` list window: the last scrolled window (`share_top_idx`),
-    /// moved as little as needed to keep the selected share visible and the window full.
+    /// First share of the `Overview` list window: the last scrolled window, moved as little
+    /// as needed to keep the selected share visible.
     pub fn first_visible_share(&self) -> usize {
-        let count = self.shares.len();
-        let max_first = count.saturating_sub(VISIBLE_SHARES);
-        let selected = self.selected_share_idx.min(count.saturating_sub(1));
-        let first = self.share_top_idx.min(max_first);
-        if selected < first {
-            selected
-        } else if selected >= first + VISIBLE_SHARES {
-            selected + 1 - VISIBLE_SHARES
-        } else {
-            first
-        }
+        self.shares_scroll
+            .first_visible(self.shares.len(), self.selected_share_idx)
     }
 
     /// Records the window on screen (`first_visible_share`) as the scroll position, so that
     /// later selection moves scroll from it rather than from an older position.
     pub fn settle_share_window(&mut self) {
-        self.share_top_idx = self.first_visible_share();
+        let len = self.shares.len();
+        let selected = self.selected_share_idx;
+        self.shares_scroll.settle(len, selected);
     }
 
     /// Scrolls the share list by `rows` (positive: towards the end of the list), within
     /// bounds (touch drag); the selection moves along so that it stays visible.
     pub fn scroll_shares(&mut self, rows: i32) {
-        let count = self.shares.len();
-        if count == 0 {
-            return;
-        }
-        let max_first = count.saturating_sub(VISIBLE_SHARES);
-        let first =
-            (self.first_visible_share() as i64 + rows as i64).clamp(0, max_first as i64) as usize;
-        self.share_top_idx = first;
-        let last = (first + VISIBLE_SHARES).min(count) - 1;
-        self.selected_share_idx = self.selected_share_idx.clamp(first, last);
+        let len = self.shares.len();
+        self.shares_scroll
+            .scroll_by(len, &mut self.selected_share_idx, rows);
     }
 
     /// True when the Settings card `row` has D-pad focus.
