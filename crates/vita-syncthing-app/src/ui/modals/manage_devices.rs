@@ -2,13 +2,14 @@
 
 use crate::domain::interaction::{HitMap, PadKey, UiAction};
 use crate::domain::{AppState, ShareMode, VISIBLE_DEVICES};
-use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton, GFX_W};
+use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton};
 use crate::ui::i18n::messages::fill;
 use crate::ui::i18n;
-use crate::ui::theme::{UiTheme, C_GOOD, C_WARN, HINT_Y, MANAGE_DEVICES_H, MANAGE_DEVICES_W};
+use crate::ui::theme::{UiTheme, C_GOOD, C_WARN, MANAGE_DEVICES_H, MANAGE_DEVICES_W};
 use crate::ui::widgets::{
-    action_width, declare_modal, declare_touch, draw_chip, draw_press_button, draw_press_hints,
-    draw_row_tick,
+    action_width, declare_touch, draw_chip, draw_modal_card, draw_modal_header,
+    draw_modal_separator, draw_press_button, draw_press_hints, draw_row_tick, ModalHeader,
+    MODAL_HEADER_TEXT_DX, MODAL_PAD_X,
 };
 
 /// Height of the touch target of a device row.
@@ -24,16 +25,9 @@ pub fn render_manage_devices_modal(
     hits: &mut HitMap,
 ) {
     let s = i18n::strings(state.language);
-    gfx.dim(175);
     let w = MANAGE_DEVICES_W;
     let h = MANAGE_DEVICES_H;
-    let dx = (GFX_W - w) / 2;
-    let dy = (HINT_Y - h) / 2;
-
-    gfx.shadow(dx, dy, w, h, 18);
-    gfx.rrect(dx, dy, w, h, 18, th.card);
-    declare_modal(hits, (dx, dy, w, h), Some(PadKey::Circle), None);
-    gfx.rrect_outline(dx, dy, w, h, 18, 1, th.border);
+    let (dx, dy) = draw_modal_card(gfx, th, hits, w, h, 175, Some(PadKey::Circle), None);
 
     let share_title = state
         .shares
@@ -46,15 +40,7 @@ pub fn render_manage_devices_modal(
         .map(|share| share.shared_devices.as_slice())
         .unwrap_or(&[]);
 
-    let lx = dx + 28;
-    gfx.circle((lx + 20) as f32, (dy + 40) as f32, 20.0, th.accent_bg);
-    gfx.icon(
-        Icon::Desktop,
-        (lx + 20) as f32,
-        (dy + 40) as f32,
-        22.0,
-        th.accent_hi,
-    );
+    let lx = dx + MODAL_PAD_X;
     // Header right: the share's access mode; touching it (or `L`) cycles ReadWrite -> ReadOnly -> SendOnly.
     // A read-only share can also revert its local changes (`START`, confirmed first).
     let mode = state
@@ -82,43 +68,32 @@ pub fn render_manage_devices_modal(
             s.action_revert,
         );
     }
-    let header_w = header_right - 12 - (lx + 52);
+    let header_w = header_right - 12 - (lx + MODAL_HEADER_TEXT_DX);
 
     let header_title = s.fmt_devices_for_share(&share_title);
-    gfx.text_fit(
-        lx + 52,
-        dy + 32,
-        header_w,
-        20,
-        FontWeight::Bold,
-        th.text,
-        Align::Left,
-        &header_title,
-    );
     let incomplete = state.is_share_creation_incomplete(share_idx);
     let (subtitle, subtitle_col) = if incomplete {
         (s.modal_manage_devices_subtitle_incomplete, C_WARN)
     } else {
         (s.modal_manage_devices_subtitle, th.dim)
     };
-    gfx.text_fit(
-        lx + 52,
-        dy + 54,
+    draw_modal_header(
+        gfx,
+        th,
+        dx,
+        dy,
         header_w,
-        14,
-        FontWeight::Regular,
-        subtitle_col,
-        Align::Left,
-        subtitle,
+        &ModalHeader::new(
+            Icon::Desktop,
+            22.0,
+            th.accent_hi,
+            th.accent_bg,
+            &header_title,
+        )
+        .title_pos(32, 20)
+        .subtitle(subtitle, 54, 14, subtitle_col),
     );
-    gfx.line(
-        (dx + 24) as f32,
-        (dy + 76) as f32,
-        (dx + w - 24) as f32,
-        (dy + 76) as f32,
-        1.0,
-        th.border,
-    );
+    draw_modal_separator(gfx, th, dx, dy, w, 76);
 
     if state.devices.is_empty() {
         let (headline, col) = if state.sync_in_progress {

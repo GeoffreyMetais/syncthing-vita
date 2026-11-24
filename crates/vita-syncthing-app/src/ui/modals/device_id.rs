@@ -4,67 +4,46 @@ use qrcodegen::{QrCode, QrCodeEcc};
 
 use crate::domain::interaction::{HitMap, PadKey};
 use crate::domain::AppState;
-use crate::ui::gfx::{rgb, Align, FontWeight, Gfx, Icon, PadButton, GFX_W};
+use crate::ui::gfx::{rgb, Align, FontWeight, Gfx, Icon, PadButton};
 use crate::ui::i18n;
-use crate::ui::theme::{UiTheme, C_GOOD, HINT_Y};
+use crate::ui::theme::{UiTheme, C_GOOD};
 use crate::ui::widgets::{
-    action_width, declare_modal, draw_chip, draw_press_button, draw_press_hints,
+    action_width, draw_chip, draw_modal_card, draw_modal_header, draw_modal_separator,
+    draw_press_button, draw_press_hints, ModalHeader,
 };
 
 /// Modal Dialog 3: Display the PS Vita's Syncthing Device ID + scannable QR code.
 pub fn render_device_id_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut HitMap) {
     let s = i18n::strings(state.language);
-    gfx.dim(180);
     let w = 720;
     let h = 446;
-    let dx = (GFX_W - w) / 2;
-    let dy = (HINT_Y - h) / 2;
-
-    gfx.shadow(dx, dy, w, h, 18);
-    gfx.rrect(dx, dy, w, h, 18, th.card);
-    declare_modal(
+    let (dx, dy) = draw_modal_card(
+        gfx,
+        th,
         hits,
-        (dx, dy, w, h),
+        w,
+        h,
+        180,
         Some(PadKey::Circle),
         Some(PadKey::Circle),
     );
-    gfx.rrect_outline(dx, dy, w, h, 18, 1, th.border);
 
-    let lx = dx + 28;
-    gfx.circle((lx + 20) as f32, (dy + 40) as f32, 20.0, th.accent_bg);
-    gfx.icon(
-        Icon::Vita,
-        (lx + 20) as f32,
-        (dy + 40) as f32,
-        26.0,
-        th.accent_hi,
+    let lx = draw_modal_header(
+        gfx,
+        th,
+        dx,
+        dy,
+        w - 108,
+        &ModalHeader::new(
+            Icon::Vita,
+            26.0,
+            th.accent_hi,
+            th.accent_bg,
+            s.modal_device_id_title,
+        )
+        .subtitle(s.modal_device_id_subtitle, 54, 14, th.dim),
     );
-    gfx.text(
-        lx + 52,
-        dy + 31,
-        21,
-        FontWeight::Bold,
-        th.text,
-        Align::Left,
-        s.modal_device_id_title,
-    );
-    gfx.text(
-        lx + 52,
-        dy + 54,
-        14,
-        FontWeight::Regular,
-        th.dim,
-        Align::Left,
-        s.modal_device_id_subtitle,
-    );
-    gfx.line(
-        (dx + 24) as f32,
-        (dy + 76) as f32,
-        (dx + w - 24) as f32,
-        (dy + 76) as f32,
-        1.0,
-        th.border,
-    );
+    draw_modal_separator(gfx, th, dx, dy, w, 76);
 
     // Left Column: Crisp white QR code card (`246 x 246`)
     let qr_box_x = lx;

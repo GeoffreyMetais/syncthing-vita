@@ -2,10 +2,13 @@
 
 use crate::domain::interaction::{HitMap, PadKey, UiAction};
 use crate::domain::{AppState, NEW_SHARE_TEMPLATES};
-use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton, GFX_W};
+use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton};
 use crate::ui::i18n;
-use crate::ui::theme::{UiTheme, C_GOOD, HINT_Y};
-use crate::ui::widgets::{declare_modal, declare_touch, draw_press_hints};
+use crate::ui::theme::{UiTheme, C_GOOD};
+use crate::ui::widgets::{
+    declare_touch, draw_modal_card, draw_modal_header, draw_modal_separator, draw_press_hints,
+    ModalHeader,
+};
 
 /// Height of the touch target of a template row.
 const TEMPLATE_ROW_H: i32 = 44;
@@ -19,52 +22,26 @@ pub fn render_create_share_modal(
     hits: &mut HitMap,
 ) {
     let s = i18n::strings(state.language);
-    gfx.dim(175);
     let w = 680;
     let h = 408;
-    let dx = (GFX_W - w) / 2;
-    let dy = (HINT_Y - h) / 2;
-
-    gfx.shadow(dx, dy, w, h, 18);
-    gfx.rrect(dx, dy, w, h, 18, th.card);
-    declare_modal(hits, (dx, dy, w, h), Some(PadKey::Circle), None);
-    gfx.rrect_outline(dx, dy, w, h, 18, 1, th.border);
-
-    let lx = dx + 28;
-    gfx.circle((lx + 20) as f32, (dy + 40) as f32, 20.0, th.accent_bg);
-    gfx.icon(
-        Icon::Plus,
-        (lx + 20) as f32,
-        (dy + 40) as f32,
-        22.0,
-        th.accent_hi,
+    let (dx, dy) = draw_modal_card(gfx, th, hits, w, h, 175, Some(PadKey::Circle), None);
+    let lx = draw_modal_header(
+        gfx,
+        th,
+        dx,
+        dy,
+        w - 108,
+        &ModalHeader::new(
+            Icon::Plus,
+            22.0,
+            th.accent_hi,
+            th.accent_bg,
+            s.modal_create_share_title,
+        )
+        .title_pos(32, 21)
+        .subtitle(s.modal_create_share_subtitle, 54, 14, th.dim),
     );
-    gfx.text(
-        lx + 52,
-        dy + 32,
-        21,
-        FontWeight::Bold,
-        th.text,
-        Align::Left,
-        s.modal_create_share_title,
-    );
-    gfx.text(
-        lx + 52,
-        dy + 54,
-        14,
-        FontWeight::Regular,
-        th.dim,
-        Align::Left,
-        s.modal_create_share_subtitle,
-    );
-    gfx.line(
-        (dx + 24) as f32,
-        (dy + 76) as f32,
-        (dx + w - 24) as f32,
-        (dy + 76) as f32,
-        1.0,
-        th.border,
-    );
+    draw_modal_separator(gfx, th, dx, dy, w, 76);
 
     for (i, &(fid, label, path)) in NEW_SHARE_TEMPLATES.iter().enumerate() {
         let ry = dy + 90 + (i as i32) * 50;

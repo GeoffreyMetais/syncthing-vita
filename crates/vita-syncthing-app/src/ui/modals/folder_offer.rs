@@ -6,7 +6,10 @@ use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton};
 use crate::ui::i18n::messages::fill;
 use crate::ui::i18n;
 use crate::ui::theme::{folder_offer_modal_rect, folder_offer_slot_x, UiTheme};
-use crate::ui::widgets::{declare_modal, draw_press_button, draw_press_hints};
+use crate::ui::widgets::{
+    draw_modal_card, draw_modal_header, draw_modal_separator, draw_press_button, draw_press_hints,
+    ModalHeader,
+};
 
 /// Renders the `FolderOffer` modal for `state.folder_offers[offer_idx]`.
 pub fn render_folder_offer_modal(
@@ -20,33 +23,10 @@ pub fn render_folder_offer_modal(
         return;
     };
     let s = i18n::strings(state.language);
-    gfx.dim(180);
-    let (dx, dy, w, h) = folder_offer_modal_rect();
-    let (dx, dy, w, h) = (dx as i32, dy as i32, w as i32, h as i32);
+    let (_, _, w, h) = folder_offer_modal_rect();
+    let (w, h) = (w as i32, h as i32);
+    let (dx, dy) = draw_modal_card(gfx, th, hits, w, h, 180, None, None);
 
-    gfx.shadow(dx, dy, w, h, 18);
-    gfx.rrect(dx, dy, w, h, 18, th.card);
-    declare_modal(hits, (dx, dy, w, h), None, None);
-    gfx.rrect_outline(dx, dy, w, h, 18, 1, th.border);
-
-    let lx = dx + 28;
-    gfx.circle((lx + 20) as f32, (dy + 40) as f32, 20.0, th.accent_bg);
-    gfx.icon(
-        Icon::Folder,
-        (lx + 20) as f32,
-        (dy + 40) as f32,
-        22.0,
-        th.accent,
-    );
-    gfx.text(
-        lx + 52,
-        dy + 31,
-        21,
-        FontWeight::Bold,
-        th.text,
-        Align::Left,
-        s.modal_folder_offer_title,
-    );
     let device = state
         .devices
         .iter()
@@ -59,24 +39,22 @@ pub fn render_folder_offer_modal(
             )
         });
     let requester_sub = s.fmt_folder_offer_sub(&device);
-    gfx.text_fit(
-        lx + 52,
-        dy + 54,
+    let lx = draw_modal_header(
+        gfx,
+        th,
+        dx,
+        dy,
         w - 108,
-        14,
-        FontWeight::Regular,
-        th.dim,
-        Align::Left,
-        &requester_sub,
+        &ModalHeader::new(
+            Icon::Folder,
+            22.0,
+            th.accent,
+            th.accent_bg,
+            s.modal_folder_offer_title,
+        )
+        .subtitle(&requester_sub, 54, 14, th.dim),
     );
-    gfx.line(
-        (dx + 24) as f32,
-        (dy + 76) as f32,
-        (dx + w - 24) as f32,
-        (dy + 76) as f32,
-        1.0,
-        th.border,
-    );
+    draw_modal_separator(gfx, th, dx, dy, w, 76);
 
     let title = s.fmt_share_title(&offer.label, &offer.folder_id);
     gfx.text_fit(
