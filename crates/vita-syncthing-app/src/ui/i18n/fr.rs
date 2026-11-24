@@ -59,7 +59,7 @@ pub static STRINGS_FR: Strings = Strings {
     tab_files: "Fichiers",
     tab_settings: "Paramètres",
     app_title: "VitaSync",
-    app_version_label: "v0.1.0",
+    app_version_label: concat!("v", env!("CARGO_PKG_VERSION")),
     sidebar_syncing: "Synchronisation...",
     sidebar_uploading: "Envoi...",
     sidebar_sync_cta: "Synchroniser",

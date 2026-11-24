@@ -3,7 +3,7 @@
 
 use syncthing_core::DeviceIdParseError;
 use vita_syncthing_app::domain::{Language, UiText};
-use vita_syncthing_app::ui::strings;
+use vita_syncthing_app::ui::i18n;
 
 fn s(v: &str) -> String {
     v.to_owned()
@@ -120,7 +120,7 @@ fn all_messages() -> Vec<UiText> {
 #[test]
 fn test_every_message_is_rendered_in_every_language() {
     for lang in Language::ALL {
-        let catalog = strings::strings(lang);
+        let catalog = i18n::strings(lang);
         for msg in all_messages() {
             let text = catalog.text(&msg);
             assert!(!text.trim().is_empty(), "{lang:?} {msg:?} is empty");
@@ -134,9 +134,9 @@ fn test_every_message_is_rendered_in_every_language() {
 
 #[test]
 fn test_messages_are_translated_and_parameters_filled() {
-    let en = strings::strings(Language::English);
-    let fr = strings::strings(Language::French);
-    let de = strings::strings(Language::German);
+    let en = i18n::strings(Language::English);
+    let fr = i18n::strings(Language::French);
+    let de = i18n::strings(Language::German);
 
     assert_eq!(
         en.text(&UiText::SelectDeviceToConnect),
@@ -179,7 +179,7 @@ fn test_messages_are_translated_and_parameters_filled() {
         Language::German,
         Language::Italian,
     ] {
-        let other = strings::strings(lang);
+        let other = i18n::strings(lang);
         for msg in [
             UiText::ReadyTapSyncCard,
             UiText::NoFoldersSynced,
@@ -194,8 +194,8 @@ fn test_messages_are_translated_and_parameters_filled() {
 
 #[test]
 fn test_device_id_errors_are_translated() {
-    let en = strings::strings(Language::English);
-    let it = strings::strings(Language::Italian);
+    let en = i18n::strings(Language::English);
+    let it = i18n::strings(Language::Italian);
     let errors = [
         DeviceIdParseError::Empty,
         DeviceIdParseError::InvalidChar('!'),

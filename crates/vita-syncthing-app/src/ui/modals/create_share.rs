@@ -3,7 +3,7 @@
 use crate::domain::interaction::{HitMap, PadKey, UiAction};
 use crate::domain::{AppState, NEW_SHARE_TEMPLATES};
 use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton, GFX_W};
-use crate::ui::strings;
+use crate::ui::i18n;
 use crate::ui::theme::{UiTheme, C_GOOD, HINT_Y};
 use crate::ui::widgets::{declare_modal, declare_touch, draw_press_hints};
 
@@ -18,7 +18,7 @@ pub fn render_create_share_modal(
     selected_idx: usize,
     hits: &mut HitMap,
 ) {
-    let s = strings::strings(state.language);
+    let s = i18n::strings(state.language);
     gfx.dim(175);
     let w = 680;
     let h = 408;

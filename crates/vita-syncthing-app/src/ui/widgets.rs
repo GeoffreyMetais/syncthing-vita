@@ -8,7 +8,7 @@ use crate::domain::{
 use crate::ui::gfx::{
     rgb, with_alpha, Align, Color, FontWeight, Gfx, Icon, PadButton, GFX_H, GFX_W,
 };
-use crate::ui::strings::{self, Strings};
+use crate::ui::i18n::{self, Strings};
 use crate::ui::theme::{
     UiTheme, ACTION_TOUCH_H, CONTENT_R, CONTENT_W, CONTENT_X, C_GOOD, C_PROGRESS_TRACK, C_WARN,
     HINT_TOUCH_MARGIN, HINT_Y, SIDEBAR_W,
@@ -194,7 +194,7 @@ pub fn draw_page_title(gfx: &mut Gfx, th: &UiTheme, title: &str, right: Option<&
 /// Draws the screen background, the sidebar (tabs, transfer card, status) and declares the
 /// sidebar's interactive elements.
 pub fn draw_chrome(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut HitMap) {
-    let s = strings::strings(state.language);
+    let s = i18n::strings(state.language);
     let tabs = [
         (s.tab_overview, Icon::Vita, ActiveTab::Dashboard),
         (s.tab_files, Icon::Receive, ActiveTab::FolderPicker),

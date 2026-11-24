@@ -2,7 +2,7 @@
 
 use crate::domain::{AppState, SyncActivity};
 use crate::ui::gfx::{rgb, Align, FontWeight, Gfx, Icon};
-use crate::ui::strings;
+use crate::ui::i18n;
 use crate::ui::theme::{UiTheme, C_GOOD};
 use crate::ui::widgets::{draw_indeterminate_progress, draw_progress};
 
@@ -11,7 +11,7 @@ pub const SAVER_H: f32 = 132.0;
 
 /// Renders the bouncing DVD-style **OLED Screensaver** (`#000000` background).
 pub fn render_oled_screensaver(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
-    let s = strings::strings(state.language);
+    let s = i18n::strings(state.language);
     gfx.clear(rgb(0, 0, 0));
 
     let bx = state.saver.x as i32;

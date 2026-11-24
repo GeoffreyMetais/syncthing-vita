@@ -5,7 +5,7 @@ use crate::domain::{
     BROWSER_ROWS,
 };
 use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton};
-use crate::ui::strings;
+use crate::ui::i18n;
 use crate::ui::theme::{
     UiTheme, BROWSER_STEP, BROWSER_TOP, CONTENT_R, CONTENT_W, CONTENT_X, C_GOOD,
 };
@@ -21,7 +21,7 @@ const CHIP_TOUCH_MARGIN: i32 = 16;
 
 /// Renders Tab 3: **Files** (`FolderPicker`).
 pub fn render_folder_picker_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut HitMap) {
-    let s = strings::strings(state.language);
+    let s = i18n::strings(state.language);
     let (page_title, share_name) = if state.picker.mode == PickerMode::CreateNewShare {
         (s.picker_title_create, s.picker_subtitle_create.to_owned())
     } else {

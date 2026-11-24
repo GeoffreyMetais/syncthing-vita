@@ -15,7 +15,7 @@ use crate::ui::screens::{
     render_dashboard_tab, render_folder_picker_tab, render_log_screen, render_oled_screensaver,
     render_settings_tab, SAVER_H, SAVER_W,
 };
-use crate::ui::strings;
+use crate::ui::i18n;
 use crate::ui::theme::UiTheme;
 use crate::ui::widgets::{draw_chrome, draw_toast};
 
@@ -132,7 +132,7 @@ pub fn draw_frame(gfx: &mut Gfx, state: &mut AppState) {
         }
     }
 
-    let s = strings::strings(state.language);
+    let s = i18n::strings(state.language);
     draw_toast(gfx, &th, s, state.toast_msg.as_ref());
     state.hit_map = hits;
 }

@@ -2,7 +2,7 @@
 
 use vita_syncthing_app::domain::Language;
 use vita_syncthing_app::infrastructure::detect_system_language;
-use vita_syncthing_app::ui::strings;
+use vita_syncthing_app::ui::i18n;
 
 #[test]
 fn test_language_enum_cycling() {
@@ -22,11 +22,11 @@ fn test_language_enum_cycling() {
 
 #[test]
 fn test_localized_catalogs_and_formatters() {
-    let en = strings::strings(Language::English);
-    let fr = strings::strings(Language::French);
-    let es = strings::strings(Language::Spanish);
-    let de = strings::strings(Language::German);
-    let it = strings::strings(Language::Italian);
+    let en = i18n::strings(Language::English);
+    let fr = i18n::strings(Language::French);
+    let es = i18n::strings(Language::Spanish);
+    let de = i18n::strings(Language::German);
+    let it = i18n::strings(Language::Italian);
 
     // Common actions vary across languages
     assert_eq!(en.action_cancel, "Cancel");

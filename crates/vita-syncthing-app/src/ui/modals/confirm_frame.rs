@@ -5,7 +5,7 @@
 use crate::domain::interaction::{HitMap, PadKey};
 use crate::domain::Language;
 use crate::ui::gfx::{Align, Color, FontWeight, Gfx, Icon, PadButton, GFX_W};
-use crate::ui::strings;
+use crate::ui::i18n;
 use crate::ui::theme::{UiTheme, HINT_Y};
 use crate::ui::widgets::{action_width, declare_modal, draw_press_button, draw_press_hints};
 
@@ -38,7 +38,7 @@ pub fn draw_confirm_frame(
     language: Language,
     frame: &ConfirmFrame<'_>,
 ) -> (i32, i32) {
-    let s = strings::strings(language);
+    let s = i18n::strings(language);
     let (w, h) = frame.size;
     let dx = (GFX_W - w) / 2;
     let dy = (HINT_Y - h) / 2;

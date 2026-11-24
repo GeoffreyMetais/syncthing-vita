@@ -411,8 +411,3 @@ pub fn strings(lang: Language) -> &'static Strings {
         Language::Italian => &STRINGS_IT,
     }
 }
-
-/// Alias for `strings(lang)`.
-pub fn get_strings(lang: Language) -> &'static Strings {
-    strings(lang)
-}

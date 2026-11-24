@@ -7,7 +7,7 @@ use crate::domain::{
     LOG_VIEW_ROWS,
 };
 use crate::ui::gfx::{Align, Color, FontWeight, Gfx, PadButton, GFX_W};
-use crate::ui::strings;
+use crate::ui::i18n;
 use crate::ui::theme::{UiTheme, CONTENT_B, C_BAD, C_GOOD};
 use crate::ui::widgets::{draw_card, draw_hint_bar, draw_scrollbar, Hint};
 
@@ -43,7 +43,7 @@ pub fn render_log_screen(
     view: &LogView,
     hits: &mut HitMap,
 ) {
-    let s = strings::strings(state.language);
+    let s = i18n::strings(state.language);
     let lines = view.lines(&state.logs);
     let (start, end) = view.window(lines.len());
     let right = GFX_W - MARGIN;

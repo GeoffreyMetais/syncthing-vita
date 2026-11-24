@@ -7,7 +7,7 @@ use crate::domain::interaction::{HitMap, PadKey, UiAction};
 use crate::domain::AppState;
 use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton, GFX_W};
 use crate::ui::i18n::messages::fill;
-use crate::ui::strings;
+use crate::ui::i18n;
 use crate::ui::theme::{add_device_modal_height, UiTheme, C_GOOD, C_WARN, HINT_Y};
 use crate::ui::widgets::{
     action_width, declare_modal, declare_touch, draw_press_button, draw_press_hints,
@@ -21,7 +21,7 @@ pub fn render_add_device_modal(
     keypad_idx: usize,
     hits: &mut HitMap,
 ) {
-    let s = strings::strings(state.language);
+    let s = i18n::strings(state.language);
     gfx.dim(180);
     let keypad = state.fallback_keypad_visible;
     let w = 700;

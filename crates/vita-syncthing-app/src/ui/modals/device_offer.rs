@@ -3,7 +3,7 @@
 use crate::domain::interaction::HitMap;
 use crate::domain::AppState;
 use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton};
-use crate::ui::strings;
+use crate::ui::i18n;
 use crate::ui::theme::{folder_offer_modal_rect, folder_offer_slot_x, UiTheme};
 use crate::ui::widgets::{declare_modal, draw_press_button, draw_press_hints};
 
@@ -18,7 +18,7 @@ pub fn render_device_offer_modal(
     let Some(offer) = state.device_offers.get(offer_idx) else {
         return;
     };
-    let s = strings::strings(state.language);
+    let s = i18n::strings(state.language);
     gfx.dim(180);
     let (dx, dy, w, h) = folder_offer_modal_rect();
     let (dx, dy, w, h) = (dx as i32, dy as i32, w as i32, h as i32);

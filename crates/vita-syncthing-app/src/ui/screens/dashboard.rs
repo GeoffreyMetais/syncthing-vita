@@ -4,7 +4,7 @@
 use crate::domain::{AppState, FocusSlot, HitMap, Hotspot, Rect, UiAction, UiText};
 use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton};
 use crate::ui::screens::shares::draw_share_list;
-use crate::ui::strings;
+use crate::ui::i18n;
 use crate::ui::theme::{UiTheme, CONTENT_R, CONTENT_W, CONTENT_X, CONTENT_Y, C_GOOD, C_WARN};
 use crate::ui::widgets::{
     action_width, draw_action_hotspot, draw_card, draw_chip, draw_hint_bar, draw_page_title, Hint,
@@ -17,7 +17,7 @@ const SECTION_GAP: i32 = 10;
 
 /// Renders Tab 1: **Overview** (`Dashboard`).
 pub fn render_dashboard_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut HitMap) {
-    let s = strings::strings(state.language);
+    let s = i18n::strings(state.language);
     let active_count = state.shares.iter().filter(|s| s.enabled).count();
     let subtitle = s.fmt_active_shares_devices(active_count, state.devices.len());
     draw_page_title(gfx, th, s.dashboard_title, Some(&subtitle));
@@ -51,7 +51,7 @@ pub fn render_dashboard_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits:
 
 /// "This device" card: name, status, Device ID and the `[QR / ID, New Share]` header buttons.
 fn draw_device_card(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut HitMap) {
-    let s = strings::strings(state.language);
+    let s = i18n::strings(state.language);
     let header_focused = state.is_focused(FocusSlot::Header { col: 0 })
         || state.is_focused(FocusSlot::Header { col: 1 });
     draw_card(

@@ -5,7 +5,7 @@ use qrcodegen::{QrCode, QrCodeEcc};
 use crate::domain::interaction::{HitMap, PadKey};
 use crate::domain::AppState;
 use crate::ui::gfx::{rgb, Align, FontWeight, Gfx, Icon, PadButton, GFX_W};
-use crate::ui::strings;
+use crate::ui::i18n;
 use crate::ui::theme::{UiTheme, C_GOOD, HINT_Y};
 use crate::ui::widgets::{
     action_width, declare_modal, draw_chip, draw_press_button, draw_press_hints,
@@ -13,7 +13,7 @@ use crate::ui::widgets::{
 
 /// Modal Dialog 3: Display the PS Vita's Syncthing Device ID + scannable QR code.
 pub fn render_device_id_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut HitMap) {
-    let s = strings::strings(state.language);
+    let s = i18n::strings(state.language);
     gfx.dim(180);
     let w = 720;
     let h = 446;

@@ -5,13 +5,13 @@ use crate::domain::AppState;
 use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton};
 use crate::ui::i18n::messages::fill;
 use crate::ui::image::draw_gray_image;
-use crate::ui::strings;
+use crate::ui::i18n;
 use crate::ui::theme::{scan_qr_modal_rect, UiTheme, C_WARN, SCAN_QR_VIEW_H, SCAN_QR_VIEW_W};
 use crate::ui::widgets::{action_width, declare_modal, draw_press_button, draw_press_hints};
 
 /// Renders the `ScanDeviceQr` modal: live camera preview with a viewfinder frame.
 pub fn render_scan_qr_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut HitMap) {
-    let s = strings::strings(state.language);
+    let s = i18n::strings(state.language);
     gfx.dim(180);
     let (dx, dy, w, h) = scan_qr_modal_rect();
     let (dx, dy, w, h) = (dx as i32, dy as i32, w as i32, h as i32);
@@ -78,7 +78,7 @@ fn draw_viewfinder(gfx: &mut Gfx, th: &UiTheme, state: &AppState, vx: i32, vy: i
     let (vw, vh) = (SCAN_QR_VIEW_W, SCAN_QR_VIEW_H);
     gfx.rect(vx, vy, vw, vh, th.bg);
 
-    let st = strings::strings(state.language);
+    let st = i18n::strings(state.language);
     if let Some(err) = state.qr_camera_error.as_deref() {
         let msg = fill(st.messages.camera_error, &[("error", &err)]);
         gfx.text_fit(
