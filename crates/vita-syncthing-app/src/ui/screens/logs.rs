@@ -8,7 +8,7 @@ use crate::domain::{
 };
 use crate::ui::gfx::{Align, Color, FontWeight, Gfx, PadButton, GFX_W};
 use crate::ui::i18n;
-use crate::ui::theme::{UiTheme, CONTENT_B, C_BAD, C_GOOD};
+use crate::ui::theme::{UiTheme, CONTENT_B};
 use crate::ui::widgets::{draw_card, draw_hint_bar, draw_scrollbar, Hint};
 
 /// Left / right margin of the viewer.
@@ -23,13 +23,13 @@ const LINE_SIZE: i32 = 13;
 /// Colour of a log line: errors in red, completed syncs and connections in green.
 pub fn log_line_colour(th: &UiTheme, line: &str) -> Color {
     if line.contains("Error") || line.contains("Failed") {
-        C_BAD
+        th.bad
     } else if line.contains("Synced")
         || line.contains("Connected")
         || line.contains("Sync OK")
         || line.contains("up-to-date")
     {
-        C_GOOD
+        th.good
     } else {
         th.dim
     }

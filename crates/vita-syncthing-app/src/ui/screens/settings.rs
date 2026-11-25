@@ -62,6 +62,8 @@ pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: 
     let theme_desc = match state.theme_mode {
         ThemeMode::Dark => s.settings_desc_theme_dark,
         ThemeMode::Oled => s.settings_desc_theme_oled,
+        ThemeMode::SyncthingDark => s.settings_desc_theme_syncthing_dark,
+        ThemeMode::SyncthingLight => s.settings_desc_theme_syncthing_light,
     };
     gfx.text(
         lx,

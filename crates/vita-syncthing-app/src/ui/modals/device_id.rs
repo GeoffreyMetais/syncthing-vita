@@ -6,7 +6,7 @@ use crate::domain::interaction::{HitMap, PadKey};
 use crate::domain::AppState;
 use crate::ui::gfx::{rgb, Align, FontWeight, Gfx, Icon, PadButton};
 use crate::ui::i18n;
-use crate::ui::theme::{UiTheme, C_GOOD};
+use crate::ui::theme::UiTheme;
 use crate::ui::widgets::{
     action_width, draw_chip, draw_modal_card, draw_modal_header, draw_modal_separator,
     draw_press_button, draw_press_hints, ModalHeader,
@@ -54,7 +54,7 @@ pub fn render_device_id_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hit
         qr_box_y,
         qr_box_size,
         qr_box_size,
-        14,
+        th.card_radius,
         rgb(255, 255, 255),
     );
     gfx.rrect_outline(
@@ -62,7 +62,7 @@ pub fn render_device_id_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hit
         qr_box_y,
         qr_box_size,
         qr_box_size,
-        14,
+        th.card_radius,
         1,
         th.border,
     );
@@ -128,10 +128,12 @@ pub fn render_device_id_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hit
         String::new()
     };
 
+    let inner_r = th.card_radius.min(10);
+
     // Row 1 box (Groups 1..4)
     let box1_y = dy + 120;
-    gfx.rrect(rx, box1_y, rw, 50, 10, th.accent_bg);
-    gfx.rrect_outline(rx, box1_y, rw, 50, 10, 1, th.accent);
+    gfx.rrect(rx, box1_y, rw, 50, inner_r, th.accent_bg);
+    gfx.rrect_outline(rx, box1_y, rw, 50, inner_r, 1, th.accent);
     gfx.text(
         rx + 14,
         box1_y + 15,
@@ -154,8 +156,8 @@ pub fn render_device_id_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hit
 
     // Row 2 box (Groups 5..8)
     let box2_y = dy + 180;
-    gfx.rrect(rx, box2_y, rw, 50, 10, th.accent_bg);
-    gfx.rrect_outline(rx, box2_y, rw, 50, 10, 1, th.accent);
+    gfx.rrect(rx, box2_y, rw, 50, inner_r, th.accent_bg);
+    gfx.rrect_outline(rx, box2_y, rw, 50, inner_r, 1, th.accent);
     gfx.text(
         rx + 14,
         box2_y + 15,
@@ -178,16 +180,17 @@ pub fn render_device_id_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hit
 
     // Device metadata card
     let meta_y = dy + 244;
-    gfx.rrect(rx, meta_y, rw, 96, 10, th.bg);
-    gfx.rrect_outline(rx, meta_y, rw, 96, 10, 1, th.border);
+    gfx.rrect(rx, meta_y, rw, 96, inner_r, th.bg);
+    gfx.rrect_outline(rx, meta_y, rw, 96, inner_r, 1, th.border);
 
     let short_id = groups.first().copied().unwrap_or("VITA");
     draw_chip(
         gfx,
+        th,
         rx + rw - 14,
         meta_y + 22,
         "TLS 1.3 · ECDSA P-256",
-        C_GOOD,
+        th.good,
     );
     let short_id_label = s.fmt_short_id_label(short_id);
     gfx.text(

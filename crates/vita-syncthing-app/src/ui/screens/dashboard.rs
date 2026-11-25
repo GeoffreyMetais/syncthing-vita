@@ -5,7 +5,7 @@ use crate::domain::{AppState, FocusSlot, HitMap, Hotspot, Rect, UiAction, UiText
 use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton};
 use crate::ui::i18n;
 use crate::ui::screens::shares::draw_share_list;
-use crate::ui::theme::{UiTheme, CONTENT_R, CONTENT_W, CONTENT_X, CONTENT_Y, C_GOOD, C_WARN};
+use crate::ui::theme::{UiTheme, CONTENT_R, CONTENT_W, CONTENT_X, CONTENT_Y};
 use crate::ui::widgets::{
     action_width, draw_action_hotspot, draw_card, draw_chip, draw_hint_bar, draw_page_title, Hint,
 };
@@ -72,7 +72,7 @@ fn draw_device_card(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut Hi
     });
 
     let lx = CONTENT_X + 20;
-    gfx.rrect(lx, CONTENT_Y + 20, 64, 64, 18, th.accent_bg);
+    gfx.rrect(lx, CONTENT_Y + 20, 64, 64, th.modal_radius, th.accent_bg);
     gfx.icon(
         Icon::Vita,
         (lx + 32) as f32,
@@ -85,13 +85,13 @@ fn draw_device_card(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut Hi
     let (chip_txt, chip_col) = if state.sync_in_progress {
         (s.status_syncing, th.accent_hi)
     } else if state.status_line == UiText::ScanningLan {
-        (s.status_scanning, C_WARN)
+        (s.status_scanning, th.warn)
     } else if !state.session_connected && !state.sync_peers().is_empty() {
-        (s.status_offline, C_WARN)
+        (s.status_offline, th.warn)
     } else {
-        (s.status_ready, C_GOOD)
+        (s.status_ready, th.good)
     };
-    let cw = draw_chip(gfx, CONTENT_R - 20, CONTENT_Y + 24, chip_txt, chip_col);
+    let cw = draw_chip(gfx, th, CONTENT_R - 20, CONTENT_Y + 24, chip_txt, chip_col);
 
     let label_w = gfx.text(
         tx,

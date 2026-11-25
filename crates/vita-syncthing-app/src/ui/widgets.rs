@@ -10,24 +10,31 @@ use crate::ui::gfx::{
 };
 use crate::ui::i18n::{self, Strings};
 use crate::ui::theme::{
-    UiTheme, ACTION_TOUCH_H, CONTENT_R, CONTENT_W, CONTENT_X, C_GOOD, C_PROGRESS_TRACK, C_WARN,
-    HINT_TOUCH_MARGIN, HINT_Y, SIDEBAR_W,
+    UiTheme, ACTION_TOUCH_H, CONTENT_R, CONTENT_W, CONTENT_X, HINT_TOUCH_MARGIN, HINT_Y, SIDEBAR_W,
 };
 use crate::ui::transfer_card::draw_transfer_card;
 
 pub fn draw_card(gfx: &mut Gfx, th: &UiTheme, x: i32, y: i32, w: i32, h: i32, focused: bool) {
     let bg = if focused { th.card_hi } else { th.card };
-    gfx.rrect(x, y, w, h, 14, bg);
+    gfx.rrect(x, y, w, h, th.card_radius, bg);
     if focused {
-        gfx.rrect_outline(x, y, w, h, 14, 2, th.accent);
+        gfx.rrect_outline(x, y, w, h, th.card_radius, 2, th.accent);
     } else {
-        gfx.rrect_outline(x, y, w, h, 14, 1, th.border);
+        gfx.rrect_outline(x, y, w, h, th.card_radius, 1, th.border);
     }
 }
 
-pub fn draw_chip(gfx: &mut Gfx, right_x: i32, cy: i32, text: &str, col: Color) -> i32 {
+pub fn draw_chip(
+    gfx: &mut Gfx,
+    th: &UiTheme,
+    right_x: i32,
+    cy: i32,
+    text: &str,
+    col: Color,
+) -> i32 {
     let w = gfx.text_width(13, FontWeight::Medium, text) + 22;
-    gfx.rrect(right_x - w, cy - 12, w, 24, 12, with_alpha(col, 44));
+    let r = th.button_radius.min(12);
+    gfx.rrect(right_x - w, cy - 12, w, 24, r, with_alpha(col, 44));
     gfx.text(
         right_x - w / 2,
         cy,
@@ -55,9 +62,10 @@ pub fn draw_action(
     let gw = Gfx::pad_button_width(btn, 22);
     let tw = gfx.text_width(15, FontWeight::Medium, label);
     let w = 8 + gw + 8 + tw + 16;
-    gfx.rrect(x, cy - 17, w, 34, 17, rgb(36, 45, 54));
-    gfx.rrect_outline(x, cy - 17, w, 34, 17, 1, th.border);
-    gfx.pad_button(btn, x + 8 + gw / 2 + 1, cy, 22);
+    let r = th.button_radius;
+    gfx.rrect(x, cy - 17, w, 34, r, th.btn);
+    gfx.rrect_outline(x, cy - 17, w, 34, r, 1, th.border);
+    gfx.pad_button_themed(btn, x + 8 + gw / 2 + 1, cy, 22, th.dpad_on, th.dpad_off);
     gfx.text(
         x + 8 + gw + 8,
         cy,
@@ -101,9 +109,10 @@ pub fn draw_action_hotspot(
     w
 }
 
-/// D-pad focus ring around an action pill drawn by `draw_action` at (`x`, `cy`) with width `w`.
+/// D-pad focus ring around an action button drawn by `draw_action` at (`x`, `cy`) with width `w`.
 pub fn draw_focus_ring(gfx: &mut Gfx, th: &UiTheme, x: i32, cy: i32, w: i32) {
-    gfx.rrect_outline(x - 4, cy - 21, w + 8, 42, 21, 2, th.accent_hi);
+    let r = (th.button_radius + 4).min(21);
+    gfx.rrect_outline(x - 4, cy - 21, w + 8, 42, r, 2, th.accent_hi);
 }
 
 /// Circular checkbox modeled after VitaSend `row_tick`.
@@ -116,8 +125,18 @@ pub fn draw_row_tick(gfx: &mut Gfx, th: &UiTheme, cx: i32, cy: i32, on: bool) {
     }
 }
 
-pub fn draw_progress(gfx: &mut Gfx, x: i32, y: i32, w: i32, h: i32, pct: u32, col: Color) {
-    gfx.rrect(x, y, w, h, h / 2, C_PROGRESS_TRACK);
+#[allow(clippy::too_many_arguments)]
+pub fn draw_progress(
+    gfx: &mut Gfx,
+    th: &UiTheme,
+    x: i32,
+    y: i32,
+    w: i32,
+    h: i32,
+    pct: u32,
+    col: Color,
+) {
+    gfx.rrect(x, y, w, h, h / 2, th.track);
     let p = pct.min(100);
     if p == 0 {
         return;
@@ -127,8 +146,10 @@ pub fn draw_progress(gfx: &mut Gfx, x: i32, y: i32, w: i32, h: i32, pct: u32, co
 }
 
 /// Draws an animated indeterminate progress bar for initialization steps before any bytes arrive.
+#[allow(clippy::too_many_arguments)]
 pub fn draw_indeterminate_progress(
     gfx: &mut Gfx,
+    th: &UiTheme,
     x: i32,
     y: i32,
     w: i32,
@@ -136,7 +157,7 @@ pub fn draw_indeterminate_progress(
     tick: u32,
     col: Color,
 ) {
-    gfx.rrect(x, y, w, h, h / 2, C_PROGRESS_TRACK);
+    gfx.rrect(x, y, w, h, h / 2, th.track);
     let seg_w = (w / 3).max(h * 2).min(w);
     let travel = (w - seg_w).max(0);
     let phase = (tick % 120) as i32;
@@ -145,6 +166,7 @@ pub fn draw_indeterminate_progress(
     gfx.rrect(x + offset, y, seg_w, h, h / 2, col);
 }
 
+#[allow(clippy::too_many_arguments)]
 pub fn draw_scrollbar(
     gfx: &mut Gfx,
     th: &UiTheme,
@@ -158,7 +180,7 @@ pub fn draw_scrollbar(
     if count <= rows || rows == 0 {
         return;
     }
-    gfx.rrect(x, y, 4, h, 2, rgb(30, 38, 45));
+    gfx.rrect(x, y, 4, h, 2, th.track);
     let thumb_h = ((h as usize) * rows / count).max(16) as i32;
     let thumb_y = y + ((h - thumb_h) as usize * top / (count - rows)) as i32;
     gfx.rrect(x, thumb_y, 4, thumb_h, 2, th.faint);
@@ -209,8 +231,8 @@ pub fn draw_chrome(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut Hit
         gfx.rect(0, HINT_Y, GFX_W, 1, th.border);
     }
 
-    // Top-left VitaSend-style rounded logo + title
-    gfx.rrect(20, 22, 40, 40, 12, th.accent);
+    // Top-left VitaSend/Syncthing-style rounded logo + title
+    gfx.rrect(20, 22, 40, 40, th.card_radius.min(12), th.accent);
     gfx.icon(Icon::Logo, 40.0, 42.0, 34.0, rgb(255, 255, 255));
     gfx.text(
         70,
@@ -223,6 +245,7 @@ pub fn draw_chrome(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut Hit
     );
 
     // Sidebar tabs
+    let tab_r = th.button_radius.clamp(6, 12);
     for (i, &(name, icon, tab)) in tabs.iter().enumerate() {
         let y = 90 + (i as i32) * 50;
         let on = state.active_tab == tab;
@@ -233,14 +256,14 @@ pub fn draw_chrome(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut Hit
             shortcut: None,
         });
         if on {
-            gfx.rrect(12, y, SIDEBAR_W - 24, 44, 12, th.accent_bg);
+            gfx.rrect(12, y, SIDEBAR_W - 24, 44, tab_r, th.accent_bg);
             // A thicker, brighter outline shows the sidebar has D-pad focus
             let (width, col) = if state.nav.focus == NavFocus::Sidebar {
                 (2, th.accent_hi)
             } else {
                 (1, th.accent)
             };
-            gfx.rrect_outline(12, y, SIDEBAR_W - 24, 44, 12, width, col);
+            gfx.rrect_outline(12, y, SIDEBAR_W - 24, 44, tab_r, width, col);
         }
         let fg = if on { th.accent_hi } else { th.dim };
         gfx.icon(icon, 38.0, (y + 22) as f32, 24.0, fg);
@@ -257,7 +280,7 @@ pub fn draw_chrome(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut Hit
         30.0,
         (base - 4) as f32,
         18.0,
-        if wifi_ok { C_GOOD } else { C_WARN },
+        if wifi_ok { th.good } else { th.warn },
     );
     let net_txt = if wifi_ok {
         s.protocol_tls
@@ -357,11 +380,11 @@ pub fn draw_hint_bar(gfx: &mut Gfx, th: &UiTheme, hits: &mut HitMap, items: &[Hi
             break;
         }
         let w1 = Gfx::pad_button_width(hint.button, size);
-        gfx.pad_button(hint.button, x + w1 / 2, cy, size);
+        gfx.pad_button_themed(hint.button, x + w1 / 2, cy, size, th.dpad_on, th.dpad_off);
         x += w1 + 4;
         if let Some(sec) = hint.second {
             let w2 = Gfx::pad_button_width(sec, size);
-            gfx.pad_button(sec, x + w2 / 2, cy, size);
+            gfx.pad_button_themed(sec, x + w2 / 2, cy, size, th.dpad_on, th.dpad_off);
             x += w2 + 4;
         }
         x += 5;
@@ -370,7 +393,7 @@ pub fn draw_hint_bar(gfx: &mut Gfx, th: &UiTheme, hits: &mut HitMap, items: &[Hi
             cy,
             15,
             FontWeight::Medium,
-            rgb(176, 186, 198),
+            th.hint_text,
             Align::Left,
             hint.label,
         );
@@ -439,6 +462,7 @@ pub const MODAL_HEADER_TEXT_DX: i32 = 52;
 /// Draws the dimmed backdrop and the modal card (shadow, fill, outline), centred on screen,
 /// and declares the modal's touch area (`close_key` outside the card, `extra_key` inside).
 /// Returns the card's top-left corner `(dx, dy)`.
+#[allow(clippy::too_many_arguments)]
 pub fn draw_modal_card(
     gfx: &mut Gfx,
     th: &UiTheme,
@@ -451,11 +475,12 @@ pub fn draw_modal_card(
 ) -> (i32, i32) {
     let dx = (GFX_W - w) / 2;
     let dy = (HINT_Y - h) / 2;
+    let r = th.modal_radius;
     gfx.dim(dim);
-    gfx.shadow(dx, dy, w, h, 18);
-    gfx.rrect(dx, dy, w, h, 18, th.card);
+    gfx.shadow(dx, dy, w, h, r);
+    gfx.rrect(dx, dy, w, h, r, th.card);
     declare_modal(hits, (dx, dy, w, h), close_key, extra_key);
-    gfx.rrect_outline(dx, dy, w, h, 18, 1, th.border);
+    gfx.rrect_outline(dx, dy, w, h, r, 1, th.border);
     (dx, dy)
 }
 
@@ -629,10 +654,12 @@ pub fn draw_toast(gfx: &mut Gfx, th: &UiTheme, s: &Strings, toast_msg: Option<&(
         let tw = gfx.text_width(size, FontWeight::Medium, msg).min(maxw);
         let w = tw + 48;
         let h = 42;
+        let r = th.button_radius.min(21);
         let x = (GFX_W - w) / 2;
         let y = HINT_Y - 18 - h;
-        gfx.shadow(x, y, w, h, 21);
-        gfx.rrect(x, y, w, h, 21, rgb(54, 63, 74));
+        gfx.shadow(x, y, w, h, r);
+        gfx.rrect(x, y, w, h, r, th.toast);
+        gfx.rrect_outline(x, y, w, h, r, 1, th.border);
         gfx.text_fit(
             GFX_W / 2,
             y + h / 2,

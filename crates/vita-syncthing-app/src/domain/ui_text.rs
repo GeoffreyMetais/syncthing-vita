@@ -75,6 +75,8 @@ pub enum UiText {
     SyncingWithPeers,
     ThemeDark,
     ThemeOled,
+    ThemeSyncthingDark,
+    ThemeSyncthingLight,
     LanguageChanged(Language),
     DeviceLinked {
         device: String,

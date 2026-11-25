@@ -81,7 +81,7 @@ pub const C_BAD: Color = rgb(239, 83, 80);
 /// Track (unfilled part) of the progress bars.
 pub const C_PROGRESS_TRACK: Color = rgb(38, 47, 56);
 
-/// Colour palette for the VitaSend-inspired interface.
+/// Colour palette and corner radii for the VitaSend & Syncthing interfaces.
 #[allow(dead_code)]
 #[derive(Debug, Clone, Copy)]
 pub struct UiTheme {
@@ -89,15 +89,27 @@ pub struct UiTheme {
     pub sidebar: Color,
     pub card: Color,
     pub card_hi: Color,
+    pub btn: Color,
     pub border: Color,
+    pub track: Color,
+    pub toast: Color,
     pub text: Color,
     pub dim: Color,
     pub faint: Color,
+    pub hint_text: Color,
+    pub dpad_on: Color,
+    pub dpad_off: Color,
     pub accent: Color,
     pub accent_hi: Color,
     pub accent_bg: Color,
     pub on_accent: Color,
+    pub good: Color,
+    pub warn: Color,
+    pub bad: Color,
     pub divider: bool,
+    pub card_radius: i32,
+    pub button_radius: i32,
+    pub modal_radius: i32,
 }
 
 impl UiTheme {
@@ -105,6 +117,8 @@ impl UiTheme {
         match mode {
             ThemeMode::Dark => Self::dark(),
             ThemeMode::Oled => Self::oled(),
+            ThemeMode::SyncthingDark => Self::syncthing_dark(),
+            ThemeMode::SyncthingLight => Self::syncthing_light(),
         }
     }
 
@@ -114,15 +128,27 @@ impl UiTheme {
             sidebar: rgb(11, 14, 17),
             card: rgb(25, 31, 37),
             card_hi: rgb(31, 40, 48),
+            btn: rgb(36, 45, 54),
             border: rgb(40, 49, 58),
+            track: C_PROGRESS_TRACK,
+            toast: rgb(54, 63, 74),
             text: rgb(232, 238, 243),
             dim: rgb(140, 152, 164),
             faint: rgb(88, 99, 110),
+            hint_text: rgb(176, 186, 198),
+            dpad_on: rgb(214, 222, 234),
+            dpad_off: rgb(84, 94, 110),
             accent: rgb(38, 166, 154),
             accent_hi: rgb(72, 208, 190),
             accent_bg: rgba(38, 166, 154, 46),
             on_accent: rgb(6, 24, 22),
+            good: C_GOOD,
+            warn: C_WARN,
+            bad: C_BAD,
             divider: false,
+            card_radius: 14,
+            button_radius: 17,
+            modal_radius: 18,
         }
     }
 
@@ -132,15 +158,89 @@ impl UiTheme {
             sidebar: rgb(0, 0, 0),
             card: rgb(15, 15, 16),
             card_hi: rgb(26, 27, 28),
+            btn: rgb(28, 30, 34),
             border: rgb(38, 40, 42),
+            track: rgb(30, 32, 36),
+            toast: rgb(42, 44, 48),
             text: rgb(240, 242, 244),
             dim: rgb(150, 156, 162),
             faint: rgb(96, 101, 106),
+            hint_text: rgb(176, 186, 198),
+            dpad_on: rgb(214, 222, 234),
+            dpad_off: rgb(84, 94, 110),
             accent: rgb(38, 166, 154),
             accent_hi: rgb(72, 208, 190),
             accent_bg: rgba(38, 166, 154, 46),
             on_accent: rgb(2, 20, 18),
+            good: C_GOOD,
+            warn: C_WARN,
+            bad: C_BAD,
             divider: true,
+            card_radius: 14,
+            button_radius: 17,
+            modal_radius: 18,
+        }
+    }
+
+    /// Official Syncthing dark Web UI palette with subtle Bootstrap-style corner radii.
+    pub const fn syncthing_dark() -> Self {
+        Self {
+            bg: rgb(39, 39, 39),
+            sidebar: rgb(51, 51, 51),
+            card: rgb(59, 59, 59),
+            card_hi: rgb(69, 69, 69),
+            btn: rgb(51, 51, 51),
+            border: rgb(78, 78, 78),
+            track: rgb(45, 45, 45),
+            toast: rgb(64, 64, 64),
+            text: rgb(224, 224, 224),
+            dim: rgb(160, 160, 160),
+            faint: rgb(115, 115, 115),
+            hint_text: rgb(190, 190, 190),
+            dpad_on: rgb(214, 222, 234),
+            dpad_off: rgb(84, 94, 110),
+            accent: rgb(18, 148, 206),
+            accent_hi: rgb(56, 182, 236),
+            accent_bg: rgba(18, 148, 206, 46),
+            on_accent: rgb(255, 255, 255),
+            good: rgb(92, 184, 92),
+            warn: rgb(240, 173, 78),
+            bad: rgb(217, 83, 79),
+            divider: true,
+            card_radius: 6,
+            button_radius: 5,
+            modal_radius: 8,
+        }
+    }
+
+    /// Official Syncthing light Web UI palette with subtle Bootstrap-style corner radii.
+    pub const fn syncthing_light() -> Self {
+        Self {
+            bg: rgb(245, 245, 245),
+            sidebar: rgb(238, 238, 238),
+            card: rgb(255, 255, 255),
+            card_hi: rgb(247, 250, 253),
+            btn: rgb(255, 255, 255),
+            border: rgb(208, 212, 217),
+            track: rgb(224, 228, 232),
+            toast: rgb(255, 255, 255),
+            text: rgb(51, 51, 51),
+            dim: rgb(102, 102, 102),
+            faint: rgb(148, 154, 160),
+            hint_text: rgb(72, 76, 82),
+            dpad_on: rgb(58, 66, 76),
+            dpad_off: rgb(168, 174, 182),
+            accent: rgb(17, 125, 176),
+            accent_hi: rgb(8, 108, 162),
+            accent_bg: rgba(17, 125, 176, 30),
+            on_accent: rgb(255, 255, 255),
+            good: rgb(46, 139, 60),
+            warn: rgb(192, 114, 0),
+            bad: rgb(201, 48, 44),
+            divider: true,
+            card_radius: 6,
+            button_radius: 5,
+            modal_radius: 8,
         }
     }
 }

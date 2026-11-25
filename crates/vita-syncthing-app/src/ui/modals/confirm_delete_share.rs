@@ -3,9 +3,9 @@
 use super::confirm_frame::{draw_confirm_frame, draw_confirm_lines, ConfirmFrame, CONFIRM_PAD_X};
 use crate::domain::interaction::HitMap;
 use crate::domain::AppState;
-use crate::ui::gfx::{rgba, FontWeight, Gfx, Icon};
+use crate::ui::gfx::{with_alpha, FontWeight, Gfx, Icon};
 use crate::ui::i18n;
-use crate::ui::theme::{UiTheme, C_BAD};
+use crate::ui::theme::UiTheme;
 
 /// Renders the `ConfirmDeleteShare` modal for `shares[share_idx]`.
 pub fn render_confirm_delete_share_modal(
@@ -21,8 +21,8 @@ pub fn render_confirm_delete_share_modal(
     let frame = ConfirmFrame {
         size: (w, 236),
         icon: Icon::Close,
-        icon_colour: C_BAD,
-        icon_disc: rgba(239, 83, 80, 42),
+        icon_colour: th.bad,
+        icon_disc: with_alpha(th.bad, 42),
         title: s.modal_delete_share_title,
         subtitle: s.modal_delete_share_subtitle,
         confirm_label: s.action_delete,

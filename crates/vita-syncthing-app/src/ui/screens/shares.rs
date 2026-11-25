@@ -11,7 +11,7 @@ use crate::domain::{
 };
 use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton};
 use crate::ui::i18n;
-use crate::ui::theme::{UiTheme, CONTENT_R, CONTENT_W, CONTENT_X, C_GOOD, C_WARN};
+use crate::ui::theme::{UiTheme, CONTENT_R, CONTENT_W, CONTENT_X};
 use crate::ui::widgets::{action_width, draw_action_hotspot, draw_card, draw_chip, draw_scrollbar};
 
 /// Height of a share card and vertical distance between two cards.
@@ -107,7 +107,14 @@ fn draw_share_card(
     });
 
     let lx = CONTENT_X + 14;
-    gfx.rrect(lx, ry + (SHARE_CARD_H - 44) / 2, 44, 44, 12, th.accent_bg);
+    gfx.rrect(
+        lx,
+        ry + (SHARE_CARD_H - 44) / 2,
+        44,
+        44,
+        th.card_radius.min(12),
+        th.accent_bg,
+    );
     gfx.icon(
         Icon::Folder,
         (lx + 22) as f32,
@@ -173,15 +180,16 @@ fn draw_share_card(
     let tx = lx + 58;
     let max_w = bx_devs - 16 - tx;
     let (status_txt, status_col) = if share.enabled {
-        (s.status_active, C_GOOD)
+        (s.status_active, th.good)
     } else {
-        (s.status_paused, C_WARN)
+        (s.status_paused, th.warn)
     };
-    let status_chip_w = draw_chip(gfx, tx + max_w, ry + TITLE_DY, status_txt, status_col);
+    let status_chip_w = draw_chip(gfx, th, tx + max_w, ry + TITLE_DY, status_txt, status_col);
     let mode_chip_w = if share.mode == ShareMode::SendOnly {
         let gap = 6;
         gap + draw_chip(
             gfx,
+            th,
             tx + max_w - status_chip_w - gap,
             ry + TITLE_DY,
             s.share_mode_send_only,
@@ -215,7 +223,7 @@ fn draw_share_card(
     );
     let summary = state.share_devices_summary(share);
     let dev_col = if share.shared_devices.is_empty() {
-        C_WARN
+        th.warn
     } else {
         th.dim
     };

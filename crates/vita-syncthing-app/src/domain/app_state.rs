@@ -418,13 +418,12 @@ impl AppState {
     }
 
     pub fn toggle_theme(&mut self) {
-        self.theme_mode = match self.theme_mode {
-            ThemeMode::Dark => ThemeMode::Oled,
-            ThemeMode::Oled => ThemeMode::Dark,
-        };
+        self.theme_mode = self.theme_mode.next();
         self.show_toast(match self.theme_mode {
             ThemeMode::Dark => UiText::ThemeDark,
             ThemeMode::Oled => UiText::ThemeOled,
+            ThemeMode::SyncthingDark => UiText::ThemeSyncthingDark,
+            ThemeMode::SyncthingLight => UiText::ThemeSyncthingLight,
         });
     }
 

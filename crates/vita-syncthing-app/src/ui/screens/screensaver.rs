@@ -61,11 +61,19 @@ pub fn render_oled_screensaver(gfx: &mut Gfx, th: &UiTheme, state: &AppState) {
         &status_line,
     );
     match bar {
-        Some(Some(p)) => {
-            draw_progress(gfx, bx + 2, by + 104, (SAVER_W as i32) - 8, 8, p, th.accent)
-        }
+        Some(Some(p)) => draw_progress(
+            gfx,
+            th,
+            bx + 2,
+            by + 104,
+            (SAVER_W as i32) - 8,
+            8,
+            p,
+            th.accent,
+        ),
         Some(None) => draw_indeterminate_progress(
             gfx,
+            th,
             bx + 2,
             by + 104,
             (SAVER_W as i32) - 8,

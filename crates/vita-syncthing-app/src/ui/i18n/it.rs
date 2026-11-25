@@ -121,6 +121,8 @@ pub static STRINGS_IT: Strings = Strings {
     settings_label_colour_theme: "Tema colori",
     settings_desc_theme_dark: "Scuro — Design blu ardesia VitaSend con accento turchese",
     settings_desc_theme_oled: "OLED — Fondo nero puro (risparmia batteria OLED)",
+    settings_desc_theme_syncthing_dark: "Syncthing Scuro — Palette scura ufficiale Syncthing",
+    settings_desc_theme_syncthing_light: "Syncthing Chiaro — Palette chiara ufficiale Syncthing",
     settings_saver_auto_hint:
         "Il salvaschermo OLED si attiva dopo 10s di sincronizzazione (30s a riposo).",
     settings_sec_devices: "DISPOSITIVI E ABBINAMENTO",
@@ -251,6 +253,8 @@ pub static MESSAGES_IT: Messages = Messages {
     syncing_with_peers: "Sincronizzazione con i peer della LAN...",
     theme_dark: "Tema: Scuro (grigio-blu)",
     theme_oled: "Tema: OLED (nero puro #000000)",
+    theme_syncthing_dark: "Tema: Syncthing Scuro",
+    theme_syncthing_light: "Tema: Syncthing Chiaro",
     language_changed: "Lingua: {name}",
     device_linked: "{device} aggiunto a '{share}'",
     device_unlinked: "{device} rimosso da '{share}'",

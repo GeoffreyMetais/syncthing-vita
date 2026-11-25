@@ -5,7 +5,7 @@ use crate::domain::{AppState, ShareMode, VISIBLE_DEVICES};
 use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton};
 use crate::ui::i18n;
 use crate::ui::i18n::messages::fill;
-use crate::ui::theme::{UiTheme, C_GOOD, C_WARN, MANAGE_DEVICES_H, MANAGE_DEVICES_W};
+use crate::ui::theme::{UiTheme, MANAGE_DEVICES_H, MANAGE_DEVICES_W};
 use crate::ui::widgets::{
     action_width, declare_touch, draw_chip, draw_modal_card, draw_modal_header,
     draw_modal_separator, draw_press_button, draw_press_hints, draw_row_tick, ModalHeader,
@@ -73,7 +73,7 @@ pub fn render_manage_devices_modal(
     let header_title = s.fmt_devices_for_share(&share_title);
     let incomplete = state.is_share_creation_incomplete(share_idx);
     let (subtitle, subtitle_col) = if incomplete {
-        (s.modal_manage_devices_subtitle_incomplete, C_WARN)
+        (s.modal_manage_devices_subtitle_incomplete, th.warn)
     } else {
         (s.modal_manage_devices_subtitle, th.dim)
     };
@@ -98,7 +98,7 @@ pub fn render_manage_devices_modal(
         let (headline, col) = if state.sync_in_progress {
             (s.modal_manage_devices_scanning, th.accent_hi)
         } else {
-            (s.modal_manage_devices_empty, C_WARN)
+            (s.modal_manage_devices_empty, th.warn)
         };
         gfx.text(
             lx,
@@ -133,7 +133,7 @@ pub fn render_manage_devices_modal(
             let is_checked = shared_list.iter().any(|id| id.matches_peer(&dev.device_id));
 
             if is_sel {
-                gfx.rrect(lx, ry, w - 56, 46, 10, th.accent_bg);
+                gfx.rrect(lx, ry, w - 56, 46, th.card_radius.min(10), th.accent_bg);
                 gfx.rrect(lx, ry + 10, 4, 26, 2, th.accent);
             }
 
@@ -151,8 +151,8 @@ pub fn render_manage_devices_modal(
             } else {
                 s.action_not_linked
             };
-            let badge_col = if is_checked { C_GOOD } else { th.dim };
-            draw_chip(gfx, dx + w - 36, cy, badge_txt, badge_col);
+            let badge_col = if is_checked { th.good } else { th.dim };
+            draw_chip(gfx, th, dx + w - 36, cy, badge_txt, badge_col);
 
             gfx.text(
                 lx + 78,
