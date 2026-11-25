@@ -1,0 +1,45 @@
+# ui-script scenario for PR #54 screenshots.
+#
+# Affected by this PR (visual): the sidebar version label (hardcoded "v0.1.0"
+# -> CARGO_PKG_VERSION = "v0.2.0", visible on every screen with the sidebar) and
+# the modal header titles of CreateShare / ManageDevices, now on the shared
+# header baseline (was 1-2 px lower / 1 px smaller).
+#
+# Run (needs Vita3K + the armv7 Vita toolchain, not available in the agent sandbox):
+#   just ui-scenario docs/screenshots/vibe-codebase-factorization-09f116/scenario.txt 40
+# PNGs land in target/ui-shots/, then:
+#   cp target/ui-shots/*.png docs/screenshots/vibe-codebase-factorization-09f116/
+#   git add docs/screenshots/vibe-codebase-factorization-09f116 && git commit && git push
+#   embed them in the PR description through the new commit hash (see AGENTS.md §6).
+#
+# For another UI language, seed the preference before the run, e.g.:
+#   printf 'fr\n' > ~/.local/share/Vita3K/Vita3K/ux0/data/syncthing/language.cfg
+# and re-run the scenario (shots keep the same names in a per-language subfolder).
+
+wait 90
+shot 1_overview
+# Settings tab (R x2 from Overview) — version label in the sidebar
+press R
+wait 20
+press R
+wait 30
+shot 2_settings
+# Device ID modal (Circle on Settings)
+press CIRCLE
+wait 30
+shot 3_device_id
+press CIRCLE
+wait 20
+# Back to Overview (L x2), open CreateShare (Triangle), then ManageDevices (Cross on first preset)
+press L
+wait 20
+press L
+wait 30
+press TRIANGLE
+wait 30
+shot 4_create_share
+press CROSS
+wait 40
+shot 5_manage_devices
+press CIRCLE
+wait 20
