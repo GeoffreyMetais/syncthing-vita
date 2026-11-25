@@ -3,51 +3,37 @@
 use crate::domain::interaction::{HitMap, PadKey};
 use crate::domain::AppState;
 use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton};
+use crate::ui::i18n;
 use crate::ui::i18n::messages::fill;
 use crate::ui::image::draw_gray_image;
-use crate::ui::strings;
 use crate::ui::theme::{scan_qr_modal_rect, UiTheme, C_WARN, SCAN_QR_VIEW_H, SCAN_QR_VIEW_W};
-use crate::ui::widgets::{action_width, declare_modal, draw_press_button, draw_press_hints};
+use crate::ui::widgets::{
+    action_width, draw_modal_card, draw_modal_header, draw_press_button, draw_press_hints,
+    ModalHeader,
+};
 
 /// Renders the `ScanDeviceQr` modal: live camera preview with a viewfinder frame.
 pub fn render_scan_qr_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut HitMap) {
-    let s = strings::strings(state.language);
-    gfx.dim(180);
-    let (dx, dy, w, h) = scan_qr_modal_rect();
-    let (dx, dy, w, h) = (dx as i32, dy as i32, w as i32, h as i32);
+    let s = i18n::strings(state.language);
+    let (_, _, w, h) = scan_qr_modal_rect();
+    let (w, h) = (w as i32, h as i32);
+    let (dx, dy) = draw_modal_card(gfx, th, hits, w, h, 180, Some(PadKey::Circle), None);
 
-    gfx.shadow(dx, dy, w, h, 18);
-    gfx.rrect(dx, dy, w, h, 18, th.card);
-    declare_modal(hits, (dx, dy, w, h), Some(PadKey::Circle), None);
-    gfx.rrect_outline(dx, dy, w, h, 18, 1, th.border);
-
-    let lx = dx + 28;
-    gfx.circle((lx + 20) as f32, (dy + 38) as f32, 20.0, th.accent_bg);
-    gfx.icon(
-        Icon::Phone,
-        (lx + 20) as f32,
-        (dy + 38) as f32,
-        20.0,
-        th.accent_hi,
-    );
-    gfx.text(
-        lx + 52,
-        dy + 29,
-        20,
-        FontWeight::Bold,
-        th.text,
-        Align::Left,
-        s.modal_scan_qr_title,
-    );
-    gfx.text_fit(
-        lx + 52,
-        dy + 51,
+    let lx = draw_modal_header(
+        gfx,
+        th,
+        dx,
+        dy,
         w - 108,
-        13,
-        FontWeight::Regular,
-        th.dim,
-        Align::Left,
-        s.modal_scan_qr_subtitle,
+        &ModalHeader::new(
+            Icon::Phone,
+            20.0,
+            th.accent_hi,
+            th.accent_bg,
+            s.modal_scan_qr_title,
+        )
+        .compact()
+        .subtitle(s.modal_scan_qr_subtitle, th.dim),
     );
 
     let vx = lx;
@@ -78,7 +64,7 @@ fn draw_viewfinder(gfx: &mut Gfx, th: &UiTheme, state: &AppState, vx: i32, vy: i
     let (vw, vh) = (SCAN_QR_VIEW_W, SCAN_QR_VIEW_H);
     gfx.rect(vx, vy, vw, vh, th.bg);
 
-    let st = strings::strings(state.language);
+    let st = i18n::strings(state.language);
     if let Some(err) = state.qr_camera_error.as_deref() {
         let msg = fill(st.messages.camera_error, &[("error", &err)]);
         gfx.text_fit(

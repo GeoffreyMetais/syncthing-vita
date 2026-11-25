@@ -10,7 +10,7 @@ use crate::domain::{
     UiAction, VISIBLE_SHARES,
 };
 use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton};
-use crate::ui::strings;
+use crate::ui::i18n;
 use crate::ui::theme::{UiTheme, CONTENT_R, CONTENT_W, CONTENT_X, C_GOOD, C_WARN};
 use crate::ui::widgets::{action_width, draw_action_hotspot, draw_card, draw_chip, draw_scrollbar};
 
@@ -64,7 +64,7 @@ pub fn draw_share_list(
 }
 
 fn draw_empty_list(gfx: &mut Gfx, th: &UiTheme, state: &AppState, top_y: i32) {
-    let s = strings::strings(state.language);
+    let s = i18n::strings(state.language);
     draw_card(gfx, th, CONTENT_X, top_y, CONTENT_W, EMPTY_CARD_H, false);
     let lines = [
         (34, 17, FontWeight::Medium, th.text, s.msg_no_shares),
@@ -93,7 +93,7 @@ fn draw_share_card(
     i: usize,
     ry: i32,
 ) {
-    let s = strings::strings(state.language);
+    let s = i18n::strings(state.language);
     let share = &state.shares[i];
     // The selected card is not highlighted while the device card above holds the focus.
     let is_sel = i == state.selected_share_idx && !state.is_header_focused(ActiveTab::Dashboard);

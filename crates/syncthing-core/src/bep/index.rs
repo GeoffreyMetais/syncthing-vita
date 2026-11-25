@@ -23,6 +23,36 @@ pub struct BepVersionCounter {
     pub value: u64,
 }
 
+/// Decodes a repeated `Counter` field (as in `Index` file entries, field 9, and
+/// `DownloadProgress` updates, field 3): each item is a length-delimited `Counter` message
+/// with `id = 1` (short device ID) and `value = 2`.
+pub fn decode_version_counters(data: &[u8]) -> io::Result<Vec<BepVersionCounter>> {
+    let mut counters = Vec::new();
+    for c_item in WireIter::new(data) {
+        let (cf, cw, cdata) = c_item?;
+        if cf == 1 && cw == 2 {
+            let mut short_id = 0u64;
+            let mut val = 0u64;
+            for kv in WireIter::new(cdata) {
+                let (kf, kw, kdata) = kv?;
+                if kw == 0 {
+                    let (v, _) = decode_varint(kdata)?;
+                    if kf == 1 {
+                        short_id = v;
+                    } else if kf == 2 {
+                        val = v;
+                    }
+                }
+            }
+            counters.push(BepVersionCounter {
+                short_device_id: short_id,
+                value: val,
+            });
+        }
+    }
+    Ok(counters)
+}
+
 /// Information about a file block in `Index` / `IndexUpdate`.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct BepBlockInfo {
@@ -231,28 +261,7 @@ impl BepIndex {
                     no_permissions = v != 0;
                 }
                 (9, 2) => {
-                    for c_item in WireIter::new(data) {
-                        let (cf, cw, cdata) = c_item?;
-                        if cf == 1 && cw == 2 {
-                            let mut short_id = 0u64;
-                            let mut val = 0u64;
-                            for kv in WireIter::new(cdata) {
-                                let (kf, kw, kdata) = kv?;
-                                if kw == 0 {
-                                    let (v, _) = decode_varint(kdata)?;
-                                    if kf == 1 {
-                                        short_id = v;
-                                    } else if kf == 2 {
-                                        val = v;
-                                    }
-                                }
-                            }
-                            versions.push(BepVersionCounter {
-                                short_device_id: short_id,
-                                value: val,
-                            });
-                        }
-                    }
+                    versions.extend(decode_version_counters(data)?);
                 }
                 (10, 0) => {
                     let (v, _) = decode_varint(data)?;

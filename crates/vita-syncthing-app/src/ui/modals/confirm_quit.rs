@@ -4,12 +4,12 @@ use super::confirm_frame::{draw_confirm_frame, draw_confirm_lines, ConfirmFrame,
 use crate::domain::interaction::HitMap;
 use crate::domain::AppState;
 use crate::ui::gfx::{rgba, FontWeight, Gfx, Icon};
-use crate::ui::strings;
+use crate::ui::i18n;
 use crate::ui::theme::{UiTheme, CONFIRM_QUIT_H, CONFIRM_QUIT_W, C_BAD, C_WARN};
 
 /// Renders the `ConfirmQuit` modal (warns when a sync is in progress).
 pub fn render_confirm_quit_modal(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut HitMap) {
-    let s = strings::strings(state.language);
+    let s = i18n::strings(state.language);
     let w = CONFIRM_QUIT_W;
     let frame = ConfirmFrame {
         size: (w, CONFIRM_QUIT_H),

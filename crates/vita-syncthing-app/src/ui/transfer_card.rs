@@ -4,7 +4,7 @@
 
 use crate::domain::{AppState, HitMap, Hotspot, NavFocus, Rect, SyncActivity, UiAction};
 use crate::ui::gfx::{with_alpha, Align, FontWeight, Gfx, Icon};
-use crate::ui::strings::Strings;
+use crate::ui::i18n::Strings;
 use crate::ui::theme::{UiTheme, C_GOOD, HINT_Y, SIDEBAR_W};
 use crate::ui::widgets::{draw_indeterminate_progress, draw_progress};
 

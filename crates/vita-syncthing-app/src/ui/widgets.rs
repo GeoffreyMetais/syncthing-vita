@@ -8,7 +8,7 @@ use crate::domain::{
 use crate::ui::gfx::{
     rgb, with_alpha, Align, Color, FontWeight, Gfx, Icon, PadButton, GFX_H, GFX_W,
 };
-use crate::ui::strings::{self, Strings};
+use crate::ui::i18n::{self, Strings};
 use crate::ui::theme::{
     UiTheme, ACTION_TOUCH_H, CONTENT_R, CONTENT_W, CONTENT_X, C_GOOD, C_PROGRESS_TRACK, C_WARN,
     HINT_TOUCH_MARGIN, HINT_Y, SIDEBAR_W,
@@ -194,7 +194,7 @@ pub fn draw_page_title(gfx: &mut Gfx, th: &UiTheme, title: &str, right: Option<&
 /// Draws the screen background, the sidebar (tabs, transfer card, status) and declares the
 /// sidebar's interactive elements.
 pub fn draw_chrome(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut HitMap) {
-    let s = strings::strings(state.language);
+    let s = i18n::strings(state.language);
     let tabs = [
         (s.tab_overview, Icon::Vita, ActiveTab::Dashboard),
         (s.tab_files, Icon::Receive, ActiveTab::FolderPicker),
@@ -428,6 +428,148 @@ pub fn declare_modal(
     let action = |key: Option<PadKey>| key.map_or(UiAction::Inert, UiAction::Press);
     declare_touch(hits, 0, 0, GFX_W, GFX_H, action(outside));
     declare_touch(hits, x, y, w, h, action(inside));
+}
+
+/// Horizontal padding inside a modal card.
+pub const MODAL_PAD_X: i32 = 28;
+
+/// Offset of the header text from the left padding (after the icon disc).
+pub const MODAL_HEADER_TEXT_DX: i32 = 52;
+
+/// Draws the dimmed backdrop and the modal card (shadow, fill, outline), centred on screen,
+/// and declares the modal's touch area (`close_key` outside the card, `extra_key` inside).
+/// Returns the card's top-left corner `(dx, dy)`.
+pub fn draw_modal_card(
+    gfx: &mut Gfx,
+    th: &UiTheme,
+    hits: &mut HitMap,
+    w: i32,
+    h: i32,
+    dim: u8,
+    close_key: Option<PadKey>,
+    extra_key: Option<PadKey>,
+) -> (i32, i32) {
+    let dx = (GFX_W - w) / 2;
+    let dy = (HINT_Y - h) / 2;
+    gfx.dim(dim);
+    gfx.shadow(dx, dy, w, h, 18);
+    gfx.rrect(dx, dy, w, h, 18, th.card);
+    declare_modal(hits, (dx, dy, w, h), close_key, extra_key);
+    gfx.rrect_outline(dx, dy, w, h, 18, 1, th.border);
+    (dx, dy)
+}
+
+/// Header of a modal card: icon disc, bold title, optional subtitle line.
+pub struct ModalHeader<'a> {
+    pub icon: Icon,
+    pub icon_size: f32,
+    pub icon_colour: Color,
+    pub icon_disc: Color,
+    pub title: &'a str,
+    pub subtitle: Option<(&'a str, Color)>,
+    /// Compact variant (scan QR, add device): smaller disc, title and subtitle offsets.
+    pub compact: bool,
+}
+
+impl<'a> ModalHeader<'a> {
+    /// Standard header: disc at `dy + 40`, 21 px bold title at `dy + 31`, 14 px subtitle at
+    /// `dy + 54`.
+    pub fn new(
+        icon: Icon,
+        icon_size: f32,
+        icon_colour: Color,
+        icon_disc: Color,
+        title: &'a str,
+    ) -> Self {
+        Self {
+            icon,
+            icon_size,
+            icon_colour,
+            icon_disc,
+            title,
+            subtitle: None,
+            compact: false,
+        }
+    }
+
+    /// Adds a subtitle line in `colour`.
+    pub fn subtitle(mut self, text: &'a str, colour: Color) -> Self {
+        self.subtitle = Some((text, colour));
+        self
+    }
+
+    /// Compact variant: disc at `dy + 38`, 20 px title at `dy + 29`, 13 px subtitle at `dy + 51`.
+    pub fn compact(mut self) -> Self {
+        self.compact = true;
+        self
+    }
+}
+
+/// Draws a modal header fitted to `text_max_w`. Returns the left content margin
+/// (`dx + MODAL_PAD_X`).
+pub fn draw_modal_header(
+    gfx: &mut Gfx,
+    th: &UiTheme,
+    dx: i32,
+    dy: i32,
+    text_max_w: i32,
+    header: &ModalHeader<'_>,
+) -> i32 {
+    let (disc_dy, title_dy, title_size, sub_dy, sub_size) = if header.compact {
+        (38, 29, 20, 51, 13)
+    } else {
+        (40, 31, 21, 54, 14)
+    };
+    let lx = dx + MODAL_PAD_X;
+    gfx.circle(
+        (lx + 20) as f32,
+        (dy + disc_dy) as f32,
+        20.0,
+        header.icon_disc,
+    );
+    gfx.icon(
+        header.icon,
+        (lx + 20) as f32,
+        (dy + disc_dy) as f32,
+        header.icon_size,
+        header.icon_colour,
+    );
+    gfx.text_fit(
+        lx + MODAL_HEADER_TEXT_DX,
+        dy + title_dy,
+        text_max_w,
+        title_size,
+        FontWeight::Bold,
+        th.text,
+        Align::Left,
+        header.title,
+    );
+    if let Some((text, colour)) = header.subtitle {
+        gfx.text_fit(
+            lx + MODAL_HEADER_TEXT_DX,
+            dy + sub_dy,
+            text_max_w,
+            sub_size,
+            FontWeight::Regular,
+            colour,
+            Align::Left,
+            text,
+        );
+    }
+    lx
+}
+
+/// Draws the horizontal separator under a modal header, `sep_dy` below the card top
+/// (76 for a full header, 70 for the compact one).
+pub fn draw_modal_separator(gfx: &mut Gfx, th: &UiTheme, dx: i32, dy: i32, w: i32, sep_dy: i32) {
+    gfx.line(
+        (dx + 24) as f32,
+        (dy + sep_dy) as f32,
+        (dx + w - 24) as f32,
+        (dy + sep_dy) as f32,
+        1.0,
+        th.border,
+    );
 }
 
 /// Draws an action pill of a modal dialog like [`draw_action`]; touching it is the same as

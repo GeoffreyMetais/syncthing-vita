@@ -4,15 +4,18 @@
 
 use crate::domain::interaction::{HitMap, PadKey};
 use crate::domain::Language;
-use crate::ui::gfx::{Align, Color, FontWeight, Gfx, Icon, PadButton, GFX_W};
-use crate::ui::strings;
-use crate::ui::theme::{UiTheme, HINT_Y};
-use crate::ui::widgets::{action_width, declare_modal, draw_press_button, draw_press_hints};
+use crate::ui::gfx::{Align, Color, FontWeight, Gfx, Icon, PadButton};
+use crate::ui::i18n;
+use crate::ui::theme::UiTheme;
+use crate::ui::widgets::{
+    action_width, draw_modal_card, draw_modal_header, draw_modal_separator, draw_press_button,
+    draw_press_hints, ModalHeader, MODAL_HEADER_TEXT_DX,
+};
 
 /// Horizontal padding inside a confirmation dialog.
-pub const CONFIRM_PAD_X: i32 = 28;
+pub use crate::ui::widgets::MODAL_PAD_X as CONFIRM_PAD_X;
 /// Offset of the title / subtitle from the left padding (after the icon).
-const HEADER_TEXT_DX: i32 = 52;
+const HEADER_TEXT_DX: i32 = MODAL_HEADER_TEXT_DX;
 
 /// What distinguishes one confirmation dialog from another.
 pub struct ConfirmFrame<'a> {
@@ -38,51 +41,30 @@ pub fn draw_confirm_frame(
     language: Language,
     frame: &ConfirmFrame<'_>,
 ) -> (i32, i32) {
-    let s = strings::strings(language);
+    let s = i18n::strings(language);
     let (w, h) = frame.size;
-    let dx = (GFX_W - w) / 2;
-    let dy = (HINT_Y - h) / 2;
-
-    gfx.dim(180);
-    gfx.shadow(dx, dy, w, h, 18);
-    gfx.rrect(dx, dy, w, h, 18, th.card);
-    declare_modal(
+    let (dx, dy) = draw_modal_card(
+        gfx,
+        th,
         hits,
-        (dx, dy, w, h),
+        w,
+        h,
+        180,
         Some(PadKey::Circle),
         Some(PadKey::Circle),
     );
-    gfx.rrect_outline(dx, dy, w, h, 18, 1, th.border);
 
-    let lx = dx + CONFIRM_PAD_X;
     let header_max_w = w - 2 * CONFIRM_PAD_X - HEADER_TEXT_DX;
-    let (icon_x, icon_y) = ((lx + 20) as f32, (dy + 40) as f32);
-    gfx.circle(icon_x, icon_y, 20.0, frame.icon_disc);
-    gfx.icon(frame.icon, icon_x, icon_y, 22.0, frame.icon_colour);
-    let header = [
-        (dy + 31, 21, FontWeight::Bold, th.text, frame.title),
-        (dy + 54, 14, FontWeight::Regular, th.dim, frame.subtitle),
-    ];
-    for (y, size, weight, colour, text) in header {
-        gfx.text_fit(
-            lx + HEADER_TEXT_DX,
-            y,
-            header_max_w,
-            size,
-            weight,
-            colour,
-            Align::Left,
-            text,
-        );
-    }
-    gfx.line(
-        (dx + 24) as f32,
-        (dy + 76) as f32,
-        (dx + w - 24) as f32,
-        (dy + 76) as f32,
-        1.0,
-        th.border,
-    );
+    let header = ModalHeader::new(
+        frame.icon,
+        22.0,
+        frame.icon_colour,
+        frame.icon_disc,
+        frame.title,
+    )
+    .subtitle(frame.subtitle, th.dim);
+    draw_modal_header(gfx, th, dx, dy, header_max_w, &header);
+    draw_modal_separator(gfx, th, dx, dy, w, 76);
 
     let w_confirm = action_width(gfx, PadButton::Cross, frame.confirm_label);
     let w_cancel = action_width(gfx, PadButton::Circle, s.action_cancel);

@@ -8,8 +8,8 @@ use crate::domain::{
     SETTINGS_ROW_LANGUAGE, SETTINGS_ROW_LOG,
 };
 use crate::ui::gfx::{Align, FontWeight, Gfx, PadButton};
+use crate::ui::i18n;
 use crate::ui::screens::logs::log_line_colour;
-use crate::ui::strings;
 use crate::ui::theme::{
     UiTheme, CONTENT_B, CONTENT_R, CONTENT_W, CONTENT_X, CONTENT_Y, SETTINGS_DECLINED_B,
     SETTINGS_DECLINED_Y, SETTINGS_DEVICES_B, SETTINGS_DEVICES_Y, SETTINGS_LANGUAGE_B,
@@ -28,7 +28,7 @@ const THEME_ACTIONS_Y: i32 = CONTENT_Y + 42;
 
 /// Renders Tab 4: **Settings & Log** (`Settings`).
 pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut HitMap) {
-    let s = strings::strings(state.language);
+    let s = i18n::strings(state.language);
     draw_page_title(gfx, th, s.settings_title, Some(s.settings_subtitle));
 
     // 1. Display & Theme Settings Card
@@ -144,7 +144,7 @@ pub fn render_settings_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: 
 
 /// Dedicated card for device pairing (`Add device`) and viewing this PS Vita's `QR / ID`.
 fn render_devices(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut HitMap) {
-    let s = strings::strings(state.language);
+    let s = i18n::strings(state.language);
     let y = SETTINGS_DEVICES_Y;
     let h = SETTINGS_DEVICES_B - SETTINGS_DEVICES_Y;
     draw_card(gfx, th, CONTENT_X, y, CONTENT_W, h, false);
@@ -212,7 +212,7 @@ fn render_devices(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut HitM
 
 /// Card showing the UI language (system default or a fixed one) with a `Change Language` button.
 fn render_language(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut HitMap) {
-    let s = strings::strings(state.language);
+    let s = i18n::strings(state.language);
     let y = SETTINGS_LANGUAGE_Y;
     let h = SETTINGS_LANGUAGE_B - SETTINGS_LANGUAGE_Y;
     draw_card(gfx, th, CONTENT_X, y, CONTENT_W, h, false);
@@ -273,7 +273,7 @@ fn render_language(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut Hit
 
 /// Card listing folder offers declined in the `FolderOffer` modal, with a `Clear Declined` button.
 fn render_declined_folders(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut HitMap) {
-    let s = strings::strings(state.language);
+    let s = i18n::strings(state.language);
     let y = SETTINGS_DECLINED_Y;
     let h = SETTINGS_DECLINED_B - SETTINGS_DECLINED_Y;
     draw_card(gfx, th, CONTENT_X, y, CONTENT_W, h, false);
@@ -335,7 +335,7 @@ fn render_declined_folders(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: 
 /// Card with the latest protocol log lines. Touching it, or its `Open` button, opens the
 /// full-screen log viewer.
 fn render_log_card(gfx: &mut Gfx, th: &UiTheme, state: &AppState, hits: &mut HitMap) {
-    let s = strings::strings(state.language);
+    let s = i18n::strings(state.language);
     let ly = SETTINGS_DECLINED_B + 8;
     let lh = CONTENT_B - ly;
     draw_card(gfx, th, CONTENT_X, ly, CONTENT_W, lh, false);

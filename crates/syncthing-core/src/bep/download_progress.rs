@@ -2,6 +2,7 @@
 
 use std::io;
 
+use super::index::decode_version_counters;
 use super::BepVersionCounter;
 use crate::proto::{
     decode_varint, encode_bytes_field, encode_varint, encode_varint_field, WireIter,
@@ -122,28 +123,7 @@ impl BepDownloadProgress {
                 }
                 (2, 2) => name = String::from_utf8_lossy(data).into_owned(),
                 (3, 2) => {
-                    for c_item in WireIter::new(data) {
-                        let (cf, cw, cdata) = c_item?;
-                        if cf == 1 && cw == 2 {
-                            let mut short_id = 0u64;
-                            let mut val = 0u64;
-                            for kv in WireIter::new(cdata) {
-                                let (kf, kw, kdata) = kv?;
-                                if kw == 0 {
-                                    let (v, _) = decode_varint(kdata)?;
-                                    if kf == 1 {
-                                        short_id = v;
-                                    } else if kf == 2 {
-                                        val = v;
-                                    }
-                                }
-                            }
-                            version.push(BepVersionCounter {
-                                short_device_id: short_id,
-                                value: val,
-                            });
-                        }
-                    }
+                    version.extend(decode_version_counters(data)?);
                 }
                 (4, 0) => {
                     // Unpacked repeated int32

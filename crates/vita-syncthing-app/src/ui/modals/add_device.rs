@@ -5,12 +5,13 @@ use syncthing_core::DeviceId;
 use super::fallback_keyboard::draw_fallback_keypad;
 use crate::domain::interaction::{HitMap, PadKey, UiAction};
 use crate::domain::AppState;
-use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton, GFX_W};
+use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton};
+use crate::ui::i18n;
 use crate::ui::i18n::messages::fill;
-use crate::ui::strings;
-use crate::ui::theme::{add_device_modal_height, UiTheme, C_GOOD, C_WARN, HINT_Y};
+use crate::ui::theme::{add_device_modal_height, UiTheme, C_GOOD, C_WARN};
 use crate::ui::widgets::{
-    action_width, declare_modal, declare_touch, draw_press_button, draw_press_hints,
+    action_width, declare_touch, draw_modal_card, draw_modal_header, draw_modal_separator,
+    draw_press_button, draw_press_hints, ModalHeader,
 };
 
 /// Modal Dialog 2b: Add a remote Syncthing device by entering its Short ID (7+ chars) or Full ID (56 chars).
@@ -21,55 +22,31 @@ pub fn render_add_device_modal(
     keypad_idx: usize,
     hits: &mut HitMap,
 ) {
-    let s = strings::strings(state.language);
-    gfx.dim(180);
+    let s = i18n::strings(state.language);
     let keypad = state.fallback_keypad_visible;
     let w = 700;
     let h = add_device_modal_height(keypad);
-    let dx = (GFX_W - w) / 2;
-    let dy = (HINT_Y - h) / 2;
-
-    gfx.shadow(dx, dy, w, h, 18);
-    gfx.rrect(dx, dy, w, h, 18, th.card);
-    declare_modal(hits, (dx, dy, w, h), Some(PadKey::Circle), None);
-    gfx.rrect_outline(dx, dy, w, h, 18, 1, th.border);
+    let (dx, dy) = draw_modal_card(gfx, th, hits, w, h, 180, Some(PadKey::Circle), None);
 
     let lx = dx + 28;
     let content_w = w - 56;
-    gfx.circle((lx + 20) as f32, (dy + 38) as f32, 20.0, th.accent_bg);
-    gfx.icon(
-        Icon::Plus,
-        (lx + 20) as f32,
-        (dy + 38) as f32,
-        22.0,
-        th.accent_hi,
+    draw_modal_header(
+        gfx,
+        th,
+        dx,
+        dy,
+        w - 108,
+        &ModalHeader::new(
+            Icon::Plus,
+            22.0,
+            th.accent_hi,
+            th.accent_bg,
+            s.modal_add_device_title,
+        )
+        .compact()
+        .subtitle(s.modal_add_device_subtitle, th.dim),
     );
-    gfx.text(
-        lx + 52,
-        dy + 29,
-        20,
-        FontWeight::Bold,
-        th.text,
-        Align::Left,
-        s.modal_add_device_title,
-    );
-    gfx.text(
-        lx + 52,
-        dy + 51,
-        13,
-        FontWeight::Regular,
-        th.dim,
-        Align::Left,
-        s.modal_add_device_subtitle,
-    );
-    gfx.line(
-        (dx + 24) as f32,
-        (dy + 70) as f32,
-        (dx + w - 24) as f32,
-        (dy + 70) as f32,
-        1.0,
-        th.border,
-    );
+    draw_modal_separator(gfx, th, dx, dy, w, 70);
 
     // Live Text Input Box (y = dy + 80..128)
     let box_y = dy + 80;

@@ -5,17 +5,16 @@ use crate::domain::defaults::ANIMATION_INTERVAL;
 use crate::domain::{ActiveTab, AppState, ModalDialog};
 use crate::infrastructure::VitaFramebuffer;
 use crate::ui::gfx::{Gfx, GFX_H, GFX_W};
+use crate::ui::i18n;
 use crate::ui::modals::{
     render_add_device_modal, render_confirm_delete_share_modal, render_confirm_quit_modal,
     render_confirm_revert_share_modal, render_create_share_modal, render_device_id_modal,
-    render_device_offer_modal, render_folder_offer_modal, render_manage_devices_modal,
-    render_scan_qr_modal,
+    render_manage_devices_modal, render_offer_modal, render_scan_qr_modal,
 };
 use crate::ui::screens::{
     render_dashboard_tab, render_folder_picker_tab, render_log_screen, render_oled_screensaver,
     render_settings_tab, SAVER_H, SAVER_W,
 };
-use crate::ui::strings;
 use crate::ui::theme::UiTheme;
 use crate::ui::widgets::{draw_chrome, draw_toast};
 
@@ -124,15 +123,12 @@ pub fn draw_frame(gfx: &mut Gfx, state: &mut AppState) {
         ModalDialog::ConfirmRevertShare { share_idx } => {
             render_confirm_revert_share_modal(gfx, &th, state, share_idx, &mut hits);
         }
-        ModalDialog::FolderOffer { offer_idx } => {
-            render_folder_offer_modal(gfx, &th, state, offer_idx, &mut hits);
-        }
-        ModalDialog::DeviceOffer { offer_idx } => {
-            render_device_offer_modal(gfx, &th, state, offer_idx, &mut hits);
+        ModalDialog::FolderOffer { .. } | ModalDialog::DeviceOffer { .. } => {
+            render_offer_modal(gfx, &th, state, &mut hits);
         }
     }
 
-    let s = strings::strings(state.language);
+    let s = i18n::strings(state.language);
     draw_toast(gfx, &th, s, state.toast_msg.as_ref());
     state.hit_map = hits;
 }

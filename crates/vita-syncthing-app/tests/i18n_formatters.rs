@@ -1,12 +1,10 @@
 //! Exact output of the dynamic formatters of `ui::i18n::Strings` in all five languages, of the
-//! English free helpers of `ui::strings`, of the `{placeholder}` filler and of the `Messages`
-//! templates of parameterised `UiText` values.
+//! `{placeholder}` filler and of the `Messages` templates of parameterised `UiText` values.
 
 use syncthing_core::DeviceIdParseError;
 use vita_syncthing_app::domain::{Language, UiText};
 use vita_syncthing_app::ui::i18n::messages::fill;
-use vita_syncthing_app::ui::i18n::{get_strings, strings, Strings};
-use vita_syncthing_app::ui::strings as en_strings;
+use vita_syncthing_app::ui::i18n::{strings, Strings};
 
 const ALL: [Language; 5] = [
     Language::English,
@@ -31,14 +29,9 @@ fn test_fill_replaces_every_occurrence_and_keeps_unknown_keys() {
 }
 
 #[test]
-fn test_get_strings_matches_strings_selector() {
+fn test_catalog_reports_its_language() {
     for lang in ALL {
-        assert_eq!(
-            get_strings(lang).language,
-            lang,
-            "catalog of {lang:?} reports its language"
-        );
-        assert_eq!(strings(lang).language, lang);
+        assert_eq!(strings(lang).language, lang, "catalog of {lang:?}");
     }
 }
 
@@ -250,45 +243,6 @@ fn test_share_title_method_in_every_language() {
             "{lang:?}"
         );
     }
-}
-
-#[test]
-fn test_english_free_helpers_in_ui_strings() {
-    assert_eq!(
-        en_strings::fmt_active_shares_devices(0, 1),
-        "0 active share(s) · 1 known device(s)"
-    );
-    assert_eq!(
-        en_strings::fmt_share_title("Photos", "pics"),
-        "Photos  ·  pics"
-    );
-    assert_eq!(
-        en_strings::fmt_template_sub("pics", "ux0:p"),
-        "ID: pics  ·  Path: ux0:p"
-    );
-    assert_eq!(en_strings::fmt_short_id_label("ABC"), "Short ID: ABC");
-    assert_eq!(
-        en_strings::fmt_picker_target("Photos", "pics"),
-        "For Photos (pics)"
-    );
-    assert_eq!(en_strings::fmt_item_counter(3, 4), "3 / 4");
-    assert_eq!(en_strings::fmt_declined_summary(1, "x"), "1 declined: x");
-    assert_eq!(
-        en_strings::fmt_files_kept_on_vita("ux0:m"),
-        "Files in ux0:m are kept on the PS Vita."
-    );
-    assert_eq!(en_strings::fmt_devices_for_share("T"), "Devices for T");
-    assert_eq!(
-        en_strings::fmt_folder_offer_sub("PC"),
-        "PC wants to share a folder with this PS Vita"
-    );
-    assert_eq!(en_strings::fmt_offers_waiting(2), "2 more offer(s) waiting");
-    assert_eq!(
-        en_strings::fmt_saver_syncing(Some(7), "f"),
-        "Syncing 7% · f"
-    );
-    assert_eq!(en_strings::fmt_saver_syncing(None, "f"), "Syncing · f");
-    assert_eq!(en_strings::fmt_saver_uploading("f"), "Uploading · f");
 }
 
 #[test]

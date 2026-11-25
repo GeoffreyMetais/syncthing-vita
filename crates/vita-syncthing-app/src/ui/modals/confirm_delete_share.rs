@@ -4,7 +4,7 @@ use super::confirm_frame::{draw_confirm_frame, draw_confirm_lines, ConfirmFrame,
 use crate::domain::interaction::HitMap;
 use crate::domain::AppState;
 use crate::ui::gfx::{rgba, FontWeight, Gfx, Icon};
-use crate::ui::strings;
+use crate::ui::i18n;
 use crate::ui::theme::{UiTheme, C_BAD};
 
 /// Renders the `ConfirmDeleteShare` modal for `shares[share_idx]`.
@@ -15,7 +15,7 @@ pub fn render_confirm_delete_share_modal(
     share_idx: usize,
     hits: &mut HitMap,
 ) {
-    let s = strings::strings(state.language);
+    let s = i18n::strings(state.language);
     // Wide enough for the longest subtitle (Spanish) next to the icon.
     let w = 620;
     let frame = ConfirmFrame {

@@ -9,7 +9,7 @@
 //! - `confirm_quit`: Application exit confirmation modal (`ConfirmQuit`)
 //! - `confirm_delete_share`: Share deletion confirmation modal (`ConfirmDeleteShare`)
 //! - `confirm_revert_share`: Read-only share revert confirmation modal (`ConfirmRevertShare`)
-//! - `folder_offer`: Consent dialog for a folder offered by a remote device (`FolderOffer`)
+//! - `offer`: Consent dialog shared by `FolderOffer` and `DeviceOffer`
 
 pub mod add_device;
 pub mod confirm_delete_share;
@@ -18,10 +18,9 @@ pub mod confirm_quit;
 pub mod confirm_revert_share;
 pub mod create_share;
 pub mod device_id;
-pub mod device_offer;
 pub mod fallback_keyboard;
-pub mod folder_offer;
 pub mod manage_devices;
+pub mod offer;
 pub mod scan_qr;
 
 pub use add_device::render_add_device_modal;
@@ -30,7 +29,6 @@ pub use confirm_quit::render_confirm_quit_modal;
 pub use confirm_revert_share::render_confirm_revert_share_modal;
 pub use create_share::render_create_share_modal;
 pub use device_id::render_device_id_modal;
-pub use device_offer::render_device_offer_modal;
-pub use folder_offer::render_folder_offer_modal;
 pub use manage_devices::render_manage_devices_modal;
+pub use offer::render_offer_modal;
 pub use scan_qr::render_scan_qr_modal;
