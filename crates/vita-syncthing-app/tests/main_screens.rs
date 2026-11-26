@@ -13,7 +13,7 @@ use vita_syncthing_app::domain::{
 use vita_syncthing_app::infrastructure::{ConfigRepository, BTN_SQUARE, BTN_START, BTN_TRIANGLE};
 use vita_syncthing_app::ui::gfx::{Gfx, GFX_H, GFX_W};
 use vita_syncthing_app::ui::renderer::draw_frame;
-use vita_syncthing_app::ui::theme::{UiTheme, C_PROGRESS_TRACK, HINT_Y, SIDEBAR_W};
+use vita_syncthing_app::ui::theme::{UiTheme, HINT_Y, SIDEBAR_W};
 
 const PEER: DeviceId = DeviceId([0x42; 32]);
 const LANGUAGES: [Language; 5] = [
@@ -148,9 +148,9 @@ fn test_sidebar_tabs_and_transfer_card() {
 fn transfer_bar_drawn(state: &mut AppState, card: Rect) -> bool {
     let mut gfx = Gfx::new();
     draw_frame(&mut gfx, state);
-    (card.y + 64..card.y + 72).any(|y| {
-        (24..SIDEBAR_W - 64).any(|x| gfx.pixels[(y * GFX_W + x) as usize] == C_PROGRESS_TRACK)
-    })
+    let track = UiTheme::for_mode(state.theme_mode).track;
+    (card.y + 64..card.y + 72)
+        .any(|y| (24..SIDEBAR_W - 64).any(|x| gfx.pixels[(y * GFX_W + x) as usize] == track))
 }
 
 /// Draws the frame and tells whether the transfer card's `Sync now` button is drawn.

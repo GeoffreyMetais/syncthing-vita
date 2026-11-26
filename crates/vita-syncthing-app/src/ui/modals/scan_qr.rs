@@ -6,7 +6,7 @@ use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton};
 use crate::ui::i18n;
 use crate::ui::i18n::messages::fill;
 use crate::ui::image::draw_gray_image;
-use crate::ui::theme::{scan_qr_modal_rect, UiTheme, C_WARN, SCAN_QR_VIEW_H, SCAN_QR_VIEW_W};
+use crate::ui::theme::{scan_qr_modal_rect, UiTheme, SCAN_QR_VIEW_H, SCAN_QR_VIEW_W};
 use crate::ui::widgets::{
     action_width, draw_modal_card, draw_modal_header, draw_press_button, draw_press_hints,
     ModalHeader,
@@ -73,7 +73,7 @@ fn draw_viewfinder(gfx: &mut Gfx, th: &UiTheme, state: &AppState, vx: i32, vy: i
             vw - 32,
             15,
             FontWeight::Medium,
-            C_WARN,
+            th.warn,
             Align::Center,
             &msg,
         );

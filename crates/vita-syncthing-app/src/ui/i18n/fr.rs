@@ -122,6 +122,8 @@ pub static STRINGS_FR: Strings = Strings {
     settings_label_colour_theme: "Thème de couleur",
     settings_desc_theme_dark: "Sombre — Aspect bleu ardoise VitaSend avec accent turquoise",
     settings_desc_theme_oled: "OLED — Fond noir pur (économise la batterie PS Vita OLED)",
+    settings_desc_theme_syncthing_dark: "Syncthing Sombre — Palette sombre officielle Syncthing",
+    settings_desc_theme_syncthing_light: "Syncthing Clair — Palette claire officielle Syncthing",
     settings_saver_auto_hint:
         "L'économiseur d'écran OLED s'active après 10s en sync (30s au repos).",
     settings_sec_devices: "APPAREILS & APPAIRAGE",
@@ -253,6 +255,8 @@ pub static MESSAGES_FR: Messages = Messages {
     syncing_with_peers: "Synchronisation avec les pairs du LAN...",
     theme_dark: "Thème : Sombre (bleu-gris)",
     theme_oled: "Thème : OLED (noir pur #000000)",
+    theme_syncthing_dark: "Thème : Syncthing Sombre",
+    theme_syncthing_light: "Thème : Syncthing Clair",
     language_changed: "Langue : {name}",
     device_linked: "{device} ajouté à « {share} »",
     device_unlinked: "{device} retiré de « {share} »",

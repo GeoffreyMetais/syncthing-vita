@@ -4,9 +4,9 @@
 use super::confirm_frame::{draw_confirm_frame, draw_confirm_lines, ConfirmFrame, CONFIRM_PAD_X};
 use crate::domain::interaction::HitMap;
 use crate::domain::AppState;
-use crate::ui::gfx::{rgba, FontWeight, Gfx, Icon};
+use crate::ui::gfx::{with_alpha, FontWeight, Gfx, Icon};
 use crate::ui::i18n;
-use crate::ui::theme::{UiTheme, C_WARN};
+use crate::ui::theme::UiTheme;
 
 /// Renders the `ConfirmRevertShare` modal for `shares[share_idx]`.
 pub fn render_confirm_revert_share_modal(
@@ -21,8 +21,8 @@ pub fn render_confirm_revert_share_modal(
     let frame = ConfirmFrame {
         size: (w, 246),
         icon: Icon::Refresh,
-        icon_colour: C_WARN,
-        icon_disc: rgba(255, 183, 77, 42),
+        icon_colour: th.warn,
+        icon_disc: with_alpha(th.warn, 42),
         title: s.modal_revert_title,
         subtitle: s.modal_revert_subtitle,
         confirm_label: s.action_revert,
@@ -47,7 +47,7 @@ pub fn render_confirm_revert_share_modal(
                     th.accent_hi,
                     &share.target_path,
                 ),
-                (line_y(2), 14, FontWeight::Regular, C_WARN, added),
+                (line_y(2), 14, FontWeight::Regular, th.warn, added),
                 (line_y(3), 14, FontWeight::Regular, th.dim, restored),
             ],
         );

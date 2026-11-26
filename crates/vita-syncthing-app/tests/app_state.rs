@@ -249,6 +249,12 @@ fn test_toggle_theme_switches_and_announces_the_new_theme() {
     assert_eq!(s.theme_mode, ThemeMode::Dark);
     assert_eq!(s.toast_msg, Some((UiText::ThemeDark, 110)));
     s.toggle_theme();
+    assert_eq!(s.theme_mode, ThemeMode::SyncthingDark);
+    assert_eq!(s.toast_msg, Some((UiText::ThemeSyncthingDark, 110)));
+    s.toggle_theme();
+    assert_eq!(s.theme_mode, ThemeMode::SyncthingLight);
+    assert_eq!(s.toast_msg, Some((UiText::ThemeSyncthingLight, 110)));
+    s.toggle_theme();
     assert_eq!(s.theme_mode, ThemeMode::Oled);
     assert_eq!(s.toast_msg, Some((UiText::ThemeOled, 110)));
 }

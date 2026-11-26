@@ -104,12 +104,24 @@ fn test_theme_mode_default_codes_and_parsing() {
     assert_eq!(ThemeMode::default(), ThemeMode::Oled);
     assert_eq!(ThemeMode::Dark.as_str(), "dark");
     assert_eq!(ThemeMode::Oled.as_str(), "oled");
+    assert_eq!(ThemeMode::SyncthingDark.as_str(), "syncthing-dark");
+    assert_eq!(ThemeMode::SyncthingLight.as_str(), "syncthing-light");
     assert_eq!(ThemeMode::parse("DARK"), Some(ThemeMode::Dark));
     assert_eq!(ThemeMode::parse(" 0 "), Some(ThemeMode::Dark));
     assert_eq!(ThemeMode::parse("oled"), Some(ThemeMode::Oled));
     assert_eq!(ThemeMode::parse("1"), Some(ThemeMode::Oled));
+    assert_eq!(
+        ThemeMode::parse("syncthing-dark"),
+        Some(ThemeMode::SyncthingDark)
+    );
+    assert_eq!(ThemeMode::parse("2"), Some(ThemeMode::SyncthingDark));
+    assert_eq!(
+        ThemeMode::parse("syncthing-light"),
+        Some(ThemeMode::SyncthingLight)
+    );
+    assert_eq!(ThemeMode::parse("3"), Some(ThemeMode::SyncthingLight));
     assert_eq!(ThemeMode::parse("light"), None);
-    assert_eq!(ThemeMode::parse("2"), None);
+    assert_eq!(ThemeMode::parse("4"), None);
 }
 
 #[test]

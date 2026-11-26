@@ -966,6 +966,18 @@ impl Gfx {
     }
 
     pub fn pad_button(&mut self, b: PadButton, cx: i32, cy: i32, size: i32) -> i32 {
+        self.pad_button_themed(b, cx, cy, size, rgb(214, 222, 234), rgb(84, 94, 110))
+    }
+
+    pub fn pad_button_themed(
+        &mut self,
+        b: PadButton,
+        cx: i32,
+        cy: i32,
+        size: i32,
+        dpad_on: Color,
+        dpad_off: Color,
+    ) -> i32 {
         let w = Self::pad_button_width(b, size);
         let r = (size as f32) * 0.5;
         let col = Self::pad_color(b);
@@ -1043,8 +1055,6 @@ impl Gfx {
                 );
             }
             PadButton::Dpad | PadButton::DpadLr | PadButton::DpadUd => {
-                let on = rgb(214, 222, 234);
-                let off = rgb(84, 94, 110);
                 let th = (r * 0.62) as i32;
                 let ri = r as i32;
                 self.rrect(
@@ -1053,7 +1063,11 @@ impl Gfx {
                     ri * 2,
                     th,
                     th / 3,
-                    if b == PadButton::DpadUd { off } else { on },
+                    if b == PadButton::DpadUd {
+                        dpad_off
+                    } else {
+                        dpad_on
+                    },
                 );
                 self.rrect(
                     cx - th / 2,
@@ -1061,7 +1075,11 @@ impl Gfx {
                     th,
                     ri * 2,
                     th / 3,
-                    if b == PadButton::DpadLr { off } else { on },
+                    if b == PadButton::DpadLr {
+                        dpad_off
+                    } else {
+                        dpad_on
+                    },
                 );
             }
         }

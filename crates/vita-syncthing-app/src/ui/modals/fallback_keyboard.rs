@@ -3,8 +3,8 @@
 
 use crate::domain::interaction::{HitMap, UiAction};
 use crate::domain::ADD_DEVICE_KEYPAD;
-use crate::ui::gfx::{rgba, Align, Color, FontWeight, Gfx};
-use crate::ui::theme::{UiTheme, C_GOOD};
+use crate::ui::gfx::{Align, Color, FontWeight, Gfx};
+use crate::ui::theme::UiTheme;
 use crate::ui::widgets::declare_touch;
 
 /// Grid layout constants for the 36-key (9x4) Base32 keypad.
@@ -23,9 +23,9 @@ pub fn keypad_button_colors(th: &UiTheme, label: &str, is_sel: bool) -> (Color, 
     let bg = if is_sel {
         th.accent
     } else if is_add {
-        rgba(38, 166, 154, 48)
+        th.accent_bg
     } else if is_action {
-        rgba(255, 255, 255, 16)
+        th.btn
     } else {
         th.bg
     };
@@ -33,7 +33,7 @@ pub fn keypad_button_colors(th: &UiTheme, label: &str, is_sel: bool) -> (Color, 
     let fg = if is_sel {
         th.on_accent
     } else if is_add {
-        C_GOOD
+        th.good
     } else if is_action {
         th.accent_hi
     } else {
@@ -55,6 +55,7 @@ pub fn draw_fallback_keypad(
     selected_idx: usize,
     ime_active: bool,
 ) {
+    let key_r = th.button_radius.min(8);
     for (idx, &label) in ADD_DEVICE_KEYPAD.iter().enumerate() {
         let col = (idx % KEYPAD_COLS) as i32;
         let row = (idx / KEYPAD_COLS) as i32;
@@ -73,8 +74,8 @@ pub fn draw_fallback_keypad(
 
         let (bg, fg, outline) = keypad_button_colors(th, label, is_sel);
 
-        gfx.rrect(kx, ky, KEYPAD_CELL_W, KEYPAD_CELL_H, 8, bg);
-        gfx.rrect_outline(kx, ky, KEYPAD_CELL_W, KEYPAD_CELL_H, 8, 1, outline);
+        gfx.rrect(kx, ky, KEYPAD_CELL_W, KEYPAD_CELL_H, key_r, bg);
+        gfx.rrect_outline(kx, ky, KEYPAD_CELL_W, KEYPAD_CELL_H, key_r, 1, outline);
         gfx.text(
             kx + KEYPAD_CELL_W / 2,
             ky + KEYPAD_CELL_H / 2,

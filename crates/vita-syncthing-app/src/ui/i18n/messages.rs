@@ -57,6 +57,8 @@ pub struct Messages {
     pub syncing_with_peers: &'static str,
     pub theme_dark: &'static str,
     pub theme_oled: &'static str,
+    pub theme_syncthing_dark: &'static str,
+    pub theme_syncthing_light: &'static str,
     /// `{name}` (native language name).
     pub language_changed: &'static str,
     /// `{device}`, `{share}`.
@@ -193,6 +195,8 @@ impl Strings {
             UiText::SyncingWithPeers => m.syncing_with_peers,
             UiText::ThemeDark => m.theme_dark,
             UiText::ThemeOled => m.theme_oled,
+            UiText::ThemeSyncthingDark => m.theme_syncthing_dark,
+            UiText::ThemeSyncthingLight => m.theme_syncthing_light,
             UiText::OwnDeviceId => m.own_device_id,
             UiText::QrNotDeviceId => m.qr_not_device_id,
             UiText::FolderProtected => m.folder_protected,

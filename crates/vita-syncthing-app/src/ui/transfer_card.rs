@@ -5,7 +5,7 @@
 use crate::domain::{AppState, HitMap, Hotspot, NavFocus, Rect, SyncActivity, UiAction};
 use crate::ui::gfx::{with_alpha, Align, FontWeight, Gfx, Icon};
 use crate::ui::i18n::Strings;
-use crate::ui::theme::{UiTheme, C_GOOD, HINT_Y, SIDEBAR_W};
+use crate::ui::theme::{UiTheme, HINT_Y, SIDEBAR_W};
 use crate::ui::widgets::{draw_indeterminate_progress, draw_progress};
 
 /// Left edge, width and height of the card.
@@ -35,7 +35,8 @@ pub fn draw_transfer_card(
         SyncActivity::Downloading | SyncActivity::Uploading
     );
 
-    gfx.rrect(CARD_X, card_y, CARD_W, CARD_H, 12, th.card);
+    let card_r = th.card_radius.min(12);
+    gfx.rrect(CARD_X, card_y, CARD_W, CARD_H, card_r, th.card);
     if !syncing {
         hits.add(Hotspot {
             rect: Rect::new(CARD_X, card_y, CARD_W, CARD_H),
@@ -44,13 +45,13 @@ pub fn draw_transfer_card(
             shortcut: None,
         });
     }
-    gfx.rrect_outline(CARD_X, card_y, CARD_W, CARD_H, 12, 1, th.border);
+    gfx.rrect_outline(CARD_X, card_y, CARD_W, CARD_H, card_r, 1, th.border);
 
     let focused = state.nav.focus == NavFocus::SyncCard;
     match activity {
         SyncActivity::Ready => {
             draw_sync_button(gfx, th, s, card_y, focused);
-            draw_ready(gfx, s, card_y);
+            draw_ready(gfx, th, s, card_y);
         }
         SyncActivity::Idle => {
             draw_sync_button(gfx, th, s, card_y, focused);
@@ -68,26 +69,28 @@ pub fn draw_transfer_card(
     }
 }
 
-/// Draws the `Sync now` pill button at the top of the card.
+/// Draws the `Sync now` button at the top of the card.
 fn draw_sync_button(gfx: &mut Gfx, th: &UiTheme, s: &Strings, card_y: i32, focused: bool) {
     let cta_y = card_y + 12;
-    gfx.rrect(INNER_X, cta_y, INNER_W, CTA_H, CTA_H / 2, th.accent_bg);
+    let btn_r = th.button_radius.min(CTA_H / 2);
+    gfx.rrect(INNER_X, cta_y, INNER_W, CTA_H, btn_r, th.accent_bg);
     gfx.rrect_outline(
         INNER_X,
         cta_y,
         INNER_W,
         CTA_H,
-        CTA_H / 2,
+        btn_r,
         1,
         with_alpha(th.accent, 160),
     );
     if focused {
+        let focus_r = (btn_r + 3).min((CTA_H + 6) / 2);
         gfx.rrect_outline(
             INNER_X - 3,
             cta_y - 3,
             INNER_W + 6,
             CTA_H + 6,
-            (CTA_H + 6) / 2,
+            focus_r,
             2,
             th.accent_hi,
         );
@@ -122,16 +125,16 @@ fn draw_sync_button(gfx: &mut Gfx, th: &UiTheme, s: &Strings, card_y: i32, focus
 }
 
 /// Connected and up to date: green check and "Ready" below the `Sync now` button.
-fn draw_ready(gfx: &mut Gfx, s: &Strings, card_y: i32) {
+fn draw_ready(gfx: &mut Gfx, th: &UiTheme, s: &Strings, card_y: i32) {
     let cy = card_y + 62;
-    gfx.icon(Icon::Check, (INNER_X + 9) as f32, cy as f32, 18.0, C_GOOD);
+    gfx.icon(Icon::Check, (INNER_X + 9) as f32, cy as f32, 18.0, th.good);
     gfx.text_fit(
         INNER_X + 24,
         cy,
         INNER_W - 24,
         15,
         FontWeight::Medium,
-        C_GOOD,
+        th.good,
         Align::Left,
         s.status_ready,
     );
@@ -186,12 +189,22 @@ fn draw_bar(gfx: &mut Gfx, th: &UiTheme, state: &AppState, card_y: i32, pct: Opt
     let pct_str = match pct {
         Some(p) => {
             let p = p.min(100);
-            draw_progress(gfx, INNER_X, card_y + 64, SIDEBAR_W - 88, 8, p, th.accent);
+            draw_progress(
+                gfx,
+                th,
+                INNER_X,
+                card_y + 64,
+                SIDEBAR_W - 88,
+                8,
+                p,
+                th.accent,
+            );
             format!("{}%", p)
         }
         None => {
             draw_indeterminate_progress(
                 gfx,
+                th,
                 INNER_X,
                 card_y + 64,
                 SIDEBAR_W - 88,

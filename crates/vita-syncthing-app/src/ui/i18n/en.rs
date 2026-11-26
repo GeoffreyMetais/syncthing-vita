@@ -121,6 +121,8 @@ pub static STRINGS_EN: Strings = Strings {
     settings_label_colour_theme: "Colour Theme",
     settings_desc_theme_dark: "Dark — Blue-grey look with teal accent",
     settings_desc_theme_oled: "OLED — Pure black background (saves PS Vita OLED battery)",
+    settings_desc_theme_syncthing_dark: "Syncthing Dark — Official Syncthing dark palette",
+    settings_desc_theme_syncthing_light: "Syncthing Light — Official Syncthing light palette",
     settings_saver_auto_hint:
         "OLED Screensaver activates automatically after 10s during sync (30s when idle).",
     settings_sec_devices: "DEVICES & PAIRING",
@@ -251,6 +253,8 @@ pub static MESSAGES_EN: Messages = Messages {
     syncing_with_peers: "Synchronizing with LAN peers...",
     theme_dark: "Theme: Dark (blue-grey)",
     theme_oled: "Theme: OLED (pure black #000000)",
+    theme_syncthing_dark: "Theme: Syncthing Dark",
+    theme_syncthing_light: "Theme: Syncthing Light",
     language_changed: "Language: {name}",
     device_linked: "Added {device} to '{share}'",
     device_unlinked: "Removed {device} from '{share}'",

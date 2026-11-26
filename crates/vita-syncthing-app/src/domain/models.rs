@@ -134,23 +134,39 @@ pub enum ThemeMode {
     Dark = 0,
     #[default]
     Oled = 1,
+    SyncthingDark = 2,
+    SyncthingLight = 3,
 }
 
 impl ThemeMode {
+    /// Cycles `Oled -> Dark -> SyncthingDark -> SyncthingLight -> Oled`.
+    pub const fn next(self) -> Self {
+        match self {
+            Self::Oled => Self::Dark,
+            Self::Dark => Self::SyncthingDark,
+            Self::SyncthingDark => Self::SyncthingLight,
+            Self::SyncthingLight => Self::Oled,
+        }
+    }
+
     /// Returns the lowercase ASCII identifier for configuration files.
     pub const fn as_str(&self) -> &'static str {
         match self {
             Self::Dark => "dark",
             Self::Oled => "oled",
+            Self::SyncthingDark => "syncthing-dark",
+            Self::SyncthingLight => "syncthing-light",
         }
     }
 
     /// Parses a theme mode identifier (case-insensitive, trimmed).
-    /// Accepts `"dark"`, `"0"`, `"oled"`, `"1"`.
+    /// Accepts `"dark"`/`"0"`, `"oled"`/`"1"`, `"syncthing-dark"`/`"2"`, `"syncthing-light"`/`"3"`.
     pub fn parse(s: &str) -> Option<Self> {
         match s.trim().to_ascii_lowercase().as_str() {
             "dark" | "0" => Some(Self::Dark),
             "oled" | "1" => Some(Self::Oled),
+            "syncthing-dark" | "syncthing_dark" | "2" => Some(Self::SyncthingDark),
+            "syncthing-light" | "syncthing_light" | "3" => Some(Self::SyncthingLight),
             _ => None,
         }
     }

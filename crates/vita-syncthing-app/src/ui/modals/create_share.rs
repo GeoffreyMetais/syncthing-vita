@@ -4,7 +4,7 @@ use crate::domain::interaction::{HitMap, PadKey, UiAction};
 use crate::domain::{AppState, NEW_SHARE_TEMPLATES};
 use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton};
 use crate::ui::i18n;
-use crate::ui::theme::{UiTheme, C_GOOD};
+use crate::ui::theme::UiTheme;
 use crate::ui::widgets::{
     declare_touch, draw_modal_card, draw_modal_header, draw_modal_separator, draw_press_hints,
     ModalHeader,
@@ -42,6 +42,7 @@ pub fn render_create_share_modal(
     );
     draw_modal_separator(gfx, th, dx, dy, w, 76);
 
+    let row_r = th.card_radius.min(10);
     for (i, &(fid, label, path)) in NEW_SHARE_TEMPLATES.iter().enumerate() {
         let ry = dy + 90 + (i as i32) * 50;
         let cy = ry + 21;
@@ -50,7 +51,7 @@ pub fn render_create_share_modal(
         let is_sel = i == selected_idx;
 
         if is_sel {
-            gfx.rrect(lx, ry, w - 56, 44, 10, th.accent_bg);
+            gfx.rrect(lx, ry, w - 56, 44, row_r, th.accent_bg);
             gfx.rrect(lx, ry + 9, 4, 26, 2, th.accent);
         }
 
@@ -65,7 +66,7 @@ pub fn render_create_share_modal(
             (lx + 24) as f32,
             cy as f32,
             22.0,
-            if is_browse { C_GOOD } else { th.accent_hi },
+            if is_browse { th.good } else { th.accent_hi },
         );
 
         gfx.text(

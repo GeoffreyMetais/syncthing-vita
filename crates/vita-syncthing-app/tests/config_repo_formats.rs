@@ -289,10 +289,22 @@ fn test_theme_cfg_exact_format_and_defaults() {
     assert_eq!(read(&dir, "theme.cfg"), "oled\n");
     assert_eq!(repo.load_theme(), ThemeMode::Oled);
 
+    repo.save_theme(ThemeMode::SyncthingDark);
+    assert_eq!(read(&dir, "theme.cfg"), "syncthing-dark\n");
+    assert_eq!(repo.load_theme(), ThemeMode::SyncthingDark);
+
+    repo.save_theme(ThemeMode::SyncthingLight);
+    assert_eq!(read(&dir, "theme.cfg"), "syncthing-light\n");
+    assert_eq!(repo.load_theme(), ThemeMode::SyncthingLight);
+
     write(&dir, "theme.cfg", "  DARK  \n");
     assert_eq!(repo.load_theme(), ThemeMode::Dark);
     write(&dir, "theme.cfg", "0\n");
     assert_eq!(repo.load_theme(), ThemeMode::Dark);
+    write(&dir, "theme.cfg", "2\n");
+    assert_eq!(repo.load_theme(), ThemeMode::SyncthingDark);
+    write(&dir, "theme.cfg", "3\n");
+    assert_eq!(repo.load_theme(), ThemeMode::SyncthingLight);
     write(&dir, "theme.cfg", "purple\n");
     assert_eq!(
         repo.load_theme(),

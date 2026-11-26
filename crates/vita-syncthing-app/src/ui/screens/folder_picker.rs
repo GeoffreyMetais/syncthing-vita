@@ -6,9 +6,7 @@ use crate::domain::{
 };
 use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton};
 use crate::ui::i18n;
-use crate::ui::theme::{
-    UiTheme, BROWSER_STEP, BROWSER_TOP, CONTENT_R, CONTENT_W, CONTENT_X, C_GOOD,
-};
+use crate::ui::theme::{UiTheme, BROWSER_STEP, BROWSER_TOP, CONTENT_R, CONTENT_W, CONTENT_X};
 use crate::ui::widgets::{
     action_width, draw_action_hotspot, draw_card, draw_chip, draw_hint_bar, draw_page_title,
     draw_scrollbar, Hint,
@@ -115,7 +113,7 @@ pub fn render_folder_picker_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState, h
                 y,
                 CONTENT_W - 14,
                 BROWSER_ROW_H,
-                10,
+                th.card_radius.min(10),
                 th.accent_bg,
             );
             gfx.rrect(CONTENT_X, y + 8, 4, 22, 2, th.accent);
@@ -131,7 +129,7 @@ pub fn render_folder_picker_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState, h
         let ic_col = if item.is_shared {
             th.faint
         } else if item.is_preset {
-            C_GOOD
+            th.good
         } else {
             th.accent_hi
         };
@@ -151,7 +149,7 @@ pub fn render_folder_picker_tab(gfx: &mut Gfx, th: &UiTheme, state: &AppState, h
             focus: Some(FocusSlot::RowAction { row: idx, col: 0 }),
             shortcut: None,
         });
-        let bw = draw_chip(gfx, CONTENT_R - 26, cy, badge, ic_col);
+        let bw = draw_chip(gfx, th, CONTENT_R - 26, cy, badge, ic_col);
         if !item.is_shared && !item.is_preset {
             let chip_x = CONTENT_R - 26 - bw - CHIP_TOUCH_MARGIN;
             hits.add(Hotspot {

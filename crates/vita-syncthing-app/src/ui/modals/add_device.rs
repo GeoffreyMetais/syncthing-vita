@@ -8,7 +8,7 @@ use crate::domain::AppState;
 use crate::ui::gfx::{Align, FontWeight, Gfx, Icon, PadButton};
 use crate::ui::i18n;
 use crate::ui::i18n::messages::fill;
-use crate::ui::theme::{add_device_modal_height, UiTheme, C_GOOD, C_WARN};
+use crate::ui::theme::{add_device_modal_height, UiTheme};
 use crate::ui::widgets::{
     action_width, declare_touch, draw_modal_card, draw_modal_header, draw_modal_separator,
     draw_press_button, draw_press_hints, ModalHeader,
@@ -51,21 +51,22 @@ pub fn render_add_device_modal(
     // Live Text Input Box (y = dy + 80..128)
     let box_y = dy + 80;
     let box_h = 48;
+    let box_r = th.card_radius.min(10);
     let id_part = state.device_id_input.split('@').next().unwrap_or("").trim();
     let parse_res = DeviceId::parse_user_id(id_part);
     let border_col = if state.device_id_input.trim().is_empty() {
         th.accent
     } else if parse_res.is_ok() {
-        C_GOOD
+        th.good
     } else {
-        C_WARN
+        th.warn
     };
 
-    gfx.rrect(lx, box_y, content_w, box_h, 10, th.bg);
+    gfx.rrect(lx, box_y, content_w, box_h, box_r, th.bg);
     // Touching the text box opens the system keyboard (its `Virtual Keyboard` button,
     // declared below, sits on top of it).
     declare_touch(hits, lx, box_y, content_w, box_h, UiAction::OpenKeyboard);
-    gfx.rrect_outline(lx, box_y, content_w, box_h, 10, 1, border_col);
+    gfx.rrect_outline(lx, box_y, content_w, box_h, box_r, 1, border_col);
 
     let kbd_lbl = if keypad {
         s.action_hide_keyboard
@@ -127,7 +128,7 @@ pub fn render_add_device_modal(
                                 ("addr", &peer.address),
                             ],
                         ),
-                        C_GOOD,
+                        th.good,
                     )
                 } else if parsed_id.is_short_placeholder() {
                     (
@@ -138,7 +139,7 @@ pub fn render_add_device_modal(
                                 ("short", &parsed_id.short()),
                             ],
                         ),
-                        C_GOOD,
+                        th.good,
                     )
                 } else {
                     (
@@ -146,11 +147,11 @@ pub fn render_add_device_modal(
                             s.messages.add_device_valid_full,
                             &[("short", &parsed_id.short())],
                         ),
-                        C_GOOD,
+                        th.good,
                     )
                 }
             }
-            Err(err) => (s.device_id_error(err), C_WARN),
+            Err(err) => (s.device_id_error(err), th.warn),
         }
     };
     gfx.text_fit(
